@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM python:3.9-slim
 
 # Set up a new user 'user' with UID 1000 for security
 RUN useradd -m -u 1000 user
