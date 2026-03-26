@@ -16,142 +16,130 @@ def get_dashboard_data(
     db: Session = Depends(get_db)
 ):
     try:
-        # --- Base filters ---
-        # PostgreSQL extract returns a float/numeric, comparing with int is usually fine
-        # but let's be explicit and cast or handle types carefully.
-        
-        # Base queries
-        q_kontrak = db.query(models.Kontrak).filter(func.extract('year', models.Kontrak.tanggal_kontrak) == year)
-        q_invoice = db.query(models.Invoice).filter(func.extract('year', models.Invoice.tanggal_transaksi) == year)
-        q_do = db.query(models.DeliveryOrder).filter(func.extract('year', models.DeliveryOrder.tanggal_do) == year)
-        q_b = db.query(models.LaporanBypass).filter(func.extract('year', models.LaporanBypass.tanggal) == year)
+        # Base queries for filtering
+        base_kontrak = db.query(models.Kontrak).filter(func.extract('year', models.Kontrak.tanggal_kontrak) == year)
+        base_invoice = db.query(models.Invoice).filter(func.extract('year', models.Invoice.tanggal_transaksi) == year)
+        base_do = db.query(models.DeliveryOrder).filter(func.extract('year', models.DeliveryOrder.tanggal_do) == year)
+        base_bypass = db.query(models.LaporanBypass).filter(func.extract('year', models.LaporanBypass.tanggal) == year)
 
-        # Apply Unit filter
         if unit != "ALL":
-            q_kontrak = q_kontrak.filter(models.Kontrak.kebun_produsen == unit)
-            q_invoice = q_invoice.filter(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit))
-            q_do = q_do.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit)))
-            q_b = q_b.filter(models.LaporanBypass.unit == unit)
+            base_kontrak = base_kontrak.filter(models.Kontrak.kebun_produsen == unit)
+            base_invoice = base_invoice.filter(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit))
+            base_do = base_do.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit)))
+            base_bypass = base_bypass.filter(models.LaporanBypass.unit == unit)
 
-        # Apply Komoditi filter
         if komoditi != "ALL":
-            q_kontrak = q_kontrak.filter(models.Kontrak.komoditi == komoditi)
-            q_invoice = q_invoice.filter(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi))
-            q_do = q_do.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi)))
-            q_b = q_b.filter(models.LaporanBypass.komoditi == komoditi)
+            base_kontrak = base_kontrak.filter(models.Kontrak.komoditi == komoditi)
+            base_invoice = base_invoice.filter(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi))
+            base_do = base_do.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi)))
+            base_bypass = base_bypass.filter(models.LaporanBypass.komoditi == komoditi)
 
-        # --- Aggregations ---
-        total_kontrak = q_kontrak.count()
-        total_invoice = q_invoice.count()
-        total_do = q_do.count() + q_b.count()
+        # 1. Summary Metrics
+        total_kontrak = int(base_kontrak.count())
+        total_invoice = int(base_invoice.count())
+        total_do_count = int(base_do.count() + base_bypass.count())
 
-        # Sum values
-        kontrak_ids = q_kontrak.with_entities(models.Kontrak.no_kontrak)
-        invoice_ids = q_invoice.with_entities(models.Invoice.no_invoice)
-        do_ids = q_do.with_entities(models.DeliveryOrder.no_do)
-        bypass_ids = q_b.with_entities(models.LaporanBypass.id)
+        # Subqueries for sums
+        k_ids = base_kontrak.with_entities(models.Kontrak.no_kontrak)
+        i_ids = base_invoice.with_entities(models.Invoice.no_invoice)
+        d_ids = base_do.with_entities(models.DeliveryOrder.no_do)
+        b_ids = base_bypass.with_entities(models.LaporanBypass.id)
 
-        sum_kontrak = db.query(func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(kontrak_ids)).scalar() or 0.0
-        sum_bypass = db.query(func.sum(models.LaporanBypass.nominal)).filter(models.LaporanBypass.id.in_(bypass_ids)).scalar() or 0.0
-        total_nilai_transaksi = sum_kontrak + sum_bypass
+        sum_k = db.query(func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(k_ids)).scalar() or 0
+        sum_b = db.query(func.sum(models.LaporanBypass.nominal)).filter(models.LaporanBypass.id.in_(b_ids)).scalar() or 0
+        total_nilai_transaksi = float(sum_k) + float(sum_b)
 
-        sum_invoice = db.query(func.sum(models.Invoice.jumlah_pembayaran)).filter(models.Invoice.no_invoice.in_(invoice_ids)).scalar() or 0.0
-        total_nilai_invoice = sum_invoice + sum_bypass
+        sum_i = db.query(func.sum(models.Invoice.jumlah_pembayaran)).filter(models.Invoice.no_invoice.in_(i_ids)).scalar() or 0
+        total_nilai_invoice = float(sum_i) + float(sum_b)
 
-        sum_do = db.query(func.sum(models.DeliveryOrder.nominal_transfer)).filter(models.DeliveryOrder.no_do.in_(do_ids)).scalar() or 0.0
-        total_cash_in = sum_do + sum_bypass
+        sum_d = db.query(func.sum(models.DeliveryOrder.nominal_transfer)).filter(models.DeliveryOrder.no_do.in_(d_ids)).scalar() or 0
+        total_cash_in = float(sum_d) + float(sum_b)
 
-        # --- Charts: Komoditas ---
-        kom_q = db.query(models.Kontrak.komoditi, func.sum(models.Kontrak.volume)).filter(models.Kontrak.no_kontrak.in_(kontrak_ids)).group_by(models.Kontrak.komoditi).all()
-        kom_b_q = db.query(models.LaporanBypass.komoditi, func.count()).filter(models.LaporanBypass.id.in_(bypass_ids)).group_by(models.LaporanBypass.komoditi).all()
+        # 2. Charts: Komoditas
+        kom_res = db.query(models.Kontrak.komoditi, func.sum(models.Kontrak.volume)).filter(models.Kontrak.no_kontrak.in_(k_ids)).group_by(models.Kontrak.komoditi).all()
+        kom_b_res = db.query(models.LaporanBypass.komoditi, func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids)).group_by(models.LaporanBypass.komoditi).all()
         
-        komod_map = {}
-        for k, v in kom_q: komod_map[k] = float(v or 0)
-        for k, v in kom_b_q: komod_map[k] = komod_map.get(k, 0) + float(v or 0)
+        kom_map = {}
+        for k, v in kom_res: kom_map[str(k or "Lainnya")] = float(v or 0)
+        for k, v in kom_b_res: 
+            key = str(k or "Lainnya")
+            kom_map[key] = kom_map.get(key, 0) + float(v or 0)
 
-        # --- Charts: Unit ---
-        unit_q = db.query(models.Kontrak.kebun_produsen, func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(kontrak_ids)).group_by(models.Kontrak.kebun_produsen).all()
-        unit_b_q = db.query(models.LaporanBypass.unit, func.sum(models.LaporanBypass.nominal)).filter(models.LaporanBypass.id.in_(bypass_ids)).group_by(models.LaporanBypass.unit).all()
+        # 3. Charts: Unit
+        unit_res = db.query(models.Kontrak.kebun_produsen, func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(k_ids)).group_by(models.Kontrak.kebun_produsen).all()
+        unit_b_res = db.query(models.LaporanBypass.unit, func.sum(models.LaporanBypass.nominal)).filter(models.LaporanBypass.id.in_(b_ids)).group_by(models.LaporanBypass.unit).all()
         
         unit_map = {}
-        for k, v in unit_q: unit_map[k] = float(v or 0)
-        for k, v in unit_b_q: unit_map[k] = unit_map.get(k, 0) + float(v or 0)
+        for k, v in unit_res: unit_map[str(k or "Lainnya")] = float(v or 0)
+        for k, v in unit_b_res:
+            key = str(k or "Lainnya")
+            unit_map[key] = unit_map.get(key, 0) + float(v or 0)
 
-        # --- Charts: Monthly (Extract Month) ---
-        # We need to make sure we treat bulan as int or string correctly
-        pendapatan_map = {f"{i:02d}": 0.0 for i in range(1, 13)}
-        invoice_map   = {f"{i:02d}": 0.0 for i in range(1, 13)}
-        cashin_map    = {f"{i:02d}": 0.0 for i in range(1, 13)}
+        # 4. Charts: Monthly
+        pend_m = {f"{i:02d}": 0.0 for i in range(1, 13)}
+        inv_m  = {f"{i:02d}": 0.0 for i in range(1, 13)}
+        cash_m = {f"{i:02d}": 0.0 for i in range(1, 13)}
 
         # Contract results
-        mk_q = db.query(func.extract('month', models.Kontrak.tanggal_kontrak), func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(kontrak_ids)).group_by(func.extract('month', models.Kontrak.tanggal_kontrak)).all()
-        for month_num, total in mk_q:
-            if month_num is not None:
-                pendapatan_map[f"{int(month_num):02d}"] += float(total or 0)
+        mk_res = db.query(func.extract('month', models.Kontrak.tanggal_kontrak), func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(k_ids)).group_by(func.extract('month', models.Kontrak.tanggal_kontrak)).all()
+        for m, s in mk_res:
+            if m: pend_m[f"{int(m):02d}"] += float(s or 0)
 
         # Bypass results
-        mb_q = db.query(func.extract('month', models.LaporanBypass.tanggal), func.sum(models.LaporanBypass.nominal)).filter(models.LaporanBypass.id.in_(bypass_ids)).group_by(func.extract('month', models.LaporanBypass.tanggal)).all()
-        for month_num, total in mb_q:
-            if month_num is not None:
-                m_key = f"{int(month_num):02d}"
-                pendapatan_map[m_key] += float(total or 0)
-                invoice_map[m_key] += float(total or 0)
-                cashin_map[m_key] += float(total or 0)
+        mb_res = db.query(func.extract('month', models.LaporanBypass.tanggal), func.sum(models.LaporanBypass.nominal)).filter(models.LaporanBypass.id.in_(b_ids)).group_by(func.extract('month', models.LaporanBypass.tanggal)).all()
+        for m, s in mb_res:
+            if m:
+                key = f"{int(m):02d}"
+                f_val = float(s or 0)
+                pend_m[key] += f_val; inv_m[key] += f_val; cash_m[key] += f_val
 
         # Invoice results
-        mi_q = db.query(func.extract('month', models.Invoice.tanggal_transaksi), func.sum(models.Invoice.jumlah_pembayaran)).filter(models.Invoice.no_invoice.in_(invoice_ids)).group_by(func.extract('month', models.Invoice.tanggal_transaksi)).all()
-        for month_num, total in mi_q:
-            if month_num is not None:
-                invoice_map[f"{int(month_num):02d}"] += float(total or 0)
+        mi_res = db.query(func.extract('month', models.Invoice.tanggal_transaksi), func.sum(models.Invoice.jumlah_pembayaran)).filter(models.Invoice.no_invoice.in_(i_ids)).group_by(func.extract('month', models.Invoice.tanggal_transaksi)).all()
+        for m, s in mi_res:
+            if m: inv_m[f"{int(m):02d}"] += float(s or 0)
 
         # DO results
-        md_q = db.query(func.extract('month', models.DeliveryOrder.tanggal_do), func.sum(models.DeliveryOrder.nominal_transfer)).filter(models.DeliveryOrder.no_do.in_(do_ids)).group_by(func.extract('month', models.DeliveryOrder.tanggal_do)).all()
-        for month_num, total in md_q:
-            if month_num is not None:
-                cashin_map[f"{int(month_num):02d}"] += float(total or 0)
+        md_res = db.query(func.extract('month', models.DeliveryOrder.tanggal_do), func.sum(models.DeliveryOrder.nominal_transfer)).filter(models.DeliveryOrder.no_do.in_(d_ids)).group_by(func.extract('month', models.DeliveryOrder.tanggal_do)).all()
+        for m, s in md_res:
+            if m: cash_m[f"{int(m):02d}"] += float(s or 0)
 
-        # --- Filters Data ---
-        available_years = db.query(func.extract('year', models.Kontrak.tanggal_kontrak)).distinct().all()
-        available_years = sorted([int(y[0]) for y in available_years if y[0]], reverse=True)
-        if year not in available_years: available_years.append(year)
-        available_years = sorted(list(set(available_years)), reverse=True)
+        # 5. Filter lists
+        y_q = db.query(func.extract('year', models.Kontrak.tanggal_kontrak)).distinct().all()
+        avail_y = sorted([int(y[0]) for y in y_q if y[0]], reverse=True)
+        if year not in avail_y: avail_y.insert(0, year)
+        avail_y = sorted(list(set(avail_y)), reverse=True)
 
-        available_units = db.query(models.Kontrak.kebun_produsen).distinct().all()
-        available_units = sorted([u[0] for u in available_units if u[0] and u[0] != "-"])
-
-        available_komoditas = db.query(models.Kontrak.komoditi).distinct().all()
-        available_komoditas = sorted([k[0] for k in available_komoditas if k[0] and k[0] != "-"])
+        avail_u = sorted([str(r[0]) for r in db.query(models.Kontrak.kebun_produsen).distinct().all() if r[0] and r[0] != "-"])
+        avail_k = sorted([str(r[0]) for r in db.query(models.Kontrak.komoditi).distinct().all() if r[0] and r[0] != "-"])
 
         return {
             "summary": {
                 "total_kontrak": total_kontrak,
                 "total_invoice": total_invoice,
-                "total_do": total_do,
+                "total_do": total_do_count,
                 "total_nilai_transaksi": total_nilai_transaksi,
                 "total_nilai_invoice": total_nilai_invoice,
                 "total_cash_in": total_cash_in,
             },
             "charts": {
-                "komoditas": {"labels": list(komod_map.keys()), "values": list(komod_map.values())},
+                "komoditas": {"labels": list(kom_map.keys()), "values": list(kom_map.values())},
                 "unit": {"labels": list(unit_map.keys()), "values": list(unit_map.values())},
                 "bulanan": {
                     "labels": ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"],
-                    "pendapatan": [pendapatan_map[f"{i:02d}"] for i in range(1, 13)],
-                    "invoice": [invoice_map[f"{i:02d}"] for i in range(1, 13)],
-                    "cashin": [cashin_map[f"{i:02d}"] for i in range(1, 13)],
+                    "pendapatan": [pend_m[f"{i:02d}"] for i in range(1, 13)],
+                    "invoice": [inv_m[f"{i:02d}"] for i in range(1, 13)],
+                    "cashin": [cash_m[f"{i:02d}"] for i in range(1, 13)],
                 }
             },
-            "available_years": available_years,
-            "selected_year": year,
-            "available_units": available_units,
-            "selected_unit": unit,
-            "available_komoditas": available_komoditas,
-            "selected_komoditi": komoditi,
+            "available_years": avail_y,
+            "selected_year": int(year),
+            "available_units": avail_u,
+            "selected_unit": str(unit),
+            "available_komoditas": avail_k,
+            "selected_komoditi": str(komoditi),
         }
 
     except Exception as e:
         import traceback
-        error_msg = traceback.format_exc()
-        print(f"DASHBOARD ERROR: {error_msg}")
-        # Return the error in the response so we can see it in the browser console
-        return {"error": str(e), "traceback": error_msg}
+        print(traceback.format_exc())
+        return {"error": str(e)}
