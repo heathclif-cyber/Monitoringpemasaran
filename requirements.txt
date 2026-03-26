@@ -5,3 +5,7 @@ jinja2
 openpyxl
 python-multipart
 pydantic
+psycopg2-binary
+python-dotenv
+Pillow
+python-docx

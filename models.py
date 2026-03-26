@@ -88,7 +88,32 @@ class DeliveryOrder(Base):
     tanggal_pembayaran = Column(Date, nullable=True)
     nominal_transfer = Column(Float, default=0.0)
     
+    # New SAP Fields
+    superman = Column(String, nullable=True)
+    kontrak_sap = Column(String, nullable=True)
+    so_sap = Column(String, nullable=True)
+    do_sap = Column(String, nullable=True)
+    billing_sap = Column(String, nullable=True)
+    
     # Calculated Fields
     selisih = Column(Float, default=0.0)
     
     invoice = relationship("Invoice", back_populates="delivery_orders")
+
+class LaporanBypass(Base):
+    __tablename__ = "laporan_bypass"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    unit = Column(String)
+    komoditi = Column(String)
+    tanggal = Column(Date, nullable=False)
+    nominal = Column(Float, default=0.0)
+    pembeli = Column(String)
+    deskripsi = Column(String)
+    
+    # Optional SAP fields
+    superman = Column(String, nullable=True)
+    kontrak_sap = Column(String, nullable=True)
+    so_sap = Column(String, nullable=True)
+    do_sap = Column(String, nullable=True)
+    billing_sap = Column(String, nullable=True)
