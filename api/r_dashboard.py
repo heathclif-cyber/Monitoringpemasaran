@@ -18,9 +18,9 @@ def get_dashboard_data(
     year_str = str(year)
 
     # Base queries
-    q_kontrak = db.query(models.Kontrak).filter(func.strftime("%Y", models.Kontrak.tanggal_kontrak) == year_str)
-    q_invoice = db.query(models.Invoice).filter(func.strftime("%Y", models.Invoice.tanggal_transaksi) == year_str)
-    q_do = db.query(models.DeliveryOrder).filter(func.strftime("%Y", models.DeliveryOrder.tanggal_do) == year_str)
+    q_kontrak = db.query(models.Kontrak).filter(func.extract('year', models.Kontrak.tanggal_kontrak) == year)
+    q_invoice = db.query(models.Invoice).filter(func.extract('year', models.Invoice.tanggal_transaksi) == year)
+    q_do = db.query(models.DeliveryOrder).filter(func.extract('year', models.DeliveryOrder.tanggal_do) == year)
 
     # Apply Unit filter if not ALL
     if unit != "ALL":
@@ -35,7 +35,7 @@ def get_dashboard_data(
         q_do = q_do.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi)))
 
     # --- 1.2 Bypass Data (e.g. Sawit) ---
-    q_b = db.query(models.LaporanBypass).filter(func.strftime("%Y", models.LaporanBypass.tanggal) == year_str)
+    q_b = db.query(models.LaporanBypass).filter(func.extract('year', models.LaporanBypass.tanggal) == year)
     
     if unit != "ALL":
         q_b = q_b.filter(models.LaporanBypass.unit == unit)
@@ -114,45 +114,52 @@ def get_dashboard_data(
 
     # --- Bulanan ---
     mk_q = db.query(
-        func.strftime("%m", models.Kontrak.tanggal_kontrak).label("bulan"),
+        func.extract('month', models.Kontrak.tanggal_kontrak).label("bulan"),
         func.sum(models.Kontrak.nilai_transaksi).label("total")
     ).filter(
         models.Kontrak.no_kontrak.in_(q_kontrak.with_entities(models.Kontrak.no_kontrak))
-    ).group_by("bulan").all()
+    ).group_by(func.extract('month', models.Kontrak.tanggal_kontrak)).all()
 
     mb_q = db.query(
-        func.strftime("%m", models.LaporanBypass.tanggal).label("bulan"),
+        func.extract('month', models.LaporanBypass.tanggal).label("bulan"),
         func.sum(models.LaporanBypass.nominal).label("total")
     ).filter(
         models.LaporanBypass.id.in_(q_b.with_entities(models.LaporanBypass.id))
-    ).group_by("bulan").all()
+    ).group_by(func.extract('month', models.LaporanBypass.tanggal)).all()
 
     mi_q = db.query(
-        func.strftime("%m", models.Invoice.tanggal_transaksi).label("bulan"),
+        func.extract('month', models.Invoice.tanggal_transaksi).label("bulan"),
         func.sum(models.Invoice.jumlah_pembayaran).label("total")
     ).filter(
         models.Invoice.no_invoice.in_(q_invoice.with_entities(models.Invoice.no_invoice))
-    ).group_by("bulan").all()
+    ).group_by(func.extract('month', models.Invoice.tanggal_transaksi)).all()
 
     md_q = db.query(
-        func.strftime("%m", models.DeliveryOrder.tanggal_do).label("bulan"),
+        func.extract('month', models.DeliveryOrder.tanggal_do).label("bulan"),
         func.sum(models.DeliveryOrder.nominal_transfer).label("total")
     ).filter(
         models.DeliveryOrder.no_do.in_(q_do.with_entities(models.DeliveryOrder.no_do))
-    ).group_by("bulan").all()
+    ).group_by(func.extract('month', models.DeliveryOrder.tanggal_do)).all()
 
     pendapatan_map = {f"{i:02d}": 0.0 for i in range(1, 13)}
     invoice_map   = {f"{i:02d}": 0.0 for i in range(1, 13)}
     cashin_map    = {f"{i:02d}": 0.0 for i in range(1, 13)}
 
-    for r in mk_q: pendapatan_map[r.bulan] += float(r.total or 0)
+    for r in mk_q: 
+        b_key = f"{int(r.bulan):02d}"
+        pendapatan_map[b_key] += float(r.total or 0)
     for r in mb_q: 
-        pendapatan_map[r.bulan] += float(r.total or 0)
-        invoice_map[r.bulan] += float(r.total or 0)
-        cashin_map[r.bulan] += float(r.total or 0) # Bypass is instant cash-in
+        b_key = f"{int(r.bulan):02d}"
+        pendapatan_map[b_key] += float(r.total or 0)
+        invoice_map[b_key] += float(r.total or 0)
+        cashin_map[b_key] += float(r.total or 0) 
 
-    for r in mi_q: invoice_map[r.bulan] += float(r.total or 0)
-    for r in md_q: cashin_map[r.bulan] += float(r.total or 0)
+    for r in mi_q: 
+        b_key = f"{int(r.bulan):02d}"
+        invoice_map[b_key] += float(r.total or 0)
+    for r in md_q: 
+        b_key = f"{int(r.bulan):02d}"
+        cashin_map[b_key] += float(r.total or 0)
 
     bulan_labels = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"]
     bulan_pendapatan = [pendapatan_map[f"{i:02d}"] for i in range(1, 13)]
@@ -160,8 +167,8 @@ def get_dashboard_data(
     bulan_cashin     = [cashin_map[f"{i:02d}"] for i in range(1, 13)]
 
     # Available Filters Extension
-    years_q = db.query(func.strftime("%Y", models.Kontrak.tanggal_kontrak).label("thn")).distinct().all()
-    years_b = db.query(func.strftime("%Y", models.LaporanBypass.tanggal).label("thn")).distinct().all()
+    years_q = db.query(func.extract('year', models.Kontrak.tanggal_kontrak).label("thn")).distinct().all()
+    years_b = db.query(func.extract('year', models.LaporanBypass.tanggal).label("thn")).distinct().all()
     available_years = sorted(set([int(r.thn) for r in (years_q + years_b) if r.thn]))
 
     units_q = db.query(models.Kontrak.kebun_produsen).distinct().all()
