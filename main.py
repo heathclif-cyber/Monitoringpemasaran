@@ -2,6 +2,11 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 import models
 from database import engine
@@ -18,9 +23,15 @@ app = FastAPI(title="PTPN I - Sales Document Automation")
 
 @app.on_event("startup")
 def startup_event():
-    # Create tables on startup to avoid blocking the main import thread
-    # This helps in environments like Hugging Face Spaces where DB connection might be slow
-    models.Base.metadata.create_all(bind=engine)
+    logger.info("Application starting up...")
+    try:
+        # Create tables on startup to avoid blocking the main import thread
+        logger.info("Initializing database tables...")
+        models.Base.metadata.create_all(bind=engine)
+        logger.info("Database initialization complete.")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # We don't raise here so the app can still start and show health check status
 
 os.makedirs("static/css", exist_ok=True)
 os.makedirs("static/js", exist_ok=True)
