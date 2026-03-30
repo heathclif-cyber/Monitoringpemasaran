@@ -4,9 +4,12 @@ emoji: 📊
 colorFrom: blue
 colorTo: indigo
 sdk: docker
-app_port: 7860
 pinned: false
 ---
 
 # Monitoring Pemasaran - PTPN I
-Sales Monitoring System for PTPN I Regional 8.
+Sales Document Automation & Reporting System.
+
+## Configuration
+This project is deployed using Docker on Hugging Face Spaces.
+Database: Supabase (PostgreSQL)
