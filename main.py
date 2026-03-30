@@ -9,10 +9,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 import models
-from database import engine
+from api.r_laporan import router as laporan_router, seed_beteleme
+from database import engine, SessionLocal
 
 # --- Router imports ---
-from api.r_kontrak import router as kontrak_router
+from endpoints.kontrak import router as kontrak_router
 from api.r_invoice import router as invoice_router
 from api.r_do import router as do_router
 from api.r_dashboard import router as dashboard_router
@@ -28,6 +29,33 @@ def startup_event():
         # Create tables on startup to avoid blocking the main import thread
         logger.info("Initializing database tables...")
         models.Base.metadata.create_all(bind=engine)
+        
+        # --- MIGRATION: Ensure new columns exist ---
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            logger.info("Checking for missing columns in laporan_bypass...")
+            # Try to add columns if they don't exist
+            db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS volume FLOAT DEFAULT 0.0"))
+            db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS satuan VARCHAR DEFAULT 'Kg'"))
+            db.commit()
+            logger.info("Migration complete: columns verified/added.")
+        except Exception as migrate_err:
+            logger.error(f"Migration failed: {migrate_err}")
+            db.rollback()
+        finally:
+            db.close()
+
+        # Seed Beteleme Sawit data if not present
+        db = SessionLocal()
+        try:
+            seed_beteleme(db)
+            logger.info("Beteleme Sawit data seeded successfully.")
+        except Exception as seed_err:
+            logger.error(f"Seeding failed: {seed_err}")
+        finally:
+            db.close()
+            
         logger.info("Database initialization complete.")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")

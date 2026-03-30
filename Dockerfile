@@ -3,6 +3,7 @@ FROM python:3.9-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH="/home/user/.local/bin:$PATH"
 
 # Set up a new user 'user' with UID 1000 for security

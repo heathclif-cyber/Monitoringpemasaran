@@ -64,3 +64,12 @@ def get_do(no_do: str, db: Session = Depends(get_db)):
     if not db_do:
         raise HTTPException(status_code=404, detail="DO not found")
     return db_do
+@router.delete("/{no_do:path}")
+def delete_do(no_do: str, db: Session = Depends(get_db)):
+    db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == no_do).first()
+    if not db_do:
+        raise HTTPException(status_code=404, detail="DO not found")
+    
+    db.delete(db_do)
+    db.commit()
+    return {"success": True, "message": "DO deleted successfully"}

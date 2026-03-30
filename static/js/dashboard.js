@@ -5,6 +5,9 @@
 let trendChartInstance = null;
 let commodityChartInstance = null;
 let unitChartInstance = null;
+let volumeChartInstance = null;
+Chart.register(ChartDataLabels);
+Chart.defaults.set('plugins.datalabels', { display: false });
 
 async function fetchDashboardData() {
     const yearSelect = document.getElementById('dash-year-filter');
@@ -31,7 +34,7 @@ async function fetchDashboardData() {
         // --- Update Summary Cards ---
         document.getElementById('dash-nilai-transaksi').innerText = formatRupiah(data.summary.total_nilai_transaksi);
         document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in);
-        document.getElementById('dash-kontrak-count').innerText = data.summary.total_kontrak;
+        document.getElementById('dash-volume-realisasi').innerText = data.summary.total_volume_realisasi.toLocaleString('id-ID') + ' Kg';
         document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice;
         document.getElementById('dash-do-count').innerText = data.summary.total_do;
 
@@ -172,7 +175,7 @@ async function fetchDashboardData() {
             data: {
                 labels: data.charts.unit.labels,
                 datasets: [{
-                    label: 'Nilai Transaksi',
+                    label: 'Realisasi (IDR)',
                     data: data.charts.unit.values,
                     backgroundColor: barColors.slice(0, data.charts.unit.labels.length),
                     borderRadius: 6,
@@ -214,37 +217,130 @@ async function fetchDashboardData() {
             }
         });
 
-        // --- Doughnut Chart: Portofolio Komoditas ---
-        const ctxCom = document.getElementById('commodityChart').getContext('2d');
-        if (commodityChartInstance) commodityChartInstance.destroy();
-        const doughnutColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#64748b', '#ef4444'];
-        commodityChartInstance = new Chart(ctxCom, {
-            type: 'doughnut',
+        // --- Bar Chart: Volume Penjualan Bulanan ---
+        const ctxVol = document.getElementById('volumeChart').getContext('2d');
+        if (volumeChartInstance) volumeChartInstance.destroy();
+        volumeChartInstance = new Chart(ctxVol, {
+            type: 'bar',
             data: {
-                labels: data.charts.komoditas.labels,
+                labels: data.charts.bulanan.labels,
                 datasets: [{
-                    data: data.charts.komoditas.values,
-                    backgroundColor: doughnutColors.slice(0, data.charts.komoditas.labels.length),
-                    borderWidth: 2,
-                    borderColor: '#fff',
-                    hoverOffset: 6,
+                    label: 'Volume Realisasi (Kg)',
+                    data: data.charts.bulanan.volume,
+                    backgroundColor: '#f97316', // Orange
+                    borderRadius: 6,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { boxWidth: 10, font: { size: 10 }, padding: 10 }
-                    },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString('id-ID')}`
+                            label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} unit/Kg`
                         }
                     }
                 },
-                cutout: '65%'
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (val) => {
+                                if (val >= 1000000) return (val/1000000).toFixed(1) + 'jt';
+                                if (val >= 1000) return (val/1000).toFixed(0) + 'rb';
+                                return val;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // --- Pie Chart: Portofolio Komoditas ---
+        const ctxCom = document.getElementById('commodityChart').getContext('2d');
+        if (commodityChartInstance) commodityChartInstance.destroy();
+        
+        const komValues = data.charts.komoditas.values;
+        const komTotal = komValues.reduce((a, b) => a + (b || 0), 0);
+        
+        const chartColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#64748b', '#ef4444'];
+        commodityChartInstance = new Chart(ctxCom, {
+            type: 'pie',
+            plugins: [ChartDataLabels],
+            data: {
+                labels: data.charts.komoditas.labels,
+                datasets: [{
+                    data: komValues,
+                    backgroundColor: chartColors.slice(0, data.charts.komoditas.labels.length),
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                    hoverOffset: 15,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: { top: 10, bottom: 10 }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { 
+                            boxWidth: 8, 
+                            font: { size: 10, weight: '600', family: 'Inter' }, 
+                            padding: 15,
+                            usePointStyle: true,
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    return data.labels.map(function(label, i) {
+                                        const value = data.datasets[0].data[i];
+                                        const percentage = komTotal > 0 ? ((value / komTotal) * 100).toFixed(1) : 0;
+                                        return {
+                                            text: `${label} (${percentage}%)`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            strokeStyle: data.datasets[0].borderColor,
+                                            lineWidth: data.datasets[0].borderWidth,
+                                            hidden: isNaN(data.datasets[0].data[i]) || chart.getDatasetMeta(0).data[i].hidden,
+                                            index: i
+                                        };
+                                    });
+                                }
+                                return [];
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        titleColor: '#1e293b',
+                        bodyColor: '#475569',
+                        borderColor: '#e2e8f0',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        usePointStyle: true,
+                        callbacks: {
+                            label: (ctx) => {
+                                const value = ctx.raw;
+                                const percentage = komTotal > 0 ? ((value / komTotal) * 100).toFixed(1) : 0;
+                                return ` ${ctx.label}: ${formatRupiah(value)} (${percentage}%)`;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold', size: 11 },
+                        formatter: (value, ctx) => {
+                            const percent = komTotal > 0 ? ((value / komTotal) * 100).toFixed(0) : 0;
+                            return percent > 5 ? percent + '%' : ''; // Only show if > 5% to avoid clutter
+                        },
+                        textShadowBlur: 4,
+                        textShadowColor: 'rgba(0,0,0,0.5)',
+                        display: 'auto'
+                    }
+                }
             }
         });
 

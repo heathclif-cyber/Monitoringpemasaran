@@ -59,7 +59,7 @@ class Kontrak(Base):
     jatuh_tempo_pembayaran = Column(Date)
     terbilang = Column(String)
     
-    invoices = relationship("Invoice", back_populates="kontrak")
+    invoices = relationship("Invoice", back_populates="kontrak", cascade="all, delete-orphan")
 
 class Invoice(Base):
     __tablename__ = "invoice"
@@ -75,7 +75,7 @@ class Invoice(Base):
     terbilang_invoice = Column(String)
     
     kontrak = relationship("Kontrak", back_populates="invoices")
-    delivery_orders = relationship("DeliveryOrder", back_populates="invoice")
+    delivery_orders = relationship("DeliveryOrder", back_populates="invoice", cascade="all, delete-orphan")
 
 class DeliveryOrder(Base):
     __tablename__ = "delivery_order"
@@ -110,6 +110,8 @@ class LaporanBypass(Base):
     nominal = Column(Float, default=0.0)
     pembeli = Column(String)
     deskripsi = Column(String)
+    volume = Column(Float, default=0.0)
+    satuan = Column(String, default="Kg")
     
     # Optional SAP fields
     superman = Column(String, nullable=True)

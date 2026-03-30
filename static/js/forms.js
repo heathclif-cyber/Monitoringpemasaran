@@ -34,8 +34,8 @@ async function autoLoadKontrak() {
             if (el && data[f] !== undefined) el.value = data[f];
         });
         showToast("Mode Edit: Data kontrak " + no + " berhasil dimuat.", "info");
-        buildLivePreview();
         calculateKontrakPreview();
+        buildLivePreview();
     } catch (e) { }
 }
 
@@ -51,6 +51,7 @@ async function autoLoadInvoice() {
         document.getElementById('i_pph_22').value = data.pph_22_persen;
         await fetchKontrakForInvoice();
         showToast("Mode Edit: Data invoice " + no + " berhasil dimuat.", "info");
+        buildInvoicePreview();
     } catch (e) { }
 }
 
@@ -68,6 +69,7 @@ async function autoLoadDO() {
         document.getElementById('d_nominal_transfer').value = data.nominal_transfer;
         await fetchInvoiceForDO();
         showToast("Mode Edit: Data DO " + no + " berhasil dimuat.", "info");
+        buildDOPreview();
     } catch (e) { }
 }
 
@@ -266,7 +268,7 @@ async function handleKontrakSubmit(e) {
         showToast("Kontrak berhasil disimpan!");
         lastSavedKontrakId = payload.no_kontrak;
         populateDropdowns();
-        document.getElementById('formCreateKontrak').reset();
+        // document.getElementById('formCreateKontrak').reset(); // Don't reset when editing
         calculateKontrakPreview();
         loadKontrakPreview(payload.no_kontrak);
     } catch (err) {
@@ -364,7 +366,7 @@ async function handleInvoiceSubmit(e) {
         }
 
         showToast("Invoice berhasil diterbitkan!");
-        document.getElementById('formCreateInvoice').reset();
+        // document.getElementById('formCreateInvoice').reset();
         populateDropdowns();
     } catch (err) {
         showToast(err.message, 'error');
@@ -563,7 +565,7 @@ async function handleDOSubmit(e) {
         }
 
         showToast("Delivery Order berhasil diterbitkan!");
-        document.getElementById('formCreateDO').reset();
+        // document.getElementById('formCreateDO').reset();
     } catch (err) {
         showToast(err.message, 'error');
     }

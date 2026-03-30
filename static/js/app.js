@@ -11,6 +11,7 @@ const formatRupiah = (number) => {
 
 const showNotification = (message, type = 'success') => {
     const container = document.getElementById('notification-container');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type} show`;
     toast.innerText = message;
@@ -21,6 +22,7 @@ const showNotification = (message, type = 'success') => {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 };
+window.showToast = showNotification;
 
 const MONTHS_ID = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -126,82 +128,249 @@ async function populateDropdowns() {
 }
 
 // --- List Data ---
+let rawListData = { kontrak: [], invoice: [], do: [] };
+
 async function fetchListData() {
     try {
-        let res = await fetch('/api/kontrak');
-        let data = await res.json();
-        let tbody = document.getElementById('table-kontrak');
-        tbody.innerHTML = '';
-        if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400 text-sm">Belum ada data kontrak</td></tr>';
-        }
-        data.forEach(item => {
-            let tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
-            tr.innerHTML = `
-                <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_kontrak}</td>
-                <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_kontrak)}</td>
-                <td class="py-4 px-6 text-slate-700 font-medium">${safe(item.pembeli).split('\n')[0]}</td>
-                <td class="py-4 px-6 text-slate-600 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      ${safe(item.komoditi)}
-                    </span>
-                </td>
-                <td class="py-4 px-6 font-bold text-slate-800 text-right whitespace-nowrap">${fmtRpFull(item.nilai_transaksi)}</td>
-                <td class="py-4 px-6">
-                    <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="loadKontrakPreview('${item.no_kontrak}'); switchTabDirect('kontrak-form');" class="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors tooltip" title="Preview Form"><i class="fas fa-eye"></i></button>
-                        <a href="/api/kontrak/export?no_kontrak=${encodeURIComponent(item.no_kontrak)}" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        res = await fetch('/api/invoice');
-        data = await res.json();
-        tbody = document.getElementById('table-invoice');
-        tbody.innerHTML = '';
-        data.forEach(item => {
-            let tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
-            tr.innerHTML = `
-                <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_invoice}</td>
-                <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${item.no_kontrak}</td>
-                <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_transaksi)}</td>
-                <td class="py-4 px-6 font-bold text-slate-800 text-right whitespace-nowrap">${fmtRpFull(item.jumlah_pembayaran)}</td>
-                <td class="py-4 px-6">
-                    <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <a href="/api/invoice/export?no_invoice=${encodeURIComponent(item.no_invoice)}" target="_blank" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        res = await fetch('/api/do');
-        data = await res.json();
-        tbody = document.getElementById('table-do');
-        tbody.innerHTML = '';
-        data.forEach(item => {
-            let tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
-            tr.innerHTML = `
-                <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_do}</td>
-                <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${item.no_invoice}</td>
-                <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_do)}</td>
-                <td class="py-4 px-6 text-slate-700 font-medium">${safe(item.kepada_unit)}</td>
-                <td class="py-4 px-6">
-                    <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <a href="/api/do/export?no_do=${encodeURIComponent(item.no_do)}" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+        const [resK, resI, resD] = await Promise.all([
+            fetch('/api/kontrak'),
+            fetch('/api/invoice'),
+            fetch('/api/do')
+        ]);
+        rawListData.kontrak = await resK.json();
+        rawListData.invoice = await resI.json();
+        rawListData.do = await resD.json();
+        
+        populateListDataFilters();
+        applyListDataFilters();
     } catch (err) {
         console.error(err);
     }
+}
+
+function populateListDataFilters() {
+    const selBulan = document.getElementById('filter-list-bulan');
+    const selUnit = document.getElementById('filter-list-unit');
+    const selPembeli = document.getElementById('filter-list-pembeli');
+    const selKomoditi = document.getElementById('filter-list-komoditi');
+
+    if (!selBulan) return; // Wait if not in DOM
+
+    // Collect sets
+    const units = new Set();
+    const pembelis = new Set();
+    const komoditis = new Set();
+    const monthMap = {}; // "YYYY-MM" -> "Bulan YYYY"
+
+    const addMonth = (dateStr) => {
+        if (!dateStr || dateStr === '-') return;
+        const [y, m, d] = dateStr.split('-');
+        if (y && m) {
+            const key = `${y}-${m}`;
+            monthMap[key] = `${MONTHS_ID[parseInt(m)]} ${y}`;
+        }
+    };
+
+    rawListData.kontrak.forEach(k => {
+        if (k.kebun_produsen && k.kebun_produsen !== '-') units.add(k.kebun_produsen);
+        if (k.pembeli && k.pembeli !== '-') pembelis.add(k.pembeli.split('\n')[0].trim());
+        if (k.komoditi && k.komoditi !== '-') komoditis.add(k.komoditi);
+        addMonth(k.tanggal_kontrak);
+    });
+
+    rawListData.invoice.forEach(i => {
+        addMonth(i.tanggal_transaksi);
+    });
+
+    rawListData.do.forEach(d => {
+        if (d.kepada_unit && d.kepada_unit !== '-') units.add(d.kepada_unit);
+        addMonth(d.tanggal_do);
+    });
+
+    // Save current values
+    const curBulan = selBulan.value;
+    const curUnit = selUnit.value;
+    const curPembeli = selPembeli.value;
+    const curKomoditi = selKomoditi.value;
+
+    // Reset options
+    selBulan.innerHTML = '<option value="ALL">Semua Bulan</option>';
+    selUnit.innerHTML = '<option value="ALL">Semua Unit</option>';
+    selPembeli.innerHTML = '<option value="ALL">Semua Pembeli</option>';
+    selKomoditi.innerHTML = '<option value="ALL">Semua Komoditi</option>';
+
+    // Build options
+    Object.keys(monthMap).sort().reverse().forEach(m => selBulan.add(new Option(monthMap[m], m)));
+    [...units].sort().forEach(u => selUnit.add(new Option(u, u)));
+    [...pembelis].sort().forEach(p => selPembeli.add(new Option(p, p)));
+    [...komoditis].sort().forEach(k => selKomoditi.add(new Option(k, k)));
+
+    // Restore values
+    if ([...selBulan.options].some(o => o.value === curBulan)) selBulan.value = curBulan;
+    if ([...selUnit.options].some(o => o.value === curUnit)) selUnit.value = curUnit;
+    if ([...selPembeli.options].some(o => o.value === curPembeli)) selPembeli.value = curPembeli;
+    if ([...selKomoditi.options].some(o => o.value === curKomoditi)) selKomoditi.value = curKomoditi;
+}
+
+function applyListDataFilters() {
+    const selBulan = document.getElementById('filter-list-bulan');
+    if (!selBulan) return;
+
+    const query = document.getElementById('search-list-data').value.toLowerCase();
+    const bulan = selBulan.value;
+    const unit = document.getElementById('filter-list-unit').value;
+    const pembeli = document.getElementById('filter-list-pembeli').value;
+    const komoditi = document.getElementById('filter-list-komoditi').value;
+    const sort = document.getElementById('filter-list-sort').value;
+
+    // Lookups for cross-referencing
+    const kontrakMap = {};
+    rawListData.kontrak.forEach(k => { kontrakMap[k.no_kontrak] = k; });
+    
+    const invoiceMap = {};
+    rawListData.invoice.forEach(i => { invoiceMap[i.no_invoice] = i; });
+
+    // Filter Kontrak
+    const fKontrak = rawListData.kontrak.filter(k => {
+        let match = true;
+        if (bulan !== 'ALL' && (!k.tanggal_kontrak || !k.tanggal_kontrak.startsWith(bulan))) match = false;
+        if (unit !== 'ALL' && k.kebun_produsen !== unit) match = false;
+        if (pembeli !== 'ALL' && (!k.pembeli || !k.pembeli.includes(pembeli))) match = false;
+        if (komoditi !== 'ALL' && k.komoditi !== komoditi) match = false;
+        if (query) {
+            const txt = (k.no_kontrak + ' ' + k.pembeli + ' ' + k.komoditi).toLowerCase();
+            if (!txt.includes(query)) match = false;
+        }
+        return match;
+    });
+
+    // Filter Invoice
+    const fInvoice = rawListData.invoice.filter(i => {
+        const k = kontrakMap[i.no_kontrak] || {};
+        let match = true;
+        if (bulan !== 'ALL' && (!i.tanggal_transaksi || !i.tanggal_transaksi.startsWith(bulan))) match = false;
+        if (unit !== 'ALL' && k.kebun_produsen !== unit) match = false;
+        if (pembeli !== 'ALL' && (!k.pembeli || !k.pembeli.includes(pembeli))) match = false;
+        if (komoditi !== 'ALL' && k.komoditi !== komoditi) match = false;
+        if (query) {
+            const txt = (i.no_invoice + ' ' + i.no_kontrak).toLowerCase();
+            if (!txt.includes(query)) match = false;
+        }
+        return match;
+    });
+
+    // Filter DO
+    const fDo = rawListData.do.filter(d => {
+        const i = invoiceMap[d.no_invoice] || {};
+        const k = kontrakMap[i.no_kontrak] || {};
+        let match = true;
+        if (bulan !== 'ALL' && (!d.tanggal_do || !d.tanggal_do.startsWith(bulan))) match = false;
+        if (unit !== 'ALL' && d.kepada_unit !== unit && k.kebun_produsen !== unit) match = false;
+        if (pembeli !== 'ALL' && (!k.pembeli || !k.pembeli.includes(pembeli))) match = false;
+        if (komoditi !== 'ALL' && k.komoditi !== komoditi) match = false;
+        if (query) {
+            const txt = (d.no_do + ' ' + d.no_invoice + ' ' + d.kepada_unit).toLowerCase();
+            if (!txt.includes(query)) match = false;
+        }
+        return match;
+    });
+
+    // Sorting
+    const sortByDate = (arr, dateField) => {
+        return arr.sort((a, b) => {
+            const ta = new Date(a[dateField] || 0).getTime();
+            const tb = new Date(b[dateField] || 0).getTime();
+            return sort === 'DESC' ? tb - ta : ta - tb;
+        });
+    };
+
+    sortByDate(fKontrak, 'tanggal_kontrak');
+    sortByDate(fInvoice, 'tanggal_transaksi');
+    sortByDate(fDo, 'tanggal_do');
+
+    renderListData(fKontrak, fInvoice, fDo);
+}
+
+function renderListData(kontraks, invoices, dos) {
+    // 1. Render Kontrak
+    let tbody = document.getElementById('table-kontrak');
+    tbody.innerHTML = '';
+    if (kontraks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400 text-sm">Belum ada data kontrak yang memfilter</td></tr>';
+    }
+    kontraks.forEach(item => {
+        let tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
+        tr.innerHTML = `
+            <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_kontrak}</td>
+            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_kontrak)}</td>
+            <td class="py-4 px-6 text-slate-700 font-medium">${safe(item.pembeli).split('\n')[0]}</td>
+            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ${safe(item.komoditi)}
+                </span>
+            </td>
+            <td class="py-4 px-6 font-bold text-slate-800 text-right whitespace-nowrap">${fmtRpFull(item.nilai_transaksi)}</td>
+            <td class="py-4 px-6">
+                <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick="editDoc('kontrak', '${item.no_kontrak}')" class="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors tooltip" title="Edit / View"><i class="fas fa-edit"></i></button>
+                    <a href="/api/kontrak/export?no_kontrak=${encodeURIComponent(item.no_kontrak)}" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
+                    <button onclick="deleteContract('${item.no_kontrak}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Hapus Kontrak"><i class="fas fa-trash"></i></button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // 2. Render Invoice
+    tbody = document.getElementById('table-invoice');
+    tbody.innerHTML = '';
+    if (invoices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 text-sm">Belum ada data invoice yang memfilter</td></tr>';
+    }
+    invoices.forEach(item => {
+        let tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
+        tr.innerHTML = `
+            <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_invoice}</td>
+            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${item.no_kontrak}</td>
+            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_transaksi)}</td>
+            <td class="py-4 px-6 font-bold text-slate-800 text-right whitespace-nowrap">${fmtRpFull(item.jumlah_pembayaran)}</td>
+            <td class="py-4 px-6">
+                <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick="editDoc('invoice', '${item.no_invoice}')" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors tooltip" title="Edit / View"><i class="fas fa-edit"></i></button>
+                    <a href="/api/invoice/export?no_invoice=${encodeURIComponent(item.no_invoice)}" target="_blank" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
+                    <button onclick="deleteInvoice('${item.no_invoice}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Hapus Invoice"><i class="fas fa-trash"></i></button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // 3. Render DO
+    tbody = document.getElementById('table-do');
+    tbody.innerHTML = '';
+    if (dos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 text-sm">Belum ada data DO yang memfilter</td></tr>';
+    }
+    dos.forEach(item => {
+        let tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
+        tr.innerHTML = `
+            <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_do}</td>
+            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${item.no_invoice}</td>
+            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_do)}</td>
+            <td class="py-4 px-6 text-slate-700 font-medium">${safe(item.kepada_unit)}</td>
+            <td class="py-4 px-6 text-center">
+                <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick="editDoc('do', '${item.no_do}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors tooltip" title="Edit / View"><i class="fas fa-edit"></i></button>
+                    <a href="/api/do/export?no_do=${encodeURIComponent(item.no_do)}" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
+                    <button onclick="deleteDO('${item.no_do}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Hapus DO"><i class="fas fa-trash"></i></button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 // --- Init ---
@@ -244,3 +413,41 @@ document.addEventListener("DOMContentLoaded", () => {
         if (el) el.addEventListener('change', buildDOPreview);
     });
 });
+
+async function editDoc(type, id) {
+    if (type === 'kontrak') {
+        switchTab('kontrak-form');
+        document.getElementById('k_no_kontrak').value = id;
+        if (window.autoLoadKontrak) await autoLoadKontrak();
+        if (window.loadKontrakPreview) await loadKontrakPreview(id);
+    } else if (type === 'invoice') {
+        switchTab('invoice-form');
+        document.getElementById('i_no_invoice').value = id;
+        if (window.autoLoadInvoice) await autoLoadInvoice();
+    } else if (type === 'do') {
+        switchTab('do-form');
+        document.getElementById('d_no_do').value = id;
+        if (window.autoLoadDO) await autoLoadDO();
+    }
+}
+async function deleteContract(no) {
+    if (!confirm('Hapus kontrak ' + no + '? Semua data invoice dan DO terkait juga akan terhapus.')) return;
+    try {
+        const res = await fetch('/api/kontrak/' + encodeURIComponent(no), { method: 'DELETE' });
+        if (res.ok) { showNotification('Kontrak dihapus'); fetchListData(); populateDropdowns(); if(window.fetchLaporanData) fetchLaporanData(); }
+    } catch (e) { showNotification('Gagal menghapus', 'error'); }
+}
+async function deleteInvoice(no) {
+    if (!confirm('Hapus invoice ' + no + '? Data DO terkait juga akan terhapus.')) return;
+    try {
+        const res = await fetch('/api/invoice/' + encodeURIComponent(no), { method: 'DELETE' });
+        if (res.ok) { showNotification('Invoice dihapus'); fetchListData(); populateDropdowns(); if(window.fetchLaporanData) fetchLaporanData(); }
+    } catch (e) { showNotification('Gagal menghapus', 'error'); }
+}
+async function deleteDO(no) {
+    if (!confirm('Hapus DO ' + no + '?')) return;
+    try {
+        const res = await fetch('/api/do/' + encodeURIComponent(no), { method: 'DELETE' });
+        if (res.ok) { showNotification('DO dihapus'); fetchListData(); populateDropdowns(); if(window.fetchLaporanData) fetchLaporanData(); }
+    } catch (e) { showNotification('Gagal menghapus', 'error'); }
+}

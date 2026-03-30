@@ -89,7 +89,7 @@ def generate_contract_docx(k) -> io.BytesIO:
     premi = k.premi or 0
     ppn = k.ppn_persen or 11
     sat = _s(k.satuan, 'Unit')
-    nilai = (vol * harga) + premi
+    nilai = k.nilai_transaksi or 0
 
     vol_str = '{:,.0f}'.format(vol).replace(',', '.') + ' ' + sat if vol else '-'
     harga_str = _rp_full(harga) + ' per ' + sat if harga else '-'
@@ -215,7 +215,7 @@ def generate_contract_docx(k) -> io.BytesIO:
         _run(p, f"{letter}.    {clean}")
 
     RS('Dasar Ketentuan', dasar)
-    RS('Jumlah (Pokok)', jml_str)
+    RS('Jumlah Pembayaran', jml_str)
     RS('Catatan', '-')
 
     # Signatures
@@ -583,7 +583,7 @@ def generate_do_docx(do) -> io.BytesIO:
     _run(p_info, f"Jenis Barang\t: {_s(k.komoditi)}\tTahun panen: {_s(k.tahun_panen)}", size=10)
 
     # 7. Header Row
-    headers = ['Kebun', 'Jenis\nProduk/Mutu', 'Banyaknya\nBale/Karung', 'No.\nKav./\nChop', 'No. Kontrak', 'Berat Kotor/\nBersih (Kg)', 'Levering']
+    headers = ['Kebun', 'Jenis\nProduk/Mutu', 'Banyaknya\nBale/Karung', 'No.\nKav./\nChop', 'No. Kontrak', 'Berat Kotor/\nBersih', 'Levering']
     for i, h in enumerate(headers):
         c = tbl.cell(4, i)
         p = _p0(c, WD_ALIGN_PARAGRAPH.CENTER)

@@ -69,3 +69,12 @@ def get_invoice(no_invoice: str, db: Session = Depends(get_db)):
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return db_invoice
+@router.delete("/{no_invoice:path}")
+def delete_invoice(no_invoice: str, db: Session = Depends(get_db)):
+    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    db.delete(db_invoice)
+    db.commit()
+    return {"success": True, "message": "Invoice deleted successfully"}
