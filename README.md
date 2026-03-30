@@ -5,9 +5,8 @@ colorFrom: blue
 colorTo: indigo
 sdk: docker
 app_port: 7860
-suggested_hardware: cpu-basic
+hardware: zero-gpu
 pinned: false
-short_description: PTPN I Sales Document Automation & Reporting System
 ---
 
 # Monitoring Pemasaran - PTPN I
