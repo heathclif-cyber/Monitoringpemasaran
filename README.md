@@ -15,3 +15,5 @@ Sales Document Automation and Reporting System.
 ## Configuration
 This project is deployed using Docker on Hugging Face Spaces.
 Database: Supabase (PostgreSQL)
+
+
