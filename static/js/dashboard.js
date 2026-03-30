@@ -34,7 +34,7 @@ async function fetchDashboardData() {
         // --- Update Summary Cards ---
         document.getElementById('dash-nilai-transaksi').innerText = formatRupiah(data.summary.total_nilai_transaksi);
         document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in);
-        document.getElementById('dash-kontrak-count').innerText = data.summary.total_kontrak;
+        document.getElementById('dash-volume-realisasi').innerText = data.summary.total_volume_realisasi.toLocaleString('id-ID') + ' Kg';
         document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice;
         document.getElementById('dash-do-count').innerText = data.summary.total_do;
 
@@ -175,7 +175,7 @@ async function fetchDashboardData() {
             data: {
                 labels: data.charts.unit.labels,
                 datasets: [{
-                    label: 'Nilai Transaksi',
+                    label: 'Realisasi (IDR)',
                     data: data.charts.unit.values,
                     backgroundColor: barColors.slice(0, data.charts.unit.labels.length),
                     borderRadius: 6,
@@ -225,7 +225,7 @@ async function fetchDashboardData() {
             data: {
                 labels: data.charts.bulanan.labels,
                 datasets: [{
-                    label: 'Volume Penjualan',
+                    label: 'Volume Realisasi (Kg)',
                     data: data.charts.bulanan.volume,
                     backgroundColor: '#f97316', // Orange
                     borderRadius: 6,

@@ -55,8 +55,17 @@ def get_dashboard_data(
         sum_d = db.query(func.sum(models.DeliveryOrder.nominal_transfer)).filter(models.DeliveryOrder.no_do.in_(d_ids)).scalar() or 0
         total_cash_in = float(sum_d) + float(sum_b)
 
-        # 2. Charts: Komoditas
-        kom_res = db.query(models.Kontrak.komoditi, func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(k_ids)).group_by(models.Kontrak.komoditi).all()
+        # 2. Charts: Komoditas (Based on REALIZATION / DO)
+        # We sum DeliveryOrder.nominal_transfer + LaporanBypass.nominal
+        kom_res = db.query(
+            models.Kontrak.komoditi, 
+            func.sum(models.DeliveryOrder.nominal_transfer)
+        ).select_from(models.DeliveryOrder)\
+         .join(models.Invoice)\
+         .join(models.Kontrak)\
+         .filter(models.DeliveryOrder.no_do.in_(d_ids))\
+         .group_by(models.Kontrak.komoditi).all()
+         
         kom_b_res = db.query(models.LaporanBypass.komoditi, func.sum(models.LaporanBypass.nominal)).filter(models.LaporanBypass.id.in_(b_ids)).group_by(models.LaporanBypass.komoditi).all()
         
         kom_map = {}
@@ -65,8 +74,16 @@ def get_dashboard_data(
             key = str(k or "Lainnya")
             kom_map[key] = kom_map.get(key, 0) + float(v or 0)
 
-        # 3. Charts: Unit
-        unit_res = db.query(models.Kontrak.kebun_produsen, func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(k_ids)).group_by(models.Kontrak.kebun_produsen).all()
+        # 3. Charts: Unit (Based on REALIZATION / DO)
+        unit_res = db.query(
+            models.Kontrak.kebun_produsen, 
+            func.sum(models.DeliveryOrder.nominal_transfer)
+        ).select_from(models.DeliveryOrder)\
+         .join(models.Invoice)\
+         .join(models.Kontrak)\
+         .filter(models.DeliveryOrder.no_do.in_(d_ids))\
+         .group_by(models.Kontrak.kebun_produsen).all()
+         
         unit_b_res = db.query(models.LaporanBypass.unit, func.sum(models.LaporanBypass.nominal)).filter(models.LaporanBypass.id.in_(b_ids)).group_by(models.LaporanBypass.unit).all()
         
         unit_map = {}
@@ -81,12 +98,27 @@ def get_dashboard_data(
         cash_m = {f"{i:02d}": 0.0 for i in range(1, 13)}
         vol_m  = {f"{i:02d}": 0.0 for i in range(1, 13)}
 
-        # Contract results
-        mk_res = db.query(func.extract('month', models.Kontrak.tanggal_kontrak), func.sum(models.Kontrak.nilai_transaksi), func.sum(models.Kontrak.volume)).filter(models.Kontrak.no_kontrak.in_(k_ids)).group_by(func.extract('month', models.Kontrak.tanggal_kontrak)).all()
-        for m, s, v in mk_res:
+        # Contract results (Pendapatan/Target)
+        mk_res = db.query(func.extract('month', models.Kontrak.tanggal_kontrak), func.sum(models.Kontrak.nilai_transaksi)).filter(models.Kontrak.no_kontrak.in_(k_ids)).group_by(func.extract('month', models.Kontrak.tanggal_kontrak)).all()
+        for m, s in mk_res:
+            if m: pend_m[f"{int(m):02d}"] += float(s or 0)
+
+        # DO results (Cash In & VOLUME REALIZATION)
+        # Note: volume is taken from Kontrak but only for those that have been DO'd
+        md_res = db.query(
+            func.extract('month', models.DeliveryOrder.tanggal_do), 
+            func.sum(models.DeliveryOrder.nominal_transfer),
+            func.sum(models.Kontrak.volume)
+        ).select_from(models.DeliveryOrder)\
+         .join(models.Invoice)\
+         .join(models.Kontrak)\
+         .filter(models.DeliveryOrder.no_do.in_(d_ids))\
+         .group_by(func.extract('month', models.DeliveryOrder.tanggal_do)).all()
+         
+        for m, s, v in md_res:
             if m:
                 key = f"{int(m):02d}"
-                pend_m[key] += float(s or 0)
+                cash_m[key] += float(s or 0)
                 vol_m[key] += float(v or 0)
 
         # Bypass results
@@ -96,18 +128,14 @@ def get_dashboard_data(
                 key = f"{int(m):02d}"
                 f_val = float(s or 0)
                 f_vol = float(v or 0)
-                pend_m[key] += f_val; inv_m[key] += f_val; cash_m[key] += f_val
+                # For bypass, everything happens at once
+                inv_m[key] += f_val; cash_m[key] += f_val
                 vol_m[key] += f_vol
 
         # Invoice results
         mi_res = db.query(func.extract('month', models.Invoice.tanggal_transaksi), func.sum(models.Invoice.jumlah_pembayaran)).filter(models.Invoice.no_invoice.in_(i_ids)).group_by(func.extract('month', models.Invoice.tanggal_transaksi)).all()
         for m, s in mi_res:
             if m: inv_m[f"{int(m):02d}"] += float(s or 0)
-
-        # DO results
-        md_res = db.query(func.extract('month', models.DeliveryOrder.tanggal_do), func.sum(models.DeliveryOrder.nominal_transfer)).filter(models.DeliveryOrder.no_do.in_(d_ids)).group_by(func.extract('month', models.DeliveryOrder.tanggal_do)).all()
-        for m, s in md_res:
-            if m: cash_m[f"{int(m):02d}"] += float(s or 0)
 
         # 5. Filter lists
         y_q = db.query(func.extract('year', models.Kontrak.tanggal_kontrak)).distinct().all()
@@ -131,6 +159,7 @@ def get_dashboard_data(
                 "total_nilai_transaksi": total_nilai_transaksi,
                 "total_nilai_invoice": total_nilai_invoice,
                 "total_cash_in": total_cash_in,
+                "total_volume_realisasi": float(sum(vol_m.values())),
             },
             "charts": {
                 "komoditas": {"labels": list(kom_map.keys()), "values": list(kom_map.values())},
