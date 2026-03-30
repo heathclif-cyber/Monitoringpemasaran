@@ -10,7 +10,7 @@ pinned: false
 ---
 
 # Monitoring Pemasaran - PTPN I
-Sales Document Automation & Reporting System.
+Sales Document Automation and Reporting System.
 
 ## Configuration
 This project is deployed using Docker on Hugging Face Spaces.
