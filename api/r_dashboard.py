@@ -103,23 +103,35 @@ def get_dashboard_data(
         for m, s in mk_res:
             if m: pend_m[f"{int(m):02d}"] += float(s or 0)
 
-        # DO results (Cash In & VOLUME REALIZATION)
-        # Note: volume is taken from Kontrak but only for those that have been DO'd
+        # DO results (Cash In)
         md_res = db.query(
             func.extract('month', models.DeliveryOrder.tanggal_do), 
-            func.sum(models.DeliveryOrder.nominal_transfer),
-            func.sum(models.Kontrak.volume)
+            func.sum(models.DeliveryOrder.nominal_transfer)
+        ).select_from(models.DeliveryOrder)\
+         .filter(models.DeliveryOrder.no_do.in_(d_ids))\
+         .group_by(func.extract('month', models.DeliveryOrder.tanggal_do)).all()
+         
+        for m, s in md_res:
+            if m:
+                key = f"{int(m):02d}"
+                cash_m[key] += float(s or 0)
+
+        # Realized Volume results
+        # To avoid duplicating Kontrak volume if there are multiple DOs, we group by Kontrak
+        realized_k = db.query(
+            models.Kontrak.no_kontrak,
+            models.Kontrak.volume,
+            func.min(models.DeliveryOrder.tanggal_do).label('min_do_date')
         ).select_from(models.DeliveryOrder)\
          .join(models.Invoice)\
          .join(models.Kontrak)\
          .filter(models.DeliveryOrder.no_do.in_(d_ids))\
-         .group_by(func.extract('month', models.DeliveryOrder.tanggal_do)).all()
-         
-        for m, s, v in md_res:
-            if m:
-                key = f"{int(m):02d}"
-                cash_m[key] += float(s or 0)
-                vol_m[key] += float(v or 0)
+         .group_by(models.Kontrak.no_kontrak, models.Kontrak.volume).all()
+
+        for nk, vol, do_date in realized_k:
+            if do_date:
+                m = f"{do_date.month:02d}"
+                vol_m[m] += float(vol or 0)
 
         # Bypass results
         mb_res = db.query(func.extract('month', models.LaporanBypass.tanggal), func.sum(models.LaporanBypass.nominal), func.sum(models.LaporanBypass.volume)).filter(models.LaporanBypass.id.in_(b_ids)).group_by(func.extract('month', models.LaporanBypass.tanggal)).all()
