@@ -11,6 +11,7 @@ const formatRupiah = (number) => {
 
 const showNotification = (message, type = 'success') => {
     const container = document.getElementById('notification-container');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type} show`;
     toast.innerText = message;
@@ -21,6 +22,7 @@ const showNotification = (message, type = 'success') => {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 };
+window.showToast = showNotification;
 
 const MONTHS_ID = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 

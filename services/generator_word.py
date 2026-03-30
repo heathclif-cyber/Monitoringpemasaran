@@ -583,7 +583,7 @@ def generate_do_docx(do) -> io.BytesIO:
     _run(p_info, f"Jenis Barang\t: {_s(k.komoditi)}\tTahun panen: {_s(k.tahun_panen)}", size=10)
 
     # 7. Header Row
-    headers = ['Kebun', 'Jenis\nProduk/Mutu', 'Banyaknya\nBale/Karung', 'No.\nKav./\nChop', 'No. Kontrak', 'Berat Kotor/\nBersih (Kg)', 'Levering']
+    headers = ['Kebun', 'Jenis\nProduk/Mutu', 'Banyaknya\nBale/Karung', 'No.\nKav./\nChop', 'No. Kontrak', 'Berat Kotor/\nBersih', 'Levering']
     for i, h in enumerate(headers):
         c = tbl.cell(4, i)
         p = _p0(c, WD_ALIGN_PARAGRAPH.CENTER)
