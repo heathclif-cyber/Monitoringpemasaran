@@ -1,0 +1,15 @@
+---
+title: Monitoring Pemasaran
+emoji: 📊
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
+# Monitoring Pemasaran - PTPN I
+Sales Document Automation & Reporting System.
+
+## Configuration
+This project is deployed using Docker on Hugging Face Spaces.
+Database: Supabase (PostgreSQL)

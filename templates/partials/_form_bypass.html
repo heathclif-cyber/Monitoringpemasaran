@@ -1,0 +1,157 @@
+<section id="bypass-form" class="page-section pt-4">
+
+    <!-- Main Card -->
+    <div class="glass-panel p-0 max-w-4xl mx-auto overflow-hidden shadow-2xl shadow-slate-200 border-0">
+        <!-- Accent bar -->
+        <div class="h-1.5 bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600"></div>
+
+        <form id="formBypass" class="flex flex-col md:flex-row">
+            <input type="hidden" name="id" id="bypass_id">
+            
+            <!-- Left Side: Basic Info -->
+            <div class="md:w-5/12 p-8 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/50">
+                <h4 class="text-slate-700 font-bold mb-6 flex items-center gap-2">
+                    <i class="fas fa-info-circle text-brand-500"></i>
+                    Informasi Dasar
+                </h4>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Unit Kerja / Produksi</label>
+                        <div class="relative group">
+                            <i class="fas fa-leaf absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-brand-500 transition-colors"></i>
+                            <input type="text" name="Unit" id="bypass_unit" list="unit-list" placeholder="Pilih atau Ketik Unit" 
+                                class="form-input pl-10 h-11 border-slate-200 focus:border-brand-500 bg-white" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Komoditi</label>
+                        <div class="relative group">
+                            <i class="fas fa-box absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-brand-500 transition-colors"></i>
+                            <input type="text" name="Komoditi" id="bypass_komoditi" placeholder="Contoh: Karet, Sawit" 
+                                class="form-input pl-10 h-11 border-slate-200 focus:border-brand-500 bg-white" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tanggal Transaksi</label>
+                        <div class="relative group">
+                            <i class="fas fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-brand-500 transition-colors"></i>
+                            <input type="date" name="Tanggal" id="bypass_tanggal" 
+                                class="form-input pl-10 h-11 border-slate-200 focus:border-brand-500 bg-white" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Values & Descriptions -->
+            <div class="md:w-7/12 p-8 bg-white flex flex-col justify-between">
+                <div class="space-y-6">
+                    <h4 class="text-slate-700 font-bold flex items-center gap-2">
+                        <i class="fas fa-calculator text-indigo-500"></i>
+                        Detail Transaksi
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Volume</label>
+                            <div class="relative group">
+                                <i class="fas fa-weight-hanging absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors"></i>
+                                <input type="number" step="0.01" name="Volume" id="bypass_volume" placeholder="0.00" 
+                                    class="form-input pl-10 h-11 border-slate-200 focus:border-indigo-500 bg-slate-50 focus:bg-white" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Satuan</label>
+                            <select name="Satuan" id="bypass_satuan" class="form-input h-11 border-slate-200 focus:border-indigo-500 bg-slate-50 focus:bg-white cursor-pointer font-medium">
+                                <option value="Kg">Kilogram (Kg)</option>
+                                <option value="Butir">Butir</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Nilai Transaksi (Rp)</label>
+                        <div class="relative group">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 group-focus-within:text-emerald-600 transition-colors">Rp</span>
+                            <input type="number" name="Nominal" id="bypass_nominal" placeholder="0" 
+                                class="form-input pl-10 h-11 border-slate-200 focus:border-emerald-500 bg-emerald-50/10 focus:bg-white font-bold text-slate-700" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Mitra Pembeli</label>
+                        <div class="relative group">
+                            <i class="fas fa-handshake absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-brand-500 transition-colors"></i>
+                            <input type="text" name="Pembeli" id="bypass_pembeli" placeholder="Nama Perusahaan / Pembeli" 
+                                class="form-input pl-10 h-11 border-slate-200 focus:border-brand-500 bg-white" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Deskripsi Produk / Keterangan</label>
+                        <textarea name="Deskripsi" id="bypass_deskripsi" rows="2" placeholder="Detail produk, nomor surat, atau catatan lainnya..." 
+                            class="form-input resize-none py-3 h-auto"></textarea>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="pt-8 flex items-center justify-end gap-3 mt-4">
+                    <button type="reset" class="px-6 py-2.5 rounded-lg text-slate-500 font-semibold hover:bg-slate-50 hover:text-slate-700 transition-all"
+                        onclick="document.getElementById('bypass_id').value=''; document.getElementById('bypass_form_title').innerText='Input Bypass Laporan'; document.getElementById('btn_submit_bypass').innerHTML='Simpan Data <i class=\'fas fa-save ml-2\'></i>';">
+                        Reset
+                    </button>
+                    <button type="submit" id="btn_submit_bypass" class="px-10 py-2.5 bg-gradient-to-r from-brand-600 to-emerald-600 text-white rounded-lg font-bold shadow-xl shadow-brand-200 hover:shadow-brand-300 hover:scale-[1.02] transform transition-all flex items-center">
+                        Simpan Data <i class="fas fa-save ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+<script>
+document.getElementById('formBypass').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btnSubmit = document.getElementById('btn_submit_bypass');
+    const originalContent = btnSubmit.innerHTML;
+    
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Memproses...';
+    
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+        const id = document.getElementById('bypass_id').value;
+        const url = id ? '/api/laporan/update-bypass' : '/api/laporan/create-bypass';
+        const method = id ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showNotification(id ? 'Data bypass berhasil diperbarui!' : 'Data bypass berhasil disimpan!', 'success');
+            e.target.reset();
+            document.getElementById('bypass_id').value = '';
+            document.getElementById('page-title').innerText = 'Input Data Bypass Laporan';
+            btnSubmit.innerHTML = 'Simpan Data <i class="fas fa-save ml-2"></i>';
+            if (window.fetchDashboardData) window.fetchDashboardData();
+            if (window.fetchLaporanData) window.fetchLaporanData();
+        } else {
+            showNotification('Gagal: ' + result.message, 'error');
+            btnSubmit.innerHTML = originalContent;
+        }
+    } catch (err) {
+        showNotification('Terjadi kesalahan sistem', 'error');
+        btnSubmit.innerHTML = originalContent;
+    } finally {
+        btnSubmit.disabled = false;
+    }
+});
+</script>

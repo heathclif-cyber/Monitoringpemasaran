@@ -1,0 +1,357 @@
+<section id="laporan" class="page-section max-w-full mx-auto space-y-4">
+
+    <div class="flex flex-col md:flex-row md:items-center justify-end gap-3 mb-2">
+
+        <div class="flex items-center gap-2">
+            <button onclick="fetchLaporanData()"
+                class="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            <button onclick="exportLaporanExcel()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center gap-2">
+                <i class="fas fa-file-excel"></i> Export Excel
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters Row -->
+    <div class="flex flex-wrap items-center gap-6 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Unit Produksi</label>
+            <select id="filter-laporan-unit" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[150px]">
+                <option value="ALL">Semua Unit</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Pembeli</label>
+            <select id="filter-laporan-pembeli" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[180px]">
+                <option value="ALL">Semua Pembeli</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Bulan Transfer</label>
+            <select id="filter-laporan-bulan" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[140px]">
+                <option value="ALL">Semua Bulan</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Komoditi</label>
+            <select id="filter-laporan-komoditi" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[130px]">
+                <option value="ALL">Semua Komoditi</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1 w-full sm:w-auto flex-1 md:flex-none">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Urutan Tanggal</label>
+            <select id="filter-laporan-sort" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[150px]">
+                <option value="DESC" selected>Terbaru ke Terlama</option>
+                <option value="ASC">Terlama ke Terbaru</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="glass-panel p-0 overflow-hidden">
+        <div class="overflow-x-auto" style="max-width: 100%;">
+            <table class="w-full text-[11px] text-left border-collapse min-w-[3200px]" id="tabel-laporan">
+                <thead class="sticky top-0 z-10">
+                    <tr class="bg-indigo-50 border-b-2 border-indigo-100 text-slate-600 font-bold uppercase">
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">No. DO</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">No Invoice</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">No Kontrak</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Unit</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Komoditi</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Billing Date / Invoice</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Tanggal Transfer</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah Transfer</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Mitra Pembeli</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Deskripsi Produk</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah Kontrak (Kg)</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Harga Per Kg (Kontrak)
+                        </th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah DO</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pendapatan Pokok (Rp)</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pajak PPN</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Kewajiban Pembayaran Mitra
+                        </th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Selisih</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Bulan Buku</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Superman</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Kontrak SAP</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">SO SAP</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">DO SAP</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">No Billing</th>
+                        <th class="py-3 px-4 border-l border-indigo-100 shadow-sm text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="laporan-tbody" class="bg-white">
+                    <tr>
+                        <td colspan="24" class="text-center py-6 text-slate-400">Loading data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- Include SheetJS for Excel Export -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+<script>
+    let rawLaporanData = [];
+
+    async function fetchLaporanData() {
+        const tbody = document.getElementById('laporan-tbody');
+        tbody.innerHTML = '<tr><td colspan="24" class="text-center py-6 text-slate-400">Loading data...</td></tr>';
+
+        try {
+            const res = await fetch('/api/laporan');
+            if (!res.ok) throw new Error("Gagal mengambil data laporan");
+            const data = await res.json();
+
+            rawLaporanData = data;
+            populateLaporanFilters(data);
+            applyLaporanFilters();
+
+        } catch (err) {
+            console.error(err);
+            tbody.innerHTML = `<tr><td colspan="24" class="text-center py-6 text-red-500">${err.message}</td></tr>`;
+        }
+    }
+
+    function populateLaporanFilters(data) {
+        const units = [...new Set(data.map(r => r.Unit).filter(Boolean))].sort();
+        const komods = [...new Set(data.map(r => r.Komoditi).filter(Boolean))].sort();
+        const buyers = [...new Set(data.map(r => r.Mitra_Pembeli).filter(Boolean))].sort();
+
+        // Extract Months from Tanggal_Transfer (format: dd/mm/yyyy)
+        const monthMap = {};
+        data.forEach(r => {
+            if (r.Tanggal_Transfer && r.Tanggal_Transfer !== '-') {
+                const parts = r.Tanggal_Transfer.split('/');
+                if (parts.length === 3) {
+                    const monthKey = `${parts[2]}-${parts[1]}`; // YYYY-MM
+                    const monthLabel = `${MONTHS_ID[parseInt(parts[1])]} ${parts[2]}`;
+                    monthMap[monthKey] = monthLabel;
+                }
+            } else {
+                monthMap['NONE'] = 'Belum Transfer';
+            }
+        });
+        const monthKeys = Object.keys(monthMap).sort().reverse(); // Show recent months first
+
+        const selUnit = document.getElementById('filter-laporan-unit');
+        const selKomod = document.getElementById('filter-laporan-komoditi');
+        const selBuyer = document.getElementById('filter-laporan-pembeli');
+        const selMonth = document.getElementById('filter-laporan-bulan');
+
+        const curU = selUnit.value;
+        const curK = selKomod.value;
+        const curB = selBuyer.value;
+        const curM = selMonth.value;
+
+        selUnit.innerHTML = '<option value="ALL">Semua Unit</option>';
+        selKomod.innerHTML = '<option value="ALL">Semua Komoditi</option>';
+        selBuyer.innerHTML = '<option value="ALL">Semua Pembeli</option>';
+        selMonth.innerHTML = '<option value="ALL">Semua Bulan</option>';
+
+        units.forEach(u => selUnit.add(new Option(u, u)));
+        komods.forEach(k => selKomod.add(new Option(k, k)));
+        buyers.forEach(b => selBuyer.add(new Option(b, b)));
+        monthKeys.forEach(m => selMonth.add(new Option(monthMap[m], m)));
+
+        if (units.includes(curU)) selUnit.value = curU;
+        if (komods.includes(curK)) selKomod.value = curK;
+        if (buyers.includes(curB)) selBuyer.value = curB;
+        if (monthKeys.includes(curM)) selMonth.value = curM;
+    }
+
+    function applyLaporanFilters() {
+        const unit = document.getElementById('filter-laporan-unit').value;
+        const komod = document.getElementById('filter-laporan-komoditi').value;
+        const buyer = document.getElementById('filter-laporan-pembeli').value;
+        const month = document.getElementById('filter-laporan-bulan').value;
+        const sort = document.getElementById('filter-laporan-sort').value;
+
+        let filtered = rawLaporanData.filter(r => {
+            const matchUnit = unit === 'ALL' || r.Unit === unit;
+            const matchKomod = komod === 'ALL' || r.Komoditi === komod;
+            const matchBuyer = buyer === 'ALL' || r.Mitra_Pembeli === buyer;
+
+            let matchMonth = true;
+            if (month !== 'ALL') {
+                if (month === 'NONE') {
+                    matchMonth = !r.Tanggal_Transfer || r.Tanggal_Transfer === '-';
+                } else {
+                    const parts = (r.Tanggal_Transfer || '').split('/');
+                    if (parts.length === 3) {
+                        const rMonthKey = `${parts[2]}-${parts[1]}`;
+                        matchMonth = rMonthKey === month;
+                    } else {
+                        matchMonth = r.Tanggal_Transfer && r.Tanggal_Transfer.includes(month.substr(0, 4)); // Simple check
+                    }
+                }
+            }
+
+            return matchUnit && matchKomod && matchBuyer && matchMonth;
+        });
+
+        // Sorting
+        filtered.sort((a, b) => {
+            const ta = new Date(a.Raw_Date || 0).getTime();
+            const tb = new Date(b.Raw_Date || 0).getTime();
+            return sort === 'DESC' ? tb - ta : ta - tb;
+        });
+
+        renderLaporanTable(filtered);
+    }
+
+    function renderLaporanTable(data) {
+        const tbody = document.getElementById('laporan-tbody');
+        tbody.innerHTML = '';
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="24" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
+            return;
+        }
+
+        data.forEach((row, i) => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
+            const fmtRp = val => val ? formatRupiah(val) : '-';
+            const fmtNum = val => val ? Number(val).toLocaleString('id-ID') : '-';
+
+            // Helper to make a cell editable if No_DO exists
+            const editable = (field, value) => {
+                if (!row.No_DO) return `<span class="text-slate-300 italic">No DO missing</span>`;
+                return `<div contenteditable="true" 
+                             class="px-2 py-1 rounded border border-transparent hover:border-indigo-200 focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                             onblur="saveSapField('${row.No_DO}', '${field}', this.innerText.trim())">${value || ''}</div>`;
+            };
+
+            const isBypass = row.No_DO && row.No_DO.startsWith('BYPASS-');
+            const editBtn = isBypass ? `<button onclick='editBypassRow(${JSON.stringify(row)})' class="text-blue-400 hover:text-blue-600 transition-colors px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 shadow-sm mr-1" title="Edit Data Bypass">
+                                            <i class="fas fa-edit"></i>
+                                         </button>` : '';
+            const deleteBtn = isBypass ? `<button onclick="deleteBypassRow('${row.No_DO}')" class="text-red-400 hover:text-red-600 transition-colors px-2 py-1 rounded bg-red-50 hover:bg-red-100 shadow-sm" title="Hapus Data Bypass">
+                                            <i class="fas fa-trash-alt"></i>
+                                         </button>` : '-';
+
+            tr.innerHTML = `
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.No_DO}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.No_Invoice}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 font-medium text-indigo-700">${row.No_Kontrak}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Unit}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Komoditi}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Billing_Date}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Tanggal_Transfer}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-emerald-600" data-t="n" data-v="${row.Jumlah_Transfer || 0}">${fmtRp(row.Jumlah_Transfer)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-800 font-medium">${row.Mitra_Pembeli}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Deskripsi_Produk}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_Kontrak_Kg || 0}">${fmtNum(row.Jumlah_Kontrak_Kg)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Harga_Per_Kg || 0}">${fmtNum(row.Harga_Per_Kg)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_DO || 0}">${fmtNum(row.Jumlah_DO)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium" data-t="n" data-v="${row.Pendapatan_Pokok || 0}">${fmtRp(row.Pendapatan_Pokok)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Pajak_PPN || 0}">${fmtRp(row.Pajak_PPN)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-slate-800" data-t="n" data-v="${row.Kewajiban_Pembayaran || 0}">${fmtRp(row.Kewajiban_Pembayaran)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium ${row.Selisih < 0 ? 'text-amber-600' : (row.Selisih === 0 ? 'text-emerald-600' : 'text-slate-700')}" data-t="n" data-v="${row.Selisih || 0}">${row.Selisih === 0 ? '-' : fmtRp(row.Selisih)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Bulan_Buku}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100">${editable('Superman', row.Superman)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100">${editable('Kontrak_SAP', row.Kontrak_SAP)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100">${editable('SO_SAP', row.SO_SAP)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100">${editable('DO_SAP', row.DO_SAP)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100">${editable('Billing', row.Billing)}</td>
+                <td class="py-2.5 px-4 text-center">${editBtn}${deleteBtn}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function deleteBypassRow(noDo) {
+        if (!confirm(`Apakah Anda yakin ingin menghapus data bypass ${noDo}?`)) return;
+
+        try {
+            const bypassId = noDo.replace('BYPASS-', '');
+            const res = await fetch(`/api/laporan/bypass/${bypassId}`, { method: 'DELETE' });
+            const result = await res.json();
+
+            if (result.success) {
+                showNotification(`Data ${noDo} berhasil dihapus`, 'success');
+                // Refresh data
+                fetchLaporanData();
+                if (window.fetchDashboardData) window.fetchDashboardData();
+            } else {
+                showNotification(result.message, 'error');
+            }
+        } catch (err) {
+            showNotification('Gagal menghapus data', 'error');
+        }
+    }
+
+    async function saveSapField(noDo, field, value) {
+        // Find existing value to avoid redundant updates
+        const row = rawLaporanData.find(r => r.No_DO === noDo);
+        if (row && row[field] === value) return;
+
+        try {
+            const res = await fetch('/api/laporan/update-sap', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ No_DO: noDo, [field]: value })
+            });
+            const result = await res.json();
+            if (result.success) {
+                if (row) row[field] = value; // Update local state
+                showNotification(`Data ${field} berhasil diupdate`, 'success');
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (err) {
+            console.error(err);
+            showNotification(`Gagal update: ${err.message}`, 'error');
+            // Optionally reload table to revert UI
+        }
+    }
+
+    function editBypassRow(row) {
+        // Switch to bypass form tab
+        switchTab('bypass-form', document.querySelector('[onclick*="bypass-form"]'));
+
+        // Populate form fields
+        document.getElementById('bypass_id').value = row.Id_Bypass;
+        document.getElementById('bypass_unit').value = row.Unit;
+        document.getElementById('bypass_komoditi').value = row.Komoditi;
+        document.getElementById('bypass_tanggal').value = row.Raw_Date;
+        document.getElementById('bypass_volume').value = row.Jumlah_Kontrak_Kg;
+        document.getElementById('bypass_satuan').value = row.Satuan || 'Kg';
+        document.getElementById('bypass_nominal').value = row.Pendapatan_Pokok;
+        document.getElementById('bypass_pembeli').value = row.Mitra_Pembeli;
+        document.getElementById('bypass_deskripsi').value = row.Deskripsi_Produk;
+
+        // Update Title via Page Title
+        document.getElementById('page-title').innerText = 'Edit Data Bypass #' + row.Id_Bypass;
+        document.getElementById('btn_submit_bypass').innerText = 'Perbarui Data';
+
+        showNotification("Data dimuat ke form edit", "info");
+    }
+
+    function exportLaporanExcel() {
+        showNotification("Generating Excel file from current view...", "info");
+        const table = document.getElementById("tabel-laporan");
+        const wb = XLSX.utils.table_to_book(table, { sheet: "Laporan Realisasi Filtered" });
+
+        const dateStr = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, `Laporan_DO_Invoice_Kontrak_Filtered_${dateStr}.xlsx`);
+    }
+
+    window.fetchLaporanData = fetchLaporanData;
+    window.applyLaporanFilters = applyLaporanFilters;
+    window.deleteBypassRow = deleteBypassRow;
+    window.editBypassRow = editBypassRow;
+</script>
