@@ -18,12 +18,18 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
 
-    # Calculate fields using contract's nominal_ppn for consistency
-    ppn_amount = db_kontrak.nilai_transaksi * (db_kontrak.ppn_persen / 100)
-    pph_amount = 0.0
+    # Pokok is already in nilai_transaksi only if PPN is added. 
+    # Let's be explicit to match user's formula: Pokok + PPN - PPh
+    pokok = ((db_kontrak.volume or 0.0) * (db_kontrak.harga_satuan or 0.0)) + (db_kontrak.premi or 0.0)
+    ppn_val = 0.0
+    if str(getattr(db_kontrak, 'is_ppn', 'true')).lower() == 'true':
+        ppn_val = pokok * ((db_kontrak.ppn_persen or 0.0) / 100)
+    
+    pph_val = 0.0
     if str(getattr(db_kontrak, 'is_pph', 'false')).lower() == 'true':
-        pph_amount = db_kontrak.nilai_transaksi * ((getattr(db_kontrak, 'pph_persen', 0.0) or 0.0) / 100)
-    jumlah_pembayaran = db_kontrak.nilai_transaksi + ppn_amount - pph_amount
+        pph_val = pokok * ((getattr(db_kontrak, 'pph_persen', 0.0) or 0.0) / 100)
+    
+    jumlah_pembayaran = pokok + ppn_val - pph_val
     terbilang_invoice = terbilang_rupiah(math.floor(jumlah_pembayaran))
 
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == invoice.no_invoice).first()

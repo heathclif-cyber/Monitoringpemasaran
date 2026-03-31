@@ -26,6 +26,7 @@ class Kontrak(Base):
     volume = Column(Float, default=0.0)
     harga_satuan = Column(Float, default=0.0)
     premi = Column(Float, default=0.0)
+    is_ppn = Column(String, default="true")
     ppn_persen = Column(Float, default=11.0)
     
     is_pph = Column(String, default="false") # using String for boolean ease across sqlite/postgres

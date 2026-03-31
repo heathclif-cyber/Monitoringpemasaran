@@ -28,7 +28,7 @@ async function autoLoadKontrak() {
         const res = await fetch('/api/kontrak/' + encodeURIComponent(no));
         if (!res.ok) return;
         const data = await res.json();
-        const fields = ['tanggal_kontrak', 'lokasi', 'pemilik_komoditas', 'penjual', 'pembeli', 'nama_direktur', 'alamat_pembeli', 'komoditi', 'jenis_komoditi', 'deskripsi_produk', 'tahun_panen', 'kebun_produsen', 'volume', 'satuan', 'harga_satuan', 'ppn_persen', 'is_pph', 'pph_persen', 'premi', 'mutu', 'packaging', 'simbol', 'chop', 'pack_qty', 'banyak_bale', 'kondisi_penyerahan', 'waktu_penyerahan', 'levering', 'pelabuhan_muat', 'lama_pembayaran_hari', 'penyerahan_hari', 'pembayaran_metode', 'pembayaran_cara', 'pembayaran_bank'];
+        const fields = ['tanggal_kontrak', 'lokasi', 'pemilik_komoditas', 'penjual', 'pembeli', 'nama_direktur', 'alamat_pembeli', 'komoditi', 'jenis_komoditi', 'deskripsi_produk', 'tahun_panen', 'kebun_produsen', 'volume', 'satuan', 'harga_satuan', 'is_ppn', 'ppn_persen', 'is_pph', 'pph_persen', 'premi', 'mutu', 'packaging', 'simbol', 'chop', 'pack_qty', 'banyak_bale', 'kondisi_penyerahan', 'waktu_penyerahan', 'levering', 'pelabuhan_muat', 'lama_pembayaran_hari', 'penyerahan_hari', 'pembayaran_metode', 'pembayaran_cara', 'pembayaran_bank'];
         fields.forEach(f => {
             const el = document.getElementById('k_' + f);
             if (el && data[f] !== undefined) el.value = data[f];
@@ -161,7 +161,7 @@ function buildLivePreview() {
         ${rowS('Pelabuhan Muat', pelab)}
         ${rowS('Volume', volStr)}
         ${rowD('Harga Satuan', hrgStr, 'Premi', prmiStr)}
-        ${rowS('PPN', 'Tarif Efektif ' + ppnPct + '%')}
+        ${rowS('PPN', isPpn ? ('Tarif Efektif ' + ppnPct + '%') : 'Non-PPN (Bebas PPN)')}
         ${rowS('Kondisi Penyerahan', kondisi)}
         
         <tr>
@@ -263,6 +263,7 @@ async function handleKontrakSubmit(e) {
         volume: parseFloat(getVal('k_volume')) || 0,
         satuan: getVal('k_satuan'),
         harga_satuan: parseFloat(getVal('k_harga_satuan')) || 0,
+        is_ppn: getVal('k_is_ppn'),
         ppn_persen: parseFloat(getVal('k_ppn_persen')) || 0,
         is_pph: getVal('k_is_pph'),
         pph_persen: parseFloat(getVal('k_pph_persen')) || 0,

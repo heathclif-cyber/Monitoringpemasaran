@@ -179,7 +179,10 @@ def generate_contract_docx(k) -> io.BytesIO:
     RS('Pelabuhan Muat', _s(k.pelabuhan_muat))
     RS('Volume', vol_str)
     RD('Harga Satuan', harga_str, 'Premi', premi_str)
-    RS('PPN', f"Tarif Efektif {ppn}%")
+    ppn_label = f"Tarif Efektif {ppn}%"
+    if str(getattr(k, 'is_ppn', 'true')).lower() == 'false':
+        ppn_label = "Non-PPN (Bebas PPN)"
+    RS('PPN', ppn_label)
     RS('Kondisi Penyerahan', _s(k.kondisi_penyerahan))
     
     # Pembayaran

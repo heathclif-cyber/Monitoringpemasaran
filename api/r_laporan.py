@@ -41,7 +41,9 @@ def get_laporan(db: Session = Depends(get_db)):
         if k_nilai <= 0:
             k_nilai = (k_vol_local * k_harga_local) + k_premi
         
-        if k_ppn <= 0 and k_nilai > 0:
+        if str(getattr(k, 'is_ppn', 'true')).lower() == 'false':
+            k_ppn = 0.0
+        elif k_ppn <= 0 and k_nilai > 0:
             k_ppn_persen = float(getattr(k, 'ppn_persen', 0) or 0)
             if k_ppn_persen > 0:
                 k_ppn = k_nilai * (k_ppn_persen / 100)
