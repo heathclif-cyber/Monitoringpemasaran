@@ -60,7 +60,7 @@
 
     <div class="glass-panel p-0 overflow-hidden">
         <div class="overflow-x-auto" style="max-width: 100%;">
-            <table class="w-full text-[11px] text-left border-collapse min-w-[3200px]" id="tabel-laporan">
+            <table class="w-full text-[11px] text-left border-collapse min-w-[3600px]" id="tabel-laporan">
                 <thead class="sticky top-0 z-10">
                     <tr class="bg-indigo-50 border-b-2 border-indigo-100 text-slate-600 font-bold uppercase">
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">No. DO</th>
@@ -82,6 +82,8 @@
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Kewajiban Pembayaran Mitra
                         </th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Selisih</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right bg-red-50 text-red-700">Sisa Kekurangan<br>Pembayaran</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right bg-amber-50 text-amber-700">Sisa Barang<br>Belum Diserahkan</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Bulan Buku</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Superman</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Kontrak SAP</th>
@@ -93,7 +95,7 @@
                 </thead>
                 <tbody id="laporan-tbody" class="bg-white">
                     <tr>
-                        <td colspan="24" class="text-center py-6 text-slate-400">Loading data...</td>
+                        <td colspan="26" class="text-center py-6 text-slate-400">Loading data...</td>
                     </tr>
                 </tbody>
             </table>
@@ -217,7 +219,7 @@
         tbody.innerHTML = '';
 
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="24" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="26" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
             return;
         }
 
@@ -261,6 +263,8 @@
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Pajak_PPN || 0}">${fmtRp(row.Pajak_PPN)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-slate-800" data-t="n" data-v="${row.Kewajiban_Pembayaran || 0}">${fmtRp(row.Kewajiban_Pembayaran)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium ${row.Selisih < 0 ? 'text-amber-600' : (row.Selisih === 0 ? 'text-emerald-600' : 'text-slate-700')}" data-t="n" data-v="${row.Selisih || 0}">${row.Selisih === 0 ? '-' : fmtRp(row.Selisih)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-bold ${row.Sisa_Pembayaran > 0 ? 'text-red-600 bg-red-50' : (row.Sisa_Pembayaran === 0 ? 'text-emerald-600' : 'text-slate-400')}" data-t="n" data-v="${row.Sisa_Pembayaran || 0}">${row.Sisa_Pembayaran > 0 ? fmtRp(row.Sisa_Pembayaran) : (row.Sisa_Pembayaran === 0 ? '✓ Lunas' : '-')}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-bold ${row.Sisa_Volume > 0 ? 'text-amber-600 bg-amber-50' : (row.Sisa_Volume === 0 ? 'text-emerald-600' : 'text-slate-400')}" data-t="n" data-v="${row.Sisa_Volume || 0}">${row.Sisa_Volume > 0 ? fmtNum(row.Sisa_Volume) : (row.Sisa_Volume === 0 ? '✓ Selesai' : '-')}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Bulan_Buku}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('Superman', row.Superman)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('Kontrak_SAP', row.Kontrak_SAP)}</td>

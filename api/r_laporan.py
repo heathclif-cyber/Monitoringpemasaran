@@ -28,20 +28,25 @@ def get_laporan(db: Session = Depends(get_db)):
 
     rows = []
     
-    def build_row(k, inv, do):
+    def build_row(k, inv, do, inv_total=0, k_vol=0, total_do_nominal=0, total_do_volume=0):
         do_volume = float(do.volume_do or 0) if do else 0
         do_nominal = float(do.nominal_transfer or 0) if do else 0
         # Pendapatan Pokok for this DO = proportional: (volume_do / kontrak_vol) * nilai_transaksi
-        k_vol = float(k.volume or 0)
+        k_vol_local = float(k.volume or 0)
         k_nilai = float(k.nilai_transaksi or 0)
         k_ppn = float(k.nominal_ppn or 0)
-        if k_vol > 0 and do:
-            ratio = do_volume / k_vol
+        if k_vol_local > 0 and do:
+            ratio = do_volume / k_vol_local
             pendapatan_do = k_nilai * ratio
             ppn_do = k_ppn * ratio
         else:
             pendapatan_do = k_nilai
             ppn_do = k_ppn
+
+        # Sisa pembayaran = Invoice total - sum of ALL DOs nominal for this invoice
+        sisa_pembayaran = round(float(inv_total) - float(total_do_nominal), 2) if inv else 0
+        # Sisa volume = Kontrak volume - sum of ALL DOs volume for this invoice
+        sisa_volume = round(float(k_vol_local) - float(total_do_volume), 2)
 
         return {
             "No_DO": do.no_do if do else "",
@@ -62,6 +67,8 @@ def get_laporan(db: Session = Depends(get_db)):
             "Pajak_PPN": round(ppn_do, 2),
             "Kewajiban_Pembayaran": inv.jumlah_pembayaran if inv else 0,
             "Selisih": do.selisih if do else (inv.jumlah_pembayaran if inv else 0),
+            "Sisa_Pembayaran": sisa_pembayaran,
+            "Sisa_Volume": sisa_volume,
             "Bulan_Buku": get_bulan_buku(do.tanggal_pembayaran) if do and do.tanggal_pembayaran else "",
             "Superman": do.superman if do else "",
             "Kontrak_SAP": do.kontrak_sap if do else "",
@@ -72,14 +79,20 @@ def get_laporan(db: Session = Depends(get_db)):
 
     for k in kontraks:
         if not k.invoices:
-            rows.append(build_row(k, None, None))
+            rows.append(build_row(k, None, None, 0, 0, 0, 0))
         else:
             for inv in k.invoices:
+                # Calculate per-invoice totals across ALL DOs
+                total_do_nominal = sum(float(d.nominal_transfer or 0) for d in inv.delivery_orders)
+                total_do_volume = sum(float(d.volume_do or 0) for d in inv.delivery_orders)
+                inv_total = float(inv.jumlah_pembayaran or 0)
+                k_vol = float(k.volume or 0)
+                
                 if not inv.delivery_orders:
-                    rows.append(build_row(k, inv, None))
+                    rows.append(build_row(k, inv, None, inv_total, k_vol, total_do_nominal, total_do_volume))
                 else:
                     for do in inv.delivery_orders:
-                        rows.append(build_row(k, inv, do))
+                        rows.append(build_row(k, inv, do, inv_total, k_vol, total_do_nominal, total_do_volume))
                         
     # Sort by Kontrak then Invoice then DO
     rows.sort(key=lambda x: (x["Billing_Date"], x["No_Kontrak"], x["No_Invoice"], x["No_DO"]))
