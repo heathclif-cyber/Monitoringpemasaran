@@ -100,42 +100,6 @@
         </div>
     </div>
     
-    <!-- SAP Status Section -->
-    <div class="glass-panel p-6 relative overflow-hidden bg-white/50 border-amber-100 shadow-sm border">
-        <div class="relative z-10 flex items-center justify-between mb-6 border-b border-amber-50 pb-4">
-            <h3 class="font-black text-slate-800 text-sm tracking-tight flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 shadow-sm"><i class="fas fa-database"></i></div> 
-                STATUS KELENGKAPAN DATA SAP <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full ml-1 border border-amber-100">REALTIME</span>
-            </h3>
-            <span class="text-[11px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 italic">Menampilkan jumlah data yang belum memiliki nomor SAP</span>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
-            <!-- SAP Kontrak -->
-            <div class="group px-4 py-3 rounded-2xl bg-white/40 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 text-center">
-                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1 group-hover:text-amber-600 transition-colors">Kontrak SAP</p>
-                <p class="text-3xl font-black text-slate-400 font-mono tracking-tighter" id="dash-sap-kontrak">0</p>
-                <div class="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-amber-400 w-1/3 opacity-40"></div></div>
-            </div>
-            <!-- SAP SO -->
-            <div class="group px-4 py-3 rounded-2xl bg-white/40 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 text-center text-center">
-                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1 group-hover:text-blue-600 transition-colors">SO SAP (Inv)</p>
-                <p class="text-3xl font-black text-slate-400 font-mono tracking-tighter" id="dash-sap-so">0</p>
-                <div class="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-blue-400 w-1/4 opacity-40"></div></div>
-            </div>
-            <!-- SAP DO -->
-            <div class="group px-4 py-3 rounded-2xl bg-white/40 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 text-center">
-                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1 group-hover:text-orange-600 transition-colors">DO SAP</p>
-                <p class="text-3xl font-black text-slate-400 font-mono tracking-tighter" id="dash-sap-do">0</p>
-                <div class="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-orange-400 w-1/2 opacity-40"></div></div>
-            </div>
-            <!-- SAP Billing -->
-            <div class="group px-4 py-3 rounded-2xl bg-white/40 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 text-center">
-                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1 group-hover:text-indigo-600 transition-colors">Billing SAP</p>
-                <p class="text-3xl font-black text-slate-400 font-mono tracking-tighter" id="dash-sap-billing">0</p>
-                <div class="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-indigo-400 w-1/5 opacity-40"></div></div>
-            </div>
-        </div>
-    </div>
 
     <!-- Charts Row 1 -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -224,6 +188,43 @@
                         <!-- Populated by JS -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SAP Status Section -->
+    <div class="glass-panel p-6 relative overflow-hidden bg-white/50 border-amber-100 shadow-sm border">
+        <div class="relative z-10 flex items-center justify-between mb-6 border-b border-amber-50 pb-4">
+            <h3 class="font-black text-slate-800 text-sm tracking-tight flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 shadow-sm"><i class="fas fa-database"></i></div> 
+                STATUS KELENGKAPAN DATA SAP <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full ml-1 border border-amber-100">REALTIME</span>
+            </h3>
+            <span class="text-[11px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 italic">Menampilkan jumlah data yang belum memiliki nomor SAP</span>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
+            <!-- SAP Kontrak -->
+            <div class="group px-4 py-3 rounded-2xl bg-white/40 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 text-center">
+                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1 group-hover:text-amber-600 transition-colors">Kontrak SAP</p>
+                <p class="text-3xl font-black text-slate-400 font-mono tracking-tighter" id="dash-sap-kontrak">0</p>
+                <div class="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-amber-400 w-1/3 opacity-40"></div></div>
+            </div>
+            <!-- SAP SO -->
+            <div class="group px-4 py-3 rounded-2xl bg-white/40 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 text-center text-center">
+                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1 group-hover:text-blue-600 transition-colors">SO SAP (Inv)</p>
+                <p class="text-3xl font-black text-slate-400 font-mono tracking-tighter" id="dash-sap-so">0</p>
+                <div class="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-blue-400 w-1/4 opacity-40"></div></div>
+            </div>
+            <!-- SAP DO -->
+            <div class="group px-4 py-3 rounded-2xl bg-white/40 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 text-center">
+                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1 group-hover:text-orange-600 transition-colors">DO SAP</p>
+                <p class="text-3xl font-black text-slate-400 font-mono tracking-tighter" id="dash-sap-do">0</p>
+                <div class="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-orange-400 w-1/2 opacity-40"></div></div>
+            </div>
+            <!-- SAP Billing -->
+            <div class="group px-4 py-3 rounded-2xl bg-white/40 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 text-center">
+                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1 group-hover:text-indigo-600 transition-colors">Billing SAP</p>
+                <p class="text-3xl font-black text-slate-400 font-mono tracking-tighter" id="dash-sap-billing">0</p>
+                <div class="w-full h-1 bg-slate-100 rounded-full mt-3 overflow-hidden"><div class="h-full bg-indigo-400 w-1/5 opacity-40"></div></div>
             </div>
         </div>
     </div>
