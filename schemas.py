@@ -24,6 +24,7 @@ class KontrakBase(BaseModel):
     volume: Optional[float] = 0.0
     harga_satuan: Optional[float] = 0.0
     premi: Optional[float] = 0.0
+    is_ppn: Optional[str] = "true"
     ppn_persen: Optional[float] = 11.0
     
     is_pph: Optional[str] = "false"

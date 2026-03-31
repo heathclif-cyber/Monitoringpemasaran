@@ -1,415 +1,472 @@
 ﻿python : Traceback (most 
 recent call last):
 At line:1 char:1
-+ python -c "import models, 
-database; 
-db=database.SessionLocal(); 
++ python -c "import 
+models, database; db=data
+base.SessionLocal(); 
 db.qu ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~
-    + CategoryInfo           
-   : NotSpecified: (Traceba  
-  ck (most recent call las   
- t)::String) [], RemoteEx    
-ception
-    + FullyQualifiedErrorId  
-   : NativeCommandError
++ ~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo       
+       : NotSpecified: 
+(Traceba    ck (most 
+recent call las    
+t)::String) [], RemoteEx 
+   ception
+    + 
+FullyQualifiedErrorId    
+ : NativeCommandError
  
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\base.py", line 
-143, in __init__
-    self._dbapi_connection = 
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\ba
+se.py", line 143, in 
+__init__
+    
+self._dbapi_connection = 
 engine.raw_connection()
-                             
+                         
+    
 ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\base.py", line 
-3317, in raw_connection
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\ba
+se.py", line 3317, in 
+raw_connection
     return 
 self.pool.connect()
            
 ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 448, 
-in connect
-    return _ConnectionFairy._
-checkout(self)
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 
-1272, in _checkout
-    fairy = _ConnectionRecord
-.checkout(pool)
-            ^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 712, 
-in checkout
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 448, in 
+connect
+    return _ConnectionFai
+ry._checkout(self)
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 1272, in 
+_checkout
+    fairy = _ConnectionRe
+cord.checkout(pool)
+            ^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 712, in 
+checkout
     rec = pool._do_get()
           ^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\impl.py", line 177, 
-in _do_get
-    with util.safe_reraise():
-         ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\util\langhelpers.py", 
-line 121, in __exit__
-    raise exc_value.with_trac
-eback(exc_tb)
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\impl.py", line 175, 
-in _do_get
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\impl
+.py", line 177, in 
+_do_get
+    with 
+util.safe_reraise():
+         
+^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\util\lang
+helpers.py", line 121, 
+in __exit__
+    raise exc_value.with_
+traceback(exc_tb)
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\impl
+.py", line 175, in 
+_do_get
     return 
 self._create_connection()
            
 ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 389, 
-in _create_connection
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 389, in 
+_create_connection
     return 
 _ConnectionRecord(self)
            
 ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 674, 
-in __init__
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 674, in 
+__init__
     self.__connect()
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 900, 
-in __connect
-    with util.safe_reraise():
-         ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\util\langhelpers.py", 
-line 121, in __exit__
-    raise exc_value.with_trac
-eback(exc_tb)
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 896, 
-in __connect
-    self.dbapi_connection = 
-connection = 
-pool._invoke_creator(self)
-                             
-            
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\create.py", line 
-667, in connect
-    return 
-dialect.connect(*cargs_tup, 
-**cparams)
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\default.py", line 
-630, in connect
-    return self.loaded_dbapi.
-connect(*cargs, **cparams)  
-# type: 
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 900, in 
+__connect
+    with 
+util.safe_reraise():
+         
+^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\util\lang
+helpers.py", line 121, 
+in __exit__
+    raise exc_value.with_
+traceback(exc_tb)
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 896, in 
+__connect
+    
+self.dbapi_connection = 
+connection = pool._invoke
+_creator(self)
+                         
+                ^^^^^^^^^
+^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\cr
+eate.py", line 667, in 
+connect
+    return dialect.connec
+t(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\de
+fault.py", line 630, in 
+connect
+    return self.loaded_db
+api.connect(*cargs, 
+**cparams)  # type: 
 ignore[no-any-return]  # 
 NOQA: E501
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\psycopg
-2\__init__.py", line 135, in 
-connect
-    conn = _connect(dsn, conn
-ection_factory=connection_fac
-tory, **kwasync)
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^
-psycopg2.OperationalError: 
-could not translate host 
-name "db.azomqppnodduqhmbujxv
-.supabase.co" to address: 
-Name or service not known
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\psycopg2\__init__.py
+", line 135, in connect
+    conn = _connect(dsn, 
+connection_factory=connec
+tion_factory, **kwasync)
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError
+: could not translate 
+host name "db.azomqppnodd
+uqhmbujxv.supabase.co" 
+to address: Name or 
+service not known
 
 
-The above exception was the 
-direct cause of the 
+The above exception was 
+the direct cause of the 
 following exception:
 
-Traceback (most recent call 
-last):
-  File "<string>", line 1, 
-in <module>
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\orm\query.py", line 
-2704, in all
+Traceback (most recent 
+call last):
+  File "<string>", line 
+1, in <module>
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\orm\query
+.py", line 2704, in all
     return 
-self._iter().all()  # type: 
-ignore
+self._iter().all()  # 
+type: ignore
            ^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\orm\query.py", line 
-2857, in _iter
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\orm\query
+.py", line 2857, in _iter
     result: 
 Union[ScalarResult[_T], 
 Result[_T]] = 
 self.session.execute(
-                             
-                     
+                         
+                         
 ^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\orm\session.py", line 
-2351, in execute
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\orm\sessi
+on.py", line 2351, in 
+execute
     return 
 self._execute_internal(
            
 ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\orm\session.py", line 
-2239, in _execute_internal
-    conn = self._connection_f
-or_bind(bind)
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\orm\session.py", line 
-2108, in _connection_for_bind
-    return trans._connection_
-for_bind(engine, 
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\orm\sessi
+on.py", line 2239, in 
+_execute_internal
+    conn = self._connecti
+on_for_bind(bind)
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\orm\sessi
+on.py", line 2108, in 
+_connection_for_bind
+    return trans._connect
+ion_for_bind(engine, 
 execution_options)
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-^^^^^^
-  File "<string>", line 2, 
-in _connection_for_bind
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\orm\state_changes.py", 
-line 137, in _go
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
+  File "<string>", line 
+2, in 
+_connection_for_bind
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\orm\state
+_changes.py", line 137, 
+in _go
     ret_value = fn(self, 
 *arg, **kw)
                 
 ^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\orm\session.py", line 
-1187, in _connection_for_bind
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\orm\sessi
+on.py", line 1187, in 
+_connection_for_bind
     conn = bind.connect()
            ^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\base.py", line 
-3293, in connect
-    return 
-self._connection_cls(self)
-           
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\base.py", line 
-145, in __init__
-    Connection._handle_dbapi_
-exception_noconnection(
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\base.py", line 
-2448, in _handle_dbapi_except
-ion_noconnection
-    raise sqlalchemy_exceptio
-n.with_traceback(exc_info[2])
- from e
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\base.py", line 
-143, in __init__
-    self._dbapi_connection = 
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\ba
+se.py", line 3293, in 
+connect
+    return self._connecti
+on_cls(self)
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\ba
+se.py", line 145, in 
+__init__
+    Connection._handle_db
+api_exception_noconnectio
+n(
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\ba
+se.py", line 2448, in _ha
+ndle_dbapi_exception_noco
+nnection
+    raise sqlalchemy_exce
+ption.with_traceback(exc_
+info[2]) from e
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\ba
+se.py", line 143, in 
+__init__
+    
+self._dbapi_connection = 
 engine.raw_connection()
-                             
+                         
+    
 ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\base.py", line 
-3317, in raw_connection
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\ba
+se.py", line 3317, in 
+raw_connection
     return 
 self.pool.connect()
            
 ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 448, 
-in connect
-    return _ConnectionFairy._
-checkout(self)
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 
-1272, in _checkout
-    fairy = _ConnectionRecord
-.checkout(pool)
-            ^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 712, 
-in checkout
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 448, in 
+connect
+    return _ConnectionFai
+ry._checkout(self)
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 1272, in 
+_checkout
+    fairy = _ConnectionRe
+cord.checkout(pool)
+            ^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 712, in 
+checkout
     rec = pool._do_get()
           ^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\impl.py", line 177, 
-in _do_get
-    with util.safe_reraise():
-         ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\util\langhelpers.py", 
-line 121, in __exit__
-    raise exc_value.with_trac
-eback(exc_tb)
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\impl.py", line 175, 
-in _do_get
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\impl
+.py", line 177, in 
+_do_get
+    with 
+util.safe_reraise():
+         
+^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\util\lang
+helpers.py", line 121, 
+in __exit__
+    raise exc_value.with_
+traceback(exc_tb)
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\impl
+.py", line 175, in 
+_do_get
     return 
 self._create_connection()
            
 ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 389, 
-in _create_connection
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 389, in 
+_create_connection
     return 
 _ConnectionRecord(self)
            
 ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 674, 
-in __init__
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 674, in 
+__init__
     self.__connect()
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 900, 
-in __connect
-    with util.safe_reraise():
-         ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\util\langhelpers.py", 
-line 121, in __exit__
-    raise exc_value.with_trac
-eback(exc_tb)
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\pool\base.py", line 896, 
-in __connect
-    self.dbapi_connection = 
-connection = 
-pool._invoke_creator(self)
-                             
-            
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\create.py", line 
-667, in connect
-    return 
-dialect.connect(*cargs_tup, 
-**cparams)
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\sqlalch
-emy\engine\default.py", line 
-630, in connect
-    return self.loaded_dbapi.
-connect(*cargs, **cparams)  
-# type: 
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 900, in 
+__connect
+    with 
+util.safe_reraise():
+         
+^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\util\lang
+helpers.py", line 121, 
+in __exit__
+    raise exc_value.with_
+traceback(exc_tb)
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\pool\base
+.py", line 896, in 
+__connect
+    
+self.dbapi_connection = 
+connection = pool._invoke
+_creator(self)
+                         
+                ^^^^^^^^^
+^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\cr
+eate.py", line 667, in 
+connect
+    return dialect.connec
+t(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\sqlalchemy\engine\de
+fault.py", line 630, in 
+connect
+    return self.loaded_db
+api.connect(*cargs, 
+**cparams)  # type: 
 ignore[no-any-return]  # 
 NOQA: E501
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\user\AppData
-\Local\Programs\Python\Python
-312\Lib\site-packages\psycopg
-2\__init__.py", line 135, in 
-connect
-    conn = _connect(dsn, conn
-ection_factory=connection_fac
-tory, **kwasync)
-           ^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-^^^^^^^^^^^^^^^^
-sqlalchemy.exc.OperationalErr
-or: 
-(psycopg2.OperationalError) 
-could not translate host 
-name "db.azomqppnodduqhmbujxv
-.supabase.co" to address: 
-Name or service not known
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^
+  File "C:\Users\user\App
+Data\Local\Programs\Pytho
+n\Python312\Lib\site-pack
+ages\psycopg2\__init__.py
+", line 135, in connect
+    conn = _connect(dsn, 
+connection_factory=connec
+tion_factory, **kwasync)
+           ^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.Operationa
+lError: (psycopg2.Operati
+onalError) could not 
+translate host name "db.a
+zomqppnodduqhmbujxv.supab
+ase.co" to address: Name 
+or service not known
 
-(Background on this error 
-at: https://sqlalche.me/e/20/
-e3q8)
+(Background on this 
+error at: https://sqlalch
+e.me/e/20/e3q8)

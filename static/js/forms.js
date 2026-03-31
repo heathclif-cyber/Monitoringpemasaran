@@ -299,7 +299,15 @@ async function handleKontrakSubmit(e) {
             let msg = "Gagal menyimpan kontrak.";
             try {
                 const errData = await res.json();
-                msg = errData.message || msg;
+                if (errData.detail) {
+                    if (Array.isArray(errData.detail)) {
+                        msg = errData.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join('; ');
+                    } else {
+                        msg = errData.detail;
+                    }
+                } else if (errData.message) {
+                    msg = errData.message;
+                }
             } catch (e) { }
             throw new Error(msg);
         }
