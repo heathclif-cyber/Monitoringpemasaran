@@ -34,11 +34,14 @@ def startup_event():
         from sqlalchemy import text
         db = SessionLocal()
         try:
-            logger.info("Checking for missing columns in laporan_bypass...")
-            # Try to add columns if they don't exist
+            logger.info("Migrating missing columns (PPh, volume, etc)...")
+            # postgres supports ADD COLUMN IF NOT EXISTS
             db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS volume FLOAT DEFAULT 0.0"))
             db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS satuan VARCHAR DEFAULT 'Kg'"))
             db.execute(text("ALTER TABLE delivery_order ADD COLUMN IF NOT EXISTS volume_do FLOAT DEFAULT 0.0"))
+            db.execute(text("ALTER TABLE delivery_order ADD COLUMN IF NOT EXISTS is_pph_disetor VARCHAR DEFAULT 'false'"))
+            db.execute(text("ALTER TABLE kontrak ADD COLUMN IF NOT EXISTS is_pph VARCHAR DEFAULT 'false'"))
+            db.execute(text("ALTER TABLE kontrak ADD COLUMN IF NOT EXISTS pph_persen FLOAT DEFAULT 0.0"))
             db.commit()
             logger.info("Migration complete: columns verified/added.")
         except Exception as migrate_err:
