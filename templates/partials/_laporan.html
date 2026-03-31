@@ -75,7 +75,15 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-emerald-50 p-4 rounded-xl shadow-sm border border-emerald-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Total Cash In</span>
+            <span class="text-xl font-black text-emerald-600 mt-1" id="summary-cash-in">Rp 0</span>
+        </div>
+        <div class="bg-indigo-50 p-4 rounded-xl shadow-sm border border-indigo-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Total Volume DO</span>
+            <span class="text-xl font-black text-indigo-600 mt-1" id="summary-vol-do">0 Kg</span>
+        </div>
         <div class="bg-red-50 p-4 rounded-xl shadow-sm border border-red-100 flex flex-col justify-center">
             <span class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Sisa Kekurangan Pembayaran</span>
             <span class="text-xl font-black text-red-600 mt-1" id="summary-sisa-bayar">Rp 0</span>
@@ -248,8 +256,13 @@
         const uniqueInvoices = new Set();
         let totalSisaPembayaran = 0;
         let totalSisaVolume = 0;
+        let totalCashIn = 0;
+        let totalVolDO = 0;
 
         filtered.forEach(r => {
+            totalCashIn += (r.Jumlah_Transfer || 0);
+            totalVolDO += (r.Jumlah_DO || 0);
+
             let idKey = r.No_Invoice ? `INV-${r.No_Invoice}` : (r.No_Kontrak ? `KONTRAK-${r.No_Kontrak}` : null);
             if (r.No_DO && r.No_DO.startsWith('BYPASS-')) idKey = r.No_DO;
             
@@ -262,6 +275,8 @@
 
         document.getElementById('summary-sisa-bayar').innerText = formatRupiah(totalSisaPembayaran);
         document.getElementById('summary-sisa-volume').innerText = Number(totalSisaVolume).toLocaleString('id-ID') + ' Kg';
+        document.getElementById('summary-cash-in').innerText = formatRupiah(totalCashIn);
+        document.getElementById('summary-vol-do').innerText = Number(totalVolDO).toLocaleString('id-ID') + ' Kg';
 
         renderLaporanTable(filtered);
     }
