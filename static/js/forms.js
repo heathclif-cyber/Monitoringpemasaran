@@ -50,6 +50,7 @@ async function autoLoadInvoice() {
         document.getElementById('i_tanggal_transaksi').value = data.tanggal_transaksi;
         document.getElementById('i_pph_22').value = data.pph_22_persen;
         await fetchKontrakForInvoice();
+        document.getElementById('i_no_invoice').value = no; // Restore ID after fetchKontrakForInvoice overwrites it
         showToast("Mode Edit: Data invoice " + no + " berhasil dimuat.", "info");
         buildInvoicePreview();
     } catch (e) { }
@@ -68,6 +69,7 @@ async function autoLoadDO() {
         document.getElementById('d_tanggal_pembayaran').value = data.tanggal_pembayaran;
         document.getElementById('d_nominal_transfer').value = data.nominal_transfer;
         await fetchInvoiceForDO();
+        document.getElementById('d_no_do').value = no; // Restore ID after fetchInvoiceForDO overwrites it
         showToast("Mode Edit: Data DO " + no + " berhasil dimuat.", "info");
         buildDOPreview();
     } catch (e) { }
@@ -208,6 +210,10 @@ function calculateKontrakPreview() { buildLivePreview(); }
 // ==== KONTRAK SUBMIT ====
 async function handleKontrakSubmit(e) {
     e.preventDefault();
+    const btn = document.getElementById('btn-submit-kontrak');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Memproses...';
 
     const payload = {
         no_kontrak: getVal('k_no_kontrak'),
@@ -259,20 +265,21 @@ async function handleKontrakSubmit(e) {
             let msg = "Gagal menyimpan kontrak.";
             try {
                 const errData = await res.json();
-                if (Array.isArray(errData.detail)) msg += " " + errData.detail.map(e => e.loc[e.loc.length - 1] + ': ' + e.msg).join(', ');
-                else msg += " " + (errData.detail || "");
+                msg = errData.message || msg;
             } catch (e) { }
             throw new Error(msg);
         }
 
-        showToast("Kontrak berhasil disimpan!");
+        showToast("Kontrak " + payload.no_kontrak + " berhasil disimpan!", "success");
         lastSavedKontrakId = payload.no_kontrak;
         populateDropdowns();
-        // document.getElementById('formCreateKontrak').reset(); // Don't reset when editing
         calculateKontrakPreview();
         loadKontrakPreview(payload.no_kontrak);
     } catch (err) {
         showToast(err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
     }
 }
 
@@ -323,7 +330,7 @@ async function fetchKontrakForInvoice() {
         const estTotal = data.nilai_transaksi + data.nominal_ppn;
         document.getElementById('i_lbl_total').innerText = formatRupiah(estTotal);
 
-        document.getElementById('i_no_invoice').value = "INV-" + data.no_kontrak;
+        document.getElementById('i_no_invoice').value = data.no_kontrak;
         buildInvoicePreview();
     } catch (err) {
         showToast(err.message, 'error');
@@ -341,6 +348,11 @@ async function fetchKontrakForInvoice() {
 
 async function handleInvoiceSubmit(e) {
     e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Memproses...';
+    
     const payload = {
         no_invoice: document.getElementById('i_no_invoice').value,
         no_kontrak: document.getElementById('i_no_kontrak').value,
@@ -359,17 +371,18 @@ async function handleInvoiceSubmit(e) {
             let msg = "Gagal menyimpan invoice.";
             try {
                 const errData = await res.json();
-                if (Array.isArray(errData.detail)) msg += " " + errData.detail.map(e => e.loc[e.loc.length - 1] + ': ' + e.msg).join(', ');
-                else msg += " " + (errData.detail || "");
+                msg = errData.message || msg;
             } catch (e) { }
             throw new Error(msg);
         }
 
-        showToast("Invoice berhasil diterbitkan!");
-        // document.getElementById('formCreateInvoice').reset();
+        showToast("Invoice " + payload.no_invoice + " berhasil diterbitkan!", "success");
         populateDropdowns();
     } catch (err) {
         showToast(err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
     }
 }
 
@@ -435,7 +448,7 @@ function buildInvoicePreview() {
                 <td style="${tdStyle}" colspan="5"><strong>Mutu:</strong><br>${k.mutu || '-'}</td>
             </tr>
             <tr>
-                <td style="${tdStyle}" colspan="5"><strong>PPN:</strong><br>PPN ${ppnPct}% (Tarif Efektif ${ppnPct}%)</td>
+                <td style="${tdStyle}" colspan="5"><strong>PPN:</strong></td>
             </tr>
             <tr>
                 <td style="${tdStyle}" colspan="5"><strong>Kondisi Penyerahan:</strong><br>${k.kondisi_penyerahan || '-'}</td>
@@ -468,7 +481,7 @@ function buildInvoicePreview() {
                 <td style="${tdStyle} text-align:right; border-left:none;">${nilai > 0 ? nilai.toLocaleString('id-ID') : '-'}</td>
             </tr>
             <tr>
-                <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN ${ppnPct}%</strong></td>
+                <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
                 <td style="${tdStyle} text-align:right; border-left:none;"><strong>${nomPpn > 0 ? nomPpn.toLocaleString('id-ID') : '-'}</strong></td>
             </tr>
@@ -523,7 +536,7 @@ async function fetchInvoiceForDO() {
         document.getElementById('d_lbl_volume').innerText = (kData.volume || 0) + ' ' + (kData.satuan || '');
         document.getElementById('d_lbl_total').innerText = formatRupiah(invoiceData.jumlah_pembayaran);
 
-        document.getElementById('d_no_do').value = "DO-" + invoiceData.no_invoice.replace("INV-", "");
+        document.getElementById('d_no_do').value = invoiceData.no_invoice.replace("INV-", "");
         buildDOPreview();
     } catch (err) {
         showToast(err.message, 'error');
@@ -538,6 +551,11 @@ async function fetchInvoiceForDO() {
 
 async function handleDOSubmit(e) {
     e.preventDefault();
+    const btn = document.getElementById('btn-submit-do') || e.target.querySelector('button[type="submit"]');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Memproses...';
+
     const payload = {
         no_do: document.getElementById('d_no_do').value,
         no_invoice: document.getElementById('d_no_invoice').value,
@@ -558,16 +576,17 @@ async function handleDOSubmit(e) {
             let msg = "Gagal menyimpan Delivery Order.";
             try {
                 const errData = await res.json();
-                if (Array.isArray(errData.detail)) msg += " " + errData.detail.map(e => e.loc[e.loc.length - 1] + ': ' + e.msg).join(', ');
-                else msg += " " + (errData.detail || "");
+                msg = errData.message || msg;
             } catch (e) { }
             throw new Error(msg);
         }
 
-        showToast("Delivery Order berhasil diterbitkan!");
-        // document.getElementById('formCreateDO').reset();
+        showToast("Delivery Order " + payload.no_do + " berhasil diterbitkan!", "success");
     } catch (err) {
         showToast(err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
     }
 }
 
