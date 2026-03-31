@@ -57,6 +57,16 @@
             </select>
         </div>
 
+        <div class="flex flex-col gap-1 w-full sm:w-auto flex-1 md:flex-none">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipe Data</label>
+            <select id="filter-laporan-tipe" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[150px]">
+                <option value="ALL" selected>Semua Data</option>
+                <option value="NO_BYPASS">Sembunyikan Bypass</option>
+                <option value="ONLY_BYPASS">Hanya Bypass</option>
+            </select>
+        </div>
+
         <div class="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0 lg:ml-auto">
             <button onclick="resetLaporanFilters()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 py-2.5 px-3 rounded-lg font-semibold transition-colors flex items-center gap-1">
                 <i class="fas fa-times"></i> Reset Filter
@@ -197,11 +207,17 @@
         const buyer = document.getElementById('filter-laporan-pembeli').value;
         const month = document.getElementById('filter-laporan-bulan').value;
         const sort = document.getElementById('filter-laporan-sort').value;
+        const tipe = document.getElementById('filter-laporan-tipe').value;
 
         let filtered = rawLaporanData.filter(r => {
             const matchUnit = unit === 'ALL' || r.Unit === unit;
             const matchKomod = komod === 'ALL' || r.Komoditi === komod;
             const matchBuyer = buyer === 'ALL' || r.Mitra_Pembeli === buyer;
+
+            const isBypass = r.No_DO && r.No_DO.startsWith('BYPASS-');
+            let matchTipe = true;
+            if (tipe === 'NO_BYPASS' && isBypass) matchTipe = false;
+            if (tipe === 'ONLY_BYPASS' && !isBypass) matchTipe = false;
 
             let matchMonth = true;
             if (month !== 'ALL') {
@@ -218,7 +234,7 @@
                 }
             }
 
-            return matchUnit && matchKomod && matchBuyer && matchMonth;
+            return matchUnit && matchKomod && matchBuyer && matchMonth && matchTipe;
         });
 
         // Sorting
@@ -256,6 +272,7 @@
         document.getElementById('filter-laporan-pembeli').value = 'ALL';
         document.getElementById('filter-laporan-bulan').value = 'ALL';
         document.getElementById('filter-laporan-sort').value = 'DESC';
+        document.getElementById('filter-laporan-tipe').value = 'ALL';
         applyLaporanFilters();
     }
 
