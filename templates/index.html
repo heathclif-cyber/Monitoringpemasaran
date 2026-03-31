@@ -56,31 +56,38 @@
         }
 
         .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
             border-radius: 1.25rem;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        .glass-panel:hover {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 1);
+        }
 
         .form-input {
             width: 100%;
             border-radius: 0.75rem;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #cbd5e1;
             padding: 0.625rem 1rem;
             font-size: 0.875rem;
-            background-color: #ffffff;
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-weight: 500;
             transition: all 0.2s ease;
         }
 
         .form-input:focus {
             outline: none;
-            border-color: var(--brand-secondary);
-            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
-            background-color: #fff;
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+            background-color: #ffffff;
         }
 
         .page-section {
@@ -197,13 +204,13 @@
 
     <!-- 1. Sidebar: Fixed to Left with Glassmorphism -->
     <aside id="main-sidebar" class="fixed top-0 left-0 h-screen z-50 overflow-hidden">
-        <div class="px-6 h-16 flex items-center gap-3 border-b border-slate-100/50">
-            <div class="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-lg shrink-0">
-                <i class="fas fa-leaf text-lg"></i>
+        <div class="px-6 h-20 flex items-center gap-3 border-b border-slate-100/50">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/30 shrink-0 transform transition hover:rotate-12">
+                <i class="fas fa-leaf text-xl"></i>
             </div>
             <div>
-                <h1 class="font-extrabold text-slate-800 text-lg leading-tight uppercase tracking-tight">PTPN I</h1>
-                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Regional 8</p>
+                <h1 class="font-black text-slate-800 text-xl leading-tight uppercase tracking-tight">PTPN I</h1>
+                <p class="text-[10px] font-bold text-brand-600 uppercase tracking-widest">Regional 8</p>
             </div>
         </div>
         
@@ -236,15 +243,18 @@
     </aside>
 
     <!-- 2. Header: Fixed with Glassmorphism -->
-    <header id="top-header" class="fixed top-0 right-0 h-16 z-40 flex items-center justify-between px-8 shadow-sm">
-        <h2 id="page-title" class="text-xl font-extrabold text-slate-800 tracking-tight">Dashboard Overview</h2>
-        <div class="flex items-center gap-4">
-            <div class="relative cursor-pointer hover:bg-slate-200/30 p-2 rounded-lg transition-colors">
-                <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                <i class="far fa-bell text-slate-500 text-lg"></i>
+    <header id="top-header" class="fixed top-0 right-0 h-20 z-40 flex items-center justify-between px-8 shadow-sm">
+        <h2 id="page-title" class="text-2xl font-black text-slate-800 tracking-tight drop-shadow-sm">Dashboard Overview</h2>
+        <div class="flex items-center gap-5">
+            <div class="relative cursor-pointer hover:bg-slate-100 p-2.5 rounded-xl transition-colors">
+                <span class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
+                <i class="far fa-bell text-slate-600 text-xl"></i>
             </div>
-            <button class="bg-white/50 border border-slate-200/50 px-4 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-white transition-all shadow-sm">
-                <i class="fas fa-user-circle mr-2 text-brand-600"></i> Admin Profile
+            <button class="bg-white border border-slate-200/60 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 hover:shadow-md transition-all shadow-sm flex items-center gap-2">
+                <div class="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center text-brand-600">
+                    <i class="fas fa-user"></i>
+                </div>
+                Admin Profile
             </button>
         </div>
     </header>
