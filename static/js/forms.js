@@ -330,7 +330,19 @@ async function fetchKontrakForInvoice() {
         const estTotal = data.nilai_transaksi + data.nominal_ppn;
         document.getElementById('i_lbl_total').innerText = formatRupiah(estTotal);
 
-        document.getElementById('i_no_invoice').value = data.no_kontrak;
+        // Auto-generate Invoice number with suffix if multiple Invoices exist for this contract
+        let existingInvs = 0;
+        try {
+            const allInvRes = await fetch('/api/invoice');
+            if(allInvRes.ok) {
+                const allInv = await allInvRes.json();
+                existingInvs = allInv.filter(d => d.no_kontrak === data.no_kontrak).length;
+            }
+        } catch(e) {}
+        
+        let suffix = existingInvs > 0 ? `-${existingInvs + 1}` : '';
+        document.getElementById('i_no_invoice').value = data.no_kontrak + suffix;
+        
         buildInvoicePreview();
     } catch (err) {
         showToast(err.message, 'error');
@@ -536,7 +548,19 @@ async function fetchInvoiceForDO() {
         document.getElementById('d_lbl_volume').innerText = (kData.volume || 0) + ' ' + (kData.satuan || '');
         document.getElementById('d_lbl_total').innerText = formatRupiah(invoiceData.jumlah_pembayaran);
 
-        document.getElementById('d_no_do').value = invoiceData.no_invoice.replace("INV-", "");
+        // Auto-generate DO number with suffix if multiple DOs exist for this invoice
+        let existingDos = 0;
+        try {
+            const allDosRes = await fetch('/api/do');
+            if(allDosRes.ok) {
+                const allDos = await allDosRes.json();
+                existingDos = allDos.filter(d => d.no_invoice === invoiceData.no_invoice).length;
+            }
+        } catch(e) {}
+        
+        let suffix = existingDos > 0 ? `-${existingDos + 1}` : '';
+        document.getElementById('d_no_do').value = invoiceData.no_invoice.replace("INV-", "") + suffix;
+        
         buildDOPreview();
     } catch (err) {
         showToast(err.message, 'error');
