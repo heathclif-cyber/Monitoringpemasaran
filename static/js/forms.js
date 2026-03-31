@@ -57,6 +57,8 @@ async function autoLoadInvoice() {
 }
 
 async function autoLoadDO() {
+    // Guard: don't run while fetchInvoiceForDO is programmatically setting fields
+    if (window._isFetchingInvoiceForDO) return;
     const no = document.getElementById('d_no_do').value;
     if (!no) return;
     try {
@@ -528,6 +530,11 @@ async function fetchInvoiceForDO() {
     const noInvoice = document.getElementById('d_no_invoice').value;
     if (!noInvoice) return;
 
+    // Set guard flag to prevent autoLoadDO from being triggered by datalist browser behavior
+    window._isFetchingInvoiceForDO = true;
+    // Clear the DO number field first to prevent datalist from auto-triggering autoLoadDO
+    document.getElementById('d_no_do').value = '';
+
     try {
         const res = await fetch(`/api/invoice/${noInvoice}`);
         if (!res.ok) throw new Error("Invoice tidak ditemukan");
@@ -572,6 +579,9 @@ async function fetchInvoiceForDO() {
         document.getElementById('d_lbl_komoditi').innerText = '-';
         document.getElementById('d_lbl_volume').innerText = '-';
         document.getElementById('d_lbl_total').innerText = 'Rp 0';
+    } finally {
+        // Always release the guard flag
+        window._isFetchingInvoiceForDO = false;
     }
 }
 
