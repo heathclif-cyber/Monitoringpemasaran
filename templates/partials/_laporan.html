@@ -60,10 +60,24 @@
         <div class="flex flex-col gap-1 w-full sm:w-auto flex-1 md:flex-none">
             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipe Data</label>
             <select id="filter-laporan-tipe" onchange="applyLaporanFilters()"
-                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[150px]">
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[135px]">
                 <option value="ALL" selected>Semua Data</option>
                 <option value="NO_BYPASS">Sembunyikan Bypass</option>
                 <option value="ONLY_BYPASS">Hanya Bypass</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1 w-full sm:w-auto flex-1 md:flex-none">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Status SAP</label>
+            <select id="filter-laporan-sap" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[170px]">
+                <option value="ALL" selected>Semua Status SAP</option>
+                <option value="MISSING_ANY">Belum Lengkap (Ada Kosong)</option>
+                <option value="MISSING_KONTRAK">Belum Ada Kontrak SAP</option>
+                <option value="MISSING_SO">Belum Ada SO SAP</option>
+                <option value="MISSING_DO">Belum Ada DO SAP</option>
+                <option value="MISSING_BILLING">Belum Ada Billing SAP</option>
+                <option value="COMPLETE">Sudah Lengkap Semua</option>
             </select>
         </div>
 
@@ -218,6 +232,7 @@
         const month = document.getElementById('filter-laporan-bulan').value;
         const sort = document.getElementById('filter-laporan-sort').value;
         const tipe = document.getElementById('filter-laporan-tipe').value;
+        const sapFilter = document.getElementById('filter-laporan-sap').value;
 
         let filtered = rawLaporanData.filter(r => {
             const matchUnit = unit === 'ALL' || r.Unit === unit;
@@ -244,7 +259,22 @@
                 }
             }
 
-            return matchUnit && matchKomod && matchBuyer && matchMonth && matchTipe;
+            let matchSap = true;
+            if (sapFilter === 'MISSING_ANY') {
+                matchSap = !r.Kontrak_SAP || !r.SO_SAP || !r.DO_SAP || !r.Billing;
+            } else if (sapFilter === 'MISSING_KONTRAK') {
+                matchSap = !r.Kontrak_SAP;
+            } else if (sapFilter === 'MISSING_SO') {
+                matchSap = !r.SO_SAP;
+            } else if (sapFilter === 'MISSING_DO') {
+                matchSap = !r.DO_SAP;
+            } else if (sapFilter === 'MISSING_BILLING') {
+                matchSap = !r.Billing;
+            } else if (sapFilter === 'COMPLETE') {
+                matchSap = r.Kontrak_SAP && r.SO_SAP && r.DO_SAP && r.Billing;
+            }
+
+            return matchUnit && matchKomod && matchBuyer && matchMonth && matchTipe && matchSap;
         });
 
         // Sorting
@@ -290,6 +320,7 @@
         document.getElementById('filter-laporan-bulan').value = 'ALL';
         document.getElementById('filter-laporan-sort').value = 'DESC';
         document.getElementById('filter-laporan-tipe').value = 'ALL';
+        document.getElementById('filter-laporan-sap').value = 'ALL';
         applyLaporanFilters();
     }
 
