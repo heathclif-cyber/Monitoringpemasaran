@@ -305,7 +305,7 @@
         data.forEach((row, i) => {
             const tr = document.createElement('tr');
             tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
-            const fmtRp = val => val ? formatRupiah(val) : '-';
+            const fmtRp = val => (val !== null && val !== undefined) ? formatRupiah(val) : '-';
             const fmtNum = val => val ? Number(val).toLocaleString('id-ID') : '-';
 
             // Helper to make a cell editable if No_DO exists

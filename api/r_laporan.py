@@ -144,6 +144,8 @@ def get_laporan(db: Session = Depends(get_db)):
             "Satuan": b.satuan or "Kg",
             "Pendapatan_Pokok": b.nominal or 0,
             "Pajak_PPN": 0,
+            "PPh_Nominal": 0,
+            "PPh_Setor": "false",
             "Kewajiban_Pembayaran": b.nominal or 0,
             "Bulan_Buku": get_bulan_buku(b.tanggal),
             "Superman": b.superman or "",
