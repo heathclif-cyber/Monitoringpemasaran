@@ -367,7 +367,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_ppn = rows[7].cells[5]
     c_ppn.merge(rows[7].cells[9])
     ppn_pct = k.ppn_persen or 11
-    add_rt(c_ppn, 'PPN:', f"PPN 12% (Tarif Efektif {ppn_pct}%)")
+    add_rt(c_ppn, 'PPN:', f"Pajak Pertambahan Nilai (Tarif Efektif {ppn_pct}%)")
 
     # Row 8
     c_kon = rows[8].cells[0]

@@ -18,8 +18,10 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
 
-    # Calculate fields
-    jumlah_pembayaran = db_kontrak.nilai_transaksi + db_kontrak.nominal_ppn + (db_kontrak.nilai_transaksi * ((invoice.pph_22_persen or 0.0) / 100))
+    # Calculate fields using contract's nominal_ppn for consistency
+    ppn_amount = db_kontrak.nilai_transaksi * (db_kontrak.ppn_persen / 100)
+    pph_amount = db_kontrak.nilai_transaksi * ((invoice.pph_22_persen or 0.0) / 100)
+    jumlah_pembayaran = db_kontrak.nilai_transaksi + ppn_amount + pph_amount
     terbilang_invoice = terbilang_rupiah(math.floor(jumlah_pembayaran))
 
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == invoice.no_invoice).first()

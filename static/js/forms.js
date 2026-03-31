@@ -460,7 +460,7 @@ function buildInvoicePreview() {
                 <td style="${tdStyle}" colspan="5"><strong>Mutu:</strong><br>${k.mutu || '-'}</td>
             </tr>
             <tr>
-                <td style="${tdStyle}" colspan="5"><strong>PPN:</strong></td>
+                <td style="${tdStyle}" colspan="5"><strong>PPN:</strong><br>Tarif Efektif ${ppnPct}%</td>
             </tr>
             <tr>
                 <td style="${tdStyle}" colspan="5"><strong>Kondisi Penyerahan:</strong><br>${k.kondisi_penyerahan || '-'}</td>
@@ -493,7 +493,7 @@ function buildInvoicePreview() {
                 <td style="${tdStyle} text-align:right; border-left:none;">${nilai > 0 ? nilai.toLocaleString('id-ID') : '-'}</td>
             </tr>
             <tr>
-                <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN</strong></td>
+                <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN ${ppnPct}%</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
                 <td style="${tdStyle} text-align:right; border-left:none;"><strong>${nomPpn > 0 ? nomPpn.toLocaleString('id-ID') : '-'}</strong></td>
             </tr>
