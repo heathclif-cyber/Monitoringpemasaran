@@ -33,8 +33,21 @@ def get_laporan(db: Session = Depends(get_db)):
         do_nominal = float(do.nominal_transfer or 0) if do else 0
         # Pendapatan Pokok for this DO = proportional: (volume_do / kontrak_vol) * nilai_transaksi
         k_vol_local = float(k.volume or 0)
+        k_harga_local = float(k.harga_satuan or 0)
+        k_premi = float(k.premi or 0)
         k_nilai = float(k.nilai_transaksi or 0)
         k_ppn = float(k.nominal_ppn or 0)
+        
+        if k_nilai <= 0:
+            k_nilai = (k_vol_local * k_harga_local) + k_premi
+        
+        if k_ppn <= 0 and k_nilai > 0:
+            k_ppn_persen = float(getattr(k, 'ppn_persen', 0) or 0)
+            if k_ppn_persen > 0:
+                k_ppn = k_nilai * (k_ppn_persen / 100)
+            elif inv and float(inv.jumlah_pembayaran or 0) > k_nilai:
+                k_ppn = float(inv.jumlah_pembayaran) - k_nilai
+
         if k_vol_local > 0 and do:
             ratio = do_volume / k_vol_local
             pendapatan_do = k_nilai * ratio
@@ -66,7 +79,6 @@ def get_laporan(db: Session = Depends(get_db)):
             "Pendapatan_Pokok": round(pendapatan_do, 2),
             "Pajak_PPN": round(ppn_do, 2),
             "Kewajiban_Pembayaran": inv.jumlah_pembayaran if inv else 0,
-            "Selisih": do.selisih if do else (inv.jumlah_pembayaran if inv else 0),
             "Sisa_Pembayaran": sisa_pembayaran,
             "Sisa_Volume": sisa_volume,
             "Bulan_Buku": get_bulan_buku(do.tanggal_pembayaran) if do and do.tanggal_pembayaran else "",
@@ -120,7 +132,6 @@ def get_laporan(db: Session = Depends(get_db)):
             "Pendapatan_Pokok": b.nominal or 0,
             "Pajak_PPN": 0,
             "Kewajiban_Pembayaran": b.nominal or 0,
-            "Selisih": 0,
             "Bulan_Buku": get_bulan_buku(b.tanggal),
             "Superman": b.superman or "",
             "Kontrak_SAP": b.kontrak_sap or "",
