@@ -32,21 +32,36 @@ def startup_event():
         
         # --- MIGRATION: Ensure new columns exist ---
         from sqlalchemy import text
-        db = SessionLocal()
         try:
+            db = SessionLocal()
             logger.info("Migrating missing columns (PPh, volume, etc)...")
-            # postgres supports ADD COLUMN IF NOT EXISTS
-            db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS volume FLOAT DEFAULT 0.0"))
-            db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS satuan VARCHAR DEFAULT 'Kg'"))
-            db.execute(text("ALTER TABLE delivery_order ADD COLUMN IF NOT EXISTS volume_do FLOAT DEFAULT 0.0"))
-            db.execute(text("ALTER TABLE delivery_order ADD COLUMN IF NOT EXISTS is_pph_disetor VARCHAR DEFAULT 'false'"))
-            db.execute(text("ALTER TABLE kontrak ADD COLUMN IF NOT EXISTS is_pph VARCHAR DEFAULT 'false'"))
-            db.execute(text("ALTER TABLE kontrak ADD COLUMN IF NOT EXISTS pph_persen FLOAT DEFAULT 0.0"))
-            db.commit()
-            logger.info("Migration complete: columns verified/added.")
+            from sqlalchemy import text
+            
+            # Helper to add column safely
+            def add_column_safely(table, col, type_def):
+                try:
+                    # Try Postgres style first (IF NOT EXISTS)
+                    db.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {type_def}"))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    try:
+                        # Try SQLite/Standard style (will fail if exists)
+                        db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_def}"))
+                        db.commit()
+                    except Exception:
+                        db.rollback() # Likely already exists
+            
+            add_column_safely("laporan_bypass", "volume", "FLOAT DEFAULT 0.0")
+            add_column_safely("laporan_bypass", "satuan", "VARCHAR DEFAULT 'Kg'")
+            add_column_safely("delivery_order", "volume_do", "FLOAT DEFAULT 0.0")
+            add_column_safely("delivery_order", "is_pph_disetor", "VARCHAR DEFAULT 'false'")
+            add_column_safely("kontrak", "is_pph", "VARCHAR DEFAULT 'false'")
+            add_column_safely("kontrak", "pph_persen", "FLOAT DEFAULT 0.0")
+            
+            logger.info("Migration routine finished.")
         except Exception as migrate_err:
-            logger.error(f"Migration failed: {migrate_err}")
-            db.rollback()
+            logger.error(f"Migration routine failed: {migrate_err}")
         finally:
             db.close()
 
