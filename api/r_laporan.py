@@ -48,16 +48,27 @@ def get_laporan(db: Session = Depends(get_db)):
             elif inv and float(inv.jumlah_pembayaran or 0) > k_nilai:
                 k_ppn = float(inv.jumlah_pembayaran) - k_nilai
 
+        k_pph = 0.0
+        if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
+            k_pph_p = float(getattr(k, 'pph_persen', 0) or 0)
+            k_pph = k_nilai * (k_pph_p / 100)
+
         if k_vol_local > 0 and do:
             ratio = do_volume / k_vol_local
             pendapatan_do = k_nilai * ratio
             ppn_do = k_ppn * ratio
+            pph_do = k_pph * ratio
         else:
             pendapatan_do = k_nilai
             ppn_do = k_ppn
+            pph_do = k_pph
 
         # Sisa pembayaran = Invoice total - sum of ALL DOs nominal for this invoice
-        sisa_pembayaran = round(float(inv_total) - float(total_do_nominal), 2) if inv else 0
+        # If invoice total is missing, fallback to calculate it
+        if not inv_total or inv_total <= 0:
+            inv_total = k_nilai + k_ppn - k_pph
+
+        sisa_pembayaran = round(float(inv_total) - float(total_do_nominal), 2) if (inv or do) else 0
         # Sisa volume = Kontrak volume - sum of ALL DOs volume for this invoice
         sisa_volume = round(float(k_vol_local) - float(total_do_volume), 2)
 
@@ -78,7 +89,9 @@ def get_laporan(db: Session = Depends(get_db)):
             "Jumlah_DO": do_volume,
             "Pendapatan_Pokok": round(pendapatan_do, 2),
             "Pajak_PPN": round(ppn_do, 2),
-            "Kewajiban_Pembayaran": inv.jumlah_pembayaran if inv else 0,
+            "PPh_Nominal": round(pph_do, 2),
+            "PPh_Setor": do.is_pph_disetor if do else "false",
+            "Kewajiban_Pembayaran": inv_total,
             "Sisa_Pembayaran": sisa_pembayaran,
             "Sisa_Volume": sisa_volume,
             "Bulan_Buku": get_bulan_buku(do.tanggal_pembayaran) if do and do.tanggal_pembayaran else "",

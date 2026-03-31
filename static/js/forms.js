@@ -28,7 +28,7 @@ async function autoLoadKontrak() {
         const res = await fetch('/api/kontrak/' + encodeURIComponent(no));
         if (!res.ok) return;
         const data = await res.json();
-        const fields = ['tanggal_kontrak', 'lokasi', 'pemilik_komoditas', 'penjual', 'pembeli', 'nama_direktur', 'alamat_pembeli', 'komoditi', 'jenis_komoditi', 'deskripsi_produk', 'tahun_panen', 'kebun_produsen', 'volume', 'satuan', 'harga_satuan', 'ppn_persen', 'premi', 'mutu', 'packaging', 'simbol', 'chop', 'pack_qty', 'banyak_bale', 'kondisi_penyerahan', 'waktu_penyerahan', 'levering', 'pelabuhan_muat', 'lama_pembayaran_hari', 'penyerahan_hari', 'pembayaran_metode', 'pembayaran_cara', 'pembayaran_bank'];
+        const fields = ['tanggal_kontrak', 'lokasi', 'pemilik_komoditas', 'penjual', 'pembeli', 'nama_direktur', 'alamat_pembeli', 'komoditi', 'jenis_komoditi', 'deskripsi_produk', 'tahun_panen', 'kebun_produsen', 'volume', 'satuan', 'harga_satuan', 'ppn_persen', 'is_pph', 'pph_persen', 'premi', 'mutu', 'packaging', 'simbol', 'chop', 'pack_qty', 'banyak_bale', 'kondisi_penyerahan', 'waktu_penyerahan', 'levering', 'pelabuhan_muat', 'lama_pembayaran_hari', 'penyerahan_hari', 'pembayaran_metode', 'pembayaran_cara', 'pembayaran_bank'];
         fields.forEach(f => {
             const el = document.getElementById('k_' + f);
             if (el && data[f] !== undefined) el.value = data[f];
@@ -70,6 +70,7 @@ async function autoLoadDO() {
         document.getElementById('d_kepada_unit').value = data.kepada_unit;
         document.getElementById('d_tanggal_pembayaran').value = data.tanggal_pembayaran;
         document.getElementById('d_nominal_transfer').value = data.nominal_transfer;
+        document.getElementById('d_is_pph_disetor').value = data.is_pph_disetor || "false";
         await fetchInvoiceForDO();
         document.getElementById('d_no_do').value = no; // Restore ID after fetchInvoiceForDO overwrites it
         showToast("Mode Edit: Data DO " + no + " berhasil dimuat.", "info");
@@ -107,9 +108,13 @@ function buildLivePreview() {
     const harga = parseFloat(g('k_harga_satuan')) || 0;
     const premi = parseFloat(g('k_premi')) || 0;
     const ppnPct = parseFloat(g('k_ppn_persen')) || 11;
-
-    const nilai = (vol * harga) + premi;
-    const nominalPpn = nilai * (ppnPct / 100);
+    const isPph = g('k_is_pph') === 'true';
+    const pphPct = parseFloat(g('k_pph_persen')) || 0;
+    
+    const nilaiPokok = (vol * harga) + premi;
+    const nominalPpn = nilaiPokok * (ppnPct / 100);
+    const nominalPph = isPph ? (nilaiPokok * (pphPct / 100)) : 0;
+    const totalByr = nilaiPokok + nominalPpn - nominalPph;
 
     const volStr = vol > 0 ? vol.toLocaleString('id-ID') + ' ' + satuan : '-';
     const hrgStr = harga > 0 ? fmtRpFull(harga) + ' per ' + satuan : '-';
@@ -133,7 +138,9 @@ function buildLivePreview() {
     ];
 
     const dasar = 'Mengacu kepada tata Cara dan Ketentuan Penjualan Komoditi Perkebunan PT Perkebunan Nusantara III (Persero)';
-    const jumlahStr = fmtRpFull(nilai);
+    const jumlahStr = fmtRpFull(nilaiPokok);
+    const pphTag = isPph ? `${rowS('PPh', 'Potongan PPh 22 (' + pphPct + '%) : -' + fmtRpLocal(nominalPph))}` : '';
+    const totalTag = isPph ? `${rowS('Total Tagihan', fmtRpFull(totalByr), true)}` : '';
 
     const html = `
     <div style="font-family:'Arial',sans-serif;font-size:9pt;color:#000;padding:14px;background:white">
@@ -187,6 +194,8 @@ function buildLivePreview() {
         </tr>
         ${rowS('Dasar Ketentuan', dasar)}
         ${rowS('Jumlah (Pokok)', jumlahStr)}
+        ${pphTag}
+        ${totalTag}
         ${rowS('Catatan', '-')}
       </table>
       
@@ -203,8 +212,27 @@ function buildLivePreview() {
 
     const elNilai = document.getElementById('k_preview_nilai');
     const elPpn = document.getElementById('k_preview_ppn');
-    if (elNilai) elNilai.innerText = fmtRpFull(nilai);
+    const elPph = document.getElementById('k_preview_pph');
+    const elTotal = document.getElementById('k_preview_total');
+
+    if (elNilai) elNilai.innerText = fmtRpFull(nilaiPokok);
     if (elPpn) elPpn.innerText = fmtRpFull(nominalPpn);
+    if (elPph) {
+        if (isPph) {
+            elPph.parentElement.classList.remove('hidden');
+            elPph.innerText = '-' + fmtRpFull(nominalPph);
+        } else {
+            elPph.parentElement.classList.add('hidden');
+        }
+    }
+    if (elTotal) {
+        if (isPph) {
+            elTotal.parentElement.classList.remove('hidden');
+            elTotal.innerText = fmtRpFull(totalByr);
+        } else {
+            elTotal.parentElement.classList.add('hidden');
+        }
+    }
 }
 
 function calculateKontrakPreview() { buildLivePreview(); }
@@ -236,6 +264,8 @@ async function handleKontrakSubmit(e) {
         satuan: getVal('k_satuan'),
         harga_satuan: parseFloat(getVal('k_harga_satuan')) || 0,
         ppn_persen: parseFloat(getVal('k_ppn_persen')) || 0,
+        is_pph: getVal('k_is_pph'),
+        pph_persen: parseFloat(getVal('k_pph_persen')) || 0,
         premi: parseFloat(getVal('k_premi')) || 0,
         mutu: getVal('k_mutu'),
         packaging: getVal('k_packaging'),
@@ -632,6 +662,7 @@ async function handleDOSubmit(e) {
         kepada_unit: document.getElementById('d_kepada_unit').value,
         nominal_transfer: parseFloat(document.getElementById('d_nominal_transfer').value) || 0,
         tanggal_pembayaran: document.getElementById('d_tanggal_pembayaran').value || null,
+        is_pph_disetor: document.getElementById('d_is_pph_disetor').value || "false",
     };
 
     try {

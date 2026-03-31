@@ -115,6 +115,8 @@
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah DO</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pendapatan Pokok (Rp)</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pajak PPN</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pajak PPh</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">PPh Setor?</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Kewajiban Pembayaran Mitra
                         </th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right bg-red-50 text-red-700">Sisa Kekurangan<br>Pembayaran</th>
@@ -130,7 +132,7 @@
                 </thead>
                 <tbody id="laporan-tbody" class="bg-white">
                     <tr>
-                        <td colspan="25" class="text-center py-6 text-slate-400">Loading data...</td>
+                        <td colspan="27" class="text-center py-6 text-slate-400">Loading data...</td>
                     </tr>
                 </tbody>
             </table>
@@ -296,7 +298,7 @@
         tbody.innerHTML = '';
 
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="25" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="27" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
             return;
         }
 
@@ -338,6 +340,8 @@
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_DO || 0}">${fmtNum(row.Jumlah_DO)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium" data-t="n" data-v="${row.Pendapatan_Pokok || 0}">${fmtRp(row.Pendapatan_Pokok)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Pajak_PPN || 0}">${fmtRp(row.Pajak_PPN)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.PPh_Nominal || 0}">${fmtRp(row.PPh_Nominal)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-center font-bold ${String(row.PPh_Setor).toLowerCase() === 'true' ? 'text-emerald-600' : 'text-slate-400'}">${String(row.PPh_Setor).toLowerCase() === 'true' ? '✓ Disetor' : '-'}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-slate-800" data-t="n" data-v="${row.Kewajiban_Pembayaran || 0}">${fmtRp(row.Kewajiban_Pembayaran)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-bold ${row.Sisa_Pembayaran > 0 ? 'text-red-600 bg-red-50' : (row.Sisa_Pembayaran === 0 ? 'text-emerald-600' : 'text-slate-400')}" data-t="n" data-v="${row.Sisa_Pembayaran || 0}">${row.Sisa_Pembayaran > 0 ? fmtRp(row.Sisa_Pembayaran) : (row.Sisa_Pembayaran === 0 ? '✓ Lunas' : '-')}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-bold ${row.Sisa_Volume > 0 ? 'text-amber-600 bg-amber-50' : (row.Sisa_Volume === 0 ? 'text-emerald-600' : 'text-slate-400')}" data-t="n" data-v="${row.Sisa_Volume || 0}">${row.Sisa_Volume > 0 ? fmtNum(row.Sisa_Volume) : (row.Sisa_Volume === 0 ? '✓ Selesai' : '-')}</td>

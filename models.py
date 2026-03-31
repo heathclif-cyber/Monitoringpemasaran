@@ -28,6 +28,9 @@ class Kontrak(Base):
     premi = Column(Float, default=0.0)
     ppn_persen = Column(Float, default=11.0)
     
+    is_pph = Column(String, default="false") # using String for boolean ease across sqlite/postgres
+    pph_persen = Column(Float, default=0.0)
+    
     alamat_produksi = Column(String)
     chop = Column(String)
     pack_qty = Column(Float, default=0.0)
@@ -87,6 +90,7 @@ class DeliveryOrder(Base):
     alamat_unit = Column(String)
     tanggal_pembayaran = Column(Date, nullable=True)
     nominal_transfer = Column(Float, default=0.0)
+    is_pph_disetor = Column(String, default="false")
     
     # New SAP Fields
     superman = Column(String, nullable=True)

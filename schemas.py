@@ -26,6 +26,9 @@ class KontrakBase(BaseModel):
     premi: Optional[float] = 0.0
     ppn_persen: Optional[float] = 11.0
     
+    is_pph: Optional[str] = "false"
+    pph_persen: Optional[float] = 0.0
+    
     alamat_produksi: Optional[str] = None
     chop: Optional[str] = None
     pack_qty: Optional[float] = 0.0
@@ -88,6 +91,7 @@ class DeliveryOrderBase(BaseModel):
     alamat_unit: Optional[str] = None
     tanggal_pembayaran: Optional[date] = None
     nominal_transfer: Optional[float] = 0.0
+    is_pph_disetor: Optional[str] = "false"
 
 class DeliveryOrderCreate(DeliveryOrderBase):
     pass
