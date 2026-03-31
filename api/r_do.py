@@ -16,21 +16,35 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Calculate fields
-    selisih = db_invoice.jumlah_pembayaran - (do.nominal_transfer or 0.0)
+    # Get kontrak for volume calculation
+    db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == db_invoice.no_kontrak).first()
+    kontrak_volume = float(db_kontrak.volume or 0) if db_kontrak else 0
+    invoice_total = float(db_invoice.jumlah_pembayaran or 0)
+    nominal = float(do.nominal_transfer or 0)
+
+    # Calculate proportional volume: (payment / invoice_total) * kontrak_volume
+    if invoice_total > 0 and kontrak_volume > 0:
+        volume_do = (nominal / invoice_total) * kontrak_volume
+    else:
+        volume_do = kontrak_volume  # fallback: full volume
+
+    # Calculate selisih
+    selisih = invoice_total - nominal
 
     db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == do.no_do).first()
     if db_do:
         for key, value in do.model_dump().items():
             setattr(db_do, key, value)
         db_do.selisih = selisih
+        db_do.volume_do = round(volume_do, 2)
         db.commit()
         db.refresh(db_do)
         return db_do
     else:
         new_do = models.DeliveryOrder(
             **do.model_dump(),
-            selisih=selisih
+            selisih=selisih,
+            volume_do=round(volume_do, 2)
         )
         db.add(new_do)
         db.commit()

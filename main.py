@@ -38,6 +38,7 @@ def startup_event():
             # Try to add columns if they don't exist
             db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS volume FLOAT DEFAULT 0.0"))
             db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS satuan VARCHAR DEFAULT 'Kg'"))
+            db.execute(text("ALTER TABLE delivery_order ADD COLUMN IF NOT EXISTS volume_do FLOAT DEFAULT 0.0"))
             db.commit()
             logger.info("Migration complete: columns verified/added.")
         except Exception as migrate_err:

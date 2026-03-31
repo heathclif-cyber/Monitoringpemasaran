@@ -29,6 +29,20 @@ def get_laporan(db: Session = Depends(get_db)):
     rows = []
     
     def build_row(k, inv, do):
+        do_volume = float(do.volume_do or 0) if do else 0
+        do_nominal = float(do.nominal_transfer or 0) if do else 0
+        # Pendapatan Pokok for this DO = proportional: (volume_do / kontrak_vol) * nilai_transaksi
+        k_vol = float(k.volume or 0)
+        k_nilai = float(k.nilai_transaksi or 0)
+        k_ppn = float(k.nominal_ppn or 0)
+        if k_vol > 0 and do:
+            ratio = do_volume / k_vol
+            pendapatan_do = k_nilai * ratio
+            ppn_do = k_ppn * ratio
+        else:
+            pendapatan_do = k_nilai
+            ppn_do = k_ppn
+
         return {
             "No_DO": do.no_do if do else "",
             "No_Invoice": inv.no_invoice if inv else "",
@@ -37,14 +51,15 @@ def get_laporan(db: Session = Depends(get_db)):
             "Komoditi": k.komoditi or "",
             "Billing_Date": format_date(inv.tanggal_transaksi) if inv else format_date(k.tanggal_kontrak),
             "Tanggal_Transfer": format_date(do.tanggal_pembayaran) if do else "",
-            "Jumlah_Transfer": do.nominal_transfer if do else 0,
+            "Raw_Date": (do.tanggal_pembayaran or (inv.tanggal_transaksi if inv else k.tanggal_kontrak)).strftime("%Y-%m-%d") if (do and do.tanggal_pembayaran) or inv or k.tanggal_kontrak else "",
+            "Jumlah_Transfer": do_nominal,
             "Mitra_Pembeli": k.pembeli or "",
             "Deskripsi_Produk": (k.deskripsi_produk or k.komoditi) or "",
             "Jumlah_Kontrak_Kg": k.volume or 0,
             "Harga_Per_Kg": k.harga_satuan or 0,
-            "Jumlah_DO": k.volume or 0, # Assuming full quantity
-            "Pendapatan_Pokok": k.nilai_transaksi or 0,
-            "Pajak_PPN": k.nominal_ppn or 0,
+            "Jumlah_DO": do_volume,
+            "Pendapatan_Pokok": round(pendapatan_do, 2),
+            "Pajak_PPN": round(ppn_do, 2),
             "Kewajiban_Pembayaran": inv.jumlah_pembayaran if inv else 0,
             "Selisih": do.selisih if do else (inv.jumlah_pembayaran if inv else 0),
             "Bulan_Buku": get_bulan_buku(do.tanggal_pembayaran) if do and do.tanggal_pembayaran else "",

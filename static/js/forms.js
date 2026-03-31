@@ -541,6 +541,7 @@ async function fetchInvoiceForDO() {
         } catch (e) { }
 
         window.currentDOKontrak = kData;
+        window.currentDOInvoice = invoiceData;
 
         document.getElementById('d_lbl_kontrak').innerText = invoiceData.no_kontrak || '-';
         document.getElementById('d_lbl_pembeli').innerText = (kData.pembeli ? kData.pembeli.split('\n')[0] : '-');
@@ -561,6 +562,7 @@ async function fetchInvoiceForDO() {
         let suffix = existingDos > 0 ? `-${existingDos + 1}` : '';
         document.getElementById('d_no_do').value = invoiceData.no_invoice.replace("INV-", "") + suffix;
         
+        updateProportionalVolume();
         buildDOPreview();
     } catch (err) {
         showToast(err.message, 'error');
@@ -571,6 +573,39 @@ async function fetchInvoiceForDO() {
         document.getElementById('d_lbl_volume').innerText = '-';
         document.getElementById('d_lbl_total').innerText = 'Rp 0';
     }
+}
+
+// Store invoice data globally for proportional calculation
+window.currentDOInvoice = null;
+
+function updateProportionalVolume() {
+    const k = window.currentDOKontrak || {};
+    const inv = window.currentDOInvoice || {};
+    const nominal = parseFloat(document.getElementById('d_nominal_transfer').value) || 0;
+    const invoiceTotal = parseFloat(inv.jumlah_pembayaran) || 0;
+    const kontrakVol = parseFloat(k.volume) || 0;
+    const satuan = k.satuan || 'Kg';
+
+    let volumeDo = 0;
+    if (invoiceTotal > 0 && kontrakVol > 0) {
+        volumeDo = (nominal / invoiceTotal) * kontrakVol;
+    }
+
+    const lbl = document.getElementById('d_lbl_volume_do');
+    if (lbl) {
+        lbl.innerText = volumeDo.toLocaleString('id-ID', {maximumFractionDigits: 2}) + ' ' + satuan;
+        // Visual feedback: green if > 0, red if > 100%
+        const pct = invoiceTotal > 0 ? (nominal / invoiceTotal * 100) : 0;
+        if (pct > 100) {
+            lbl.className = 'text-sm font-bold text-red-600';
+        } else if (pct > 0) {
+            lbl.className = 'text-sm font-bold text-emerald-700';
+        } else {
+            lbl.className = 'text-sm font-bold text-blue-800';
+        }
+    }
+    // Update preview too
+    buildDOPreview();
 }
 
 async function handleDOSubmit(e) {
@@ -632,7 +667,17 @@ function buildDOPreview() {
     // tgl is YYYY-MM-DD from input type=date.
     const tglDoStr = tgl ? tgl.split('-').reverse().join('/') : '-'; 
     
-    const volStr = k.volume ? Number(k.volume).toLocaleString('id-ID') : '-';
+    const inv = window.currentDOInvoice || {};
+    const nominal = parseFloat(document.getElementById('d_nominal_transfer').value) || 0;
+    const invoiceTotal = parseFloat(inv.jumlah_pembayaran) || 0;
+    const kontrakVol = parseFloat(k.volume) || 0;
+    
+    // Calculate proportional volume for preview
+    let propVol = 0;
+    if (invoiceTotal > 0 && kontrakVol > 0) {
+        propVol = (nominal / invoiceTotal) * kontrakVol;
+    }
+    const volStr = propVol > 0 ? Number(propVol).toLocaleString('id-ID', {maximumFractionDigits: 2}) : (k.volume ? Number(k.volume).toLocaleString('id-ID') : '-');
     const baleStr = k.banyaknya_bale_karung ? Number(k.banyaknya_bale_karung) : '-';
 
     const html = `
@@ -684,7 +729,7 @@ function buildDOPreview() {
                 <td style="${tdCenter}">${baleStr}</td>
                 <td style="${tdCenter}">${k.no_kav_chop || '-'}</td>
                 <td style="${tdStyle}">${k.no_kontrak || '-'}</td>
-                <td style="${tdCenter}">${volStr}</td>
+                <td style="${tdCenter}"><strong>${volStr}</strong></td>
                 <td style="${tdCenter}">${k.levering || '-'}</td>
             </tr>
             <tr>

@@ -97,6 +97,7 @@ class DeliveryOrder(Base):
     
     # Calculated Fields
     selisih = Column(Float, default=0.0)
+    volume_do = Column(Float, default=0.0)
     
     invoice = relationship("Invoice", back_populates="delivery_orders")
 
