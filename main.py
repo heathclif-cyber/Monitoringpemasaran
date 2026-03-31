@@ -56,6 +56,8 @@ def startup_event():
             add_column_safely("laporan_bypass", "satuan", "VARCHAR DEFAULT 'Kg'")
             add_column_safely("delivery_order", "volume_do", "FLOAT DEFAULT 0.0")
             add_column_safely("delivery_order", "is_pph_disetor", "VARCHAR DEFAULT 'false'")
+            add_column_safely("kontrak", "is_ppn", "VARCHAR DEFAULT 'true'")
+            add_column_safely("kontrak", "ppn_persen", "FLOAT DEFAULT 11.0")
             add_column_safely("kontrak", "is_pph", "VARCHAR DEFAULT 'false'")
             add_column_safely("kontrak", "pph_persen", "FLOAT DEFAULT 0.0")
             
