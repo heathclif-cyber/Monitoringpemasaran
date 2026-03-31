@@ -108,11 +108,12 @@ function buildLivePreview() {
     const harga = parseFloat(g('k_harga_satuan')) || 0;
     const premi = parseFloat(g('k_premi')) || 0;
     const ppnPct = parseFloat(g('k_ppn_persen')) || 11;
+    const isPpn = g('k_is_ppn') === 'true';
     const isPph = g('k_is_pph') === 'true';
     const pphPct = parseFloat(g('k_pph_persen')) || 0;
     
     const nilaiPokok = (vol * harga) + premi;
-    const nominalPpn = nilaiPokok * (ppnPct / 100);
+    const nominalPpn = isPpn ? (nilaiPokok * (ppnPct / 100)) : 0;
     const nominalPph = isPph ? (nilaiPokok * (pphPct / 100)) : 0;
     const totalByr = nilaiPokok + nominalPpn - nominalPph;
 
