@@ -38,6 +38,27 @@ async function fetchDashboardData() {
         document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice;
         document.getElementById('dash-do-count').innerText = data.summary.total_do;
 
+        // --- Update SAP Stats (Missing counts) ---
+        if (data.summary.sap_stats) {
+            const updateStat = (id, count) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerText = count || 0;
+                    if (count > 0) {
+                        el.classList.remove('text-slate-400');
+                        el.classList.add('text-rose-600');
+                    } else {
+                        el.classList.remove('text-rose-600');
+                        el.classList.add('text-slate-400');
+                    }
+                }
+            };
+            updateStat('dash-sap-kontrak', data.summary.sap_stats.missing_kontrak);
+            updateStat('dash-sap-so', data.summary.sap_stats.missing_so);
+            updateStat('dash-sap-do', data.summary.sap_stats.missing_do);
+            updateStat('dash-sap-billing', data.summary.sap_stats.missing_billing);
+        }
+
         // Populasi dropdown tahun dari data available_years
         if (data.available_years && yearSelect) {
             const currentVal = yearSelect.value;

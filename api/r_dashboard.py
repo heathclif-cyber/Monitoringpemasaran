@@ -166,6 +166,24 @@ def get_dashboard_data(
                 "total_nilai_invoice": total_nilai_invoice,
                 "total_cash_in": total_cash_in,
                 "total_volume_realisasi": float(sum(vol_m.values())),
+                "sap_stats": {
+                    "missing_kontrak": int(
+                        db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.kontrak_sap == None) | (models.DeliveryOrder.kontrak_sap == '')).scalar() or 0
+                        + db.query(func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids), (models.LaporanBypass.kontrak_sap == None) | (models.LaporanBypass.kontrak_sap == '')).scalar() or 0
+                    ),
+                    "missing_so": int(
+                        db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.so_sap == None) | (models.DeliveryOrder.so_sap == '')).scalar() or 0
+                        + db.query(func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids), (models.LaporanBypass.so_sap == None) | (models.LaporanBypass.so_sap == '')).scalar() or 0
+                    ),
+                    "missing_do": int(
+                        db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.do_sap == None) | (models.DeliveryOrder.do_sap == '')).scalar() or 0
+                        + db.query(func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids), (models.LaporanBypass.do_sap == None) | (models.LaporanBypass.do_sap == '')).scalar() or 0
+                    ),
+                    "missing_billing": int(
+                        db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.billing_sap == None) | (models.DeliveryOrder.billing_sap == '')).scalar() or 0
+                        + db.query(func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids), (models.LaporanBypass.billing_sap == None) | (models.LaporanBypass.billing_sap == '')).scalar() or 0
+                    ),
+                }
             },
             "charts": {
                 "komoditas": {"labels": list(kom_map.keys()), "values": list(kom_map.values())},
