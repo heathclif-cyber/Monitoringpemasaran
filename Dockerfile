@@ -26,8 +26,8 @@ COPY --chown=user . /app
 # Use the non-root user
 USER user
 
-# Hugging Face Spaces expects the app to run on port 7860
-EXPOSE 7860
+# Railway typically uses the $PORT environment variable
+EXPOSE 8080
 
-# Run the app
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# Run the app using the PORT env var if available, otherwise default to 8080
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips '*'"]

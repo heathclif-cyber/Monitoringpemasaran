@@ -233,10 +233,6 @@ def generate_contract_docx(k) -> io.BytesIO:
     
     p_l = sig.rows[1].cells[0].paragraphs[0]; _run(p_l, 'Persetujuan Pembeli', True)
     
-    _run(sig.rows[2].cells[0].paragraphs[0], '\n\n\n\n')
-    
-    p_l3 = sig.rows[3].cells[0].paragraphs[0]; _run(p_l3, '(________________________)')
-
     buf = io.BytesIO()
     doc.save(buf)
     buf.seek(0)
