@@ -202,8 +202,7 @@ function buildLivePreview() {
       
       <p style="text-align:right;margin:24px 0 10px;font-size:9pt;">${lokasi}, ${fmtDateLocal(tgl)}</p>
       <div style="margin-top:24px;font-size:9pt;font-weight:600;text-align:left;">
-        <div style="margin-bottom:60px">Persetujuan Pembeli</div>
-        <div>(________________________)</div>
+        <div>Persetujuan Pembeli</div>
       </div>
     </div>
     `;
