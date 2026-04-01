@@ -34,7 +34,7 @@ async function fetchDashboardData() {
         // --- Update Summary Cards ---
         document.getElementById('dash-nilai-transaksi').innerText = formatRupiah(data.summary.total_nilai_transaksi);
         document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in);
-        document.getElementById('dash-volume-realisasi').innerText = data.summary.total_volume_realisasi.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' Kg';
+        document.getElementById('dash-volume-realisasi').innerText = data.summary.total_volume_realisasi.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg';
         document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice;
         document.getElementById('dash-do-count').innerText = data.summary.total_do;
 
@@ -259,7 +259,7 @@ async function fetchDashboardData() {
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} unit/Kg`
+                            label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit/Kg`
                         }
                     }
                 },

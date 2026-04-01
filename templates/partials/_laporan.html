@@ -306,9 +306,9 @@
         });
 
         document.getElementById('summary-sisa-bayar').innerText = formatRupiah(totalSisaPembayaran);
-        document.getElementById('summary-sisa-volume').innerText = Number(totalSisaVolume).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' Kg';
+        document.getElementById('summary-sisa-volume').innerText = Number(totalSisaVolume).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg';
         document.getElementById('summary-cash-in').innerText = formatRupiah(totalCashIn);
-        document.getElementById('summary-vol-do').innerText = Number(totalVolDO).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' Kg';
+        document.getElementById('summary-vol-do').innerText = Number(totalVolDO).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg';
 
         renderLaporanTable(filtered);
     }
@@ -337,7 +337,7 @@
             const tr = document.createElement('tr');
             tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
             const fmtRp = val => (val !== null && val !== undefined) ? formatRupiah(val) : '-';
-            const fmtNum = val => val !== null && val !== undefined ? Number(val).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-';
+            const fmtNum = val => val !== null && val !== undefined ? Number(val).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-';
 
             // Helper to make a cell editable if No_DO exists
             const editable = (field, value) => {

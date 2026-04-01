@@ -6,8 +6,8 @@ let lastSavedKontrakId = null;
 
 // --- Helpers ---
 const formatRupiah = (number) => {
-    if (number === null || number === undefined || isNaN(number)) return 'Rp0';
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(number);
+    if (number === null || number === undefined || isNaN(number)) return 'Rp0,00';
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number);
 };
 
 const showNotification = (message, type = 'success') => {
@@ -28,12 +28,12 @@ window.showToast = showNotification;
 const MONTHS_ID = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 function fmtRpLocal(v) {
-    if (v === null || v === undefined || isNaN(v)) return '-';
-    return 'Rp' + Number(v).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    if (v === null || v === undefined || isNaN(v)) return '0,00';
+    return Number(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function fmtRpFull(v) {
-    if (v === null || v === undefined || isNaN(v)) return 'Rp0';
-    return 'Rp' + Number(v).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    if (v === null || v === undefined || isNaN(v)) return 'Rp0,00';
+    return 'Rp' + Number(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function parseLocaleFloat(str) {
     if (!str) return 0;

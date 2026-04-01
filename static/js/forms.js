@@ -117,7 +117,7 @@ function buildLivePreview() {
     const nominalPph = isPph ? (nilaiPokok * (pphPct / 100)) : 0;
     const totalByr = nilaiPokok + nominalPpn - nominalPph;
 
-    const volStr = vol > 0 ? vol.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ' + satuan : '-';
+    const volStr = vol > 0 ? vol.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + satuan : '-';
     const hrgStr = harga > 0 ? fmtRpFull(harga) + ' per ' + satuan : '-';
     const prmiStr = premi > 0 ? fmtRpLocal(premi) : '-';
 
@@ -528,20 +528,20 @@ function buildInvoicePreview() {
                 <td style="${tdStyle}">-</td>
                 <td style="${tdStyle}">${k.simbol || '-'}</td>
                 <td style="${tdStyle}">-</td>
-                <td style="${tdStyle} text-align:right;">${vol > 0 ? vol.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}</td>
+                <td style="${tdStyle} text-align:right;">${vol > 0 ? vol.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
                 <td style="${tdStyle} text-align:right;">${hrg > 0 ? hrg.toLocaleString('id-ID', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
-                <td style="${tdStyle} text-align:right; border-left:none;">${nilai > 0 ? nilai.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}</td>
+                <td style="${tdStyle} text-align:right; border-left:none;">${nilai > 0 ? nilai.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
             </tr>
             <tr>
                 <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN ${ppnPct}%</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
-                <td style="${tdStyle} text-align:right; border-left:none;"><strong>${nomPpn > 0 ? nomPpn.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}</strong></td>
+                <td style="${tdStyle} text-align:right; border-left:none;"><strong>${nomPpn > 0 ? nomPpn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</strong></td>
             </tr>
             <tr>
                 <td style="${tdStyle} text-align:right;" colspan="8"><strong>Jumlah Pembayaran</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
-                <td style="${tdStyle} text-align:right; border-left:none;">${estTotal > 0 ? estTotal.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}</td>
+                <td style="${tdStyle} text-align:right; border-left:none;">${estTotal > 0 ? estTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
             </tr>
             <tr>
                 <td style="${tdStyle}" colspan="10">
@@ -642,7 +642,7 @@ function updateProportionalVolume() {
 
     const lbl = document.getElementById('d_lbl_volume_do');
     if (lbl) {
-        lbl.innerText = volumeDo.toLocaleString('id-ID', {maximumFractionDigits: 2}) + ' ' + satuan;
+        lbl.innerText = volumeDo.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + satuan;
         // Visual feedback: green if > 0, red if > 100%
         const pct = invoiceTotal > 0 ? (nominal / invoiceTotal * 100) : 0;
         if (pct > 100) {
@@ -718,16 +718,16 @@ function buildDOPreview() {
     const tglDoStr = tgl ? tgl.split('-').reverse().join('/') : '-'; 
     
     const inv = window.currentDOInvoice || {};
-    const nominal = parseFloat(document.getElementById('d_nominal_transfer').value) || 0;
-    const invoiceTotal = parseFloat(inv.jumlah_pembayaran) || 0;
-    const kontrakVol = parseFloat(k.volume) || 0;
+    const nominal = parseLocaleFloat(document.getElementById('d_nominal_transfer').value);
+    const invoiceTotal = parseLocaleFloat(inv.jumlah_pembayaran);
+    const kontrakVol = parseLocaleFloat(k.volume);
     
     // Calculate proportional volume for preview
     let propVol = 0;
     if (invoiceTotal > 0 && kontrakVol > 0) {
         propVol = (nominal / invoiceTotal) * kontrakVol;
     }
-    const volStr = propVol > 0 ? Number(propVol).toLocaleString('id-ID', {maximumFractionDigits: 2}) : (k.volume ? Number(k.volume).toLocaleString('id-ID') : '-');
+    const volStr = propVol > 0 ? Number(propVol).toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : (k.volume ? Number(k.volume).toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-');
     const baleStr = k.banyaknya_bale_karung ? Number(k.banyaknya_bale_karung) : '-';
 
     const html = `

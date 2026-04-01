@@ -65,22 +65,18 @@ def _cp(cell):
 def _s(v, fb='-'):
     return str(v).strip() if v else fb
 
-def _id_fmt(v, decimals=0):
+def _id_fmt(v, decimals=2):
     if v is None: return '-'
     res = ("{:,." + str(decimals) + "f}").format(v).replace(",", "X").replace(".", ",").replace("X", ".")
     return res
 
 def _rp(v):
     if v is None: return '-'
-    if abs(float(v) - int(float(v))) > 0.001:
-        return 'Rp' + _id_fmt(v, 2)
-    return 'Rp' + _id_fmt(v, 0)
+    return 'Rp' + _id_fmt(v, 2)
 
 def _rp_full(v):
-    if not v: return 'Rp0'
-    if abs(float(v) - int(float(v))) > 0.001:
-        return 'Rp' + _id_fmt(v, 2)
-    return 'Rp' + _id_fmt(v, 0)
+    if not v: return 'Rp0,00'
+    return 'Rp' + _id_fmt(v, 2)
 
 MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 def _date(d):
@@ -101,7 +97,7 @@ def generate_contract_docx(k) -> io.BytesIO:
     sat = _s(k.satuan, 'Unit')
     nilai = (vol * harga) + premi
 
-    vol_str = _id_fmt(vol, 2).rstrip('0').rstrip(',') + ' ' + sat if vol else '-'
+    vol_str = _id_fmt(vol, 2) + ' ' + sat if vol else '-'
     harga_str = _rp_full(harga) + ' per ' + sat if harga else '-'
     premi_str = _rp(premi)
     jml_str = _rp_full(nilai) + (f" ({_s(k.terbilang)} Rupiah)" if k.terbilang else "")
