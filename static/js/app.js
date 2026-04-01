@@ -6,7 +6,8 @@ let lastSavedKontrakId = null;
 
 // --- Helpers ---
 const formatRupiah = (number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+    if (number === null || number === undefined || isNaN(number)) return 'Rp0';
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(number);
 };
 
 const showNotification = (message, type = 'success') => {
@@ -27,12 +28,28 @@ window.showToast = showNotification;
 const MONTHS_ID = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 function fmtRpLocal(v) {
-    if (!v || isNaN(v)) return '-';
-    return 'Rp' + Number(v).toLocaleString('id-ID', { minimumFractionDigits: 0 });
+    if (v === null || v === undefined || isNaN(v)) return '-';
+    return 'Rp' + Number(v).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 function fmtRpFull(v) {
-    if (!v || isNaN(v)) return 'Rp0';
-    return 'Rp' + Number(v).toLocaleString('id-ID', { minimumFractionDigits: 0 });
+    if (v === null || v === undefined || isNaN(v)) return 'Rp0';
+    return 'Rp' + Number(v).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+function parseLocaleFloat(str) {
+    if (!str) return 0;
+    // Replace comma with dot for parseFloat if it looks like Indonesian decimal
+    // But be careful: if they use dots for thousands, we should remove them first
+    // Typical Indo: 1.234.567,89 -> 1234567.89
+    // If they just type "123,45" -> 123.45
+    let clean = String(str).replace(/\s/g, '');
+    if (clean.includes(',') && clean.includes('.')) {
+        // Has both, assume . is thousands and , is decimal
+        clean = clean.replace(/\./g, '').replace(',', '.');
+    } else if (clean.includes(',')) {
+        // Has only comma, assume it's decimal
+        clean = clean.replace(',', '.');
+    }
+    return parseFloat(clean) || 0;
 }
 function safe(v, fb = '-') { return (v && String(v).trim()) ? String(v).trim() : fb; }
 function fmtDateLocal(dateStr) {

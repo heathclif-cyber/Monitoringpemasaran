@@ -104,20 +104,20 @@ function buildLivePreview() {
     const kebun = safe(g('k_kebun_produsen'));
     const pelab = safe(g('k_pelabuhan_muat'));
     const satuan = safe(g('k_satuan'), 'Unit');
-    const vol = parseFloat(g('k_volume')) || 0;
-    const harga = parseFloat(g('k_harga_satuan')) || 0;
-    const premi = parseFloat(g('k_premi')) || 0;
-    const ppnPct = parseFloat(g('k_ppn_persen')) || 11;
+    const vol = parseLocaleFloat(g('k_volume'));
+    const harga = parseLocaleFloat(g('k_harga_satuan'));
+    const premi = parseLocaleFloat(g('k_premi'));
+    const ppnPct = parseLocaleFloat(g('k_ppn_persen')) || 11;
     const isPpn = g('k_is_ppn') === 'true';
     const isPph = g('k_is_pph') === 'true';
-    const pphPct = parseFloat(g('k_pph_persen')) || 0;
+    const pphPct = parseLocaleFloat(g('k_pph_persen'));
     
     const nilaiPokok = (vol * harga) + premi;
     const nominalPpn = isPpn ? (nilaiPokok * (ppnPct / 100)) : 0;
     const nominalPph = isPph ? (nilaiPokok * (pphPct / 100)) : 0;
     const totalByr = nilaiPokok + nominalPpn - nominalPph;
 
-    const volStr = vol > 0 ? vol.toLocaleString('id-ID') + ' ' + satuan : '-';
+    const volStr = vol > 0 ? vol.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ' + satuan : '-';
     const hrgStr = harga > 0 ? fmtRpFull(harga) + ' per ' + satuan : '-';
     const prmiStr = premi > 0 ? fmtRpLocal(premi) : '-';
 
@@ -260,21 +260,21 @@ async function handleKontrakSubmit(e) {
         deskripsi_produk: getVal('k_deskripsi_produk'),
         tahun_panen: getVal('k_tahun_panen'),
         kebun_produsen: getVal('k_kebun_produsen'),
-        volume: parseFloat(getVal('k_volume')) || 0,
+        volume: parseLocaleFloat(getVal('k_volume')),
         satuan: getVal('k_satuan'),
-        harga_satuan: parseFloat(getVal('k_harga_satuan')) || 0,
+        harga_satuan: parseLocaleFloat(getVal('k_harga_satuan')),
         is_ppn: getVal('k_is_ppn'),
-        ppn_persen: parseFloat(getVal('k_ppn_persen')) || 0,
+        ppn_persen: parseLocaleFloat(getVal('k_ppn_persen')),
         is_pph: getVal('k_is_pph'),
-        pph_persen: parseFloat(getVal('k_pph_persen')) || 0,
-        premi: parseFloat(getVal('k_premi')) || 0,
+        pph_persen: parseLocaleFloat(getVal('k_pph_persen')),
+        premi: parseLocaleFloat(getVal('k_premi')),
         mutu: getVal('k_mutu'),
         packaging: getVal('k_packaging'),
         simbol: getVal('k_simbol'),
         chop: getVal('k_chop'),
         no_kav_chop: getVal('k_no_kav_chop'),
-        pack_qty: parseFloat(getVal('k_pack_qty')) || 0,
-        banyaknya_bale_karung: parseFloat(getVal('k_banyak_bale')) || 0,
+        pack_qty: parseLocaleFloat(getVal('k_pack_qty')),
+        banyaknya_bale_karung: parseLocaleFloat(getVal('k_banyak_bale')),
         kondisi_penyerahan: getVal('k_kondisi_penyerahan'),
         waktu_penyerahan: getVal('k_waktu_penyerahan'),
         levering: getVal('k_levering'),
@@ -410,7 +410,7 @@ async function handleInvoiceSubmit(e) {
         no_invoice: document.getElementById('i_no_invoice').value,
         no_kontrak: document.getElementById('i_no_kontrak').value,
         tanggal_transaksi: document.getElementById('i_tanggal_transaksi').value,
-        pph_22_persen: parseFloat(document.getElementById('i_pph_22').value) || 0,
+        pph_22_persen: parseLocaleFloat(document.getElementById('i_pph_22').value),
     };
 
     try {
@@ -444,14 +444,14 @@ function buildInvoicePreview() {
     const noInv = document.getElementById('i_no_invoice').value || '[No Invoice]';
     const noK = document.getElementById('i_no_kontrak').value || '[No Kontrak]';
     const tgl = document.getElementById('i_tanggal_transaksi').value || '';
-    const pph = parseFloat(document.getElementById('i_pph_22').value) || 0;
+    const pph = parseLocaleFloat(document.getElementById('i_pph_22').value);
 
     let k = window.currentInvoiceKontrak || {};
 
-    const vol = parseFloat(k.volume) || 0;
-    const hrg = parseFloat(k.harga_satuan) || 0;
-    const nilai = (vol * hrg) + (parseFloat(k.premi) || 0);
-    const ppnPct = parseFloat(k.ppn_persen) || 11;
+    const vol = parseLocaleFloat(k.volume);
+    const hrg = parseLocaleFloat(k.harga_satuan);
+    const nilai = (vol * hrg) + (parseLocaleFloat(k.premi) || 0);
+    const ppnPct = parseLocaleFloat(k.ppn_persen) || 11;
     const nomPpn = nilai * (ppnPct / 100);
     const estTotal = nilai + nomPpn;
 
@@ -528,20 +528,20 @@ function buildInvoicePreview() {
                 <td style="${tdStyle}">-</td>
                 <td style="${tdStyle}">${k.simbol || '-'}</td>
                 <td style="${tdStyle}">-</td>
-                <td style="${tdStyle} text-align:right;">${vol > 0 ? vol.toLocaleString('id-ID') : '-'}</td>
+                <td style="${tdStyle} text-align:right;">${vol > 0 ? vol.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}</td>
                 <td style="${tdStyle} text-align:right;">${hrg > 0 ? hrg.toLocaleString('id-ID', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
-                <td style="${tdStyle} text-align:right; border-left:none;">${nilai > 0 ? nilai.toLocaleString('id-ID') : '-'}</td>
+                <td style="${tdStyle} text-align:right; border-left:none;">${nilai > 0 ? nilai.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}</td>
             </tr>
             <tr>
                 <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN ${ppnPct}%</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
-                <td style="${tdStyle} text-align:right; border-left:none;"><strong>${nomPpn > 0 ? nomPpn.toLocaleString('id-ID') : '-'}</strong></td>
+                <td style="${tdStyle} text-align:right; border-left:none;"><strong>${nomPpn > 0 ? nomPpn.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}</strong></td>
             </tr>
             <tr>
                 <td style="${tdStyle} text-align:right;" colspan="8"><strong>Jumlah Pembayaran</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
-                <td style="${tdStyle} text-align:right; border-left:none;">${estTotal > 0 ? estTotal.toLocaleString('id-ID') : '-'}</td>
+                <td style="${tdStyle} text-align:right; border-left:none;">${estTotal > 0 ? estTotal.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}</td>
             </tr>
             <tr>
                 <td style="${tdStyle}" colspan="10">
@@ -630,9 +630,9 @@ window.currentDOInvoice = null;
 function updateProportionalVolume() {
     const k = window.currentDOKontrak || {};
     const inv = window.currentDOInvoice || {};
-    const nominal = parseFloat(document.getElementById('d_nominal_transfer').value) || 0;
-    const invoiceTotal = parseFloat(inv.jumlah_pembayaran) || 0;
-    const kontrakVol = parseFloat(k.volume) || 0;
+    const nominal = parseLocaleFloat(document.getElementById('d_nominal_transfer').value);
+    const invoiceTotal = parseLocaleFloat(inv.jumlah_pembayaran);
+    const kontrakVol = parseLocaleFloat(k.volume);
     const satuan = k.satuan || 'Kg';
 
     let volumeDo = 0;
@@ -669,7 +669,7 @@ async function handleDOSubmit(e) {
         no_invoice: document.getElementById('d_no_invoice').value,
         tanggal_do: document.getElementById('d_tanggal_do').value,
         kepada_unit: document.getElementById('d_kepada_unit').value,
-        nominal_transfer: parseFloat(document.getElementById('d_nominal_transfer').value) || 0,
+        nominal_transfer: parseLocaleFloat(document.getElementById('d_nominal_transfer').value),
         tanggal_pembayaran: document.getElementById('d_tanggal_pembayaran').value || null,
         is_pph_disetor: document.getElementById('d_is_pph_disetor').value || "false",
     };

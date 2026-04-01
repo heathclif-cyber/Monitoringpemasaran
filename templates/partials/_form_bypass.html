@@ -58,7 +58,7 @@
                             <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Volume</label>
                             <div class="relative group">
                                 <i class="fas fa-weight-hanging absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors"></i>
-                                <input type="number" step="0.01" name="Volume" id="bypass_volume" placeholder="0.00" 
+                                <input type="text" inputmode="decimal" name="Volume" id="bypass_volume" placeholder="0.00" 
                                     class="form-input pl-10 h-11 border-slate-200 focus:border-indigo-500 bg-slate-50 focus:bg-white" required>
                             </div>
                         </div>
@@ -75,7 +75,7 @@
                         <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Nilai Transaksi (Rp)</label>
                         <div class="relative group">
                             <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 group-focus-within:text-emerald-600 transition-colors">Rp</span>
-                            <input type="number" name="Nominal" id="bypass_nominal" placeholder="0" 
+                            <input type="text" inputmode="decimal" name="Nominal" id="bypass_nominal" placeholder="0" 
                                 class="form-input pl-10 h-11 border-slate-200 focus:border-emerald-500 bg-emerald-50/10 focus:bg-white font-bold text-slate-700" required>
                         </div>
                     </div>
@@ -122,7 +122,10 @@ document.getElementById('formBypass').addEventListener('submit', async (e) => {
     
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData.entries());
-    
+    // Parse numeric fields to handle potential comma decimals
+    data.Volume = parseLocaleFloat(data.Volume);
+    data.Nominal = parseLocaleFloat(data.Nominal);
+
     try {
         const id = document.getElementById('bypass_id').value;
         const url = id ? '/api/laporan/update-bypass' : '/api/laporan/create-bypass';

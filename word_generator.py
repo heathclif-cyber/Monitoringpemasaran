@@ -65,12 +65,22 @@ def _cp(cell):
 def _s(v, fb='-'):
     return str(v).strip() if v else fb
 
+def _id_fmt(v, decimals=0):
+    if v is None: return '-'
+    res = ("{:,." + str(decimals) + "f}").format(v).replace(",", "X").replace(".", ",").replace("X", ".")
+    return res
+
 def _rp(v):
-    return 'Rp' + '{:,.0f}'.format(v or 0).replace(',', '.')
+    if v is None: return '-'
+    if abs(float(v) - int(float(v))) > 0.001:
+        return 'Rp' + _id_fmt(v, 2)
+    return 'Rp' + _id_fmt(v, 0)
 
 def _rp_full(v):
     if not v: return 'Rp0'
-    return 'Rp' + '{:,.0f}'.format(v).replace(',', '.')
+    if abs(float(v) - int(float(v))) > 0.001:
+        return 'Rp' + _id_fmt(v, 2)
+    return 'Rp' + _id_fmt(v, 0)
 
 MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 def _date(d):
@@ -91,7 +101,7 @@ def generate_contract_docx(k) -> io.BytesIO:
     sat = _s(k.satuan, 'Unit')
     nilai = (vol * harga) + premi
 
-    vol_str = '{:,.0f}'.format(vol).replace(',', '.') + ' ' + sat if vol else '-'
+    vol_str = _id_fmt(vol, 2).rstrip('0').rstrip(',') + ' ' + sat if vol else '-'
     harga_str = _rp_full(harga) + ' per ' + sat if harga else '-'
     premi_str = _rp(premi)
     jml_str = _rp_full(nilai) + (f" ({_s(k.terbilang)} Rupiah)" if k.terbilang else "")
@@ -406,7 +416,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_txt(3, '-')
     c_txt(4, _s(k.simbol))
     c_txt(5, '-')
-    c_txt(6, f" {k.volume:,.0f} ".replace(',', '.'), 'right')
+    c_txt(6, f" {_id_fmt(k.volume, 2).rstrip('0').rstrip(',')} ", 'right')
     c_txt(7, f" {_rp(k.harga_satuan).replace('Rp', '').strip()} ", 'right')
     c_txt(8, ' Rp')
     c_txt(9, f" {_rp(k.nilai_transaksi).replace('Rp', '').strip()} ", 'right')
@@ -490,7 +500,7 @@ def generate_do_docx(do) -> io.BytesIO:
     add_line('No. Kontrak', inv.no_kontrak)
     add_line('Tanggal DO', _date(do.tanggal_do))
     add_line('Kepada Unit', do.kepada_unit or '-')
-    add_line('Barang', f"{k.komoditi} - {k.volume:,.0f} {k.satuan}")
+    add_line('Barang', f"{k.komoditi} - {_id_fmt(k.volume, 2).rstrip('0').rstrip(',')} {k.satuan}")
     add_line('Status Bayar', f"Lunas (Tgl: {_date(do.tanggal_pembayaran)})" if do.tanggal_pembayaran else "Belum Lunas")
     add_line('Nominal Transfer', _rp(do.nominal_transfer))
 
