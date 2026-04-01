@@ -201,9 +201,9 @@ function buildLivePreview() {
       </table>
       
       <p style="text-align:right;margin:24px 0 10px;font-size:9pt;">${lokasi}, ${fmtDateLocal(tgl)}</p>
-      <div style="display:flex;justify-content:space-between;margin-top:20px;font-size:9pt;font-weight:600;text-align:center;">
-        <div style="width:40%">Persetujuan Pembeli</div>
-        <div style="width:40%">PT Perkebunan Nusantara I Regional 8</div>
+      <div style="margin-top:24px;font-size:9pt;font-weight:600;text-align:left;">
+        <div style="margin-bottom:60px">Persetujuan Pembeli</div>
+        <div>(________________________)</div>
       </div>
     </div>
     `;

@@ -218,26 +218,18 @@ def generate_contract_docx(k) -> io.BytesIO:
     RS('Jumlah (Pokok)', jml_str)
     RS('Catatan', '-')
 
-    # Signatures
+    # Signatures (Buyer only)
     doc.add_paragraph().paragraph_format.space_after = Pt(4)
-    sig = doc.add_table(rows=4, cols=2)
+    sig = doc.add_table(rows=4, cols=1)
     _no_borders(sig, True); sig.alignment = WD_TABLE_ALIGNMENT.LEFT
     for r in sig.rows:
         for c in r.cells: _no_borders(c, False); _para_fmt(c.paragraphs[0])
     
-    p_date = sig.rows[0].cells[1].paragraphs[0]; p_date.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_date = sig.rows[0].cells[0].paragraphs[0]
     _run(p_date, f"{lokasi}, {tgl}")
     
     p_l = sig.rows[1].cells[0].paragraphs[0]; _run(p_l, 'Persetujuan Pembeli', True)
-    p_r = sig.rows[1].cells[1].paragraphs[0]; p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _run(p_r, 'PT Perkebunan Nusantara I Regional 8,', True)
     
-    for c in sig.rows[2].cells: _run(c.paragraphs[0], '\n\n\n\n')
-    
-    p_l3 = sig.rows[3].cells[0].paragraphs[0]; _run(p_l3, '(________________________)')
-    p_r3 = sig.rows[3].cells[1].paragraphs[0]; p_r3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _run(p_r3, '(                                              )')
-
     buf = io.BytesIO()
     doc.save(buf)
     buf.seek(0)
