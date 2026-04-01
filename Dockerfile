@@ -4,28 +4,30 @@ FROM python:3.9-slim
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/home/user/.local/bin:$PATH"
 
-# Set working directory
+# Set up a new user 'user' with UID 1000 for security
+RUN useradd -m -u 1000 user
 WORKDIR /app
 
-# Install system dependencies (needed for psycopg2 and other tools)
+# Install system dependencies if needed (for psycopg2 or other libs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+# Copy and install requirements
+COPY --chown=user ./requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 
-# Copy application code
-COPY . .
+# Copy all project files
+COPY --chown=user . /app
 
-# Ensure static directories exist and are writable
-RUN mkdir -p static/css static/js templates
+# Use the non-root user
+USER user
 
-# Railway automatically provides the $PORT environment variable
-EXPOSE 8080
+# Hugging Face Spaces expects the app to run on port 7860
+EXPOSE 7860
 
-# Clean start command
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips '*'"]
+# Run the app
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]

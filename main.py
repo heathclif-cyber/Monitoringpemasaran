@@ -9,6 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 import models
+from api.r_laporan import router as laporan_router, seed_beteleme
 from database import engine, SessionLocal
 
 # --- Router imports ---
@@ -16,7 +17,7 @@ from endpoints.kontrak import router as kontrak_router
 from api.r_invoice import router as invoice_router
 from api.r_do import router as do_router
 from api.r_dashboard import router as dashboard_router
-from api.r_laporan import router as laporan_router, seed_beteleme
+from api.r_laporan import router as laporan_router
 
 # --- App Initialization ---
 app = FastAPI(title="PTPN I - Sales Document Automation")
