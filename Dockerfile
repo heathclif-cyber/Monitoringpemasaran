@@ -4,30 +4,28 @@ FROM python:3.9-slim
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PATH="/home/user/.local/bin:$PATH"
 
-# Set up a new user 'user' with UID 1000 for security
-RUN useradd -m -u 1000 user
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies if needed (for psycopg2 or other libs)
+# Install system dependencies (needed for psycopg2 and other tools)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install requirements
-COPY --chown=user ./requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-# Copy all project files
-COPY --chown=user . /app
+# Copy application code
+COPY . .
 
-# Use the non-root user
-USER user
+# Ensure static directories exist and are writable
+RUN mkdir -p static/css static/js templates
 
-# Railway typically uses the $PORT environment variable
+# Railway automatically provides the $PORT environment variable
 EXPOSE 8080
 
-# Run the app using the PORT env var if available, otherwise default to 8080
+# Clean start command
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips '*'"]
