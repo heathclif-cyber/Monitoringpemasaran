@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import List
 import math
-from decimal import Decimal
 
 import models
 import schemas
@@ -18,21 +17,14 @@ router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == kontrak.no_kontrak).first()
 
-    # Calculate fields using Decimal for precision
-    vol = kontrak.volume or Decimal('0.00')
-    hrg = kontrak.harga_satuan or Decimal('0.00')
-    prm = kontrak.premi or Decimal('0.00')
-    
-    pokok = (vol * hrg) + prm
-    nominal_ppn = Decimal('0.00')
-    
-    if kontrak.is_ppn:
-        ppn_p = kontrak.ppn_persen or Decimal('0.00')
-        nominal_ppn = pokok * (ppn_p / Decimal('100.00'))
-        
+    # Calculate fields
+    pokok = ((kontrak.volume or 0.0) * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
+    nominal_ppn = 0.0
+    if str(kontrak.is_ppn).lower() == 'true':
+        nominal_ppn = pokok * ((kontrak.ppn_persen or 0.0) / 100)
     nilai_transaksi = pokok + nominal_ppn
-    jatuh_tempo_pembayaran = kontrak.tanggal_kontrak + timedelta(days=kontrak.lama_pembayaran_hari)
-    terbilang = terbilang_rupiah(int(nilai_transaksi))
+    jatuh_tempo_pembayaran = kontrak.tanggal_kontrak + timedelta(days=kontrak.lama_pembayaran_hari or 0)
+    terbilang = terbilang_rupiah(math.floor(nilai_transaksi))
 
     if db_kontrak:
         for key, value in kontrak.model_dump().items():

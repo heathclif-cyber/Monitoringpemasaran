@@ -3,7 +3,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 import math
-from decimal import Decimal
 
 import models
 import schemas
@@ -19,34 +18,23 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
 
-    # Explicitly calculate: Pokok + PPN - PPh using Decimal
-    vol = db_kontrak.volume or Decimal('0.00')
-    hrg = db_kontrak.harga_satuan or Decimal('0.00')
-    prm = db_kontrak.premi or Decimal('0.00')
+    # Pokok is already in nilai_transaksi only if PPN is added. 
+    # Let's be explicit to match user's formula: Pokok + PPN - PPh
+    pokok = ((db_kontrak.volume or 0.0) * (db_kontrak.harga_satuan or 0.0)) + (db_kontrak.premi or 0.0)
+    ppn_val = 0.0
+    if str(getattr(db_kontrak, 'is_ppn', 'true')).lower() == 'true':
+        ppn_val = pokok * ((db_kontrak.ppn_persen or 0.0) / 100)
     
-    pokok = (vol * hrg) + prm
-    ppn_val = Decimal('0.00')
-    
-    if db_kontrak.is_ppn:
-        ppn_p = db_kontrak.ppn_persen or Decimal('0.00')
-        ppn_val = pokok * (ppn_p / Decimal('100.00'))
-    
-    pph_val = Decimal('0.00')
-    pph_rate = Decimal('0.00')
-    if db_kontrak.is_pph:
-        pph_rate = db_kontrak.pph_persen or Decimal('0.00')
-        pph_val = pokok * (pph_rate / Decimal('100.00'))
+    pph_val = 0.0
+    if str(getattr(db_kontrak, 'is_pph', 'false')).lower() == 'true':
+        pph_val = pokok * ((getattr(db_kontrak, 'pph_persen', 0.0) or 0.0) / 100)
     
     jumlah_pembayaran = pokok + ppn_val - pph_val
-    terbilang_invoice = terbilang_rupiah(int(jumlah_pembayaran))
+    terbilang_invoice = terbilang_rupiah(math.floor(jumlah_pembayaran))
 
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == invoice.no_invoice).first()
-    
-    invoice_data = invoice.model_dump()
-    invoice_data['pph_22_persen'] = pph_rate # Override with contract pph
-
     if db_invoice:
-        for key, value in invoice_data.items():
+        for key, value in invoice.model_dump().items():
             setattr(db_invoice, key, value)
         db_invoice.jumlah_pembayaran = jumlah_pembayaran
         db_invoice.terbilang_invoice = terbilang_invoice
@@ -55,7 +43,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
         return db_invoice
     else:
         new_invoice = models.Invoice(
-            **invoice_data,
+            **invoice.model_dump(),
             jumlah_pembayaran=jumlah_pembayaran,
             terbilang_invoice=terbilang_invoice
         )
