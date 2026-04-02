@@ -302,8 +302,8 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
             p.add_run('\n')
             _run(p, v, bold=bsv)
 
-    # 16 rows
-    rows = [nr() for _ in range(16)]
+    # 17 rows
+    rows = [nr() for _ in range(17)]
 
     # Row 0 to 3 Left
     c_kepada = rows[0].cells[0]
@@ -403,22 +403,22 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     if v is not None: v.set(qn('w:val'), 'center')
 
     # Row 11 (Item values)
-    def c_txt(idx, text, align="left"):
-        c = rows[11].cells[idx]
+    def c_txt(row_idx, idx, text, align="left"):
+        c = rows[row_idx].cells[idx]
         if align == "right": c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
         if align == "center": c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         _run(c.paragraphs[0], str(text))
 
-    c_txt(0, '-')
-    c_txt(1, _s(k.komoditi))
-    c_txt(2, _s(k.packaging))
-    c_txt(3, '-')
-    c_txt(4, _s(k.simbol))
-    c_txt(5, '-')
-    c_txt(6, f" {_id_fmt(k.volume, 2).rstrip('0').rstrip(',')} ", 'right')
-    c_txt(7, f" {_rp(k.harga_satuan).replace('Rp', '').strip()} ", 'right')
-    c_txt(8, ' Rp')
-    c_txt(9, f" {_rp(k.nilai_transaksi).replace('Rp', '').strip()} ", 'right')
+    c_txt(11, 0, '-')
+    c_txt(11, 1, _s(k.komoditi))
+    c_txt(11, 2, _s(k.packaging))
+    c_txt(11, 3, '-')
+    c_txt(11, 4, _s(k.simbol))
+    c_txt(11, 5, '-')
+    c_txt(11, 6, f" {_id_fmt(k.volume, 2).rstrip('0').rstrip(',')} ", 'right')
+    c_txt(11, 7, f" {_rp(k.harga_satuan).replace('Rp', '').strip()} ", 'right')
+    c_txt(11, 8, ' Rp')
+    c_txt(11, 9, f" {_rp(k.nilai_transaksi).replace('Rp', '').strip()} ", 'right')
 
     # Row 12 (PPN val)
     c_ppnl = rows[12].cells[0]
@@ -430,25 +430,38 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_ppnr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run(c_ppnr.paragraphs[0], f" {_rp(k.nominal_ppn).replace('Rp', '').strip()} ", bold=True)
 
-    # Row 13 (Total)
-    c_totl = rows[13].cells[0]
-    c_totl.merge(rows[13].cells[7])
+    # Row 13 (PPh val)
+    c_pph22l = rows[13].cells[0]
+    c_pph22l.merge(rows[13].cells[7])
+    c_pph22l.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    pph_pct = invoice.pph_22_persen or 0
+    _run(c_pph22l.paragraphs[0], f"PPh 22 ({pph_pct}%) ", bold=True)
+    _run(rows[13].cells[8].paragraphs[0], ' Rp')
+    c_pph22r = rows[13].cells[9]
+    c_pph22r.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    pokok = (k.volume or 0) * (k.harga_satuan or 0) + (k.premi or 0)
+    nom_pph = pokok * (pph_pct / 100)
+    _run(c_pph22r.paragraphs[0], f" -{_id_fmt(nom_pph, 2).replace('Rp', '').strip()} ", bold=True)
+
+    # Row 14 (Total)
+    c_totl = rows[14].cells[0]
+    c_totl.merge(rows[14].cells[7])
     c_totl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run(c_totl.paragraphs[0], "Jumlah Pembayaran ", bold=True)
-    _run(rows[13].cells[8].paragraphs[0], ' Rp')
-    c_totr = rows[13].cells[9]
+    _run(rows[14].cells[8].paragraphs[0], ' Rp')
+    c_totr = rows[14].cells[9]
     c_totr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _run(c_totr.paragraphs[0], f" {_rp(invoice.jumlah_pembayaran).replace('Rp', '').strip()} ")
+    _run(c_totr.paragraphs[0], f" {_id_fmt(invoice.jumlah_pembayaran, 2).replace('Rp', '').strip()} ", bold=True)
 
-    # Row 14 (Terbilang)
-    c_terb = rows[14].cells[0]
-    c_terb.merge(rows[14].cells[9])
+    # Row 15 (Terbilang)
+    c_terb = rows[15].cells[0]
+    c_terb.merge(rows[15].cells[9])
     _run(c_terb.paragraphs[0], "Terbilang:\n", bold=True)
     _run(c_terb.paragraphs[0], f"{invoice.terbilang_invoice or _s(k.terbilang, '')} Rupiah", italic=True)
 
-    # Row 15 (Transfer Ke)
-    c_trans = rows[15].cells[0]
-    c_trans.merge(rows[15].cells[9])
+    # Row 16 (Transfer Ke)
+    c_trans = rows[16].cells[0]
+    c_trans.merge(rows[16].cells[9])
     _run(c_trans.paragraphs[0], "Transfer Ke:\n", bold=True)
     bank_info = _s(k.pembayaran_bank, 'Bank Rakyat Indonesia')
     rek_info = _s(k.pembayaran_rek_no, 'No. 0050-01-005356-30-0')

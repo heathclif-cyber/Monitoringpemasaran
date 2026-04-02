@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, Date, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -23,19 +23,19 @@ class Kontrak(Base):
     mutu = Column(String)
     pelabuhan_muat = Column(String)
     
-    volume = Column(Float, default=0.0)
-    harga_satuan = Column(Float, default=0.0)
-    premi = Column(Float, default=0.0)
-    is_ppn = Column(String, default="true")
-    ppn_persen = Column(Float, default=11.0)
+    volume = Column(Numeric(15, 2), default=0.00)
+    harga_satuan = Column(Numeric(15, 2), default=0.00)
+    premi = Column(Numeric(15, 2), default=0.00)
+    is_ppn = Column(Boolean, default=True)
+    ppn_persen = Column(Numeric(5, 2), default=11.00)
     
-    is_pph = Column(String, default="false") # using String for boolean ease across sqlite/postgres
-    pph_persen = Column(Float, default=0.0)
+    is_pph = Column(Boolean, default=False)
+    pph_persen = Column(Numeric(5, 2), default=0.00)
     
     alamat_produksi = Column(String)
     chop = Column(String)
-    pack_qty = Column(Float, default=0.0)
-    banyaknya_bale_karung = Column(Float, default=0.0)
+    pack_qty = Column(Numeric(15, 2), default=0.00)
+    banyaknya_bale_karung = Column(Numeric(15, 2), default=0.00)
     no_kav_chop = Column(String)
     
     kondisi_penyerahan = Column(String)
@@ -58,8 +58,8 @@ class Kontrak(Base):
     lokasi = Column(String, default="Makassar")
     
     # Calculated Fields
-    nilai_transaksi = Column(Float, default=0.0)
-    nominal_ppn = Column(Float, default=0.0)
+    nilai_transaksi = Column(Numeric(15, 2), default=0.00)
+    nominal_ppn = Column(Numeric(15, 2), default=0.00)
     jatuh_tempo_pembayaran = Column(Date)
     terbilang = Column(String)
     
@@ -72,10 +72,10 @@ class Invoice(Base):
     no_kontrak = Column(String, ForeignKey("kontrak.no_kontrak"))
     tanggal_transaksi = Column(Date, nullable=False)
     status_invoice = Column(String, default="Unpaid")
-    pph_22_persen = Column(Float, default=0.0)
+    pph_22_persen = Column(Numeric(5, 2), default=0.00)
     
     # Calculated Fields
-    jumlah_pembayaran = Column(Float, default=0.0)
+    jumlah_pembayaran = Column(Numeric(15, 2), default=0.00)
     terbilang_invoice = Column(String)
     
     kontrak = relationship("Kontrak", back_populates="invoices")
@@ -90,8 +90,8 @@ class DeliveryOrder(Base):
     kepada_unit = Column(String)
     alamat_unit = Column(String)
     tanggal_pembayaran = Column(Date, nullable=True)
-    nominal_transfer = Column(Float, default=0.0)
-    is_pph_disetor = Column(String, default="false")
+    nominal_transfer = Column(Numeric(15, 2), default=0.00)
+    is_pph_disetor = Column(Boolean, default=False)
     
     # New SAP Fields
     superman = Column(String, nullable=True)
@@ -101,8 +101,8 @@ class DeliveryOrder(Base):
     billing_sap = Column(String, nullable=True)
     
     # Calculated Fields
-    selisih = Column(Float, default=0.0)
-    volume_do = Column(Float, default=0.0)
+    selisih = Column(Numeric(15, 2), default=0.00)
+    volume_do = Column(Numeric(15, 2), default=0.00)
     
     invoice = relationship("Invoice", back_populates="delivery_orders")
 
@@ -113,10 +113,10 @@ class LaporanBypass(Base):
     unit = Column(String)
     komoditi = Column(String)
     tanggal = Column(Date, nullable=False)
-    nominal = Column(Float, default=0.0)
+    nominal = Column(Numeric(15, 2), default=0.00)
     pembeli = Column(String)
     deskripsi = Column(String)
-    volume = Column(Float, default=0.0)
+    volume = Column(Numeric(15, 2), default=0.00)
     satuan = Column(String, default="Kg")
     
     # Optional SAP fields
@@ -125,3 +125,4 @@ class LaporanBypass(Base):
     so_sap = Column(String, nullable=True)
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
+

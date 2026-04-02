@@ -365,10 +365,10 @@ async function fetchKontrakForInvoice() {
         document.getElementById('i_lbl_komoditi').innerText = data.komoditi || '-';
         document.getElementById('i_lbl_vol_harga').innerText = `${data.volume} x ${formatRupiah(data.harga_satuan)}`;
         document.getElementById('i_lbl_ketentuan').innerText = data.kondisi_penyerahan || '-';
-        document.getElementById('i_lbl_nilai').innerText = formatRupiah(data.nilai_transaksi);
-        document.getElementById('i_lbl_ppn').innerText = formatRupiah(data.nominal_ppn);
+        const pphPct = data.is_pph ? (data.pph_persen || 0) : 0;
+        document.getElementById('i_pph_22').value = pphPct;
 
-        const estTotal = data.nilai_transaksi + data.nominal_ppn;
+        const estTotal = data.nilai_transaksi + data.nominal_ppn - (data.is_pph ? (data.nilai_transaksi * (data.pph_persen / 100)) : 0);
         document.getElementById('i_lbl_total').innerText = formatRupiah(estTotal);
 
         // Auto-generate Invoice number with suffix if multiple Invoices exist for this contract
@@ -453,7 +453,9 @@ function buildInvoicePreview() {
     const nilai = (vol * hrg) + (parseLocaleFloat(k.premi) || 0);
     const ppnPct = parseLocaleFloat(k.ppn_persen) || 11;
     const nomPpn = nilai * (ppnPct / 100);
-    const estTotal = nilai + nomPpn;
+    const pphPct = k.is_pph ? (parseLocaleFloat(k.pph_persen) || 0) : 0;
+    const nomPph = k.is_pph ? (nilai * (pphPct / 100)) : 0;
+    const estTotal = nilai + nomPpn - nomPph;
 
     const lamaStr = k.lama_pembayaran_hari ? (k.lama_pembayaran_hari + ' hari') : '-';
 
@@ -537,6 +539,11 @@ function buildInvoicePreview() {
                 <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN ${ppnPct}%</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
                 <td style="${tdStyle} text-align:right; border-left:none;"><strong>${nomPpn > 0 ? nomPpn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</strong></td>
+            </tr>
+            <tr>
+                <td style="${tdStyle} text-align:right;" colspan="8">PPh 22 (${pphPct}%)</td>
+                <td style="${tdStyle} border-right:none;">Rp</td>
+                <td style="${tdStyle} text-align:right; border-left:none;">-${nomPph > 0 ? nomPph.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'}</td>
             </tr>
             <tr>
                 <td style="${tdStyle} text-align:right;" colspan="8"><strong>Jumlah Pembayaran</strong></td>

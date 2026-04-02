@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
+from decimal import Decimal
 
 import models
 import schemas
@@ -16,11 +17,11 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Get kontrak for volume calculation
+    # Get kontrak for volume calculation using Decimal
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == db_invoice.no_kontrak).first()
-    kontrak_volume = float(db_kontrak.volume or 0) if db_kontrak else 0
-    invoice_total = float(db_invoice.jumlah_pembayaran or 0)
-    nominal = float(do.nominal_transfer or 0)
+    kontrak_volume = db_kontrak.volume or Decimal('0.00') if db_kontrak else Decimal('0.00')
+    invoice_total = db_invoice.jumlah_pembayaran or Decimal('0.00')
+    nominal = do.nominal_transfer or Decimal('0.00')
 
     # Calculate proportional volume: (payment / invoice_total) * kontrak_volume
     if invoice_total > 0 and kontrak_volume > 0:
@@ -36,7 +37,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
         for key, value in do.model_dump().items():
             setattr(db_do, key, value)
         db_do.selisih = selisih
-        db_do.volume_do = round(volume_do, 2)
+        db_do.volume_do = volume_do
         db.commit()
         db.refresh(db_do)
         return db_do
@@ -44,7 +45,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
         new_do = models.DeliveryOrder(
             **do.model_dump(),
             selisih=selisih,
-            volume_do=round(volume_do, 2)
+            volume_do=volume_do
         )
         db.add(new_do)
         db.commit()

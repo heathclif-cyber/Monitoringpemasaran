@@ -4,6 +4,7 @@ from sqlalchemy import func
 import locale
 import calendar
 from typing import List
+from decimal import Decimal
 
 import models
 from database import get_db
@@ -28,32 +29,32 @@ def get_laporan(db: Session = Depends(get_db)):
 
     rows = []
     
-    def build_row(k, inv, do, inv_total=0, k_vol=0, total_do_nominal=0, total_do_volume=0):
-        do_volume = float(do.volume_do or 0) if do else 0
-        do_nominal = float(do.nominal_transfer or 0) if do else 0
-        # Pendapatan Pokok for this DO = proportional: (volume_do / kontrak_vol) * nilai_transaksi
-        k_vol_local = float(k.volume or 0)
-        k_harga_local = float(k.harga_satuan or 0)
-        k_premi = float(k.premi or 0)
-        k_nilai = float(k.nilai_transaksi or 0)
-        k_ppn = float(k.nominal_ppn or 0)
+    def build_row(k, inv, do, inv_total=Decimal('0.00'), k_vol=Decimal('0.00'), total_do_nominal=Decimal('0.00'), total_do_volume=Decimal('0.00')):
+        do_volume = do.volume_do or Decimal('0.00') if do else Decimal('0.00')
+        do_nominal = do.nominal_transfer or Decimal('0.00') if do else Decimal('0.00')
+        
+        k_vol_local = k.volume or Decimal('0.00')
+        k_harga_local = k.harga_satuan or Decimal('0.00')
+        k_premi = k.premi or Decimal('0.00')
+        k_nilai = k.nilai_transaksi or Decimal('0.00')
+        k_ppn = k.nominal_ppn or Decimal('0.00')
         
         if k_nilai <= 0:
             k_nilai = (k_vol_local * k_harga_local) + k_premi
         
-        if str(getattr(k, 'is_ppn', 'true')).lower() == 'false':
-            k_ppn = 0.0
+        if not k.is_ppn:
+            k_ppn = Decimal('0.00')
         elif k_ppn <= 0 and k_nilai > 0:
-            k_ppn_persen = float(getattr(k, 'ppn_persen', 0) or 0)
-            if k_ppn_persen > 0:
-                k_ppn = k_nilai * (k_ppn_persen / 100)
-            elif inv and float(inv.jumlah_pembayaran or 0) > k_nilai:
-                k_ppn = float(inv.jumlah_pembayaran) - k_nilai
+            ppn_p = k.ppn_persen or Decimal('0.00')
+            if ppn_p > 0:
+                k_ppn = k_nilai * (ppn_p / Decimal('100.00'))
+            elif inv and (inv.jumlah_pembayaran or Decimal('0.00')) > k_nilai:
+                k_ppn = inv.jumlah_pembayaran - k_nilai
 
-        k_pph = 0.0
-        if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
-            k_pph_p = float(getattr(k, 'pph_persen', 0) or 0)
-            k_pph = k_nilai * (k_pph_p / 100)
+        k_pph = Decimal('0.00')
+        if k.is_pph:
+            pph_p = k.pph_persen or Decimal('0.00')
+            k_pph = k_nilai * (pph_p / Decimal('100.00'))
 
         if k_vol_local > 0 and do:
             ratio = do_volume / k_vol_local
@@ -65,14 +66,11 @@ def get_laporan(db: Session = Depends(get_db)):
             ppn_do = k_ppn
             pph_do = k_pph
 
-        # Sisa pembayaran = Invoice total - sum of ALL DOs nominal for this invoice
-        # If invoice total is missing, fallback to calculate it
         if not inv_total or inv_total <= 0:
             inv_total = k_nilai + k_ppn - k_pph
 
-        sisa_pembayaran = round(float(inv_total) - float(total_do_nominal), 2) if (inv or do) else 0
-        # Sisa volume = Kontrak volume - sum of ALL DOs volume for this invoice
-        sisa_volume = round(float(k_vol_local) - float(total_do_volume), 2)
+        sisa_pembayaran = (inv_total - total_do_nominal) if (inv or do) else Decimal('0.00')
+        sisa_volume = k_vol_local - total_do_volume
 
         return {
             "No_DO": do.no_do if do else "",
@@ -86,13 +84,13 @@ def get_laporan(db: Session = Depends(get_db)):
             "Jumlah_Transfer": do_nominal,
             "Mitra_Pembeli": k.pembeli or "",
             "Deskripsi_Produk": (k.deskripsi_produk or k.komoditi) or "",
-            "Jumlah_Kontrak_Kg": k.volume or 0,
-            "Harga_Per_Kg": k.harga_satuan or 0,
+            "Jumlah_Kontrak_Kg": k.volume or Decimal('0.00'),
+            "Harga_Per_Kg": k.harga_satuan or Decimal('0.00'),
             "Jumlah_DO": do_volume,
-            "Pendapatan_Pokok": round(pendapatan_do, 2),
-            "Pajak_PPN": round(ppn_do, 2),
-            "PPh_Nominal": round(pph_do, 2),
-            "PPh_Setor": do.is_pph_disetor if do else "false",
+            "Pendapatan_Pokok": pendapatan_do,
+            "Pajak_PPN": ppn_do,
+            "PPh_Nominal": pph_do,
+            "PPh_Setor": "true" if (do and do.is_pph_disetor) else "false",
             "Kewajiban_Pembayaran": inv_total,
             "Sisa_Pembayaran": sisa_pembayaran,
             "Sisa_Volume": sisa_volume,
@@ -106,14 +104,13 @@ def get_laporan(db: Session = Depends(get_db)):
 
     for k in kontraks:
         if not k.invoices:
-            rows.append(build_row(k, None, None, 0, 0, 0, 0))
+            rows.append(build_row(k, None, None))
         else:
             for inv in k.invoices:
-                # Calculate per-invoice totals across ALL DOs
-                total_do_nominal = sum(float(d.nominal_transfer or 0) for d in inv.delivery_orders)
-                total_do_volume = sum(float(d.volume_do or 0) for d in inv.delivery_orders)
-                inv_total = float(inv.jumlah_pembayaran or 0)
-                k_vol = float(k.volume or 0)
+                total_do_nominal = sum((d.nominal_transfer or Decimal('0.00')) for d in inv.delivery_orders)
+                total_do_volume = sum((d.volume_do or Decimal('0.00')) for d in inv.delivery_orders)
+                inv_total = inv.jumlah_pembayaran or Decimal('0.00')
+                k_vol = k.volume or Decimal('0.00')
                 
                 if not inv.delivery_orders:
                     rows.append(build_row(k, inv, None, inv_total, k_vol, total_do_nominal, total_do_volume))
@@ -121,10 +118,8 @@ def get_laporan(db: Session = Depends(get_db)):
                     for do in inv.delivery_orders:
                         rows.append(build_row(k, inv, do, inv_total, k_vol, total_do_nominal, total_do_volume))
                         
-    # Sort by Kontrak then Invoice then DO
     rows.sort(key=lambda x: (x["Billing_Date"], x["No_Kontrak"], x["No_Invoice"], x["No_DO"]))
     
-    # 2. Fetch Bypass Data
     bypass_data = db.query(models.LaporanBypass).all()
     for b in bypass_data:
         rows.append({
@@ -137,18 +132,18 @@ def get_laporan(db: Session = Depends(get_db)):
             "Billing_Date": format_date(b.tanggal),
             "Tanggal_Transfer": format_date(b.tanggal),
             "Raw_Date": b.tanggal.strftime("%Y-%m-%d") if b.tanggal else "",
-            "Jumlah_Transfer": b.nominal or 0,
+            "Jumlah_Transfer": b.nominal or Decimal('0.00'),
             "Mitra_Pembeli": b.pembeli or "",
             "Deskripsi_Produk": b.deskripsi or "",
-            "Jumlah_Kontrak_Kg": b.volume or 0,
-            "Harga_Per_Kg": (b.nominal / b.volume) if (b.volume and b.volume > 0) else 0,
-            "Jumlah_DO": b.volume or 0,
+            "Jumlah_Kontrak_Kg": b.volume or Decimal('0.00'),
+            "Harga_Per_Kg": (b.nominal / b.volume) if (b.volume and b.volume > 0) else Decimal('0.00'),
+            "Jumlah_DO": b.volume or Decimal('0.00'),
             "Satuan": b.satuan or "Kg",
-            "Pendapatan_Pokok": b.nominal or 0,
-            "Pajak_PPN": 0,
-            "PPh_Nominal": 0,
+            "Pendapatan_Pokok": b.nominal or Decimal('0.00'),
+            "Pajak_PPN": Decimal('0.00'),
+            "PPh_Nominal": Decimal('0.00'),
             "PPh_Setor": "false",
-            "Kewajiban_Pembayaran": b.nominal or 0,
+            "Kewajiban_Pembayaran": b.nominal or Decimal('0.00'),
             "Bulan_Buku": get_bulan_buku(b.tanggal),
             "Superman": b.superman or "",
             "Kontrak_SAP": b.kontrak_sap or "",
@@ -200,10 +195,10 @@ def create_bypass_entry(data: dict, db: Session = Depends(get_db)):
             unit=data.get("Unit"),
             komoditi=data.get("Komoditi"),
             tanggal=tanggal_dt,
-            nominal=float(data.get("Nominal") or 0),
+            nominal=Decimal(str(data.get("Nominal") or 0)),
             pembeli=data.get("Pembeli"),
             deskripsi=data.get("Deskripsi"),
-            volume=float(data.get("Volume") or 0),
+            volume=Decimal(str(data.get("Volume") or 0)),
             satuan=data.get("Satuan") or "Kg"
         )
         db.add(new_rec)
@@ -225,10 +220,10 @@ def update_bypass_entry(data: dict, db: Session = Depends(get_db)):
         if "Unit" in data: rec.unit = data["Unit"]
         if "Komoditi" in data: rec.komoditi = data["Komoditi"]
         if "Tanggal" in data: rec.tanggal = datetime.strptime(data["Tanggal"], "%Y-%m-%d").date()
-        if "Nominal" in data: rec.nominal = float(data["Nominal"] or 0)
+        if "Nominal" in data: rec.nominal = Decimal(str(data["Nominal"] or 0))
         if "Pembeli" in data: rec.pembeli = data["Pembeli"]
         if "Deskripsi" in data: rec.deskripsi = data["Deskripsi"]
-        if "Volume" in data: rec.volume = float(data["Volume"] or 0)
+        if "Volume" in data: rec.volume = Decimal(str(data["Volume"] or 0))
         if "Satuan" in data: rec.satuan = data["Satuan"]
         
         db.commit()
