@@ -48,7 +48,6 @@ async function autoLoadInvoice() {
         const data = await res.json();
         document.getElementById('i_no_kontrak').value = data.no_kontrak;
         document.getElementById('i_tanggal_transaksi').value = data.tanggal_transaksi;
-        document.getElementById('i_pph_22').value = data.pph_22_persen;
         await fetchKontrakForInvoice();
         document.getElementById('i_no_invoice').value = no; // Restore ID after fetchKontrakForInvoice overwrites it
         showToast("Mode Edit: Data invoice " + no + " berhasil dimuat.", "info");
@@ -397,10 +396,34 @@ async function fetchKontrakForInvoice() {
         document.getElementById('i_lbl_komoditi').innerText = data.komoditi || '-';
         document.getElementById('i_lbl_vol_harga').innerText = `${data.volume} x ${formatRupiah(data.harga_satuan)}`;
         document.getElementById('i_lbl_ketentuan').innerText = data.kondisi_penyerahan || '-';
-        document.getElementById('i_lbl_nilai').innerText = formatRupiah(data.nilai_transaksi);
-        document.getElementById('i_lbl_ppn').innerText = formatRupiah(data.nominal_ppn);
+        
+        const vol = parseFloat(data.volume) || 0;
+        const hrg = parseFloat(data.harga_satuan) || 0;
+        const premi = parseFloat(data.premi) || 0;
+        const nilaiPokok = (vol * hrg) + premi;
 
-        const estTotal = data.nilai_transaksi + data.nominal_ppn;
+        const ppnPct = parseFloat(data.ppn_persen) || 11;
+        let nomPpn = 0;
+        if (String(data.is_ppn).toLowerCase() !== 'false') {
+            nomPpn = nilaiPokok * (ppnPct / 100);
+        }
+
+        document.getElementById('i_lbl_ppn').innerText = formatRupiah(nomPpn);
+
+        let nomPph = 0;
+        const elPph = document.getElementById('i_lbl_pph');
+        if (String(data.is_pph).toLowerCase() === 'true') {
+            const pphPct = parseFloat(data.pph_persen) || 0;
+            nomPph = nilaiPokok * (pphPct / 100);
+            if (elPph) {
+                elPph.parentElement.classList.remove('hidden');
+                elPph.innerText = `-${formatRupiah(nomPph)} (${pphPct}%)`;
+            }
+        } else if (elPph) {
+            elPph.parentElement.classList.add('hidden');
+        }
+
+        const estTotal = nilaiPokok + nomPpn - nomPph;
         document.getElementById('i_lbl_total').innerText = formatRupiah(estTotal);
 
         // Auto-generate Invoice number with suffix if multiple Invoices exist for this contract
@@ -463,8 +486,7 @@ async function handleInvoiceSubmit(e) {
     const payload = {
         no_invoice: document.getElementById('i_no_invoice').value,
         no_kontrak: document.getElementById('i_no_kontrak').value,
-        tanggal_transaksi: document.getElementById('i_tanggal_transaksi').value,
-        pph_22_persen: parseLocaleFloat(document.getElementById('i_pph_22').value),
+        tanggal_transaksi: document.getElementById('i_tanggal_transaksi').value
     };
 
     try {
@@ -498,16 +520,25 @@ function buildInvoicePreview() {
     const noInv = document.getElementById('i_no_invoice').value || '[No Invoice]';
     const noK = document.getElementById('i_no_kontrak').value || '[No Kontrak]';
     const tgl = document.getElementById('i_tanggal_transaksi').value || '';
-    const pph = parseLocaleFloat(document.getElementById('i_pph_22').value);
 
-    let k = window.currentInvoiceKontrak || {};
+    const k = window.currentInvoiceKontrak || {};
 
     const vol = parseLocaleFloat(k.volume);
     const hrg = parseLocaleFloat(k.harga_satuan);
     const nilai = (vol * hrg) + (parseLocaleFloat(k.premi) || 0);
     const ppnPct = parseLocaleFloat(k.ppn_persen) || 11;
-    const nomPpn = nilai * (ppnPct / 100);
-    const estTotal = nilai + nomPpn;
+    let nomPpn = 0;
+    if (String(k.is_ppn).toLowerCase() !== 'false') {
+        nomPpn = nilai * (ppnPct / 100);
+    }
+    let nomPph = 0;
+    const isPph = String(k.is_pph).toLowerCase() === 'true';
+    const pphPct = parseLocaleFloat(k.pph_persen) || 0;
+    if (isPph) {
+        nomPph = nilai * (pphPct / 100);
+    }
+
+    const estTotal = nilai + nomPpn - nomPph;
 
     const lamaStr = k.lama_pembayaran_hari ? (k.lama_pembayaran_hari + ' hari') : '-';
 
@@ -588,10 +619,16 @@ function buildInvoicePreview() {
                 <td style="${tdStyle} text-align:right; border-left:none;">${nilai > 0 ? nilai.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
             </tr>
             <tr>
-                <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN ${ppnPct}%</strong></td>
+                <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPN</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>
                 <td style="${tdStyle} text-align:right; border-left:none;"><strong>${nomPpn > 0 ? nomPpn.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</strong></td>
             </tr>
+            ${isPph ? `
+            <tr>
+                <td style="${tdStyle} text-align:right;" colspan="8"><strong>PPh</strong></td>
+                <td style="${tdStyle} border-right:none;">Rp</td>
+                <td style="${tdStyle} text-align:right; border-left:none;"><strong>(${nomPph > 0 ? nomPph.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'})</strong></td>
+            </tr>` : ''}
             <tr>
                 <td style="${tdStyle} text-align:right;" colspan="8"><strong>Jumlah Pembayaran</strong></td>
                 <td style="${tdStyle} border-right:none;">Rp</td>

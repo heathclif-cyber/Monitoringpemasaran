@@ -302,8 +302,8 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
             p.add_run('\n')
             _run(p, v, bold=bsv)
 
-    # 16 rows
-    rows = [nr() for _ in range(16)]
+    # 17 rows
+    rows = [nr() for _ in range(17)]
 
     # Row 0 to 3 Left
     c_kepada = rows[0].cells[0]
@@ -424,31 +424,45 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_ppnl = rows[12].cells[0]
     c_ppnl.merge(rows[12].cells[7])
     c_ppnl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _run(c_ppnl.paragraphs[0], f"PPN {ppn_pct}% ", bold=True)
+    _run(c_ppnl.paragraphs[0], f"PPN ", bold=True)
     _run(rows[12].cells[8].paragraphs[0], ' Rp')
     c_ppnr = rows[12].cells[9]
     c_ppnr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run(c_ppnr.paragraphs[0], f" {_rp(k.nominal_ppn).replace('Rp', '').strip()} ", bold=True)
 
-    # Row 13 (Total)
-    c_totl = rows[13].cells[0]
-    c_totl.merge(rows[13].cells[7])
+    # Row 13 (PPh val)
+    pph_val = 0.0
+    if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
+        pokok = (k.volume or 0) * (k.harga_satuan or 0) + (k.premi or 0)
+        pph_val = pokok * ((getattr(k, 'pph_persen', 0.0) or 0.0) / 100)
+    c_pphl = rows[13].cells[0]
+    c_pphl.merge(rows[13].cells[7])
+    c_pphl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    _run(c_pphl.paragraphs[0], f"PPh ", bold=True)
+    _run(rows[13].cells[8].paragraphs[0], ' Rp')
+    c_pphr = rows[13].cells[9]
+    c_pphr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    _run(c_pphr.paragraphs[0], f" ({_rp(pph_val).replace('Rp', '').strip()}) " if pph_val > 0 else " - ", bold=True)
+
+    # Row 14 (Total)
+    c_totl = rows[14].cells[0]
+    c_totl.merge(rows[14].cells[7])
     c_totl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run(c_totl.paragraphs[0], "Jumlah Pembayaran ", bold=True)
-    _run(rows[13].cells[8].paragraphs[0], ' Rp')
-    c_totr = rows[13].cells[9]
+    _run(rows[14].cells[8].paragraphs[0], ' Rp')
+    c_totr = rows[14].cells[9]
     c_totr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run(c_totr.paragraphs[0], f" {_rp(invoice.jumlah_pembayaran).replace('Rp', '').strip()} ")
 
-    # Row 14 (Terbilang)
-    c_terb = rows[14].cells[0]
-    c_terb.merge(rows[14].cells[9])
+    # Row 15 (Terbilang)
+    c_terb = rows[15].cells[0]
+    c_terb.merge(rows[15].cells[9])
     _run(c_terb.paragraphs[0], "Terbilang:\n", bold=True)
     _run(c_terb.paragraphs[0], f"{invoice.terbilang_invoice or _s(k.terbilang, '')} Rupiah", italic=True)
 
-    # Row 15 (Transfer Ke)
-    c_trans = rows[15].cells[0]
-    c_trans.merge(rows[15].cells[9])
+    # Row 16 (Transfer Ke)
+    c_trans = rows[16].cells[0]
+    c_trans.merge(rows[16].cells[9])
     _run(c_trans.paragraphs[0], "Transfer Ke:\n", bold=True)
     bank_info = _s(k.pembayaran_bank, 'Bank Rakyat Indonesia')
     rek_info = _s(k.pembayaran_rek_no, 'No. 0050-01-005356-30-0')

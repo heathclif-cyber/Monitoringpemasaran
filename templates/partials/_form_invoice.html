@@ -28,15 +28,9 @@
 <datalist id="invoice-list"></datalist>
                                 </div>
                                 
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="block text-xs font-medium text-slate-700 mb-1">Tgl Transaksi *</label>
-                                        <input type="date" id="i_tanggal_transaksi" required class="form-input">
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-medium text-slate-700 mb-1">PPh 22 (%)</label>
-                                        <input type="text" inputmode="decimal" id="i_pph_22" class="form-input" value="0">
-                                    </div>
+                                <div class="relative">
+                                    <label class="block text-xs font-medium text-slate-700 mb-1">Tgl Transaksi *</label>
+                                    <input type="date" id="i_tanggal_transaksi" required class="form-input w-1/2">
                                 </div>
                             </div>
                             
@@ -50,6 +44,7 @@
                                     <div class="flex justify-between text-xs"><span class="text-slate-600">Ketentuan:</span><span class="font-medium text-slate-800 text-right" id="i_lbl_ketentuan">-</span></div>
                                     <div class="flex justify-between text-xs"><span class="text-slate-600">Nilai Transaksi:</span><span class="font-medium text-slate-800 text-right" id="i_lbl_nilai">-</span></div>
                                     <div class="flex justify-between text-xs"><span class="text-slate-600">PPN:</span><span class="font-medium text-slate-800 text-right" id="i_lbl_ppn">-</span></div>
+                                    <div class="flex justify-between text-xs hidden"><span class="text-slate-600">Potongan PPh:</span><span class="font-medium text-red-600 text-right" id="i_lbl_pph">-</span></div>
                                     
                                     <div class="flex justify-between text-xs mt-3 pt-3 border-t border-brand-200">
                                         <span class="text-slate-700 font-bold uppercase tracking-wide">Estimasi Pembayaran:</span>

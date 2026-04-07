@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 import models
-from api.r_laporan import router as laporan_router, seed_beteleme
+from api.r_laporan import router as laporan_router
 from database import engine, SessionLocal
 
 # --- Router imports ---
@@ -68,16 +68,6 @@ def startup_event():
         finally:
             db.close()
 
-        # Seed Beteleme Sawit data if not present
-        db = SessionLocal()
-        try:
-            seed_beteleme(db)
-            logger.info("Beteleme Sawit data seeded successfully.")
-        except Exception as seed_err:
-            logger.error(f"Seeding failed: {seed_err}")
-        finally:
-            db.close()
-            
         logger.info("Database initialization complete.")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
