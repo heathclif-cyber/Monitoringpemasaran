@@ -100,6 +100,8 @@ class DeliveryOrder(Base):
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
     
+    rencana_pengambilan = Column(Date, nullable=True)
+    
     # Calculated Fields
     selisih = Column(Float, default=0.0)
     volume_do = Column(Float, default=0.0)

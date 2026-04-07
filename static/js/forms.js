@@ -68,9 +68,10 @@ async function autoLoadDO() {
         document.getElementById('d_no_invoice').value = data.no_invoice;
         document.getElementById('d_tanggal_do').value = data.tanggal_do;
         document.getElementById('d_kepada_unit').value = data.kepada_unit;
-        document.getElementById('d_tanggal_pembayaran').value = data.tanggal_pembayaran;
+        document.getElementById('d_tanggal_pembayaran').value = data.tanggal_pembayaran || "";
         document.getElementById('d_nominal_transfer').value = data.nominal_transfer;
         document.getElementById('d_is_pph_disetor').value = data.is_pph_disetor || "false";
+        document.getElementById('d_rencana_pengambilan').value = data.rencana_pengambilan || "";
         await fetchInvoiceForDO();
         document.getElementById('d_no_do').value = no; // Restore ID after fetchInvoiceForDO overwrites it
         showToast("Mode Edit: Data DO " + no + " berhasil dimuat.", "info");
@@ -237,6 +238,37 @@ function buildLivePreview() {
 
 function calculateKontrakPreview() { buildLivePreview(); }
 
+function isExistingDocument(inputId, datalistId) {
+    const val = document.getElementById(inputId).value;
+    const options = document.getElementById(datalistId) ? document.getElementById(datalistId).options : [];
+    for(let i=0; i<options.length; i++) {
+        if(options[i].value === val) return true;
+    }
+    return false;
+}
+
+function handleNewKontrakBtn(e) {
+    if (isExistingDocument('k_no_kontrak', 'kontrak-list')) {
+        showToast("Dokumen sudah ada, Silahkan Klik Simpan Perubahan", "warning");
+        e.preventDefault();
+        return false;
+    }
+    return true;
+}
+
+async function handleEditKontrak(e) {
+    e.preventDefault();
+    if (!document.getElementById('formCreateKontrak').checkValidity()) {
+        document.getElementById('formCreateKontrak').reportValidity();
+        return;
+    }
+    if (!isExistingDocument('k_no_kontrak', 'kontrak-list')) {
+        showToast("Dokumen Baru, Silahkan Klik Buat", "warning");
+        return;
+    }
+    await handleKontrakSubmit(e);
+}
+
 // ==== KONTRAK SUBMIT ====
 async function handleKontrakSubmit(e) {
     e.preventDefault();
@@ -397,6 +429,28 @@ async function fetchKontrakForInvoice() {
         document.getElementById('i_lbl_total').innerText = 'Rp 0';
         buildInvoicePreview();
     }
+}
+
+function handleNewInvoiceBtn(e) {
+    if (isExistingDocument('i_no_invoice', 'invoice-list')) {
+        showToast("Dokumen sudah ada, Silahkan Klik Simpan Perubahan", "warning");
+        e.preventDefault();
+        return false;
+    }
+    return true;
+}
+
+async function handleEditInvoice(e) {
+    e.preventDefault();
+    if (!document.getElementById('formCreateInvoice').checkValidity()) {
+        document.getElementById('formCreateInvoice').reportValidity();
+        return;
+    }
+    if (!isExistingDocument('i_no_invoice', 'invoice-list')) {
+        showToast("Dokumen Baru, Silahkan Klik Buat", "warning");
+        return;
+    }
+    await handleInvoiceSubmit(e);
 }
 
 async function handleInvoiceSubmit(e) {
@@ -657,6 +711,28 @@ function updateProportionalVolume() {
     buildDOPreview();
 }
 
+function handleNewDOBtn(e) {
+    if (isExistingDocument('d_no_do', 'do-list')) {
+        showToast("Dokumen sudah ada, Silahkan Klik Simpan Perubahan", "warning");
+        e.preventDefault();
+        return false;
+    }
+    return true;
+}
+
+async function handleEditDO(e) {
+    e.preventDefault();
+    if (!document.getElementById('formCreateDO').checkValidity()) {
+        document.getElementById('formCreateDO').reportValidity();
+        return;
+    }
+    if (!isExistingDocument('d_no_do', 'do-list')) {
+        showToast("Dokumen Baru, Silahkan Klik Buat", "warning");
+        return;
+    }
+    await handleDOSubmit(e);
+}
+
 async function handleDOSubmit(e) {
     e.preventDefault();
     const btn = document.getElementById('btn-submit-do') || e.target.querySelector('button[type="submit"]');
@@ -672,6 +748,7 @@ async function handleDOSubmit(e) {
         nominal_transfer: parseLocaleFloat(document.getElementById('d_nominal_transfer').value),
         tanggal_pembayaran: document.getElementById('d_tanggal_pembayaran').value || null,
         is_pph_disetor: document.getElementById('d_is_pph_disetor').value || "false",
+        rencana_pengambilan: document.getElementById('d_rencana_pengambilan').value || null,
     };
 
     try {

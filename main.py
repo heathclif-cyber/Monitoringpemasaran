@@ -60,6 +60,7 @@ def startup_event():
             add_column_safely("kontrak", "ppn_persen", "FLOAT DEFAULT 11.0")
             add_column_safely("kontrak", "is_pph", "VARCHAR DEFAULT 'false'")
             add_column_safely("kontrak", "pph_persen", "FLOAT DEFAULT 0.0")
+            add_column_safely("delivery_order", "rencana_pengambilan", "DATE DEFAULT NULL")
             
             logger.info("Migration routine finished.")
         except Exception as migrate_err:

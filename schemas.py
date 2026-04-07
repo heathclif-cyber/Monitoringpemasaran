@@ -93,6 +93,7 @@ class DeliveryOrderBase(BaseModel):
     tanggal_pembayaran: Optional[date] = None
     nominal_transfer: Optional[float] = 0.0
     is_pph_disetor: Optional[str] = "false"
+    rencana_pengambilan: Optional[date] = None
 
 class DeliveryOrderCreate(DeliveryOrderBase):
     pass
