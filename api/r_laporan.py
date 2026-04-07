@@ -151,6 +151,7 @@ def get_laporan(db: Session = Depends(get_db)):
             "PPh_Setor": "false",
             "Kewajiban_Pembayaran": b.nominal or 0,
             "Sisa_Pembayaran": 0,
+            "Rencana_Pengambilan": b.tanggal.strftime("%Y-%m-%d") if b.tanggal else "",
             "Bulan_Buku": get_bulan_buku(b.tanggal),
             "Superman": b.superman or "",
             "Kontrak_SAP": b.kontrak_sap or "",
