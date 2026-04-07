@@ -32,7 +32,7 @@ async function fetchDashboardData() {
         const data = await res.json();
 
         // --- Update Summary Cards ---
-        document.getElementById('dash-nilai-transaksi').innerText = formatRupiah(data.summary.total_nilai_transaksi);
+        document.getElementById('dash-pendapatan').innerText = formatRupiah(data.summary.total_pendapatan);
         document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in);
         document.getElementById('dash-volume-realisasi').innerText = data.summary.total_volume_realisasi.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg';
         document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice;
@@ -113,7 +113,7 @@ async function fetchDashboardData() {
                 labels: data.charts.bulanan.labels,
                 datasets: [
                     {
-                        label: 'Nilai Kontrak',
+                        label: 'Pendapatan (Omset)',
                         data: data.charts.bulanan.pendapatan,
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.07)',
