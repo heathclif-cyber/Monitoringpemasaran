@@ -81,6 +81,17 @@
             </select>
         </div>
 
+        <div class="flex flex-col gap-1 w-full sm:w-auto flex-1 md:flex-none">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Status Pembayaran</label>
+            <select id="filter-laporan-status-bayar" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[160px]">
+                <option value="ALL" selected>Semua Status</option>
+                <option value="BELUM_BAYAR">Belum Bayar</option>
+                <option value="SEBAGIAN">Pembayaran Sebagian</option>
+                <option value="LUNAS">Pembayaran Penuh / Lunas</option>
+            </select>
+        </div>
+
         <div class="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0 lg:ml-auto">
             <button onclick="resetLaporanFilters()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 py-2.5 px-3 rounded-lg font-semibold transition-colors flex items-center gap-1">
                 <i class="fas fa-times"></i> Reset Filter
@@ -233,6 +244,7 @@
         const sort = document.getElementById('filter-laporan-sort').value;
         const tipe = document.getElementById('filter-laporan-tipe').value;
         const sapFilter = document.getElementById('filter-laporan-sap').value;
+        const statusBayarFilter = document.getElementById('filter-laporan-status-bayar').value;
 
         let filtered = rawLaporanData.filter(r => {
             const matchUnit = unit === 'ALL' || r.Unit === unit;
@@ -274,7 +286,16 @@
                 matchSap = r.Kontrak_SAP && r.SO_SAP && r.DO_SAP && r.Billing;
             }
 
-            return matchUnit && matchKomod && matchBuyer && matchMonth && matchTipe && matchSap;
+            let matchStatusBayar = true;
+            if (statusBayarFilter === 'LUNAS') {
+                matchStatusBayar = r.Sisa_Pembayaran <= 0;
+            } else if (statusBayarFilter === 'BELUM_BAYAR') {
+                matchStatusBayar = r.Sisa_Pembayaran >= r.Kewajiban_Pembayaran && r.Kewajiban_Pembayaran > 0;
+            } else if (statusBayarFilter === 'SEBAGIAN') {
+                matchStatusBayar = r.Sisa_Pembayaran > 0 && r.Sisa_Pembayaran < r.Kewajiban_Pembayaran;
+            }
+
+            return matchUnit && matchKomod && matchBuyer && matchMonth && matchTipe && matchSap && matchStatusBayar;
         });
 
         // Sorting
@@ -321,6 +342,7 @@
         document.getElementById('filter-laporan-sort').value = 'DESC';
         document.getElementById('filter-laporan-tipe').value = 'ALL';
         document.getElementById('filter-laporan-sap').value = 'ALL';
+        document.getElementById('filter-laporan-status-bayar').value = 'ALL';
         applyLaporanFilters();
     }
 
