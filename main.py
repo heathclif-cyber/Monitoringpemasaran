@@ -9,7 +9,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 import models
-from api.r_laporan import router as laporan_router
 from database import engine, SessionLocal
 
 # --- Router imports ---
@@ -35,7 +34,6 @@ def startup_event():
         try:
             db = SessionLocal()
             logger.info("Migrating missing columns (PPh, volume, etc)...")
-            from sqlalchemy import text
             
             # Helper to add column safely
             def add_column_safely(table, col, type_def):
