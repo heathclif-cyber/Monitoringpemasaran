@@ -156,13 +156,14 @@
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">No Kontrak</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Unit</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Komoditi</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">Satuan</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Billing Date / Invoice</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Tanggal Transfer</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah Transfer</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Mitra Pembeli</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Deskripsi Produk</th>
-                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah Kontrak (Kg)</th>
-                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Harga Per Kg (Kontrak)
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah Kontrak</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Harga Satuan (Kontrak)
                         </th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah DO</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pendapatan Pokok (Rp)</th>
@@ -534,13 +535,14 @@
                 <td class="py-2.5 px-4 border-r border-slate-100 font-medium text-indigo-700">${row.No_Kontrak}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Unit}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Komoditi}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-center font-medium">${row.Satuan || 'Kg'}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Billing_Date}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Tanggal_Transfer}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-emerald-600" data-t="n" data-v="${row.Jumlah_Transfer || 0}">${fmtRp(row.Jumlah_Transfer)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-800 font-medium">${row.Mitra_Pembeli}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Deskripsi_Produk}</td>
-                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_Kontrak_Kg || 0}">${fmtNum(row.Jumlah_Kontrak_Kg)}</td>
-                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Harga_Per_Kg || 0}">${fmtNum(row.Harga_Per_Kg)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_Kontrak || 0}">${fmtNum(row.Jumlah_Kontrak)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Harga_Satuan || 0}">${fmtNum(row.Harga_Satuan)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_DO || 0}">${fmtNum(row.Jumlah_DO)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium" data-t="n" data-v="${row.Pendapatan_Pokok || 0}">${fmtRp(row.Pendapatan_Pokok)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Pajak_PPN || 0}">${fmtRp(row.Pajak_PPN)}</td>
@@ -617,7 +619,7 @@
         document.getElementById('bypass_unit').value = row.Unit;
         document.getElementById('bypass_komoditi').value = row.Komoditi;
         document.getElementById('bypass_tanggal').value = row.Raw_Date;
-        document.getElementById('bypass_volume').value = row.Jumlah_Kontrak_Kg;
+        document.getElementById('bypass_volume').value = row.Jumlah_Kontrak;
         document.getElementById('bypass_satuan').value = row.Satuan || 'Kg';
         document.getElementById('bypass_nominal').value = row.Pendapatan_Pokok;
         document.getElementById('bypass_pembeli').value = row.Mitra_Pembeli;
