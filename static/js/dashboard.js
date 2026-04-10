@@ -35,12 +35,16 @@ async function fetchDashboardData() {
         document.getElementById('dash-pendapatan').innerText = formatRupiah(data.summary.total_pendapatan || 0);
         document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in || 0);
         
+        document.getElementById('dash-volume-realisasi').innerText = Number(data.summary.total_volume_all || 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        
         let doVolText = [];
         if (data.summary.total_volume_kg > 0) doVolText.push(Number(data.summary.total_volume_kg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
         if (data.summary.total_volume_butir > 0) doVolText.push(Number(data.summary.total_volume_butir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
         if (doVolText.length === 0) doVolText.push('0 Kg');
 
-        document.getElementById('dash-volume-realisasi').innerText = doVolText.join(' | ');
+        const volDetailEl = document.getElementById('dash-volume-detail');
+        if (volDetailEl) volDetailEl.innerText = doVolText.join(' | ');
+        
         document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice || 0;
         document.getElementById('dash-do-count').innerText = data.summary.total_do || 0;
 
@@ -270,15 +274,16 @@ async function fetchDashboardData() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit/Kg`
+                            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         }
                     }
                 },
                 scales: {
                     y: {
+                        stacked: true,
                         beginAtZero: true,
                         ticks: {
                             callback: (val) => {
@@ -287,6 +292,9 @@ async function fetchDashboardData() {
                                 return val;
                             }
                         }
+                    },
+                    x: {
+                        stacked: true
                     }
                 }
             }

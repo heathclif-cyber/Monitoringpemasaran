@@ -170,6 +170,7 @@ def get_dashboard_data(
                 "total_pendapatan": total_pendapatan,
                 "total_nilai_invoice": total_nilai_invoice,
                 "total_cash_in": total_cash_in,
+                "total_volume_all": total_volume_kg + total_volume_butir,
                 "total_volume_kg": total_volume_kg,
                 "total_volume_butir": total_volume_butir,
                 "sap_stats": {
