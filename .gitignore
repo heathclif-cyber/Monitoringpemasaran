@@ -12,7 +12,8 @@ pip-delete-this-directory.txt
 .cache
 nosetests.xml
 coverage.xml
-test.db
+*.db
+*.sqlite
 .idea/
 .vscode/
 *.docx

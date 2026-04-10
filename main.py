@@ -59,6 +59,8 @@ def startup_event():
             add_column_safely("kontrak", "is_pph", "VARCHAR DEFAULT 'false'")
             add_column_safely("kontrak", "pph_persen", "FLOAT DEFAULT 0.0")
             add_column_safely("delivery_order", "rencana_pengambilan", "DATE DEFAULT NULL")
+            add_column_safely("delivery_order", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
+            add_column_safely("laporan_bypass", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
             
             logger.info("Migration routine finished.")
         except Exception as migrate_err:
