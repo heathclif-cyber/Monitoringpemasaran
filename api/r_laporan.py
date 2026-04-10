@@ -102,7 +102,9 @@ def get_laporan(db: Session = Depends(get_db)):
             "Kontrak_SAP": do.kontrak_sap if do else "",
             "SO_SAP": do.so_sap if do else "",
             "DO_SAP": do.do_sap if do else "",
-            "Billing": do.billing_sap if do else ""
+            "Billing": do.billing_sap if do else "",
+            "Link_Deklarasi_Penerimaan": do.link_deklarasi_penerimaan if do else "",
+            "Satuan": k.satuan or "Kg"
         }
 
     for k in kontraks:
@@ -157,7 +159,8 @@ def get_laporan(db: Session = Depends(get_db)):
             "Kontrak_SAP": b.kontrak_sap or "",
             "SO_SAP": b.so_sap or "",
             "DO_SAP": b.do_sap or "",
-            "Billing": b.billing_sap or ""
+            "Billing": b.billing_sap or "",
+            "Link_Deklarasi_Penerimaan": b.link_deklarasi_penerimaan or ""
         })
 
     return rows
@@ -178,6 +181,7 @@ def update_sap_fields(data: dict, db: Session = Depends(get_db)):
         if "SO_SAP" in data: rec.so_sap = data["SO_SAP"]
         if "DO_SAP" in data: rec.do_sap = data["DO_SAP"]
         if "Billing" in data: rec.billing_sap = data["Billing"]
+        if "Link_Deklarasi_Penerimaan" in data: rec.link_deklarasi_penerimaan = data["Link_Deklarasi_Penerimaan"]
     else:
         do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == no_do).first()
         if not do:
@@ -189,6 +193,7 @@ def update_sap_fields(data: dict, db: Session = Depends(get_db)):
         if "SO_SAP" in data: do.so_sap = data["SO_SAP"]
         if "DO_SAP" in data: do.do_sap = data["DO_SAP"]
         if "Billing" in data: do.billing_sap = data["Billing"]
+        if "Link_Deklarasi_Penerimaan" in data: do.link_deklarasi_penerimaan = data["Link_Deklarasi_Penerimaan"]
     
     db.commit()
     return {"success": True}

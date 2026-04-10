@@ -119,7 +119,7 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <div class="bg-emerald-50 p-4 rounded-xl shadow-sm border border-emerald-100 flex flex-col justify-center">
             <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Total Cash In</span>
             <span class="text-xl font-black text-emerald-600 mt-1" id="summary-cash-in">Rp 0</span>
@@ -134,7 +134,15 @@
         </div>
         <div class="bg-amber-50 p-4 rounded-xl shadow-sm border border-amber-100 flex flex-col justify-center">
             <span class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Sisa Barang Belum Diserahkan</span>
-            <span class="text-xl font-black text-amber-600 mt-1" id="summary-sisa-volume">0 Kg</span>
+            <span class="text-lg font-black text-amber-600 mt-1" id="summary-sisa-volume">0 Kg</span>
+        </div>
+        <div class="bg-cyan-50 p-4 rounded-xl shadow-sm border border-cyan-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">Harga Rata-Rata Komoditi</span>
+            <span class="text-lg font-black text-cyan-600 mt-1" id="summary-harga-rata">Rp 0 / Kg</span>
+        </div>
+        <div class="bg-fuchsia-50 p-4 rounded-xl shadow-sm border border-fuchsia-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-fuchsia-600 uppercase tracking-widest">Barang yang Telah Diserahkan</span>
+            <span class="text-lg font-black text-fuchsia-600 mt-1" id="summary-barang-disetor">0 Kg</span>
         </div>
     </div>
 
@@ -171,12 +179,13 @@
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">SO SAP</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">DO SAP</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">No Billing</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">Link Deklarasi Penerimaan</th>
                         <th class="py-3 px-4 border-l border-indigo-100 shadow-sm text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="laporan-tbody" class="bg-white">
                     <tr>
-                        <td colspan="27" class="text-center py-6 text-slate-400">Loading data...</td>
+                        <td colspan="28" class="text-center py-6 text-slate-400">Loading data...</td>
                     </tr>
                 </tbody>
             </table>
@@ -387,13 +396,31 @@
         // Summary Calculation
         const uniqueInvoices = new Set();
         let totalSisaPembayaran = 0;
-        let totalSisaVolume = 0;
+        let totalSisaVolumeKg = 0;
+        let totalSisaVolumeButir = 0;
         let totalCashIn = 0;
         let totalPendapatan = 0;
+        
+        let totalDOVolumeKg = 0;
+        let totalDOVolumeButir = 0;
+        let totalPendapatanKg = 0;
+        let totalPendapatanButir = 0;
 
         filtered.forEach(r => {
             totalCashIn += (r.Jumlah_Transfer || 0);
-            totalPendapatan += (parseFloat(r.Pendapatan_Pokok) || 0);
+            const pendPokok = (parseFloat(r.Pendapatan_Pokok) || 0);
+            totalPendapatan += pendPokok;
+            
+            const volDO = parseFloat(r.Jumlah_DO) || 0;
+            const satuan = (r.Satuan || "Kg").toLowerCase();
+
+            if (satuan === "butir") {
+                totalDOVolumeButir += volDO;
+                totalPendapatanButir += pendPokok;
+            } else {
+                totalDOVolumeKg += volDO;
+                totalPendapatanKg += pendPokok;
+            }
 
             let idKey = r.No_Invoice ? `INV-${r.No_Invoice}` : (r.No_Kontrak ? `KONTRAK-${r.No_Kontrak}` : null);
             if (r.No_DO && r.No_DO.startsWith('BYPASS-')) idKey = r.No_DO;
@@ -401,14 +428,39 @@
             if (idKey && !uniqueInvoices.has(idKey)) {
                 uniqueInvoices.add(idKey);
                 if (r.Sisa_Pembayaran && r.Sisa_Pembayaran > 0) totalSisaPembayaran += r.Sisa_Pembayaran;
-                if (r.Sisa_Volume && r.Sisa_Volume > 0) totalSisaVolume += r.Sisa_Volume;
+                if (r.Sisa_Volume && r.Sisa_Volume > 0) {
+                    if (satuan === "butir") totalSisaVolumeButir += r.Sisa_Volume;
+                    else totalSisaVolumeKg += r.Sisa_Volume;
+                }
             }
         });
 
         document.getElementById('summary-sisa-bayar').innerText = formatRupiah(totalSisaPembayaran);
-        document.getElementById('summary-sisa-volume').innerText = Number(totalSisaVolume).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg';
+        
+        let sisaVolText = [];
+        if (totalSisaVolumeKg > 0) sisaVolText.push(Number(totalSisaVolumeKg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
+        if (totalSisaVolumeButir > 0) sisaVolText.push(Number(totalSisaVolumeButir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (sisaVolText.length === 0) sisaVolText.push('0 Kg');
+        document.getElementById('summary-sisa-volume').innerText = sisaVolText.join(' | ');
+
         document.getElementById('summary-cash-in').innerText = formatRupiah(totalCashIn);
         document.getElementById('summary-pendapatan').innerText = formatRupiah(totalPendapatan);
+        
+        let doVolText = [];
+        if (totalDOVolumeKg > 0) doVolText.push(Number(totalDOVolumeKg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
+        if (totalDOVolumeButir > 0) doVolText.push(Number(totalDOVolumeButir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (doVolText.length === 0) doVolText.push('0 Kg');
+        document.getElementById('summary-barang-disetor').innerText = doVolText.join(' | ');
+
+        let avgText = [];
+        if (totalDOVolumeKg > 0) {
+            avgText.push(`${formatRupiah(totalPendapatanKg / totalDOVolumeKg)} / Kg`);
+        }
+        if (totalDOVolumeButir > 0) {
+            avgText.push(`${formatRupiah(totalPendapatanButir / totalDOVolumeButir)} / Butir`);
+        }
+        if (avgText.length === 0) avgText.push('Rp 0');
+        document.getElementById('summary-harga-rata').innerHTML = avgText.join('<br><span class="text-xs text-slate-400 mt-1">|</span> ');
 
         renderLaporanTable(filtered);
     }
@@ -434,7 +486,7 @@
         tbody.innerHTML = '';
 
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="27" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="28" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
             return;
         }
 
@@ -450,6 +502,22 @@
                 return `<div contenteditable="true" 
                              class="px-2 py-1 rounded border border-transparent hover:border-indigo-200 focus:border-indigo-500 focus:bg-white outline-none transition-all"
                              onblur="saveSapField('${row.No_DO}', '${field}', this.innerText.trim())">${value || ''}</div>`;
+            };
+
+            const linkEditable = (field, value) => {
+                if (!row.No_DO) return `<span class="text-slate-300 italic">No DO missing</span>`;
+                let linkHtml = '';
+                if (value && value.trim().startsWith('http')) {
+                    linkHtml = `<a href="${value.trim()}" target="_blank" class="text-blue-600 hover:text-blue-800 underline truncate block max-w-[200px] font-semibold text-[10px] mb-1" title="${value.trim()}"><i class="fas fa-external-link-alt mr-1"></i> Buka Link</a>`;
+                }
+                return `
+                    <div class="flex flex-col">
+                        ${linkHtml}
+                        <input type="text"
+                             class="px-2 py-1 text-[10px] rounded border border-slate-200 hover:border-indigo-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white bg-slate-50 outline-none transition-all w-full"
+                             onblur="if(this.value !== '${value || ''}') saveSapField('${row.No_DO}', '${field}', this.value.trim())" value="${value || ''}" placeholder="Paste URL disini" />
+                    </div>
+                `;
             };
 
             const isBypass = row.No_DO && row.No_DO.startsWith('BYPASS-');
@@ -487,6 +555,7 @@
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('SO_SAP', row.SO_SAP)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('DO_SAP', row.DO_SAP)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('Billing', row.Billing)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 min-w-[150px]">${linkEditable('Link_Deklarasi_Penerimaan', row.Link_Deklarasi_Penerimaan)}</td>
                 <td class="py-2.5 px-4 text-center">${editBtn}${deleteBtn}</td>
             `;
             tbody.appendChild(tr);

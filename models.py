@@ -99,6 +99,7 @@ class DeliveryOrder(Base):
     so_sap = Column(String, nullable=True)
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
+    link_deklarasi_penerimaan = Column(String, nullable=True)
     
     rencana_pengambilan = Column(Date, nullable=True)
     
@@ -127,3 +128,4 @@ class LaporanBypass(Base):
     so_sap = Column(String, nullable=True)
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
+    link_deklarasi_penerimaan = Column(String, nullable=True)
