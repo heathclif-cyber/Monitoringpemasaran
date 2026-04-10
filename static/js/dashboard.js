@@ -32,11 +32,17 @@ async function fetchDashboardData() {
         const data = await res.json();
 
         // --- Update Summary Cards ---
-        document.getElementById('dash-pendapatan').innerText = formatRupiah(data.summary.total_pendapatan);
-        document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in);
-        document.getElementById('dash-volume-realisasi').innerText = data.summary.total_volume_realisasi.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg';
-        document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice;
-        document.getElementById('dash-do-count').innerText = data.summary.total_do;
+        document.getElementById('dash-pendapatan').innerText = formatRupiah(data.summary.total_pendapatan || 0);
+        document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in || 0);
+        
+        let doVolText = [];
+        if (data.summary.total_volume_kg > 0) doVolText.push(Number(data.summary.total_volume_kg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
+        if (data.summary.total_volume_butir > 0) doVolText.push(Number(data.summary.total_volume_butir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (doVolText.length === 0) doVolText.push('0 Kg');
+
+        document.getElementById('dash-volume-realisasi').innerText = doVolText.join(' | ');
+        document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice || 0;
+        document.getElementById('dash-do-count').innerText = data.summary.total_do || 0;
 
         // --- Update SAP Stats (Missing counts) ---
         if (data.summary.sap_stats) {
@@ -245,12 +251,20 @@ async function fetchDashboardData() {
             type: 'bar',
             data: {
                 labels: data.charts.bulanan.labels,
-                datasets: [{
-                    label: 'Volume Realisasi (Kg)',
-                    data: data.charts.bulanan.volume,
-                    backgroundColor: '#f97316', // Orange
-                    borderRadius: 6,
-                }]
+                datasets: [
+                    {
+                        label: 'Realisasi (Kg)',
+                        data: data.charts.bulanan.volume_kg,
+                        backgroundColor: '#f97316', // Orange
+                        borderRadius: 6,
+                    },
+                    {
+                        label: 'Realisasi (Butir)',
+                        data: data.charts.bulanan.volume_butir,
+                        backgroundColor: '#fbbf24', // Yellowish/Amber
+                        borderRadius: 6,
+                    }
+                ]
             },
             options: {
                 responsive: true,

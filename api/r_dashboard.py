@@ -48,13 +48,17 @@ def get_dashboard_data(
         pend_m = {f"{i:02d}": 0.0 for i in range(1, 13)}
         inv_m  = {f"{i:02d}": 0.0 for i in range(1, 13)}
         cash_m = {f"{i:02d}": 0.0 for i in range(1, 13)}
-        vol_m  = {f"{i:02d}": 0.0 for i in range(1, 13)}
         kom_map = {}
         unit_map = {}
         
+        # Pisahkan volume chart per bulan
+        vol_m_kg = {f"{i:02d}": 0.0 for i in range(1, 13)}
+        vol_m_butir = {f"{i:02d}": 0.0 for i in range(1, 13)}
+        
         total_pendapatan = 0.0
         total_cash_in = 0.0
-        total_volume = 0.0
+        total_volume_kg = 0.0
+        total_volume_butir = 0.0
         total_nilai_invoice = 0.0
         
         # 1. ACCRUAL (Pendapatan & Volume)
@@ -68,12 +72,21 @@ def get_dashboard_data(
             
             pendapatan_do = k_nilai * (do_vol / k_vol) if k_vol > 0 else k_nilai
             
+            satuan = (k.satuan or "Kg").lower()
+            if satuan == "butir":
+                total_volume_butir += do_vol
+            else:
+                total_volume_kg += do_vol
+            
             total_pendapatan += pendapatan_do
-            total_volume += do_vol
             
             m = do.rencana_pengambilan.month if do.rencana_pengambilan else do.tanggal_do.month if do.tanggal_do else 1
             pend_m[f"{m:02d}"] += pendapatan_do
-            vol_m[f"{m:02d}"] += do_vol
+            
+            if satuan == "butir":
+                vol_m_butir[f"{m:02d}"] += do_vol
+            else:
+                vol_m_kg[f"{m:02d}"] += do_vol
             
             kom = k.komoditi or "Lainnya"
             unt = k.kebun_produsen or "Lainnya"
@@ -106,12 +119,21 @@ def get_dashboard_data(
             total_pendapatan += nom
             total_cash_in += nom
             total_nilai_invoice += nom
-            total_volume += vol
+            
+            satuan = (b.satuan or "Kg").lower()
+            if satuan == "butir":
+                total_volume_butir += vol
+            else:
+                total_volume_kg += vol
             
             pend_m[f"{m:02d}"] += nom
             cash_m[f"{m:02d}"] += nom
             inv_m[f"{m:02d}"] += nom
-            vol_m[f"{m:02d}"] += vol
+            
+            if satuan == "butir":
+                vol_m_butir[f"{m:02d}"] += vol
+            else:
+                vol_m_kg[f"{m:02d}"] += vol
             
             kom = b.komoditi or "Lainnya"
             unt = b.unit or "Lainnya"
@@ -148,7 +170,8 @@ def get_dashboard_data(
                 "total_pendapatan": total_pendapatan,
                 "total_nilai_invoice": total_nilai_invoice,
                 "total_cash_in": total_cash_in,
-                "total_volume_realisasi": float(sum(vol_m.values())),
+                "total_volume_kg": total_volume_kg,
+                "total_volume_butir": total_volume_butir,
                 "sap_stats": {
                     "missing_kontrak": int(
                         (db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.kontrak_sap == None) | (models.DeliveryOrder.kontrak_sap == '')).scalar() or 0)
@@ -176,7 +199,8 @@ def get_dashboard_data(
                     "pendapatan": [pend_m[f"{i:02d}"] for i in range(1, 13)],
                     "invoice": [inv_m[f"{i:02d}"] for i in range(1, 13)],
                     "cashin": [cash_m[f"{i:02d}"] for i in range(1, 13)],
-                    "volume": [vol_m[f"{i:02d}"] for i in range(1, 13)],
+                    "volume_kg": [vol_m_kg[f"{i:02d}"] for i in range(1, 13)],
+                    "volume_butir": [vol_m_butir[f"{i:02d}"] for i in range(1, 13)],
                 }
             },
             "available_years": avail_y,
