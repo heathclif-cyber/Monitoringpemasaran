@@ -33,10 +33,6 @@ async function fetchDashboardData() {
 
         // --- Update Summary Cards ---
         document.getElementById('dash-pendapatan').innerText = formatRupiah(data.summary.total_pendapatan || 0);
-        const hargaRataRata = data.summary.rata_rata_harga_kg || 0;
-        const elRataRata = document.getElementById('dash-harga-rata-rata');
-        if (elRataRata) elRataRata.innerText = formatRupiah(hargaRataRata);
-        
         document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in || 0);
         
         document.getElementById('dash-volume-realisasi').innerText = Number(data.summary.total_volume_all || 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -127,7 +123,7 @@ async function fetchDashboardData() {
                 labels: data.charts.bulanan.labels,
                 datasets: [
                     {
-                        label: 'Pendapatan Pokok (excl. Pajak)',
+                        label: 'Pendapatan (Omset)',
                         data: data.charts.bulanan.pendapatan,
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.07)',
@@ -140,7 +136,7 @@ async function fetchDashboardData() {
                         pointHoverRadius: 6,
                     },
                     {
-                        label: 'Nilai Invoice (excl. Pajak)',
+                        label: 'Nilai Invoice',
                         data: data.charts.bulanan.invoice,
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.05)',
@@ -153,7 +149,7 @@ async function fetchDashboardData() {
                         pointHoverRadius: 6,
                     },
                     {
-                        label: 'Cash In Pokok (excl. Pajak)',
+                        label: 'Cash In',
                         data: data.charts.bulanan.cashin,
                         borderColor: '#f59e0b',
                         backgroundColor: 'rgba(245, 158, 11, 0.04)',
