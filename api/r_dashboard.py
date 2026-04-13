@@ -66,11 +66,10 @@ def get_dashboard_data(
         for do in dos_pend:
             k = do.invoice.kontrak
             do_vol = float(do.volume_do or 0)
-            k_vol = float(k.volume or 0)
-            k_nilai = float(k.nilai_transaksi or 0)
-            if k_nilai <= 0: k_nilai = (k_vol * float(k.harga_satuan or 0)) + float(k.premi or 0)
-            
-            pendapatan_do = k_nilai * (do_vol / k_vol) if k_vol > 0 else k_nilai
+            # --- ALGORITMA BARU: Hitung pokok murni (Volume x Harga Satuan) ---
+            harga_satuan = float(k.harga_satuan or 0)
+            pendapatan_do = do_vol * harga_satuan
+            # ------------------------------------------------------------------
             
             satuan = (k.satuan or "Kg").lower()
             if satuan == "butir":
@@ -96,23 +95,30 @@ def get_dashboard_data(
         # 2. CASH IN
         dos_cash = base_do_cash.all()
         for do in dos_cash:
-            nom = float(do.nominal_transfer or 0)
-            total_cash_in += nom
+            nom_bruto = float(do.nominal_transfer or 0)
+            # --- ALGORITMA BARU: Ekstrak Nilai Pokok dari Transfer ---
+            nom_pokok = nom_bruto / 1.1075 if nom_bruto > 0 else 0
+            
+            total_cash_in += nom_pokok
             m = do.tanggal_pembayaran.month if do.tanggal_pembayaran else do.tanggal_do.month if do.tanggal_do else 1
-            cash_m[f"{m:02d}"] += nom
+            cash_m[f"{m:02d}"] += nom_pokok
 
         # 3. INVOICES
         invoices = base_invoice.all()
         for inv in invoices:
-            nom = float(inv.jumlah_pembayaran or 0)
-            total_nilai_invoice += nom
+            nom_bruto = float(inv.jumlah_pembayaran or 0)
+            # --- ALGORITMA BARU: Ekstrak Nilai Pokok dari Invoice ---
+            nom_pokok = nom_bruto / 1.1075 if nom_bruto > 0 else 0
+            
+            total_nilai_invoice += nom_pokok
             m = inv.tanggal_transaksi.month if inv.tanggal_transaksi else 1
-            inv_m[f"{m:02d}"] += nom
+            inv_m[f"{m:02d}"] += nom_pokok
 
         # 4. BYPASS (Berlaku untuk semua)
         bypasses = base_bypass.all()
         for b in bypasses:
-            nom = float(b.nominal or 0)
+            nom_bruto = float(b.nominal or 0)
+            nom = nom_bruto / 1.1075 if nom_bruto > 0 else 0
             vol = float(b.volume or 0)
             m = b.tanggal.month if b.tanggal else 1
             

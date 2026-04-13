@@ -123,7 +123,7 @@ async function fetchDashboardData() {
                 labels: data.charts.bulanan.labels,
                 datasets: [
                     {
-                        label: 'Pendapatan (Omset)',
+                        label: 'Pendapatan Pokok (excl. Pajak)',
                         data: data.charts.bulanan.pendapatan,
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.07)',
@@ -136,7 +136,7 @@ async function fetchDashboardData() {
                         pointHoverRadius: 6,
                     },
                     {
-                        label: 'Nilai Invoice',
+                        label: 'Nilai Invoice (excl. Pajak)',
                         data: data.charts.bulanan.invoice,
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.05)',
@@ -149,7 +149,7 @@ async function fetchDashboardData() {
                         pointHoverRadius: 6,
                     },
                     {
-                        label: 'Cash In',
+                        label: 'Cash In Pokok (excl. Pajak)',
                         data: data.charts.bulanan.cashin,
                         borderColor: '#f59e0b',
                         backgroundColor: 'rgba(245, 158, 11, 0.04)',
