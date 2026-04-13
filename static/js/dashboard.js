@@ -33,6 +33,10 @@ async function fetchDashboardData() {
 
         // --- Update Summary Cards ---
         document.getElementById('dash-pendapatan').innerText = formatRupiah(data.summary.total_pendapatan || 0);
+        const hargaRataRata = data.summary.rata_rata_harga_kg || 0;
+        const elRataRata = document.getElementById('dash-harga-rata-rata');
+        if (elRataRata) elRataRata.innerText = formatRupiah(hargaRataRata);
+        
         document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in || 0);
         
         document.getElementById('dash-volume-realisasi').innerText = Number(data.summary.total_volume_all || 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });

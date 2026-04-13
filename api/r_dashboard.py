@@ -151,6 +151,21 @@ def get_dashboard_data(
         total_invoice_count = len(invoices)
         total_kontrak = int(base_kontrak.count())
 
+        # --- ALGORITMA BARU: RATA-RATA TERTIMBANG POKOK (KONTRAK) ---
+        total_nilai_kontrak_pokok = 0.0
+        total_kuantitas_kontrak = 0.0
+        
+        for k in base_kontrak.all():
+            harga = float(k.harga_satuan or 0)
+            qty = float(k.kuantitas or 0) # Jumlah kontrak
+            
+            # Harga satuan dikali jumlah kontrak
+            total_nilai_kontrak_pokok += (harga * qty)
+            total_kuantitas_kontrak += qty
+            
+        rata_rata_harga_tertimbang = total_nilai_kontrak_pokok / total_kuantitas_kontrak if total_kuantitas_kontrak > 0 else 0
+        # ------------------------------------------------------------
+
         d_ids = base_do_cash.with_entities(models.DeliveryOrder.no_do)
         b_ids = base_bypass.with_entities(models.LaporanBypass.id)
 
@@ -179,6 +194,7 @@ def get_dashboard_data(
                 "total_volume_all": total_volume_kg + total_volume_butir,
                 "total_volume_kg": total_volume_kg,
                 "total_volume_butir": total_volume_butir,
+                "rata_rata_harga_kg": rata_rata_harga_tertimbang,
                 "sap_stats": {
                     "missing_kontrak": int(
                         (db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.kontrak_sap == None) | (models.DeliveryOrder.kontrak_sap == '')).scalar() or 0)
