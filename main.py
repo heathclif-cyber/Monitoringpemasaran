@@ -9,7 +9,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 import models
-from api.r_laporan import router as laporan_router, seed_beteleme
 from database import engine, SessionLocal
 
 # --- Router imports ---
@@ -32,30 +31,43 @@ def startup_event():
         
         # --- MIGRATION: Ensure new columns exist ---
         from sqlalchemy import text
-        db = SessionLocal()
         try:
-            logger.info("Checking for missing columns in laporan_bypass...")
-            # Try to add columns if they don't exist
-            db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS volume FLOAT DEFAULT 0.0"))
-            db.execute(text("ALTER TABLE laporan_bypass ADD COLUMN IF NOT EXISTS satuan VARCHAR DEFAULT 'Kg'"))
-            db.commit()
-            logger.info("Migration complete: columns verified/added.")
+            db = SessionLocal()
+            logger.info("Migrating missing columns (PPh, volume, etc)...")
+            
+            # Helper to add column safely
+            def add_column_safely(table, col, type_def):
+                try:
+                    # Try Postgres style first (IF NOT EXISTS)
+                    db.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {type_def}"))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    try:
+                        # Try SQLite/Standard style (will fail if exists)
+                        db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_def}"))
+                        db.commit()
+                    except Exception:
+                        db.rollback() # Likely already exists
+            
+            add_column_safely("laporan_bypass", "volume", "FLOAT DEFAULT 0.0")
+            add_column_safely("laporan_bypass", "satuan", "VARCHAR DEFAULT 'Kg'")
+            add_column_safely("delivery_order", "volume_do", "FLOAT DEFAULT 0.0")
+            add_column_safely("delivery_order", "is_pph_disetor", "VARCHAR DEFAULT 'false'")
+            add_column_safely("kontrak", "is_ppn", "VARCHAR DEFAULT 'true'")
+            add_column_safely("kontrak", "ppn_persen", "FLOAT DEFAULT 11.0")
+            add_column_safely("kontrak", "is_pph", "VARCHAR DEFAULT 'false'")
+            add_column_safely("kontrak", "pph_persen", "FLOAT DEFAULT 0.0")
+            add_column_safely("delivery_order", "rencana_pengambilan", "DATE DEFAULT NULL")
+            add_column_safely("delivery_order", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
+            add_column_safely("laporan_bypass", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
+            
+            logger.info("Migration routine finished.")
         except Exception as migrate_err:
-            logger.error(f"Migration failed: {migrate_err}")
-            db.rollback()
+            logger.error(f"Migration routine failed: {migrate_err}")
         finally:
             db.close()
 
-        # Seed Beteleme Sawit data if not present
-        db = SessionLocal()
-        try:
-            seed_beteleme(db)
-            logger.info("Beteleme Sawit data seeded successfully.")
-        except Exception as seed_err:
-            logger.error(f"Seeding failed: {seed_err}")
-        finally:
-            db.close()
-            
         logger.info("Database initialization complete.")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")

@@ -1,4 +1,4 @@
-<section id="laporan" class="page-section max-w-full mx-auto space-y-4">
+<section id="laporan" class="page-section max-w-[1600px] mx-auto space-y-8 pb-8 pt-24">
 
     <div class="flex flex-col md:flex-row md:items-center justify-end gap-3 mb-2">
 
@@ -33,11 +33,30 @@
         </div>
 
         <div class="flex flex-col gap-1">
-            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Bulan Transfer</label>
-            <select id="filter-laporan-bulan" onchange="applyLaporanFilters()"
-                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[140px]">
-                <option value="ALL">Semua Bulan</option>
-            </select>
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Pilih Bulan (Bisa Banyak)</label>
+            <div class="flex gap-2">
+                <select id="filter-laporan-mode-tanggal" onchange="applyLaporanFilters()"
+                    class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[180px]">
+                    <option value="TRANSFER">Berdasarkan Tanggal Transfer</option>
+                    <option value="RENCANA">Berdasarkan Rencana Pengambilan</option>
+                </select>
+                <div class="relative">
+                    <button id="btn-month-dropdown" onclick="toggleMonthDropdown()" 
+                        class="flex justify-between items-center text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[200px]">
+                        <span id="selected-months-label">Semua Bulan</span>
+                        <i class="fas fa-chevron-down ml-2 text-slate-400"></i>
+                    </button>
+                    
+                    <div id="month-checkbox-container" class="hidden absolute top-full left-0 mt-2 w-full min-w-[200px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto p-2">
+                        <div class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border-b border-slate-100 mb-1">
+                            <input type="checkbox" id="month-all" onchange="toggleAllMonths(this)" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <label for="month-all" class="text-xs font-bold text-slate-700 cursor-pointer w-full" onclick="document.getElementById('month-all').click()">Pilih Semua</label>
+                        </div>
+                        <div id="month-list-wrapper">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="flex flex-col gap-1">
@@ -56,11 +75,80 @@
                 <option value="ASC">Terlama ke Terbaru</option>
             </select>
         </div>
+
+        <div class="flex flex-col gap-1 w-full sm:w-auto flex-1 md:flex-none">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Tipe Data</label>
+            <select id="filter-laporan-tipe" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[135px]">
+                <option value="ALL" selected>Semua Data</option>
+                <option value="NO_BYPASS">Sembunyikan Bypass</option>
+                <option value="ONLY_BYPASS">Hanya Bypass</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1 w-full sm:w-auto flex-1 md:flex-none">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Status SAP</label>
+            <select id="filter-laporan-sap" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[170px]">
+                <option value="ALL" selected>Semua Status SAP</option>
+                <option value="MISSING_ANY">Belum Lengkap (Ada Kosong)</option>
+                <option value="MISSING_KONTRAK">Belum Ada Kontrak SAP</option>
+                <option value="MISSING_SO">Belum Ada SO SAP</option>
+                <option value="MISSING_DO">Belum Ada DO SAP</option>
+                <option value="MISSING_BILLING">Belum Ada Billing SAP</option>
+                <option value="COMPLETE">Sudah Lengkap Semua</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1 w-full sm:w-auto flex-1 md:flex-none">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Status Pembayaran</label>
+            <select id="filter-laporan-status-bayar" onchange="applyLaporanFilters()"
+                class="text-xs font-semibold border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 transition-all min-w-[160px]">
+                <option value="ALL" selected>Semua Status</option>
+                <option value="BELUM_BAYAR">Belum Bayar</option>
+                <option value="SEBAGIAN">Pembayaran Sebagian</option>
+                <option value="LUNAS">Pembayaran Penuh / Lunas</option>
+            </select>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0 lg:ml-auto">
+            <button onclick="resetLaporanFilters()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 py-2.5 px-3 rounded-lg font-semibold transition-colors flex items-center gap-1">
+                <i class="fas fa-times"></i> Reset Filter
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div class="bg-emerald-50 p-4 rounded-xl shadow-sm border border-emerald-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Total Cash In</span>
+            <span class="text-xl font-black text-emerald-600 mt-1" id="summary-cash-in">Rp 0</span>
+        </div>
+        <div class="bg-indigo-50 p-4 rounded-xl shadow-sm border border-indigo-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Total Pendapatan (Omset)</span>
+            <span class="text-xl font-black text-indigo-600 mt-1" id="summary-pendapatan">Rp 0</span>
+        </div>
+        <div class="bg-red-50 p-4 rounded-xl shadow-sm border border-red-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Sisa Kekurangan Pembayaran</span>
+            <span class="text-xl font-black text-red-600 mt-1" id="summary-sisa-bayar">Rp 0</span>
+        </div>
+        <div class="bg-amber-50 p-4 rounded-xl shadow-sm border border-amber-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Sisa Barang Belum Diserahkan</span>
+            <span class="text-lg font-black text-amber-600 mt-1" id="summary-sisa-volume">0 Kg</span>
+        </div>
+        <div class="bg-cyan-50 p-4 rounded-xl shadow-sm border border-cyan-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">Harga Rata-Rata Komoditi</span>
+            <span class="text-lg font-black text-cyan-600 mt-1" id="summary-harga-rata">Rp 0 / Kg</span>
+        </div>
+        <div class="bg-fuchsia-50 p-4 rounded-xl shadow-sm border border-fuchsia-100 flex flex-col justify-center">
+            <span class="text-[10px] font-bold text-fuchsia-600 uppercase tracking-widest">Barang yang Telah Diserahkan</span>
+            <span class="text-lg font-black text-fuchsia-600 mt-1" id="summary-barang-disetor">0 Kg</span>
+        </div>
     </div>
 
     <div class="glass-panel p-0 overflow-hidden">
         <div class="overflow-x-auto" style="max-width: 100%;">
-            <table class="w-full text-[11px] text-left border-collapse min-w-[3200px]" id="tabel-laporan">
+            <table class="w-full text-[11px] text-left border-collapse min-w-[3600px]" id="tabel-laporan">
                 <thead class="sticky top-0 z-10">
                     <tr class="bg-indigo-50 border-b-2 border-indigo-100 text-slate-600 font-bold uppercase">
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">No. DO</th>
@@ -68,32 +156,37 @@
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">No Kontrak</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Unit</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Komoditi</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">Satuan</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Billing Date / Invoice</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Tanggal Transfer</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah Transfer</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Mitra Pembeli</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Deskripsi Produk</th>
-                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah Kontrak (Kg)</th>
-                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Harga Per Kg (Kontrak)
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah Kontrak</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Harga Satuan (Kontrak)
                         </th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Jumlah DO</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pendapatan Pokok (Rp)</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pajak PPN</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Pajak PPh</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">PPh Setor?</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Kewajiban Pembayaran Mitra
                         </th>
-                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right">Selisih</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right bg-red-50 text-red-700">Sisa Kekurangan<br>Pembayaran</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-right bg-amber-50 text-amber-700">Sisa Barang<br>Belum Diserahkan</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Bulan Buku</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Superman</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">Kontrak SAP</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">SO SAP</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm">DO SAP</th>
                         <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">No Billing</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 shadow-sm text-center">Link Deklarasi Penerimaan</th>
                         <th class="py-3 px-4 border-l border-indigo-100 shadow-sm text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="laporan-tbody" class="bg-white">
                     <tr>
-                        <td colspan="24" class="text-center py-6 text-slate-400">Loading data...</td>
+                        <td colspan="28" class="text-center py-6 text-slate-400">Loading data...</td>
                     </tr>
                 </tbody>
             </table>
@@ -105,6 +198,25 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script>
     let rawLaporanData = [];
+
+    function toggleMonthDropdown() {
+        const container = document.getElementById('month-checkbox-container');
+        container.classList.toggle('hidden');
+    }
+
+    window.addEventListener('click', function(e) {
+        const btn = document.getElementById('btn-month-dropdown');
+        const container = document.getElementById('month-checkbox-container');
+        if (btn && container && !btn.contains(e.target) && !container.contains(e.target)) {
+            container.classList.add('hidden');
+        }
+    });
+
+    function toggleAllMonths(source) {
+        const checkboxes = document.querySelectorAll('.month-checkbox');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+        updateMonthLabel();
+    }
 
     async function fetchLaporanData() {
         const tbody = document.getElementById('laporan-tbody');
@@ -130,9 +242,10 @@
         const komods = [...new Set(data.map(r => r.Komoditi).filter(Boolean))].sort();
         const buyers = [...new Set(data.map(r => r.Mitra_Pembeli).filter(Boolean))].sort();
 
-        // Extract Months from Tanggal_Transfer (format: dd/mm/yyyy)
+        // Extract Months from Tanggal_Transfer and Rencana_Pengambilan
         const monthMap = {};
         data.forEach(r => {
+            // Dari Tanggal Transfer (dd/mm/yyyy)
             if (r.Tanggal_Transfer && r.Tanggal_Transfer !== '-') {
                 const parts = r.Tanggal_Transfer.split('/');
                 if (parts.length === 3) {
@@ -140,66 +253,138 @@
                     const monthLabel = `${MONTHS_ID[parseInt(parts[1])]} ${parts[2]}`;
                     monthMap[monthKey] = monthLabel;
                 }
-            } else {
-                monthMap['NONE'] = 'Belum Transfer';
+            }
+            // Dari Rencana Pengambilan (YYYY-MM-DD)
+            if (r.Rencana_Pengambilan && r.Rencana_Pengambilan !== '-') {
+                const parts = r.Rencana_Pengambilan.split('-');
+                if (parts.length >= 2) {
+                    const monthKey = `${parts[0]}-${parts[1]}`; // YYYY-MM
+                    const monthLabel = `${MONTHS_ID[parseInt(parts[1])]} ${parts[0]}`;
+                    monthMap[monthKey] = monthLabel;
+                }
+            }
+            if ((!r.Tanggal_Transfer || r.Tanggal_Transfer === '-') && (!r.Rencana_Pengambilan || r.Rencana_Pengambilan === '-')) {
+                monthMap['NONE'] = 'Belum Transfer / Pengambilan';
             }
         });
         const monthKeys = Object.keys(monthMap).sort().reverse(); // Show recent months first
 
+        const wrapper = document.getElementById('month-list-wrapper');
+        if(wrapper) wrapper.innerHTML = '';
+        
+        monthKeys.forEach(key => {
+            if(key === 'NONE') return;
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-lg cursor-pointer transition-colors";
+            div.innerHTML = `
+                <input type="checkbox" value="${key}" class="month-checkbox rounded text-indigo-600 focus:ring-indigo-500" onchange="updateMonthLabel()">
+                <label class="text-xs text-slate-600 cursor-pointer w-full">${monthMap[key]}</label>
+            `;
+            div.onclick = (e) => {
+                if(e.target.tagName !== 'INPUT') {
+                    const cb = div.querySelector('input');
+                    cb.checked = !cb.checked;
+                    updateMonthLabel();
+                }
+            };
+            if(wrapper) wrapper.appendChild(div);
+        });
+
         const selUnit = document.getElementById('filter-laporan-unit');
         const selKomod = document.getElementById('filter-laporan-komoditi');
         const selBuyer = document.getElementById('filter-laporan-pembeli');
-        const selMonth = document.getElementById('filter-laporan-bulan');
 
         const curU = selUnit.value;
         const curK = selKomod.value;
         const curB = selBuyer.value;
-        const curM = selMonth.value;
 
         selUnit.innerHTML = '<option value="ALL">Semua Unit</option>';
         selKomod.innerHTML = '<option value="ALL">Semua Komoditi</option>';
         selBuyer.innerHTML = '<option value="ALL">Semua Pembeli</option>';
-        selMonth.innerHTML = '<option value="ALL">Semua Bulan</option>';
 
         units.forEach(u => selUnit.add(new Option(u, u)));
         komods.forEach(k => selKomod.add(new Option(k, k)));
         buyers.forEach(b => selBuyer.add(new Option(b, b)));
-        monthKeys.forEach(m => selMonth.add(new Option(monthMap[m], m)));
 
         if (units.includes(curU)) selUnit.value = curU;
         if (komods.includes(curK)) selKomod.value = curK;
         if (buyers.includes(curB)) selBuyer.value = curB;
-        if (monthKeys.includes(curM)) selMonth.value = curM;
+    }
+
+    function updateMonthLabel() {
+        const checked = Array.from(document.querySelectorAll('.month-checkbox:checked'));
+        const label = document.getElementById('selected-months-label');
+        
+        if (checked.length === 0) {
+            label.innerText = "Semua Bulan";
+        } else if (checked.length === 1) {
+            label.innerText = checked[0].parentElement.querySelector('label').innerText;
+        } else {
+            label.innerText = `${checked.length} Bulan Terpilih`;
+        }
+        applyLaporanFilters();
     }
 
     function applyLaporanFilters() {
         const unit = document.getElementById('filter-laporan-unit').value;
         const komod = document.getElementById('filter-laporan-komoditi').value;
         const buyer = document.getElementById('filter-laporan-pembeli').value;
-        const month = document.getElementById('filter-laporan-bulan').value;
+        const selectedMonths = Array.from(document.querySelectorAll('.month-checkbox:checked')).map(cb => cb.value);
         const sort = document.getElementById('filter-laporan-sort').value;
+        const tipe = document.getElementById('filter-laporan-tipe').value;
+        const sapFilter = document.getElementById('filter-laporan-sap').value;
+        const statusBayarFilter = document.getElementById('filter-laporan-status-bayar').value;
 
         let filtered = rawLaporanData.filter(r => {
             const matchUnit = unit === 'ALL' || r.Unit === unit;
             const matchKomod = komod === 'ALL' || r.Komoditi === komod;
             const matchBuyer = buyer === 'ALL' || r.Mitra_Pembeli === buyer;
 
+            const isBypass = r.No_DO && r.No_DO.startsWith('BYPASS-');
+            let matchTipe = true;
+            if (tipe === 'NO_BYPASS' && isBypass) matchTipe = false;
+            if (tipe === 'ONLY_BYPASS' && !isBypass) matchTipe = false;
+
+            const modeTanggal = document.getElementById('filter-laporan-mode-tanggal').value;
+
             let matchMonth = true;
-            if (month !== 'ALL') {
-                if (month === 'NONE') {
-                    matchMonth = !r.Tanggal_Transfer || r.Tanggal_Transfer === '-';
-                } else {
+            if (selectedMonths.length > 0) {
+                let rMonthKey = "";
+                if (modeTanggal === 'TRANSFER') {
                     const parts = (r.Tanggal_Transfer || '').split('/');
-                    if (parts.length === 3) {
-                        const rMonthKey = `${parts[2]}-${parts[1]}`;
-                        matchMonth = rMonthKey === month;
-                    } else {
-                        matchMonth = r.Tanggal_Transfer && r.Tanggal_Transfer.includes(month.substr(0, 4)); // Simple check
-                    }
+                    if (parts.length === 3) rMonthKey = `${parts[2]}-${parts[1]}`;
+                } else {
+                    const parts = (r.Rencana_Pengambilan || '').split('-');
+                    if (parts.length >= 2) rMonthKey = `${parts[0]}-${parts[1]}`;
                 }
+                matchMonth = selectedMonths.includes(rMonthKey);
             }
 
-            return matchUnit && matchKomod && matchBuyer && matchMonth;
+            let matchSap = true;
+            if (sapFilter === 'MISSING_ANY') {
+                matchSap = !r.Kontrak_SAP || !r.SO_SAP || !r.DO_SAP || !r.Billing;
+            } else if (sapFilter === 'MISSING_KONTRAK') {
+                matchSap = !r.Kontrak_SAP;
+            } else if (sapFilter === 'MISSING_SO') {
+                matchSap = !r.SO_SAP;
+            } else if (sapFilter === 'MISSING_DO') {
+                matchSap = !r.DO_SAP;
+            } else if (sapFilter === 'MISSING_BILLING') {
+                matchSap = !r.Billing;
+            } else if (sapFilter === 'COMPLETE') {
+                matchSap = r.Kontrak_SAP && r.SO_SAP && r.DO_SAP && r.Billing;
+            }
+
+            let matchStatusBayar = true;
+            if (statusBayarFilter === 'LUNAS') {
+                matchStatusBayar = parseFloat(r.Sisa_Pembayaran) <= 0;
+            } else if (statusBayarFilter === 'BELUM_BAYAR') {
+                matchStatusBayar = parseFloat(r.Sisa_Pembayaran) >= parseFloat(r.Kewajiban_Pembayaran) && parseFloat(r.Kewajiban_Pembayaran) > 0;
+            } else if (statusBayarFilter === 'SEBAGIAN') {
+                matchStatusBayar = parseFloat(r.Sisa_Pembayaran) > 0 && parseFloat(r.Sisa_Pembayaran) < parseFloat(r.Kewajiban_Pembayaran);
+            }
+
+            return matchUnit && matchKomod && matchBuyer && matchMonth && matchTipe && matchSap && matchStatusBayar;
         });
 
         // Sorting
@@ -209,7 +394,92 @@
             return sort === 'DESC' ? tb - ta : ta - tb;
         });
 
+        // Summary Calculation
+        const uniqueInvoices = new Set();
+        let totalSisaPembayaran = 0;
+        let totalSisaVolumeKg = 0;
+        let totalSisaVolumeButir = 0;
+        let totalCashIn = 0;
+        let totalPendapatan = 0;
+        
+        let totalDOVolumeKg = 0;
+        let totalDOVolumeButir = 0;
+        let totalPendapatanKg = 0;
+        let totalPendapatanButir = 0;
+
+        filtered.forEach(r => {
+            totalCashIn += (r.Jumlah_Transfer || 0);
+            const pendPokok = (parseFloat(r.Pendapatan_Pokok) || 0);
+            totalPendapatan += pendPokok;
+            
+            const volDO = parseFloat(r.Jumlah_DO) || 0;
+            const satuan = (r.Satuan || "Kg").toLowerCase();
+
+            if (satuan === "butir") {
+                totalDOVolumeButir += volDO;
+                totalPendapatanButir += pendPokok;
+            } else {
+                totalDOVolumeKg += volDO;
+                totalPendapatanKg += pendPokok;
+            }
+
+            let idKey = r.No_Invoice ? `INV-${r.No_Invoice}` : (r.No_Kontrak ? `KONTRAK-${r.No_Kontrak}` : null);
+            if (r.No_DO && r.No_DO.startsWith('BYPASS-')) idKey = r.No_DO;
+            
+            if (idKey && !uniqueInvoices.has(idKey)) {
+                uniqueInvoices.add(idKey);
+                if (r.Sisa_Pembayaran && r.Sisa_Pembayaran > 0) totalSisaPembayaran += r.Sisa_Pembayaran;
+                if (r.Sisa_Volume && r.Sisa_Volume > 0) {
+                    if (satuan === "butir") totalSisaVolumeButir += r.Sisa_Volume;
+                    else totalSisaVolumeKg += r.Sisa_Volume;
+                }
+            }
+        });
+
+        document.getElementById('summary-sisa-bayar').innerText = formatRupiah(totalSisaPembayaran);
+        
+        let sisaVolText = [];
+        if (totalSisaVolumeKg > 0) sisaVolText.push(Number(totalSisaVolumeKg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
+        if (totalSisaVolumeButir > 0) sisaVolText.push(Number(totalSisaVolumeButir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (sisaVolText.length === 0) sisaVolText.push('0 Kg');
+        document.getElementById('summary-sisa-volume').innerText = sisaVolText.join(' | ');
+
+        document.getElementById('summary-cash-in').innerText = formatRupiah(totalCashIn);
+        document.getElementById('summary-pendapatan').innerText = formatRupiah(totalPendapatan);
+        
+        let doVolText = [];
+        if (totalDOVolumeKg > 0) doVolText.push(Number(totalDOVolumeKg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
+        if (totalDOVolumeButir > 0) doVolText.push(Number(totalDOVolumeButir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (doVolText.length === 0) doVolText.push('0 Kg');
+        document.getElementById('summary-barang-disetor').innerText = doVolText.join(' | ');
+
+        let avgText = [];
+        if (totalDOVolumeKg > 0) {
+            avgText.push(`${formatRupiah(totalPendapatanKg / totalDOVolumeKg)} / Kg`);
+        }
+        if (totalDOVolumeButir > 0) {
+            avgText.push(`${formatRupiah(totalPendapatanButir / totalDOVolumeButir)} / Butir`);
+        }
+        if (avgText.length === 0) avgText.push('Rp 0');
+        document.getElementById('summary-harga-rata').innerHTML = avgText.join('<br><span class="text-xs text-slate-400 mt-1">|</span> ');
+
         renderLaporanTable(filtered);
+    }
+
+    function resetLaporanFilters() {
+        document.getElementById('filter-laporan-unit').value = 'ALL';
+        document.getElementById('filter-laporan-komoditi').value = 'ALL';
+        document.getElementById('filter-laporan-pembeli').value = 'ALL';
+        document.getElementById('filter-laporan-mode-tanggal').value = 'TRANSFER';
+        document.getElementById('filter-laporan-sort').value = 'DESC';
+        document.getElementById('filter-laporan-tipe').value = 'ALL';
+        document.getElementById('filter-laporan-sap').value = 'ALL';
+        document.getElementById('filter-laporan-status-bayar').value = 'ALL';
+        
+        document.querySelectorAll('.month-checkbox').forEach(cb => cb.checked = false);
+        const monthAll = document.getElementById('month-all');
+        if (monthAll) monthAll.checked = false;
+        updateMonthLabel();
     }
 
     function renderLaporanTable(data) {
@@ -217,15 +487,15 @@
         tbody.innerHTML = '';
 
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="24" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="28" class="text-center py-6 text-slate-500 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>';
             return;
         }
 
         data.forEach((row, i) => {
             const tr = document.createElement('tr');
             tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
-            const fmtRp = val => val ? formatRupiah(val) : '-';
-            const fmtNum = val => val ? Number(val).toLocaleString('id-ID') : '-';
+            const fmtRp = val => (val !== null && val !== undefined) ? formatRupiah(val) : '-';
+            const fmtNum = val => val !== null && val !== undefined ? Number(val).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-';
 
             // Helper to make a cell editable if No_DO exists
             const editable = (field, value) => {
@@ -233,6 +503,22 @@
                 return `<div contenteditable="true" 
                              class="px-2 py-1 rounded border border-transparent hover:border-indigo-200 focus:border-indigo-500 focus:bg-white outline-none transition-all"
                              onblur="saveSapField('${row.No_DO}', '${field}', this.innerText.trim())">${value || ''}</div>`;
+            };
+
+            const linkEditable = (field, value) => {
+                if (!row.No_DO) return `<span class="text-slate-300 italic">No DO missing</span>`;
+                let linkHtml = '';
+                if (value && value.trim().startsWith('http')) {
+                    linkHtml = `<a href="${value.trim()}" target="_blank" class="text-blue-600 hover:text-blue-800 underline truncate block max-w-[200px] font-semibold text-[10px] mb-1" title="${value.trim()}"><i class="fas fa-external-link-alt mr-1"></i> Buka Link</a>`;
+                }
+                return `
+                    <div class="flex flex-col">
+                        ${linkHtml}
+                        <input type="text"
+                             class="px-2 py-1 text-[10px] rounded border border-slate-200 hover:border-indigo-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white bg-slate-50 outline-none transition-all w-full"
+                             onblur="if(this.value !== '${value || ''}') saveSapField('${row.No_DO}', '${field}', this.value.trim())" value="${value || ''}" placeholder="Paste URL disini" />
+                    </div>
+                `;
             };
 
             const isBypass = row.No_DO && row.No_DO.startsWith('BYPASS-');
@@ -249,24 +535,29 @@
                 <td class="py-2.5 px-4 border-r border-slate-100 font-medium text-indigo-700">${row.No_Kontrak}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Unit}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Komoditi}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-center font-medium">${row.Satuan || 'Kg'}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Billing_Date}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Tanggal_Transfer}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-emerald-600" data-t="n" data-v="${row.Jumlah_Transfer || 0}">${fmtRp(row.Jumlah_Transfer)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-800 font-medium">${row.Mitra_Pembeli}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Deskripsi_Produk}</td>
-                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_Kontrak_Kg || 0}">${fmtNum(row.Jumlah_Kontrak_Kg)}</td>
-                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Harga_Per_Kg || 0}">${fmtNum(row.Harga_Per_Kg)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_Kontrak || 0}">${fmtNum(row.Jumlah_Kontrak)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Harga_Satuan || 0}">${fmtNum(row.Harga_Satuan)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_DO || 0}">${fmtNum(row.Jumlah_DO)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium" data-t="n" data-v="${row.Pendapatan_Pokok || 0}">${fmtRp(row.Pendapatan_Pokok)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Pajak_PPN || 0}">${fmtRp(row.Pajak_PPN)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.PPh_Nominal || 0}">${fmtRp(row.PPh_Nominal)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-center font-bold ${String(row.PPh_Setor).toLowerCase() === 'true' ? 'text-emerald-600' : 'text-slate-400'}">${String(row.PPh_Setor).toLowerCase() === 'true' ? '✓ Disetor' : '-'}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-slate-800" data-t="n" data-v="${row.Kewajiban_Pembayaran || 0}">${fmtRp(row.Kewajiban_Pembayaran)}</td>
-                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium ${row.Selisih < 0 ? 'text-amber-600' : (row.Selisih === 0 ? 'text-emerald-600' : 'text-slate-700')}" data-t="n" data-v="${row.Selisih || 0}">${row.Selisih === 0 ? '-' : fmtRp(row.Selisih)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-bold ${row.Sisa_Pembayaran > 0 ? 'text-red-600 bg-red-50' : (row.Sisa_Pembayaran === 0 ? 'text-emerald-600' : 'text-slate-400')}" data-t="n" data-v="${row.Sisa_Pembayaran || 0}">${row.Sisa_Pembayaran > 0 ? fmtRp(row.Sisa_Pembayaran) : (row.Sisa_Pembayaran === 0 ? '✓ Lunas' : '-')}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-bold ${row.Sisa_Volume > 0 ? 'text-amber-600 bg-amber-50' : (row.Sisa_Volume === 0 ? 'text-emerald-600' : 'text-slate-400')}" data-t="n" data-v="${row.Sisa_Volume || 0}">${row.Sisa_Volume > 0 ? fmtNum(row.Sisa_Volume) : (row.Sisa_Volume === 0 ? '✓ Selesai' : '-')}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Bulan_Buku}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('Superman', row.Superman)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('Kontrak_SAP', row.Kontrak_SAP)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('SO_SAP', row.SO_SAP)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('DO_SAP', row.DO_SAP)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100">${editable('Billing', row.Billing)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 min-w-[150px]">${linkEditable('Link_Deklarasi_Penerimaan', row.Link_Deklarasi_Penerimaan)}</td>
                 <td class="py-2.5 px-4 text-center">${editBtn}${deleteBtn}</td>
             `;
             tbody.appendChild(tr);
@@ -328,7 +619,7 @@
         document.getElementById('bypass_unit').value = row.Unit;
         document.getElementById('bypass_komoditi').value = row.Komoditi;
         document.getElementById('bypass_tanggal').value = row.Raw_Date;
-        document.getElementById('bypass_volume').value = row.Jumlah_Kontrak_Kg;
+        document.getElementById('bypass_volume').value = row.Jumlah_Kontrak;
         document.getElementById('bypass_satuan').value = row.Satuan || 'Kg';
         document.getElementById('bypass_nominal').value = row.Pendapatan_Pokok;
         document.getElementById('bypass_pembeli').value = row.Mitra_Pembeli;

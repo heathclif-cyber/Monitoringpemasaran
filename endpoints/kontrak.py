@@ -19,7 +19,9 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
 
     # Calculate fields
     pokok = ((kontrak.volume or 0.0) * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
-    nominal_ppn = pokok * ((kontrak.ppn_persen or 0.0) / 100)
+    nominal_ppn = 0.0
+    if str(kontrak.is_ppn).lower() == 'true':
+        nominal_ppn = pokok * ((kontrak.ppn_persen or 0.0) / 100)
     nilai_transaksi = pokok + nominal_ppn
     jatuh_tempo_pembayaran = kontrak.tanggal_kontrak + timedelta(days=kontrak.lama_pembayaran_hari or 0)
     terbilang = terbilang_rupiah(math.floor(nilai_transaksi))
@@ -85,7 +87,9 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
     ppn_pct = k.ppn_persen or 0
     satuan = s(k.satuan, 'Unit')
     pokok = (vol * harga) + premi
-    ppn_nom = pokok * (ppn_pct / 100)
+    ppn_nom = 0.0
+    if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
+        ppn_nom = pokok * (ppn_pct / 100)
     total_nilai = pokok + ppn_nom
     tgl = k.tanggal_kontrak
     months = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -161,9 +165,8 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
       </table>
       
       <p style="text-align:right;margin:24px 0 10px;font-size:9pt;">{s(k.lokasi,'Makassar')}, {tgl_str}</p>
-      <div style="display:flex;justify-content:space-between;margin-top:20px;font-size:9pt;font-weight:600;text-align:center;">
-        <div style="width:40%">Persetujuan Pembeli</div>
-        <div style="width:40%">PT Perkebunan Nusantara I Regional 8</div>
+      <div style="margin-top:24px;font-size:9pt;font-weight:600;text-align:left;">
+        <div>Persetujuan Pembeli</div>
       </div>
     </div>'''
 

@@ -32,11 +32,42 @@ async function fetchDashboardData() {
         const data = await res.json();
 
         // --- Update Summary Cards ---
-        document.getElementById('dash-nilai-transaksi').innerText = formatRupiah(data.summary.total_nilai_transaksi);
-        document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in);
-        document.getElementById('dash-volume-realisasi').innerText = data.summary.total_volume_realisasi.toLocaleString('id-ID') + ' Kg';
-        document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice;
-        document.getElementById('dash-do-count').innerText = data.summary.total_do;
+        document.getElementById('dash-pendapatan').innerText = formatRupiah(data.summary.total_pendapatan || 0);
+        document.getElementById('dash-cash-in').innerText = formatRupiah(data.summary.total_cash_in || 0);
+        
+        document.getElementById('dash-volume-realisasi').innerText = Number(data.summary.total_volume_all || 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        
+        let doVolText = [];
+        if (data.summary.total_volume_kg > 0) doVolText.push(Number(data.summary.total_volume_kg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
+        if (data.summary.total_volume_butir > 0) doVolText.push(Number(data.summary.total_volume_butir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (doVolText.length === 0) doVolText.push('0 Kg');
+
+        const volDetailEl = document.getElementById('dash-volume-detail');
+        if (volDetailEl) volDetailEl.innerText = doVolText.join(' | ');
+        
+        document.getElementById('dash-invoice-count').innerText = data.summary.total_invoice || 0;
+        document.getElementById('dash-do-count').innerText = data.summary.total_do || 0;
+
+        // --- Update SAP Stats (Missing counts) ---
+        if (data.summary.sap_stats) {
+            const updateStat = (id, count) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerText = count || 0;
+                    if (count > 0) {
+                        el.classList.remove('text-slate-400');
+                        el.classList.add('text-rose-600');
+                    } else {
+                        el.classList.remove('text-rose-600');
+                        el.classList.add('text-slate-400');
+                    }
+                }
+            };
+            updateStat('dash-sap-kontrak', data.summary.sap_stats.missing_kontrak);
+            updateStat('dash-sap-so', data.summary.sap_stats.missing_so);
+            updateStat('dash-sap-do', data.summary.sap_stats.missing_do);
+            updateStat('dash-sap-billing', data.summary.sap_stats.missing_billing);
+        }
 
         // Populasi dropdown tahun dari data available_years
         if (data.available_years && yearSelect) {
@@ -92,7 +123,7 @@ async function fetchDashboardData() {
                 labels: data.charts.bulanan.labels,
                 datasets: [
                     {
-                        label: 'Nilai Kontrak',
+                        label: 'Pendapatan (Omset)',
                         data: data.charts.bulanan.pendapatan,
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.07)',
@@ -224,26 +255,35 @@ async function fetchDashboardData() {
             type: 'bar',
             data: {
                 labels: data.charts.bulanan.labels,
-                datasets: [{
-                    label: 'Volume Realisasi (Kg)',
-                    data: data.charts.bulanan.volume,
-                    backgroundColor: '#f97316', // Orange
-                    borderRadius: 6,
-                }]
+                datasets: [
+                    {
+                        label: 'Realisasi (Kg)',
+                        data: data.charts.bulanan.volume_kg,
+                        backgroundColor: '#f97316', // Orange
+                        borderRadius: 6,
+                    },
+                    {
+                        label: 'Realisasi (Butir)',
+                        data: data.charts.bulanan.volume_butir,
+                        backgroundColor: '#fbbf24', // Yellowish/Amber
+                        borderRadius: 6,
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} unit/Kg`
+                            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         }
                     }
                 },
                 scales: {
                     y: {
+                        stacked: true,
                         beginAtZero: true,
                         ticks: {
                             callback: (val) => {
@@ -252,6 +292,9 @@ async function fetchDashboardData() {
                                 return val;
                             }
                         }
+                    },
+                    x: {
+                        stacked: true
                     }
                 }
             }

@@ -29,7 +29,7 @@ new_invoice_form = '''                        <div class="grid grid-cols-1 lg:gr
                                     </div>
                                     <div>
                                         <label class="block text-xs font-medium text-slate-700 mb-1">PPh 22 (%)</label>
-                                        <input type="number" step="0.1" id="i_pph_22" class="form-input" value="0">
+                                        <input type="text" inputmode="decimal" id="i_pph_22" class="form-input" value="0">
                                     </div>
                                 </div>
                             </div>
@@ -97,7 +97,7 @@ new_do_form = '''                        <div class="grid grid-cols-1 lg:grid-co
                                     </div>
                                     <div>
                                         <label class="block text-xs font-medium text-slate-700 mb-1">Nominal Transfer (Rp)</label>
-                                        <input type="number" id="d_nominal_transfer" class="form-input" value="0">
+                                        <input type="text" inputmode="decimal" id="d_nominal_transfer" class="form-input" value="0">
                                     </div>
                                 </div>
                             </div>

@@ -26,7 +26,11 @@ class Kontrak(Base):
     volume = Column(Float, default=0.0)
     harga_satuan = Column(Float, default=0.0)
     premi = Column(Float, default=0.0)
+    is_ppn = Column(String, default="true")
     ppn_persen = Column(Float, default=11.0)
+    
+    is_pph = Column(String, default="false") # using String for boolean ease across sqlite/postgres
+    pph_persen = Column(Float, default=0.0)
     
     alamat_produksi = Column(String)
     chop = Column(String)
@@ -87,6 +91,7 @@ class DeliveryOrder(Base):
     alamat_unit = Column(String)
     tanggal_pembayaran = Column(Date, nullable=True)
     nominal_transfer = Column(Float, default=0.0)
+    is_pph_disetor = Column(String, default="false")
     
     # New SAP Fields
     superman = Column(String, nullable=True)
@@ -94,9 +99,13 @@ class DeliveryOrder(Base):
     so_sap = Column(String, nullable=True)
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
+    link_deklarasi_penerimaan = Column(String, nullable=True)
+    
+    rencana_pengambilan = Column(Date, nullable=True)
     
     # Calculated Fields
     selisih = Column(Float, default=0.0)
+    volume_do = Column(Float, default=0.0)
     
     invoice = relationship("Invoice", back_populates="delivery_orders")
 
@@ -119,3 +128,4 @@ class LaporanBypass(Base):
     so_sap = Column(String, nullable=True)
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
+    link_deklarasi_penerimaan = Column(String, nullable=True)

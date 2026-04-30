@@ -28,7 +28,52 @@ def get_laporan(db: Session = Depends(get_db)):
 
     rows = []
     
-    def build_row(k, inv, do):
+    def build_row(k, inv, do, inv_total=0, k_vol=0, total_do_nominal=0, total_do_volume=0):
+        do_volume = float(do.volume_do or 0) if do else 0
+        do_nominal = float(do.nominal_transfer or 0) if do else 0
+        # Pendapatan Pokok for this DO = proportional: (volume_do / kontrak_vol) * nilai_transaksi
+        k_vol_local = float(k.volume or 0)
+        k_harga_local = float(k.harga_satuan or 0)
+        k_premi = float(k.premi or 0)
+        k_nilai = float(k.nilai_transaksi or 0)
+        k_ppn = float(k.nominal_ppn or 0)
+        
+        if k_nilai <= 0:
+            k_nilai = (k_vol_local * k_harga_local) + k_premi
+        
+        if str(getattr(k, 'is_ppn', 'true')).lower() == 'false':
+            k_ppn = 0.0
+        elif k_ppn <= 0 and k_nilai > 0:
+            k_ppn_persen = float(getattr(k, 'ppn_persen', 0) or 0)
+            if k_ppn_persen > 0:
+                k_ppn = k_nilai * (k_ppn_persen / 100)
+            elif inv and float(inv.jumlah_pembayaran or 0) > k_nilai:
+                k_ppn = float(inv.jumlah_pembayaran) - k_nilai
+
+        k_pph = 0.0
+        if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
+            k_pph_p = float(getattr(k, 'pph_persen', 0) or 0)
+            k_pph = k_nilai * (k_pph_p / 100)
+
+        if k_vol_local > 0 and do:
+            ratio = do_volume / k_vol_local
+            pendapatan_do = k_nilai * ratio
+            ppn_do = k_ppn * ratio
+            pph_do = k_pph * ratio
+        else:
+            pendapatan_do = k_nilai
+            ppn_do = k_ppn
+            pph_do = k_pph
+
+        # Sisa pembayaran = Invoice total - sum of ALL DOs nominal for this invoice
+        # If invoice total is missing, fallback to calculate it
+        if not inv_total or inv_total <= 0:
+            inv_total = k_nilai + k_ppn - k_pph
+
+        sisa_pembayaran = round(float(inv_total) - float(total_do_nominal), 2) if (inv or do) else 0
+        # Sisa volume = Kontrak volume - sum of ALL DOs volume for this invoice
+        sisa_volume = round(float(k_vol_local) - float(total_do_volume), 2)
+
         return {
             "No_DO": do.no_do if do else "",
             "No_Invoice": inv.no_invoice if inv else "",
@@ -37,34 +82,47 @@ def get_laporan(db: Session = Depends(get_db)):
             "Komoditi": k.komoditi or "",
             "Billing_Date": format_date(inv.tanggal_transaksi) if inv else format_date(k.tanggal_kontrak),
             "Tanggal_Transfer": format_date(do.tanggal_pembayaran) if do else "",
-            "Jumlah_Transfer": do.nominal_transfer if do else 0,
+            "Raw_Date": (do.tanggal_pembayaran.strftime("%Y-%m-%d") if (do and do.tanggal_pembayaran) else (inv.tanggal_transaksi.strftime("%Y-%m-%d") if inv and inv.tanggal_transaksi else (k.tanggal_kontrak.strftime("%Y-%m-%d") if k.tanggal_kontrak else ""))),
+            "Jumlah_Transfer": do_nominal,
             "Mitra_Pembeli": k.pembeli or "",
             "Deskripsi_Produk": (k.deskripsi_produk or k.komoditi) or "",
-            "Jumlah_Kontrak_Kg": k.volume or 0,
-            "Harga_Per_Kg": k.harga_satuan or 0,
-            "Jumlah_DO": k.volume or 0, # Assuming full quantity
-            "Pendapatan_Pokok": k.nilai_transaksi or 0,
-            "Pajak_PPN": k.nominal_ppn or 0,
-            "Kewajiban_Pembayaran": inv.jumlah_pembayaran if inv else 0,
-            "Selisih": do.selisih if do else (inv.jumlah_pembayaran if inv else 0),
-            "Bulan_Buku": get_bulan_buku(do.tanggal_pembayaran) if do and do.tanggal_pembayaran else "",
+            "Jumlah_Kontrak": k.volume or 0,
+            "Harga_Satuan": k.harga_satuan or 0,
+            "Jumlah_DO": do_volume,
+            "Pendapatan_Pokok": round(pendapatan_do, 2),
+            "Pajak_PPN": round(ppn_do, 2),
+            "PPh_Nominal": round(pph_do, 2),
+            "PPh_Setor": do.is_pph_disetor if do else "false",
+            "Kewajiban_Pembayaran": inv_total,
+            "Sisa_Pembayaran": sisa_pembayaran,
+            "Sisa_Volume": sisa_volume,
+            "Bulan_Buku": get_bulan_buku(do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)),
+            "Rencana_Pengambilan": do.rencana_pengambilan.strftime("%Y-%m-%d") if do and getattr(do, 'rencana_pengambilan', None) else "",
             "Superman": do.superman if do else "",
             "Kontrak_SAP": do.kontrak_sap if do else "",
             "SO_SAP": do.so_sap if do else "",
             "DO_SAP": do.do_sap if do else "",
-            "Billing": do.billing_sap if do else ""
+            "Billing": do.billing_sap if do else "",
+            "Link_Deklarasi_Penerimaan": do.link_deklarasi_penerimaan if do else "",
+            "Satuan": k.satuan or "Kg"
         }
 
     for k in kontraks:
         if not k.invoices:
-            rows.append(build_row(k, None, None))
+            rows.append(build_row(k, None, None, 0, 0, 0, 0))
         else:
             for inv in k.invoices:
+                # Calculate per-invoice totals across ALL DOs
+                total_do_nominal = sum(float(d.nominal_transfer or 0) for d in inv.delivery_orders)
+                total_do_volume = sum(float(d.volume_do or 0) for d in inv.delivery_orders)
+                inv_total = float(inv.jumlah_pembayaran or 0)
+                k_vol = float(k.volume or 0)
+                
                 if not inv.delivery_orders:
-                    rows.append(build_row(k, inv, None))
+                    rows.append(build_row(k, inv, None, inv_total, k_vol, total_do_nominal, total_do_volume))
                 else:
                     for do in inv.delivery_orders:
-                        rows.append(build_row(k, inv, do))
+                        rows.append(build_row(k, inv, do, inv_total, k_vol, total_do_nominal, total_do_volume))
                         
     # Sort by Kontrak then Invoice then DO
     rows.sort(key=lambda x: (x["Billing_Date"], x["No_Kontrak"], x["No_Invoice"], x["No_DO"]))
@@ -85,20 +143,24 @@ def get_laporan(db: Session = Depends(get_db)):
             "Jumlah_Transfer": b.nominal or 0,
             "Mitra_Pembeli": b.pembeli or "",
             "Deskripsi_Produk": b.deskripsi or "",
-            "Jumlah_Kontrak_Kg": b.volume or 0,
-            "Harga_Per_Kg": (b.nominal / b.volume) if (b.volume and b.volume > 0) else 0,
+            "Jumlah_Kontrak": b.volume or 0,
+            "Harga_Satuan": (b.nominal / b.volume) if (b.volume and b.volume > 0) else 0,
             "Jumlah_DO": b.volume or 0,
             "Satuan": b.satuan or "Kg",
             "Pendapatan_Pokok": b.nominal or 0,
             "Pajak_PPN": 0,
+            "PPh_Nominal": 0,
+            "PPh_Setor": "false",
             "Kewajiban_Pembayaran": b.nominal or 0,
-            "Selisih": 0,
+            "Sisa_Pembayaran": 0,
+            "Rencana_Pengambilan": b.tanggal.strftime("%Y-%m-%d") if b.tanggal else "",
             "Bulan_Buku": get_bulan_buku(b.tanggal),
             "Superman": b.superman or "",
             "Kontrak_SAP": b.kontrak_sap or "",
             "SO_SAP": b.so_sap or "",
             "DO_SAP": b.do_sap or "",
-            "Billing": b.billing_sap or ""
+            "Billing": b.billing_sap or "",
+            "Link_Deklarasi_Penerimaan": b.link_deklarasi_penerimaan or ""
         })
 
     return rows
@@ -119,6 +181,7 @@ def update_sap_fields(data: dict, db: Session = Depends(get_db)):
         if "SO_SAP" in data: rec.so_sap = data["SO_SAP"]
         if "DO_SAP" in data: rec.do_sap = data["DO_SAP"]
         if "Billing" in data: rec.billing_sap = data["Billing"]
+        if "Link_Deklarasi_Penerimaan" in data: rec.link_deklarasi_penerimaan = data["Link_Deklarasi_Penerimaan"]
     else:
         do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == no_do).first()
         if not do:
@@ -130,6 +193,7 @@ def update_sap_fields(data: dict, db: Session = Depends(get_db)):
         if "SO_SAP" in data: do.so_sap = data["SO_SAP"]
         if "DO_SAP" in data: do.do_sap = data["DO_SAP"]
         if "Billing" in data: do.billing_sap = data["Billing"]
+        if "Link_Deklarasi_Penerimaan" in data: do.link_deklarasi_penerimaan = data["Link_Deklarasi_Penerimaan"]
     
     db.commit()
     return {"success": True}

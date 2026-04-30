@@ -36,7 +36,7 @@ function buildInvoicePreview() {
     const noInv = document.getElementById('i_no_invoice').value || '[No Invoice]';
     const noK = document.getElementById('i_no_kontrak').value || '[No Kontrak]';
     const tgl = document.getElementById('i_tanggal_transaksi').value || '';
-    const pph = parseFloat(document.getElementById('i_pph_22').value) || 0;
+    const pph = parseLocaleFloat(document.getElementById('i_pph_22').value);
     
     const pembeli = document.getElementById('i_lbl_pembeli').innerText;
     const komoditi = document.getElementById('i_lbl_komoditi').innerText;
@@ -117,8 +117,8 @@ listeners = """
 js = js.replace("buildLivePreview();\n    fetchDashboardData();", "buildLivePreview();\n    fetchDashboardData();\n" + listeners)
 
 js = js.replace(
-    "nominal_transfer: parseFloat(document.getElementById('d_nominal_transfer').value) || 0,",
-    "nominal_transfer: parseFloat(document.getElementById('d_nominal_transfer').value) || 0,\n        tanggal_pembayaran: document.getElementById('d_tanggal_pembayaran').value || null,"
+    "nominal_transfer: parseLocaleFloat(document.getElementById('d_nominal_transfer').value),",
+    "nominal_transfer: parseLocaleFloat(document.getElementById('d_nominal_transfer').value),\n        tanggal_pembayaran: document.getElementById('d_tanggal_pembayaran').value || null,"
 )
 
 js = js.replace(

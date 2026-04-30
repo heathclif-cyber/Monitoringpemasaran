@@ -24,7 +24,11 @@ class KontrakBase(BaseModel):
     volume: Optional[float] = 0.0
     harga_satuan: Optional[float] = 0.0
     premi: Optional[float] = 0.0
+    is_ppn: Optional[str] = "true"
     ppn_persen: Optional[float] = 11.0
+    
+    is_pph: Optional[str] = "false"
+    pph_persen: Optional[float] = 0.0
     
     alamat_produksi: Optional[str] = None
     chop: Optional[str] = None
@@ -88,12 +92,15 @@ class DeliveryOrderBase(BaseModel):
     alamat_unit: Optional[str] = None
     tanggal_pembayaran: Optional[date] = None
     nominal_transfer: Optional[float] = 0.0
+    is_pph_disetor: Optional[str] = "false"
+    rencana_pengambilan: Optional[date] = None
 
 class DeliveryOrderCreate(DeliveryOrderBase):
     pass
 
 class DeliveryOrderOut(DeliveryOrderBase):
     selisih: float
+    volume_do: Optional[float] = 0.0
 
     class Config:
         from_attributes = True
