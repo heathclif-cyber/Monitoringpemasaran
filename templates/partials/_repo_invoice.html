@@ -1,0 +1,72 @@
+<section id="repo-invoice" class="page-section max-w-[1600px] mx-auto space-y-6 pb-8 pt-6">
+
+    <!-- HEADER BAR -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+        <div>
+            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <i class="fas fa-file-invoice-dollar text-indigo-600 text-lg"></i> Repositori Invoice
+            </h2>
+            <p class="text-slate-500 text-sm mt-1">Daftar seluruh invoice yang telah diterbitkan.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="relative">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="ri-search" oninput="applyRepoInvoiceFilters()" placeholder="Cari nomor invoice..."
+                    class="form-input pl-9 w-56">
+            </div>
+            <button onclick="fetchListData()" class="h-9 px-3 bg-white border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 transition-all text-sm" title="Refresh">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="glass-panel p-4 mb-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="flex flex-col">
+                <label class="text-xs font-medium text-slate-500 mb-1">Bulan</label>
+                <select id="ri-bulan" onchange="applyRepoInvoiceFilters()" class="form-input h-9 py-0 text-sm">
+                    <option value="ALL">Semua Bulan</option>
+                </select>
+            </div>
+            <div class="flex flex-col">
+                <label class="text-xs font-medium text-slate-500 mb-1">No Kontrak</label>
+                <select id="ri-kontrak" onchange="applyRepoInvoiceFilters()" class="form-input h-9 py-0 text-sm">
+                    <option value="ALL">Semua Kontrak</option>
+                </select>
+            </div>
+            <div class="flex flex-col">
+                <label class="text-xs font-medium text-slate-500 mb-1">Komoditi</label>
+                <select id="ri-komoditi" onchange="applyRepoInvoiceFilters()" class="form-input h-9 py-0 text-sm">
+                    <option value="ALL">Semua Komoditi</option>
+                </select>
+            </div>
+            <div class="flex flex-col">
+                <label class="text-xs font-medium text-slate-500 mb-1">Urutan Tanggal</label>
+                <select id="ri-sort" onchange="applyRepoInvoiceFilters()" class="form-input h-9 py-0 text-sm">
+                    <option value="DESC" selected>Terbaru ke Terlama</option>
+                    <option value="ASC">Terlama ke Terbaru</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-panel overflow-hidden">
+        <div class="overflow-x-auto overflow-y-auto max-h-[65vh]">
+            <table class="w-full text-sm text-left border-collapse select-text">
+                <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-semibold sticky top-0 z-20">
+                    <tr>
+                        <th class="py-3 px-4 bg-slate-50">No Invoice</th>
+                        <th class="py-3 px-4 bg-slate-50">No Kontrak</th>
+                        <th class="py-3 px-4 bg-slate-50">Tgl Transaksi</th>
+                        <th class="py-3 px-4 bg-slate-50 text-right">Tagihan Total</th>
+                        <th class="py-3 px-4 bg-slate-50 text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="table-invoice" class="divide-y divide-slate-100 bg-white">
+                    <tr><td colspan="5" class="py-12 text-center text-sm text-slate-500">Memuat data invoice...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

@@ -78,7 +78,10 @@ function switchTab(tabId, el) {
         'do-form': 'Otomasi Delivery Order',
         'laporan': 'Rekapitulasi Laporan Terintegrasi',
         'bypass-form': 'Input Data Bypass Laporan',
-        'list-data': 'Daftar Dokumen Tersimpan'
+        'list-data': 'Daftar Dokumen Tersimpan',
+        'repo-kontrak': 'Repository — Kontrak Penjualan',
+        'repo-invoice': 'Repository — Arsip Invoice',
+        'repo-do': 'Repository — Delivery Order'
     };
     if (titMap[tabId]) document.getElementById('page-title').innerText = titMap[tabId];
 
@@ -94,7 +97,7 @@ function switchTab(tabId, el) {
 
     if (tabId === 'dashboard') {
         if (window.fetchDashboardData) fetchDashboardData();
-    } else if (tabId === 'list-data') {
+    } else if (tabId === 'list-data' || tabId === 'repo-kontrak' || tabId === 'repo-invoice' || tabId === 'repo-do') {
         if (window.fetchListData) fetchListData();
     } else if (tabId === 'laporan') {
         if (window.fetchLaporanData) fetchLaporanData();
@@ -159,33 +162,35 @@ async function fetchListData() {
         rawListData.do = await resD.json();
         
         populateListDataFilters();
-        applyListDataFilters();
+        applyRepoKontrakFilters();
+        applyRepoInvoiceFilters();
+        applyRepoDOFilters();
     } catch (err) {
         console.error(err);
     }
 }
 
 function populateListDataFilters() {
-    const selBulan = document.getElementById('filter-list-bulan');
-    const selUnit = document.getElementById('filter-list-unit');
-    const selPembeli = document.getElementById('filter-list-pembeli');
-    const selKomoditi = document.getElementById('filter-list-komoditi');
-
-    if (!selBulan) return; // Wait if not in DOM
+    // Helper: populate a select by ID if it exists
+    function fillSelect(id, options, defaultLabel) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const cur = el.value;
+        el.innerHTML = `<option value="ALL">${defaultLabel}</option>`;
+        options.forEach(o => el.add(new Option(o.label, o.value)));
+        if ([...el.options].some(o => o.value === cur)) el.value = cur;
+    }
 
     // Collect sets
     const units = new Set();
     const pembelis = new Set();
     const komoditis = new Set();
-    const monthMap = {}; // "YYYY-MM" -> "Bulan YYYY"
+    const monthMap = {};
 
     const addMonth = (dateStr) => {
         if (!dateStr || dateStr === '-') return;
-        const [y, m, d] = dateStr.split('-');
-        if (y && m) {
-            const key = `${y}-${m}`;
-            monthMap[key] = `${MONTHS_ID[parseInt(m)]} ${y}`;
-        }
+        const [y, m] = dateStr.split('-');
+        if (y && m) monthMap[`${y}-${m}`] = `${MONTHS_ID[parseInt(m)]} ${y}`;
     };
 
     rawListData.kontrak.forEach(k => {
@@ -194,198 +199,154 @@ function populateListDataFilters() {
         if (k.komoditi && k.komoditi !== '-') komoditis.add(k.komoditi);
         addMonth(k.tanggal_kontrak);
     });
-
-    rawListData.invoice.forEach(i => {
-        addMonth(i.tanggal_transaksi);
-    });
-
+    rawListData.invoice.forEach(i => addMonth(i.tanggal_transaksi));
     rawListData.do.forEach(d => {
         if (d.kepada_unit && d.kepada_unit !== '-') units.add(d.kepada_unit);
         addMonth(d.tanggal_do);
     });
 
-    // Save current values
-    const curBulan = selBulan.value;
-    const curUnit = selUnit.value;
-    const curPembeli = selPembeli.value;
-    const curKomoditi = selKomoditi.value;
+    const monthOpts = Object.keys(monthMap).sort().reverse().map(k => ({ label: monthMap[k], value: k }));
+    const unitOpts = [...units].sort().map(u => ({ label: u, value: u }));
+    const pembeliOpts = [...pembelis].sort().map(p => ({ label: p, value: p }));
+    const komoditiOpts = [...komoditis].sort().map(k => ({ label: k, value: k }));
 
-    // Reset options
-    selBulan.innerHTML = '<option value="ALL">Semua Bulan</option>';
-    selUnit.innerHTML = '<option value="ALL">Semua Unit</option>';
-    selPembeli.innerHTML = '<option value="ALL">Semua Pembeli</option>';
-    selKomoditi.innerHTML = '<option value="ALL">Semua Komoditi</option>';
-
-    // Build options
-    Object.keys(monthMap).sort().reverse().forEach(m => selBulan.add(new Option(monthMap[m], m)));
-    [...units].sort().forEach(u => selUnit.add(new Option(u, u)));
-    [...pembelis].sort().forEach(p => selPembeli.add(new Option(p, p)));
-    [...komoditis].sort().forEach(k => selKomoditi.add(new Option(k, k)));
-
-    // Restore values
-    if ([...selBulan.options].some(o => o.value === curBulan)) selBulan.value = curBulan;
-    if ([...selUnit.options].some(o => o.value === curUnit)) selUnit.value = curUnit;
-    if ([...selPembeli.options].some(o => o.value === curPembeli)) selPembeli.value = curPembeli;
-    if ([...selKomoditi.options].some(o => o.value === curKomoditi)) selKomoditi.value = curKomoditi;
+    // Populate all filter dropdowns across all repo sections
+    ['rk-bulan', 'ri-bulan', 'rd-bulan'].forEach(id => fillSelect(id, monthOpts, 'Semua Bulan'));
+    ['rk-unit',  'rd-unit'            ].forEach(id => fillSelect(id, unitOpts,   'Semua Unit'));
+    ['rk-pembeli'                      ].forEach(id => fillSelect(id, pembeliOpts,'Semua Pembeli'));
+    ['rk-sort',  'ri-sort',  'rd-sort' ].forEach(id => fillSelect(id, [
+        { label: 'Terbaru ke Terlama', value: 'DESC' },
+        { label: 'Terlama ke Terbaru', value: 'ASC'  }
+    ], 'Terbaru ke Terlama'));
+    // Invoice-specific: kontrak list
+    const kontrakOpts = rawListData.kontrak.map(k => ({ label: k.no_kontrak, value: k.no_kontrak }));
+    ['ri-kontrak'].forEach(id => fillSelect(id, kontrakOpts, 'Semua Kontrak'));
+    // DO-specific: invoice list
+    const invoiceOpts = rawListData.invoice.map(i => ({ label: i.no_invoice, value: i.no_invoice }));
+    ['rd-invoice'].forEach(id => fillSelect(id, invoiceOpts, 'Semua Invoice'));
 }
 
+// Backward compat shim for old _list_data.html filters (if still rendered)
 function applyListDataFilters() {
-    const selBulan = document.getElementById('filter-list-bulan');
-    if (!selBulan) return;
-
-    const query = document.getElementById('search-list-data').value.toLowerCase();
-    const bulan = selBulan.value;
-    const unit = document.getElementById('filter-list-unit').value;
-    const pembeli = document.getElementById('filter-list-pembeli').value;
-    const komoditi = document.getElementById('filter-list-komoditi').value;
-    const sort = document.getElementById('filter-list-sort').value;
-
-    // Lookups for cross-referencing
-    const kontrakMap = {};
-    rawListData.kontrak.forEach(k => { kontrakMap[k.no_kontrak] = k; });
-    
-    const invoiceMap = {};
-    rawListData.invoice.forEach(i => { invoiceMap[i.no_invoice] = i; });
-
-    // Filter Kontrak
-    const fKontrak = rawListData.kontrak.filter(k => {
-        let match = true;
-        if (bulan !== 'ALL' && (!k.tanggal_kontrak || !k.tanggal_kontrak.startsWith(bulan))) match = false;
-        if (unit !== 'ALL' && k.kebun_produsen !== unit) match = false;
-        if (pembeli !== 'ALL' && (!k.pembeli || !k.pembeli.includes(pembeli))) match = false;
-        if (komoditi !== 'ALL' && k.komoditi !== komoditi) match = false;
-        if (query) {
-            const txt = (k.no_kontrak + ' ' + k.pembeli + ' ' + k.komoditi).toLowerCase();
-            if (!txt.includes(query)) match = false;
-        }
-        return match;
-    });
-
-    // Filter Invoice
-    const fInvoice = rawListData.invoice.filter(i => {
-        const k = kontrakMap[i.no_kontrak] || {};
-        let match = true;
-        if (bulan !== 'ALL' && (!i.tanggal_transaksi || !i.tanggal_transaksi.startsWith(bulan))) match = false;
-        if (unit !== 'ALL' && k.kebun_produsen !== unit) match = false;
-        if (pembeli !== 'ALL' && (!k.pembeli || !k.pembeli.includes(pembeli))) match = false;
-        if (komoditi !== 'ALL' && k.komoditi !== komoditi) match = false;
-        if (query) {
-            const txt = (i.no_invoice + ' ' + i.no_kontrak).toLowerCase();
-            if (!txt.includes(query)) match = false;
-        }
-        return match;
-    });
-
-    // Filter DO
-    const fDo = rawListData.do.filter(d => {
-        const i = invoiceMap[d.no_invoice] || {};
-        const k = kontrakMap[i.no_kontrak] || {};
-        let match = true;
-        if (bulan !== 'ALL' && (!d.tanggal_do || !d.tanggal_do.startsWith(bulan))) match = false;
-        if (unit !== 'ALL' && d.kepada_unit !== unit && k.kebun_produsen !== unit) match = false;
-        if (pembeli !== 'ALL' && (!k.pembeli || !k.pembeli.includes(pembeli))) match = false;
-        if (komoditi !== 'ALL' && k.komoditi !== komoditi) match = false;
-        if (query) {
-            const txt = (d.no_do + ' ' + d.no_invoice + ' ' + d.kepada_unit).toLowerCase();
-            if (!txt.includes(query)) match = false;
-        }
-        return match;
-    });
-
-    // Sorting
-    const sortByDate = (arr, dateField) => {
-        return arr.sort((a, b) => {
-            const ta = new Date(a[dateField] || 0).getTime();
-            const tb = new Date(b[dateField] || 0).getTime();
-            return sort === 'DESC' ? tb - ta : ta - tb;
-        });
-    };
-
-    sortByDate(fKontrak, 'tanggal_kontrak');
-    sortByDate(fInvoice, 'tanggal_transaksi');
-    sortByDate(fDo, 'tanggal_do');
-
-    renderListData(fKontrak, fInvoice, fDo);
+    applyRepoKontrakFilters();
+    applyRepoInvoiceFilters();
+    applyRepoDOFilters();
 }
 
-function renderListData(kontraks, invoices, dos) {
-    // 1. Render Kontrak
-    let tbody = document.getElementById('table-kontrak');
+// ---- Repo Kontrak Filter & Render ----
+function applyRepoKontrakFilters() {
+    const gv = id => { const el = document.getElementById(id); return el ? el.value : 'ALL'; };
+    const bulan   = gv('rk-bulan');
+    const unit    = gv('rk-unit');
+    const pembeli = gv('rk-pembeli');
+    const sort    = gv('rk-sort') === 'ALL' ? 'DESC' : gv('rk-sort');
+    const query   = ((document.getElementById('rk-search') || {}).value || '').toLowerCase();
+
+    let data = rawListData.kontrak.filter(k => {
+        if (bulan   !== 'ALL' && (!k.tanggal_kontrak || !k.tanggal_kontrak.startsWith(bulan))) return false;
+        if (unit    !== 'ALL' && k.kebun_produsen !== unit) return false;
+        if (pembeli !== 'ALL' && (!k.pembeli || !k.pembeli.includes(pembeli))) return false;
+        if (query && !(k.no_kontrak+' '+k.pembeli+' '+k.komoditi).toLowerCase().includes(query)) return false;
+        return true;
+    });
+    data.sort((a,b) => { const ta=new Date(a.tanggal_kontrak||0).getTime(), tb=new Date(b.tanggal_kontrak||0).getTime(); return sort==='DESC'?tb-ta:ta-tb; });
+
+    const tbody = document.getElementById('table-kontrak');
+    if (!tbody) return;
     tbody.innerHTML = '';
-    if (kontraks.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400 text-sm">Belum ada data kontrak yang memfilter</td></tr>';
-    }
-    kontraks.forEach(item => {
-        let tr = document.createElement('tr');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-400 text-sm">Belum ada data kontrak</td></tr>'; return; }
+    data.forEach(item => {
+        const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
         tr.innerHTML = `
-            <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_kontrak}</td>
-            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_kontrak)}</td>
-            <td class="py-4 px-6 text-slate-700 font-medium">${safe(item.pembeli).split('\n')[0]}</td>
-            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  ${safe(item.komoditi)}
-                </span>
-            </td>
-            <td class="py-4 px-6 font-bold text-slate-800 text-right whitespace-nowrap">${fmtRpFull(item.nilai_transaksi)}</td>
-            <td class="py-4 px-6">
+            <td class="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">${item.no_kontrak}</td>
+            <td class="py-3 px-4 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_kontrak)}</td>
+            <td class="py-3 px-4 text-slate-700 font-medium">${safe(item.pembeli).split('\n')[0]}</td>
+            <td class="py-3 px-4 whitespace-nowrap"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">${safe(item.komoditi)}</span></td>
+            <td class="py-3 px-4 font-bold text-slate-800 text-right whitespace-nowrap">${fmtRpFull(item.nilai_transaksi)}</td>
+            <td class="py-3 px-4">
                 <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onclick="editDoc('kontrak', '${item.no_kontrak}')" class="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors tooltip" title="Edit / View"><i class="fas fa-edit"></i></button>
-                    <a href="/api/kontrak/export?no_kontrak=${encodeURIComponent(item.no_kontrak)}" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
-                    <button onclick="deleteContract('${item.no_kontrak}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Hapus Kontrak"><i class="fas fa-trash"></i></button>
+                    <button onclick="editDoc('kontrak','${item.no_kontrak}')" class="p-2 text-teal-600 hover:bg-teal-50 rounded-lg" title="Edit"><i class="fas fa-edit"></i></button>
+                    <a href="/api/kontrak/export?no_kontrak=${encodeURIComponent(item.no_kontrak)}" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download"><i class="fas fa-file-word"></i></a>
+                    <button onclick="deleteContract('${item.no_kontrak}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus"><i class="fas fa-trash"></i></button>
                 </div>
-            </td>
-        `;
+            </td>`;
         tbody.appendChild(tr);
     });
+}
 
-    // 2. Render Invoice
-    tbody = document.getElementById('table-invoice');
+// ---- Repo Invoice Filter & Render ----
+function applyRepoInvoiceFilters() {
+    const gv = id => { const el = document.getElementById(id); return el ? el.value : 'ALL'; };
+    const bulan = gv('ri-bulan');
+    const sort  = gv('ri-sort') === 'ALL' ? 'DESC' : gv('ri-sort');
+    const query = ((document.getElementById('ri-search') || {}).value || '').toLowerCase();
+
+    let data = rawListData.invoice.filter(i => {
+        if (bulan !== 'ALL' && (!i.tanggal_transaksi || !i.tanggal_transaksi.startsWith(bulan))) return false;
+        if (query && !(i.no_invoice+' '+i.no_kontrak).toLowerCase().includes(query)) return false;
+        return true;
+    });
+    data.sort((a,b) => { const ta=new Date(a.tanggal_transaksi||0).getTime(), tb=new Date(b.tanggal_transaksi||0).getTime(); return sort==='DESC'?tb-ta:ta-tb; });
+
+    const tbody = document.getElementById('table-invoice');
+    if (!tbody) return;
     tbody.innerHTML = '';
-    if (invoices.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 text-sm">Belum ada data invoice yang memfilter</td></tr>';
-    }
-    invoices.forEach(item => {
-        let tr = document.createElement('tr');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400 text-sm">Belum ada data invoice</td></tr>'; return; }
+    data.forEach(item => {
+        const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
         tr.innerHTML = `
-            <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_invoice}</td>
-            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${item.no_kontrak}</td>
-            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_transaksi)}</td>
-            <td class="py-4 px-6 font-bold text-slate-800 text-right whitespace-nowrap">${fmtRpFull(item.jumlah_pembayaran)}</td>
-            <td class="py-4 px-6">
+            <td class="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">${item.no_invoice}</td>
+            <td class="py-3 px-4 text-slate-600 whitespace-nowrap">${item.no_kontrak}</td>
+            <td class="py-3 px-4 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_transaksi)}</td>
+            <td class="py-3 px-4 font-bold text-slate-800 text-right whitespace-nowrap">${fmtRpFull(item.jumlah_pembayaran)}</td>
+            <td class="py-3 px-4">
                 <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onclick="editDoc('invoice', '${item.no_invoice}')" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors tooltip" title="Edit / View"><i class="fas fa-edit"></i></button>
-                    <a href="/api/invoice/export?no_invoice=${encodeURIComponent(item.no_invoice)}" target="_blank" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
-                    <button onclick="deleteInvoice('${item.no_invoice}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Hapus Invoice"><i class="fas fa-trash"></i></button>
+                    <button onclick="editDoc('invoice','${item.no_invoice}')" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Edit"><i class="fas fa-edit"></i></button>
+                    <a href="/api/invoice/export?no_invoice=${encodeURIComponent(item.no_invoice)}" target="_blank" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Download"><i class="fas fa-file-word"></i></a>
+                    <button onclick="deleteInvoice('${item.no_invoice}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus"><i class="fas fa-trash"></i></button>
                 </div>
-            </td>
-        `;
+            </td>`;
         tbody.appendChild(tr);
     });
+}
 
-    // 3. Render DO
-    tbody = document.getElementById('table-do');
+// ---- Repo DO Filter & Render ----
+function applyRepoDOFilters() {
+    const gv = id => { const el = document.getElementById(id); return el ? el.value : 'ALL'; };
+    const bulan = gv('rd-bulan');
+    const unit  = gv('rd-unit');
+    const sort  = gv('rd-sort') === 'ALL' ? 'DESC' : gv('rd-sort');
+    const query = ((document.getElementById('rd-search') || {}).value || '').toLowerCase();
+
+    let data = rawListData.do.filter(d => {
+        if (bulan !== 'ALL' && (!d.tanggal_do || !d.tanggal_do.startsWith(bulan))) return false;
+        if (unit  !== 'ALL' && d.kepada_unit !== unit) return false;
+        if (query && !(d.no_do+' '+d.no_invoice+' '+d.kepada_unit).toLowerCase().includes(query)) return false;
+        return true;
+    });
+    data.sort((a,b) => { const ta=new Date(a.tanggal_do||0).getTime(), tb=new Date(b.tanggal_do||0).getTime(); return sort==='DESC'?tb-ta:ta-tb; });
+
+    const tbody = document.getElementById('table-do');
+    if (!tbody) return;
     tbody.innerHTML = '';
-    if (dos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 text-sm">Belum ada data DO yang memfilter</td></tr>';
-    }
-    dos.forEach(item => {
-        let tr = document.createElement('tr');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400 text-sm">Belum ada data DO</td></tr>'; return; }
+    data.forEach(item => {
+        const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition-colors group border-b border-slate-100 last:border-0';
         tr.innerHTML = `
-            <td class="py-4 px-6 font-medium text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10">${item.no_do}</td>
-            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${item.no_invoice}</td>
-            <td class="py-4 px-6 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_do)}</td>
-            <td class="py-4 px-6 text-slate-700 font-medium">${safe(item.kepada_unit)}</td>
-            <td class="py-4 px-6 text-center">
+            <td class="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">${item.no_do}</td>
+            <td class="py-3 px-4 text-slate-600 whitespace-nowrap">${item.no_invoice}</td>
+            <td class="py-3 px-4 text-slate-600 whitespace-nowrap">${fmtDateLocal(item.tanggal_do)}</td>
+            <td class="py-3 px-4 text-slate-700 font-medium">${safe(item.kepada_unit)}</td>
+            <td class="py-3 px-4">
                 <div class="flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onclick="editDoc('do', '${item.no_do}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors tooltip" title="Edit / View"><i class="fas fa-edit"></i></button>
-                    <a href="/api/do/export?no_do=${encodeURIComponent(item.no_do)}" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors tooltip" title="Download Word"><i class="fas fa-file-word"></i></a>
-                    <button onclick="deleteDO('${item.no_do}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors tooltip" title="Hapus DO"><i class="fas fa-trash"></i></button>
+                    <button onclick="editDoc('do','${item.no_do}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit"><i class="fas fa-edit"></i></button>
+                    <a href="/api/do/export?no_do=${encodeURIComponent(item.no_do)}" target="_blank" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download"><i class="fas fa-file-word"></i></a>
+                    <button onclick="deleteDO('${item.no_do}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus"><i class="fas fa-trash"></i></button>
                 </div>
-            </td>
-        `;
+            </td>`;
         tbody.appendChild(tr);
     });
 }

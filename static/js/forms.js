@@ -52,6 +52,9 @@ async function autoLoadInvoice() {
         document.getElementById('i_no_invoice').value = no; // Restore ID after fetchKontrakForInvoice overwrites it
         showToast("Mode Edit: Data invoice " + no + " berhasil dimuat.", "info");
         buildInvoicePreview();
+        // Reveal download button for existing document
+        const btnExport = document.getElementById('btn-export-invoice');
+        if (btnExport) { btnExport.setAttribute('data-no', no); btnExport.classList.remove('hidden'); }
     } catch (e) { }
 }
 
@@ -75,6 +78,9 @@ async function autoLoadDO() {
         document.getElementById('d_no_do').value = no; // Restore ID after fetchInvoiceForDO overwrites it
         showToast("Mode Edit: Data DO " + no + " berhasil dimuat.", "info");
         buildDOPreview();
+        // Reveal download button for existing document
+        const btnExportDo = document.getElementById('btn-export-do');
+        if (btnExportDo) { btnExportDo.setAttribute('data-no', no); btnExportDo.classList.remove('hidden'); }
     } catch (e) { }
 }
 
@@ -380,6 +386,23 @@ function exportKontrakFromPreview() {
     window.open(`/api/kontrak/export?no_kontrak=${encodeURIComponent(noKontrak)}`, '_blank');
 }
 
+function exportInvoiceFromPreview() {
+    const btn = document.getElementById('btn-export-invoice');
+    const noInvoice = btn ? btn.getAttribute('data-no') : null;
+    // Fallback: read current value from the form input
+    const no = noInvoice || document.getElementById('i_no_invoice').value;
+    if (!no) { showToast('Simpan invoice terlebih dahulu', 'error'); return; }
+    window.open(`/api/invoice/export?no_invoice=${encodeURIComponent(no)}`, '_blank');
+}
+
+function exportDOFromPreview() {
+    const btn = document.getElementById('btn-export-do');
+    const noDo = btn ? btn.getAttribute('data-no') : null;
+    const no = noDo || document.getElementById('d_no_do').value;
+    if (!no) { showToast('Simpan DO terlebih dahulu', 'error'); return; }
+    window.open(`/api/do/export?no_do=${encodeURIComponent(no)}`, '_blank');
+}
+
 // ==== INVOICE ====
 async function fetchKontrakForInvoice() {
     const noKontrak = document.getElementById('i_no_kontrak').value;
@@ -507,6 +530,12 @@ async function handleInvoiceSubmit(e) {
 
         showToast("Invoice " + payload.no_invoice + " berhasil diterbitkan!", "success");
         populateDropdowns();
+        // Show the download button and store the saved invoice number
+        const btnExport = document.getElementById('btn-export-invoice');
+        if (btnExport) {
+            btnExport.setAttribute('data-no', payload.no_invoice);
+            btnExport.classList.remove('hidden');
+        }
     } catch (err) {
         showToast(err.message, 'error');
     } finally {
@@ -805,6 +834,12 @@ async function handleDOSubmit(e) {
         }
 
         showToast("Delivery Order " + payload.no_do + " berhasil diterbitkan!", "success");
+        // Show the download button and store the saved DO number
+        const btnExport = document.getElementById('btn-export-do');
+        if (btnExport) {
+            btnExport.setAttribute('data-no', payload.no_do);
+            btnExport.classList.remove('hidden');
+        }
     } catch (err) {
         showToast(err.message, 'error');
     } finally {

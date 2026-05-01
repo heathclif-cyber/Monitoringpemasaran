@@ -74,6 +74,15 @@ def get_laporan(db: Session = Depends(get_db)):
         # Sisa volume = Kontrak volume - sum of ALL DOs volume for this invoice
         sisa_volume = round(float(k_vol_local) - float(total_do_volume), 2)
 
+        # DPP (Harga Pokok, excl. PPN/PPh) = harga_satuan * volume_do + premi proporsional
+        if k_vol_local > 0 and do:
+            ratio_premi = do_volume / k_vol_local
+            dpp_pokok = (k_harga_local * do_volume) + (k_premi * ratio_premi)
+        elif do:
+            dpp_pokok = (k_harga_local * do_volume) + k_premi
+        else:
+            dpp_pokok = (k_harga_local * k_vol_local) + k_premi
+
         return {
             "No_DO": do.no_do if do else "",
             "No_Invoice": inv.no_invoice if inv else "",
@@ -90,6 +99,7 @@ def get_laporan(db: Session = Depends(get_db)):
             "Harga_Satuan": k.harga_satuan or 0,
             "Jumlah_DO": do_volume,
             "Pendapatan_Pokok": round(pendapatan_do, 2),
+            "DPP_Pokok": round(dpp_pokok, 2),
             "Pajak_PPN": round(ppn_do, 2),
             "PPh_Nominal": round(pph_do, 2),
             "PPh_Setor": do.is_pph_disetor if do else "false",
