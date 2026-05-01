@@ -65,12 +65,22 @@ def get_laporan(db: Session = Depends(get_db)):
             ppn_do = k_ppn
             pph_do = k_pph
 
-        # Sisa pembayaran = Invoice total - sum of ALL DOs nominal for this invoice
-        # If invoice total is missing, fallback to calculate it
+        # Sisa pembayaran = Invoice total gross - sum of ALL DOs pelunasan for this invoice
+        # inv_total is the NET amount stored in database. We need to add back PPh to get GROSS Kewajiban.
         if not inv_total or inv_total <= 0:
-            inv_total = k_nilai + k_ppn - k_pph
+            inv_total_net = k_nilai + k_ppn - k_pph
+            inv_total_gross = k_nilai + k_ppn
+        else:
+            inv_total_net = inv_total
+            inv_total_gross = inv_total + k_pph
 
-        sisa_pembayaran = round(float(inv_total) - float(total_do_nominal), 2) if (inv or do) else 0
+        sisa_pembayaran = round(float(inv_total_gross) - float(total_do_nominal), 2) if (inv or do) else 0
+        
+        # Determine pelunasan for THIS specific DO
+        if do and str(getattr(do, 'is_pph_disetor', 'false')).lower() == 'true':
+            pelunasan_do = do_nominal + pph_do
+        else:
+            pelunasan_do = do_nominal
         # Sisa volume = Kontrak volume - sum of ALL DOs volume for this invoice
         sisa_volume = round(float(k_vol_local) - float(total_do_volume), 2)
 
@@ -103,7 +113,8 @@ def get_laporan(db: Session = Depends(get_db)):
             "Pajak_PPN": round(ppn_do, 2),
             "PPh_Nominal": round(pph_do, 2),
             "PPh_Setor": do.is_pph_disetor if do else "false",
-            "Kewajiban_Pembayaran": inv_total,
+            "Kewajiban_Pembayaran": inv_total_gross,
+            "Pelunasan": round(pelunasan_do, 2),
             "Sisa_Pembayaran": sisa_pembayaran,
             "Sisa_Volume": sisa_volume,
             "Bulan_Buku": get_bulan_buku(do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)),
@@ -123,16 +134,33 @@ def get_laporan(db: Session = Depends(get_db)):
         else:
             for inv in k.invoices:
                 # Calculate per-invoice totals across ALL DOs
-                total_do_nominal = sum(float(d.nominal_transfer or 0) for d in inv.delivery_orders)
                 total_do_volume = sum(float(d.volume_do or 0) for d in inv.delivery_orders)
-                inv_total = float(inv.jumlah_pembayaran or 0)
+                
                 k_vol = float(k.volume or 0)
+                k_nilai = float(k.nilai_transaksi or 0)
+                if k_nilai <= 0:
+                    k_nilai = (k_vol * float(k.harga_satuan or 0)) + float(k.premi or 0)
+                k_pph = 0.0
+                if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
+                    k_pph = k_nilai * (float(getattr(k, 'pph_persen', 0) or 0) / 100)
+                
+                total_pelunasan = 0
+                for d in inv.delivery_orders:
+                    nom = float(d.nominal_transfer or 0)
+                    if str(getattr(d, 'is_pph_disetor', 'false')).lower() == 'true':
+                        d_ratio = float(d.volume_do or 0) / k_vol if k_vol > 0 else 0
+                        d_pph = k_pph * d_ratio
+                        total_pelunasan += (nom + d_pph)
+                    else:
+                        total_pelunasan += nom
+
+                inv_total = float(inv.jumlah_pembayaran or 0)
                 
                 if not inv.delivery_orders:
-                    rows.append(build_row(k, inv, None, inv_total, k_vol, total_do_nominal, total_do_volume))
+                    rows.append(build_row(k, inv, None, inv_total, k_vol, total_pelunasan, total_do_volume))
                 else:
                     for do in inv.delivery_orders:
-                        rows.append(build_row(k, inv, do, inv_total, k_vol, total_do_nominal, total_do_volume))
+                        rows.append(build_row(k, inv, do, inv_total, k_vol, total_pelunasan, total_do_volume))
                         
     # Sort by Kontrak then Invoice then DO
     rows.sort(key=lambda x: (x["Billing_Date"], x["No_Kontrak"], x["No_Invoice"], x["No_DO"]))

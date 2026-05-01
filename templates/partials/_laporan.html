@@ -180,7 +180,8 @@
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-center">Satuan</th>
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50">Billing Date / Invoice</th>
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50">Tanggal Transfer</th>
-                        <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-right">Jumlah Transfer</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-right">Jumlah Transfer (Cash In)</th>
+                        <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-right">Pelunasan (Inc. PPh)</th>
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50">Mitra Pembeli</th>
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50">Deskripsi Produk</th>
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-right">Jumlah Kontrak</th>
@@ -191,7 +192,7 @@
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-right">Pajak PPN</th>
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-right">Pajak PPh</th>
                         <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-center">PPh Setor?</th>
-                        <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-right">Kewajiban Pembayaran Mitra
+                        <th class="py-3 px-4 border-r border-indigo-100 bg-indigo-50 text-right">Kewajiban Pembayaran Mitra (Gross)
                         </th>
                         <th class="py-3 px-4 border-r border-indigo-100 text-right bg-red-100 text-red-800">Sisa Kekurangan<br>Pembayaran</th>
                         <th class="py-3 px-4 border-r border-indigo-100 text-right bg-amber-100 text-amber-800">Sisa Barang<br>Belum Diserahkan</th>
@@ -564,6 +565,7 @@
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Billing_Date}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Tanggal_Transfer}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-emerald-600" data-t="n" data-v="${row.Jumlah_Transfer || 0}">${fmtRp(row.Jumlah_Transfer)}</td>
+                <td class="py-2.5 px-4 border-r border-slate-100 text-right font-medium text-blue-600" data-t="n" data-v="${row.Pelunasan || 0}">${fmtRp(row.Pelunasan)}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-800 font-medium">${row.Mitra_Pembeli}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-slate-700">${row.Deskripsi_Produk}</td>
                 <td class="py-2.5 px-4 border-r border-slate-100 text-right" data-t="n" data-v="${row.Jumlah_Kontrak || 0}">${fmtNum(row.Jumlah_Kontrak)}</td>
