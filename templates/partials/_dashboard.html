@@ -1,4 +1,4 @@
-<section id="dashboard" class="page-section active max-w-[1600px] mx-auto space-y-8 pb-8 pt-24">
+<section id="dashboard" class="page-section active max-w-[1600px] mx-auto space-y-6 pb-8 pt-6">
 
     <!-- Filters Row -->
     <div class="flex items-center justify-end">
@@ -28,76 +28,72 @@
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <!-- Card: Nilai Transaksi -->
-        <div class="glass-panel p-6 relative overflow-hidden group">
-            <div class="absolute -right-6 -top-6 w-32 h-32 bg-brand-50 rounded-full opacity-60 group-hover:scale-150 transition-transform duration-700 ease-in-out"></div>
+        <div class="glass-panel p-5 relative overflow-hidden group">
             <div class="relative z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">PENDAPATAN (OMSET)</h3>
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-100 to-brand-50 flex items-center justify-center text-brand-600 shadow-sm border border-brand-200/50">
-                        <i class="fas fa-chart-line text-base"></i>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-[13px] font-semibold text-slate-500">Pendapatan (Omset)</h3>
+                    <div class="text-brand-600">
+                        <i class="fas fa-chart-line text-[14px]"></i>
                     </div>
                 </div>
-                <p class="text-3xl font-black text-slate-800 tracking-tight drop-shadow-sm" id="dash-pendapatan">Rp 0</p>
-                <div class="mt-4 flex items-center gap-1.5 text-[11px] font-bold text-brand-700 bg-brand-50 rounded-lg px-2.5 py-1.5 inline-flex border border-brand-100/50 shadow-sm">
-                    <i class="fas fa-file-contract"></i> <span>Berdasarkan Rencana Pengambilan</span>
+                <p class="text-2xl font-bold text-slate-900 tracking-tight" id="dash-pendapatan">Rp 0</p>
+                <div class="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                    <i class="fas fa-file-contract text-slate-400"></i> <span>Berdasarkan Rencana Pengambilan</span>
                 </div>
             </div>
         </div>
 
         <!-- Card: Cash In -->
-        <div class="glass-panel p-6 relative overflow-hidden group">
-            <div class="absolute -right-6 -top-6 w-32 h-32 bg-emerald-50 rounded-full opacity-60 group-hover:scale-150 transition-transform duration-700 ease-in-out"></div>
+        <div class="glass-panel p-5 relative overflow-hidden group">
             <div class="relative z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Cash In</h3>
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-200/50">
-                        <i class="fas fa-money-bill-transfer text-base"></i>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-[13px] font-semibold text-slate-500">Cash In</h3>
+                    <div class="text-emerald-600">
+                        <i class="fas fa-money-bill-transfer text-[14px]"></i>
                     </div>
                 </div>
-                <p class="text-3xl font-black text-slate-800 tracking-tight drop-shadow-sm" id="dash-cash-in">Rp 0</p>
-                <div class="mt-4 flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 rounded-lg px-2.5 py-1.5 inline-flex border border-emerald-100/50 shadow-sm">
-                    <i class="fas fa-truck-fast"></i> <span>Total Transfer Masuk (DO)</span>
+                <p class="text-2xl font-bold text-slate-900 tracking-tight" id="dash-cash-in">Rp 0</p>
+                <div class="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                    <i class="fas fa-truck-fast text-slate-400"></i> <span>Total Transfer Masuk (DO)</span>
                 </div>
             </div>
         </div>
 
         <!-- Card: Realisasi Volume -->
-        <div class="glass-panel p-6 relative overflow-hidden group">
-            <div class="absolute -right-6 -top-6 w-32 h-32 bg-orange-50 rounded-full opacity-60 group-hover:scale-150 transition-transform duration-700 ease-in-out"></div>
+        <div class="glass-panel p-5 relative overflow-hidden group">
             <div class="relative z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Volume Realisasi</h3>
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center text-orange-600 shadow-sm border border-orange-200/50">
-                        <i class="fas fa-box-open text-base"></i>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-[13px] font-semibold text-slate-500">Volume Realisasi</h3>
+                    <div class="text-orange-600">
+                        <i class="fas fa-box-open text-[14px]"></i>
                     </div>
                 </div>
                 <div class="flex flex-col">
-                    <p class="text-3xl font-black text-slate-800 tracking-tight drop-shadow-sm" id="dash-volume-realisasi">0</p>
-                    <p class="text-[11px] font-bold text-slate-500 mt-1" id="dash-volume-detail">0 Kg | 0 Butir</p>
+                    <p class="text-2xl font-bold text-slate-900 tracking-tight" id="dash-volume-realisasi">0</p>
+                    <p class="text-xs text-slate-500 mt-1 font-medium" id="dash-volume-detail">0 Kg | 0 Butir</p>
                 </div>
-                <div class="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-orange-700 bg-orange-50 rounded-lg px-2.5 py-1.5 inline-flex border border-orange-100/50 shadow-sm">
-                    <i class="fas fa-boxes-packing"></i> <span>Berdasarkan DO/Bypass</span>
+                <div class="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                    <i class="fas fa-boxes-packing text-slate-400"></i> <span>Berdasarkan DO/Bypass</span>
                 </div>
             </div>
         </div>
 
         <!-- Card: Total Invoice -->
-        <div class="glass-panel p-6 relative overflow-hidden group">
-            <div class="absolute -right-6 -top-6 w-32 h-32 bg-indigo-50 rounded-full opacity-60 group-hover:scale-150 transition-transform duration-700 ease-in-out"></div>
+        <div class="glass-panel p-5 relative overflow-hidden group">
             <div class="relative z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Invoice & DO</h3>
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-200/50">
-                        <i class="fas fa-file-invoice text-base"></i>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-[13px] font-semibold text-slate-500">Invoice & DO</h3>
+                    <div class="text-indigo-600">
+                        <i class="fas fa-file-invoice text-[14px]"></i>
                     </div>
                 </div>
-                <p class="text-3xl font-black text-slate-800 tracking-tight flex items-baseline gap-1 drop-shadow-sm">
+                <p class="text-2xl font-bold text-slate-900 tracking-tight flex items-baseline gap-1">
                     <span id="dash-invoice-count">0</span>
-                    <span class="text-lg font-bold text-slate-300">/</span>
+                    <span class="text-base font-normal text-slate-300">/</span>
                     <span id="dash-do-count" class="text-indigo-500">0</span>
                 </p>
-                <div class="mt-4 flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50 rounded-lg px-2.5 py-1.5 inline-flex border border-indigo-100/50 shadow-sm">
-                    <i class="fas fa-receipt"></i> <span>Total Dokumen Tercatat</span>
+                <div class="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                    <i class="fas fa-receipt text-slate-400"></i> <span>Total Dokumen Tercatat</span>
                 </div>
             </div>
         </div>

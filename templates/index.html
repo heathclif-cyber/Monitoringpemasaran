@@ -46,48 +46,46 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-            color: #1e293b;
+            background-color: #f8fafc; /* bg-slate-50 */
+            color: #0f172a;
             min-height: 100vh;
         }
 
         h1, h2, h3, h4, .font-display {
-            font-family: 'Outfit', sans-serif;
+            font-family: 'Inter', sans-serif;
+            letter-spacing: -0.02em;
         }
 
         .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
-            border-radius: 1.25rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            border-radius: 0.75rem; /* rounded-xl */
+            transition: all 0.2s ease;
         }
 
         .glass-panel:hover {
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
-            transform: translateY(-2px);
-            border-color: rgba(255, 255, 255, 1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-color: #cbd5e1;
         }
 
         .form-input {
             width: 100%;
-            border-radius: 0.75rem;
+            height: 2.25rem;
+            border-radius: 0.375rem; /* rounded-md */
             border: 1px solid #cbd5e1;
-            padding: 0.625rem 1rem;
+            padding: 0.375rem 0.75rem;
             font-size: 0.875rem;
-            background-color: #f8fafc;
+            background-color: #ffffff;
             color: #0f172a;
-            font-weight: 500;
-            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         .form-input:focus {
             outline: none;
             border-color: var(--brand-primary);
-            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
-            background-color: #ffffff;
+            box-shadow: 0 0 0 1px var(--brand-primary);
         }
 
         .page-section {
@@ -137,65 +135,67 @@
         }
 
         #main-sidebar {
-            width: 260px;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border-right: 1px solid rgba(255, 255, 255, 0.5);
-            box-shadow: 4px 0 24px -10px rgba(0,0,0,0.05);
+            width: 240px;
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            z-index: 50;
         }
 
         #top-header {
-            left: 260px;
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 4px 12px -5px rgba(0,0,0,0.03);
+            left: 240px;
+            height: 56px;
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            z-index: 40;
         }
 
         #main-wrapper {
-            padding-left: 260px;
+            padding-left: 240px;
+            padding-top: 56px;
         }
 
         .nav-item {
             display: flex;
             align-items: center;
-            padding: 12px 16px;
-            margin: 4px 12px;
-            border-radius: 12px;
-            color: #64748b;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 6px 12px;
+            margin: 2px 12px;
+            border-radius: 6px;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.15s ease;
             text-decoration: none;
-            width: calc(100% - 24px); /* Ensure it stays within aside */
+            width: calc(100% - 24px);
         }
 
         .nav-item i {
-            font-size: 1.25rem;
-            width: 28px;
-            margin-right: 12px;
+            font-size: 14px;
+            width: 24px;
+            margin-right: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            transition: all 0.2s ease;
+            color: #94a3b8;
         }
 
         .nav-item.active {
-            background: white;
-            color: #10b981 !important;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            box-shadow: 0 4px 12px -2px rgba(16, 185, 129, 0.12);
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
         }
 
         .nav-item.active i {
-            color: #10b981 !important;
+            color: var(--brand-primary);
         }
 
         .nav-item:hover:not(.active) {
-            background: rgba(255, 255, 255, 0.6);
-            color: #1e293b;
-            border: 1px solid rgba(255, 255, 255, 0.8);
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        .nav-item:hover i {
+            color: #64748b;
         }
 
         /* Notification Styling */
@@ -249,61 +249,63 @@
     </style>
 </head>
 
-<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen select-none">
+<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen">
 
-    <!-- 1. Sidebar: Fixed to Left with Glassmorphism -->
-    <aside id="main-sidebar" class="fixed top-0 left-0 h-screen z-50 overflow-hidden">
-        <div class="px-6 h-20 flex items-center gap-3 border-b border-slate-100/50">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/30 shrink-0 transform transition hover:rotate-12">
-                <i class="fas fa-leaf text-xl"></i>
+    <!-- 1. Sidebar -->
+    <aside id="main-sidebar" class="fixed top-0 left-0 h-screen overflow-hidden flex flex-col">
+        <div class="px-5 h-[56px] flex items-center gap-3 border-b border-slate-200">
+            <div class="w-7 h-7 rounded-md bg-brand-600 flex items-center justify-center text-white shrink-0">
+                <i class="fas fa-leaf text-[12px]"></i>
             </div>
             <div>
-                <h1 class="font-black text-slate-800 text-xl leading-tight uppercase tracking-tight">PTPN I</h1>
-                <p class="text-[10px] font-bold text-brand-600 uppercase tracking-widest">Regional 8</p>
+                <h1 class="font-bold text-slate-900 text-sm leading-tight tracking-tight">PTPN I</h1>
+                <p class="text-[10px] text-slate-500 tracking-wide font-medium">Regional 8</p>
             </div>
         </div>
         
-        <nav class="flex-1 overflow-y-auto py-8">
-            <p class="px-8 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Main Menu</p>
-            <ul class="space-y-1">
+        <nav class="flex-1 overflow-y-auto py-4">
+            <p class="px-5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Main Menu</p>
+            <ul class="space-y-0.5">
                 <li><a href="#" onclick="switchTab('dashboard', this)" class="nav-item active"><i class="fas fa-chart-line"></i> <span class="nav-label">Dashboard Summary</span></a></li>
                 <li><a href="#" onclick="switchTab('kontrak-form', this)" class="nav-item"><i class="fas fa-file-contract"></i> <span class="nav-label">Kontrak Penjualan</span></a></li>
                 <li><a href="#" onclick="switchTab('invoice-form', this)" class="nav-item"><i class="fas fa-file-invoice-dollar"></i> <span class="nav-label">Cetak Invoice</span></a></li>
                 <li><a href="#" onclick="switchTab('do-form', this)" class="nav-item"><i class="fas fa-truck-ramp-box"></i> <span class="nav-label">Delivery Order</span></a></li>
             </ul>
             
-            <p class="px-8 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-10 mb-4">Management</p>
-            <ul class="space-y-1">
+            <p class="px-5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-6 mb-2">Management</p>
+            <ul class="space-y-0.5">
                 <li><a href="#" onclick="switchTab('laporan', this)" class="nav-item"><i class="fas fa-table-list"></i> <span class="nav-label">Laporan Digital</span></a></li>
                 <li><a href="#" onclick="switchTab('bypass-form', this)" class="nav-item"><i class="fas fa-bolt"></i> <span class="nav-label">Input Bypass</span></a></li>
                 <li><a href="#" onclick="switchTab('list-data', this)" class="nav-item"><i class="fas fa-archive"></i> <span class="nav-label">Repository</span></a></li>
             </ul>
         </nav>
         
-        <div class="p-6 border-t border-slate-100/50">
+        <div class="p-4 border-t border-slate-200">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">A</div>
+                <div class="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600">A</div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-xs font-bold text-slate-800 truncate">Administrator</p>
-                    <p class="text-[10px] text-slate-500 truncate">PTPN I Reg 8</p>
+                    <p class="text-[13px] font-semibold text-slate-900 truncate">Administrator</p>
+                    <p class="text-[11px] text-slate-500 truncate">PTPN I Reg 8</p>
                 </div>
             </div>
         </div>
     </aside>
 
-    <!-- 2. Header: Fixed with Glassmorphism -->
-    <header id="top-header" class="fixed top-0 right-0 h-20 z-40 flex items-center justify-between px-8 shadow-sm">
-        <h2 id="page-title" class="text-2xl font-black text-slate-800 tracking-tight drop-shadow-sm">Dashboard Overview</h2>
-        <div class="flex items-center gap-5">
-            <div class="relative cursor-pointer hover:bg-slate-100 p-2.5 rounded-xl transition-colors">
-                <span class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
-                <i class="far fa-bell text-slate-600 text-xl"></i>
+    <!-- 2. Header -->
+    <header id="top-header" class="fixed top-0 right-0 flex items-center justify-between px-6">
+        <div class="flex items-center gap-2">
+            <h2 id="page-title" class="text-[15px] font-semibold text-slate-900">Dashboard Overview</h2>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="relative cursor-pointer text-slate-500 hover:text-slate-700 transition-colors">
+                <span class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                <i class="far fa-bell text-[16px]"></i>
             </div>
-            <button class="bg-white border border-slate-200/60 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 hover:shadow-md transition-all shadow-sm flex items-center gap-2">
-                <div class="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center text-brand-600">
-                    <i class="fas fa-user"></i>
+            <button class="bg-white border border-slate-200 px-3 py-1.5 rounded-md text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+                <div class="w-5 h-5 rounded-sm bg-brand-50 flex items-center justify-center text-brand-600">
+                    <i class="fas fa-user text-[10px]"></i>
                 </div>
-                Admin Profile
+                Profile
             </button>
         </div>
     </header>

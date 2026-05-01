@@ -1,4 +1,4 @@
-<section id="list-data" class="page-section max-w-[1600px] mx-auto space-y-8 pb-8 pt-24">
+<section id="list-data" class="page-section max-w-[1600px] mx-auto space-y-6 pb-8 pt-6">
     
     <!-- HEADER BAR -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
@@ -57,101 +57,87 @@
 
     <div class="grid grid-cols-1 gap-10">
         <!-- 1. Daftar Kontrak -->
-        <div class="glass-panel overflow-hidden border border-slate-200 shadow-xl group hover:border-brand-200 transition-all">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-white to-brand-50/30">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center text-brand-600">
-                        <i class="fas fa-file-signature text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-800">Daftar Kontrak Penjualan</h3>
-                        <p class="text-[10px] text-brand-600 font-bold uppercase tracking-widest">Formal Contracts Archive</p>
-                    </div>
+        <div class="space-y-4">
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600">
+                    <i class="fas fa-file-signature text-sm"></i>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-[10px] font-bold bg-white text-slate-400 px-3 py-1 rounded-full border border-slate-100 shadow-sm uppercase">Auto-Archived</span>
-                </div>
+                <h3 class="text-sm font-semibold text-slate-900">Daftar Kontrak Penjualan</h3>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left border-collapse">
-                    <thead class="bg-slate-50/80 backdrop-blur-sm text-[11px] text-slate-500 uppercase tracking-widest font-bold border-b border-slate-100 sticky top-0 z-20">
-                        <tr>
-                            <th class="py-4 px-6 sticky left-0 z-30 bg-slate-50">No Kontrak</th>
-                            <th class="py-4 px-6">Tanggal</th>
-                            <th class="py-4 px-6">Pembeli</th>
-                            <th class="py-4 px-6">Komoditi</th>
-                            <th class="py-4 px-6 text-right">Nilai Rupiah</th>
-                            <th class="py-4 px-6 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-kontrak" class="divide-y divide-slate-50 bg-white">
-                        <tr><td colspan="6" class="py-20 text-center text-slate-400">Memuat data kontrak...</td></tr>
-                    </tbody>
-                </table>
+            <div class="glass-panel overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-semibold">
+                            <tr>
+                                <th class="py-3 px-4 bg-slate-50">No Kontrak</th>
+                                <th class="py-3 px-4">Tanggal</th>
+                                <th class="py-3 px-4">Pembeli</th>
+                                <th class="py-3 px-4">Komoditi</th>
+                                <th class="py-3 px-4 text-right">Nilai Rupiah</th>
+                                <th class="py-3 px-4 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-kontrak" class="divide-y divide-slate-100 bg-white">
+                            <tr><td colspan="6" class="py-12 text-center text-sm text-slate-500">Memuat data kontrak...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
         
         <!-- 2. Daftar Invoice -->
-        <div class="glass-panel overflow-hidden border border-slate-200 shadow-xl group hover:border-purple-200 transition-all">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-white to-purple-50/30">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600">
-                        <i class="fas fa-file-invoice-dollar text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-800">Arsip Invoicing</h3>
-                        <p class="text-[10px] text-purple-600 font-bold uppercase tracking-widest">Finance Billing Records</p>
-                    </div>
+        <div class="space-y-4">
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
+                    <i class="fas fa-file-invoice-dollar text-sm"></i>
                 </div>
-                <span class="text-[10px] font-bold bg-white text-slate-400 px-3 py-1 rounded-full border border-slate-100 shadow-sm uppercase">Proforma Docs</span>
+                <h3 class="text-sm font-semibold text-slate-900">Arsip Invoicing</h3>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left border-collapse">
-                    <thead class="bg-slate-50/80 backdrop-blur-sm text-[11px] text-slate-500 uppercase tracking-widest font-bold border-b border-slate-100 sticky top-0 z-20">
-                        <tr>
-                            <th class="py-4 px-6 sticky left-0 z-30 bg-slate-50">No Invoice</th>
-                            <th class="py-4 px-6">No Kontrak</th>
-                            <th class="py-4 px-6">Tgl Transaksi</th>
-                            <th class="py-4 px-6 text-right">Tagihan Total</th>
-                            <th class="py-4 px-6 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-invoice" class="divide-y divide-slate-50 bg-white">
-                        <tr><td colspan="5" class="py-20 text-center text-slate-400">Memuat data invoice...</td></tr>
-                    </tbody>
-                </table>
+            <div class="glass-panel overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-semibold">
+                            <tr>
+                                <th class="py-3 px-4 bg-slate-50">No Invoice</th>
+                                <th class="py-3 px-4">No Kontrak</th>
+                                <th class="py-3 px-4">Tgl Transaksi</th>
+                                <th class="py-3 px-4 text-right">Tagihan Total</th>
+                                <th class="py-3 px-4 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-invoice" class="divide-y divide-slate-100 bg-white">
+                            <tr><td colspan="5" class="py-12 text-center text-sm text-slate-500">Memuat data invoice...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         <!-- 3. Daftar Delivery Order -->
-        <div class="glass-panel overflow-hidden border border-slate-200 shadow-xl group hover:border-blue-200 transition-all">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-white to-blue-50/30">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-                        <i class="fas fa-truck-fast text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-800">Daftar Delivery Order</h3>
-                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-widest">Logistics Release Authorization</p>
-                    </div>
+        <div class="space-y-4">
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                    <i class="fas fa-truck-fast text-sm"></i>
                 </div>
-                <span class="text-[10px] font-bold bg-white text-slate-400 px-3 py-1 rounded-full border border-slate-100 shadow-sm uppercase">Ready to Ship</span>
+                <h3 class="text-sm font-semibold text-slate-900">Daftar Delivery Order</h3>
             </div>
-            <div class="overflow-x-auto overflow-y-auto max-h-[500px] scrollbar-thin">
-                <table class="w-full text-sm text-left border-collapse">
-                    <thead class="bg-slate-50/80 backdrop-blur-sm text-[11px] text-slate-500 uppercase tracking-widest font-bold border-b border-slate-100 sticky top-0 z-20">
-                        <tr>
-                            <th class="py-4 px-6 sticky left-0 z-30 bg-slate-50">No DO</th>
-                            <th class="py-4 px-6">No Invoice</th>
-                            <th class="py-4 px-6">Tanggal DO</th>
-                            <th class="py-4 px-6">Unit Tujuan</th>
-                            <th class="py-4 px-6 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-do" class="divide-y divide-slate-50 bg-white">
-                        <tr><td colspan="5" class="py-20 text-center text-slate-400">Memuat data DO...</td></tr>
-                    </tbody>
-                </table>
+            <div class="glass-panel overflow-hidden">
+                <div class="overflow-x-auto overflow-y-auto max-h-[500px] scrollbar-thin">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-semibold sticky top-0 z-20">
+                            <tr>
+                                <th class="py-3 px-4 bg-slate-50">No DO</th>
+                                <th class="py-3 px-4">No Invoice</th>
+                                <th class="py-3 px-4">Tanggal DO</th>
+                                <th class="py-3 px-4">Unit Tujuan</th>
+                                <th class="py-3 px-4 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-do" class="divide-y divide-slate-100 bg-white">
+                            <tr><td colspan="5" class="py-12 text-center text-sm text-slate-500">Memuat data DO...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
