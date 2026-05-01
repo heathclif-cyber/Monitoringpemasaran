@@ -30,6 +30,33 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
         db_kontrak.nominal_ppn = nominal_ppn
         db_kontrak.jatuh_tempo_pembayaran = jatuh_tempo_pembayaran
         db_kontrak.terbilang = terbilang
+        db.flush()  # write kontrak first so child queries see updated values
+
+        # ── Cascade: recalculate all linked Invoices & their DOs ──────────────
+        pokok = nilai_transaksi  # (vol * harga) + premi
+        ppn_val = 0.0
+        if str(kontrak.is_ppn or 'true').lower() == 'true':
+            ppn_val = pokok * ((kontrak.ppn_persen or 0.0) / 100)
+        pph_val = 0.0
+        if str(kontrak.is_pph or 'false').lower() == 'true':
+            pph_val = pokok * ((kontrak.pph_persen or 0.0) / 100)
+        new_jumlah = pokok + ppn_val - pph_val
+
+        for inv in db_kontrak.invoices:
+            inv.jumlah_pembayaran = new_jumlah
+            inv.terbilang_invoice = terbilang_rupiah(math.floor(new_jumlah))
+
+            # Recalculate each DO: volume_do = (nominal_transfer / new_jumlah) * new_volume
+            new_vol = float(kontrak.volume or 0)
+            for do in inv.delivery_orders:
+                nominal = float(do.nominal_transfer or 0)
+                if new_jumlah > 0 and new_vol > 0:
+                    do.volume_do = round((nominal / new_jumlah) * new_vol, 2)
+                else:
+                    do.volume_do = new_vol
+                do.selisih = new_jumlah - nominal
+        # ─────────────────────────────────────────────────────────────────────
+
         db.commit()
         db.refresh(db_kontrak)
         return db_kontrak
@@ -45,6 +72,7 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
         db.commit()
         db.refresh(new_kontrak)
         return new_kontrak
+
 
 
 @router.get("", response_model=List[schemas.KontrakOut])
