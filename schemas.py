@@ -73,6 +73,7 @@ class InvoiceBase(BaseModel):
     tanggal_transaksi: date
     status_invoice: Optional[str] = "Unpaid"
     pph_22_persen: Optional[float] = 0.0
+    jumlah_pembayaran: Optional[float] = None  # None = auto (full kontrak value), set value = partial
 
 class InvoiceCreate(InvoiceBase):
     pass

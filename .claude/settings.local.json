@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem *)",
+      "Bash(Select-String -NotMatch \"venv|__pycache__\")",
+      "Bash(Select-Object Name)",
+      "PowerShell(npm *)",
+      "Bash(python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(npx vite *)",
+      "PowerShell(curl *)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(python -c \"from dotenv import load_dotenv; print\\('dotenv OK'\\)\")",
+      "Bash(curl -s http://localhost:8000/api/dashboard?year=2026\\\\&unit=ALL\\\\&komoditi=ALL)",
+      "Bash(curl -s http://localhost:8000/api/kontrak?limit=5)",
+      "PowerShell(Set-Location \"D:\\\\Apps-Dev\\\\Monitoringpemasaran\"; $env:DATABASE_URL = \"postgresql://postgres.azomqppnodduqhmbujxv:Sambalpedas1%40@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres\"; python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(curl -s http://localhost:8000/api/kontrak?limit=2)",
+      "Bash(curl -s \"http://localhost:8000/api/dashboard?year=2026&unit=ALL&komoditi=ALL\")",
+      "Bash(curl -s \"http://localhost:5173/api/dashboard?year=2026&unit=ALL&komoditi=ALL\")",
+      "Bash(npx tsc *)",
+      "Bash(awk NR==405 *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/invoice -H \"Content-Type: application/json\" -d '{\"no_invoice\":\"TEST-PARTIAL-01\",\"no_kontrak\":\"0160/HO-SUPCO/WASTE-L/N-I/I/2026\",\"tanggal_transaksi\":\"2026-05-13\",\"jumlah_pembayaran\":5000000}')",
+      "Bash(curl *)",
+      "Bash(git add *)"
+    ]
+  }
+}
