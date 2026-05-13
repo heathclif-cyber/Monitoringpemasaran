@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import os
@@ -77,7 +78,13 @@ os.makedirs("static/css", exist_ok=True)
 os.makedirs("static/js", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Serve React SPA from frontend/dist
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+if os.path.isdir(FRONTEND_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
+else:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
 templates = Jinja2Templates(directory="templates")
 
 # --- Include Routers ---
@@ -88,11 +95,24 @@ app.include_router(dashboard_router)
 app.include_router(laporan_router)
 
 
-# --- Root Page ---
+# --- Root Page: serve React SPA or fallback to Jinja2 ---
 @app.get("/")
 def read_root(request: Request):
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.isfile(index_path):
+        return FileResponse(index_path)
     return templates.TemplateResponse(request=request, name="index.html")
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+# --- SPA Fallback: serve React index.html for all non-API routes (must be LAST) ---
+@app.get("/{full_path:path}")
+async def spa_fallback(full_path: str):
+    if full_path.startswith("api/"):
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.isfile(index_path):
+        return FileResponse(index_path)
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
