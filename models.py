@@ -30,7 +30,7 @@ class Kontrak(Base):
     ppn_persen = Column(Float, default=11.0)
     
     is_pph = Column(String, default="false") # using String for boolean ease across sqlite/postgres
-    pph_persen = Column(Float, default=0.0)
+    pph_persen = Column(Float, default=0.25)
     
     alamat_produksi = Column(String)
     chop = Column(String)

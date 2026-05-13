@@ -28,7 +28,7 @@ class KontrakBase(BaseModel):
     ppn_persen: Optional[float] = 11.0
     
     is_pph: Optional[str] = "false"
-    pph_persen: Optional[float] = 0.0
+    pph_persen: Optional[float] = 0.25
     
     alamat_produksi: Optional[str] = None
     chop: Optional[str] = None

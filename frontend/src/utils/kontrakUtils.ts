@@ -1,5 +1,5 @@
 export const TAX_RATE_PPN_DEFAULT = 11.0
-export const TAX_RATE_PPH_DEFAULT = 0.0
+export const TAX_RATE_PPH_DEFAULT = 0.25
 
 export interface PricingResult {
   pokok: number

@@ -105,7 +105,7 @@ export default function KontrakPage() {
       is_ppn: 'true',
       ppn_persen: 11,
       is_pph: 'false',
-      pph_persen: 0,
+      pph_persen: 0.25,
       chop: '',
       pack_qty: 0,
       banyaknya_bale_karung: 0,
