@@ -17,6 +17,7 @@ coverage.xml
 .idea/
 .vscode/
 *.docx
+!templates/kuitansi_template.docx
 *.xlsm
 *.png
 *.webp

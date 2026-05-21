@@ -496,7 +496,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     return buf
 
 def generate_kuitansi_docx(invoice) -> io.BytesIO:
-    import copy, os, math
+    import os, math
     from services.utils import terbilang_rupiah
 
     k = invoice.kontrak
@@ -519,96 +519,34 @@ def generate_kuitansi_docx(invoice) -> io.BytesIO:
     nilai_kuitansi = nilai_transaksi * ratio
     terbilang_kuitansi = terbilang_rupiah(math.floor(nilai_kuitansi))
 
-    # Helper: replace text in a paragraph, keeping formatting of first run
-    def _replace_para(para, new_text):
-        if para.runs:
-            first_run = para.runs[0]
-            font = first_run.font
-            bold = font.bold
-            italic = font.italic
-            size = font.size
-            name = font.name
-            underline = font.underline
-        else:
-            bold = italic = underline = False
-            size = Pt(9)
-            name = 'Calibri'
-        for r in para.runs:
-            r.text = ''
-        para.runs[0].text = str(new_text)
-        if len(para.runs) > 1:
-            for r in para.runs[1:]:
-                r._element.getparent().remove(r._element)
-
+    # Helper: replace text in a paragraph, preserving ALL formatting of first run
     def _replace_para_keep_first(para, prefix, new_text):
-        """Replace text after a prefix, keeping the prefix run intact"""
-        if para.runs:
-            first_run = para.runs[0]
-            font = first_run.font
-            bold = font.bold
-            italic = font.italic
-            size = font.size
-            name = font.name
-            underline = font.underline
-        else:
-            bold = italic = underline = False
-            size = Pt(9)
-            name = 'Calibri'
-        # Keep first run, clear rest
-        for i in range(1, len(para.runs)):
-            para.runs[i].text = ''
-        # Remove extra runs
+        """Keep first run as prefix (preserving all its formatting), replace rest with value"""
+        # Remove excess runs, keep max 2 (prefix + value)
         while len(para.runs) > 2:
             para.runs[-1]._element.getparent().remove(para.runs[-1]._element)
-        if len(para.runs) == 1:
-            para.runs[0].text = prefix + str(new_text)
-        else:
+        # Set prefix on first run
+        if len(para.runs) >= 1:
             para.runs[0].text = prefix
+        else:
+            para.add_run(prefix)
+        # Set value on second run
+        if len(para.runs) >= 2:
             para.runs[1].text = str(new_text)
+        else:
+            para.add_run(str(new_text))
 
     def _replace_cell_text(cell, new_text):
-        """Replace all text in a cell's first paragraph"""
+        """Replace text in cell's first paragraph, preserving ALL formatting of first run"""
         p = cell.paragraphs[0]
-        # Get formatting from first run
+        # Remove all runs except the first
+        while len(p.runs) > 1:
+            p.runs[-1]._element.getparent().remove(p.runs[-1]._element)
+        # Set new text on the remaining (or new) run — preserves all existing rPr formatting
         if p.runs:
-            first = p.runs[0]
-            bold, italic, size, name, underline = first.font.bold, first.font.italic, first.font.size, first.font.name, first.font.underline
+            p.runs[0].text = str(new_text)
         else:
-            bold = italic = underline = False
-            size = Pt(9)
-            name = 'Calibri'
-        # Clear all runs
-        for r in p.runs:
-            r._element.getparent().remove(r._element)
-        # Add single formatted run
-        from docx.oxml import OxmlElement
-        new_r = OxmlElement('w:r')
-        rpr = OxmlElement('w:rPr')
-        if bold: rpr.append(_make_prop('w:b'))
-        if italic: rpr.append(_make_prop('w:i'))
-        if underline: rpr.append(_make_prop('w:u', {'w:val': 'single'}))
-        sz = OxmlElement('w:sz')
-        sz.set(qn('w:val'), str(int(size.pt * 2)) if size else '18')
-        rpr.append(sz)
-        if name:
-            rf = OxmlElement('w:rFonts')
-            rf.set(qn('w:ascii'), name)
-            rf.set(qn('w:hAnsi'), name)
-            rpr.append(rf)
-        new_r.append(rpr)
-        t = OxmlElement('w:t')
-        t.text = str(new_text)
-        t.set(qn('xml:space'), 'preserve')
-        new_r.append(t)
-        p._element.append(new_r)
-
-    def _make_prop(tag, attrs=None):
-        from docx.oxml import OxmlElement
-        el = OxmlElement(tag)
-        if attrs:
-            for k, v in attrs.items():
-                el.set(qn(k), v)
-        return el
+            p.add_run(str(new_text))
 
     # --- Replace data in template ---
 
