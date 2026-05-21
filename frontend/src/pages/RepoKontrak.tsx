@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DocxPreview } from '@/components/common/DocxPreview'
 import { formatCurrency, formatDate, safe } from '@/lib/utils'
 import type { Kontrak } from '@/types'
 
@@ -186,7 +187,7 @@ export default function RepoKontrak() {
           {previewData && (
             <>
               <div className="border rounded-lg bg-white overflow-hidden">
-                <iframe src={`/api/kontrak/preview?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} className="w-full h-[65vh] border-0" title="Preview Kontrak" />
+                <DocxPreview url={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} />
               </div>
               <div className="flex justify-end">
                 <a href={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} target="_blank">

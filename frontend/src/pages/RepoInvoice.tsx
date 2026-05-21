@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DocxPreview } from '@/components/common/DocxPreview'
 import type { Invoice } from '@/types'
 
 const MONTHS: Record<string, string> = {
@@ -162,8 +163,8 @@ export default function RepoInvoice() {
           </DialogHeader>
           {invPreviewItem && (
             <>
-              <div className="border rounded-lg bg-white overflow-hidden">
-                <iframe src={`/api/invoice/preview?no_invoice=${encodeURIComponent(invPreviewItem.no_invoice)}`} className="w-full h-[65vh] border-0" title="Preview Invoice" />
+              <div className="border rounded-lg bg-white overflow-auto max-h-[65vh]">
+                <DocxPreview url={`/api/invoice/export?no_invoice=${encodeURIComponent(invPreviewItem.no_invoice)}`} />
               </div>
               <div className="flex justify-end">
                 <a href={`/api/invoice/export?no_invoice=${encodeURIComponent(invPreviewItem.no_invoice)}`} target="_blank">
@@ -188,8 +189,8 @@ export default function RepoInvoice() {
           </DialogHeader>
           {kwPreviewItem && (
             <>
-              <div className="border rounded-lg bg-white overflow-hidden">
-                <iframe src={`/api/invoice/preview-kuitansi?no_invoice=${encodeURIComponent(kwPreviewItem.no_invoice)}`} className="w-full h-[65vh] border-0" title="Preview Kuitansi" />
+              <div className="border rounded-lg bg-white overflow-auto max-h-[65vh]">
+                <DocxPreview url={`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(kwPreviewItem.no_invoice)}`} />
               </div>
               <div className="flex justify-end">
                 <a href={`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(kwPreviewItem.no_invoice)}`} target="_blank">

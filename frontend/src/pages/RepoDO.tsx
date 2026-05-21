@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DocxPreview } from '@/components/common/DocxPreview'
 import { formatDate, safe } from '@/lib/utils'
 import type { DeliveryOrder } from '@/types'
 
@@ -167,7 +168,7 @@ export default function RepoDO() {
           {previewDO && (
             <>
               <div className="border rounded-lg bg-white overflow-hidden">
-                <iframe src={`/api/do/preview?no_do=${encodeURIComponent(previewDO.no_do)}`} className="w-full h-[65vh] border-0" title="Preview DO" />
+                <DocxPreview url={`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`} />
               </div>
               <div className="flex justify-end">
                 <a href={`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`} target="_blank">
