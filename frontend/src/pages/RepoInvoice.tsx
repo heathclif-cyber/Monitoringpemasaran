@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, FileDown, Trash2, Search, Receipt } from 'lucide-react'
+import { Edit, FileDown, Trash2, Search, Receipt, Eye, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useAppStore } from '@/store/appStore'
@@ -9,11 +9,136 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { terbilangRupiah } from '@/utils/terbilang'
+import { calculateKontrakPricing } from '@/utils/kontrakUtils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { client } from '@/lib/client'
+import type { Invoice, Kontrak } from '@/types'
 
 const MONTHS: Record<string, string> = {
   '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
   '05': 'Mei', '06': 'Juni', '07': 'Juli', '08': 'Agustus',
   '09': 'September', '10': 'Oktober', '11': 'November', '12': 'Desember',
+}
+
+function KuitansiPreview({ invoice, kontrak }: { invoice: Invoice; kontrak: Kontrak | null }) {
+  if (!kontrak) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 size={24} className="animate-spin text-slate-300" />
+      </div>
+    )
+  }
+
+  const pokok = (kontrak.volume || 0) * (kontrak.harga_satuan || 0) + (kontrak.premi || 0)
+  const isPpn = String(kontrak.is_ppn).toLowerCase() !== 'false'
+  const isPph = String(kontrak.is_pph).toLowerCase() === 'true'
+  const ppnPct = kontrak.ppn_persen || 11
+  const pphPct = kontrak.pph_persen || 0
+
+  const fullPpn = isPpn ? pokok * (ppnPct / 100) : 0
+  const fullPph = isPph ? pokok * (pphPct / 100) : 0
+  const fullNilaiTransaksi = pokok + fullPpn
+  const fullTotalTagihan = pokok + fullPpn - fullPph
+
+  const invAmount = invoice.jumlah_pembayaran || 0
+  const ratio = fullTotalTagihan > 0 ? invAmount / fullTotalTagihan : 1
+  const nilaiKuitansi = fullNilaiTransaksi * ratio
+  const terbilangK = terbilangRupiah(Math.floor(nilaiKuitansi))
+
+  const fmtNum = (v: number) => v > 0 ? v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'
+  const lokasi = kontrak.lokasi || 'Makassar'
+  const tgl = invoice.tanggal_transaksi
+    ? invoice.tanggal_transaksi.split('-').reverse().join('/')
+    : '-'
+
+  const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '10pt', fontFamily: '"Calibri", Arial, sans-serif', color: '#000' }
+  const tdL: React.CSSProperties = { padding: '4px 8px', verticalAlign: 'top', width: '38%' }
+  const tdC: React.CSSProperties = { padding: '4px 4px', verticalAlign: 'top', width: '4%', textAlign: 'center' }
+  const tdR: React.CSSProperties = { padding: '4px 8px', verticalAlign: 'top' }
+
+  return (
+    <div style={{ fontFamily: '"Calibri", Arial, sans-serif', fontSize: '10pt', color: '#000' }}>
+      {/* Title */}
+      <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14pt', margin: '0 0 12px 0' }}>KUITANSI</p>
+
+      {/* No */}
+      <p style={{ margin: '0 0 18px 0' }}>No.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{invoice.no_invoice}</p>
+
+      {/* Spacer for materai */}
+      <div style={{ height: '60px' }} />
+
+      {/* Melalui */}
+      <p style={{ margin: '0 0 24px 0' }}>Melalui,</p>
+
+      {/* TABLE 1: Data Pembayaran */}
+      <table style={tableStyle}>
+        <tbody>
+          <tr>
+            <td style={tdL}>Telah Diterima Dari</td>
+            <td style={tdC}>:</td>
+            <td style={tdR}>{(kontrak.pembeli || '-').split('\n')[0]}</td>
+          </tr>
+          <tr>
+            <td style={tdL}>Banyaknya Uang<br /><span style={{ fontSize: '8pt' }}>(Termasuk PPN)</span></td>
+            <td style={tdC}>:</td>
+            <td style={{ ...tdR, fontWeight: 'bold' }}>Rp{fmtNum(nilaiKuitansi)}</td>
+          </tr>
+          <tr>
+            <td style={tdL}>Terbilang</td>
+            <td style={tdC}>:</td>
+            <td style={{ ...tdR, fontStyle: 'italic' }}>{terbilangK} Rupiah</td>
+          </tr>
+          <tr>
+            <td style={tdL}>Untuk Pembayaran</td>
+            <td style={tdC}>:</td>
+            <td style={tdR}>Pembelian {kontrak.komoditi || '-'} sesuai Invoice No. {invoice.no_invoice}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Spacer */}
+      <div style={{ height: '28px' }} />
+
+      {/* TABLE 2: Info Bank */}
+      <table style={tableStyle}>
+        <tbody>
+          <tr>
+            <td style={tdL}>Bank Penerima</td>
+            <td style={tdC}>:</td>
+            <td style={tdR}>{kontrak.pembayaran_bank || 'Bank Rakyat Indonesia'}</td>
+          </tr>
+          <tr>
+            <td style={tdL}>Nama Pemilik Rekening</td>
+            <td style={tdC}>:</td>
+            <td style={tdR}>{kontrak.pembayaran_atas_nama || 'PT Perkebunan Nusantara I Regional 8'}</td>
+          </tr>
+          <tr>
+            <td style={tdL}>Nomor Rekening Penerima</td>
+            <td style={tdC}>:</td>
+            <td style={tdR}>{kontrak.pembayaran_rek_no || '0050-01-005356-30-0'}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Spacer */}
+      <div style={{ height: '40px' }} />
+
+      {/* Signature */}
+      <table style={{ ...tableStyle, width: '100%' }}>
+        <tbody>
+          <tr>
+            <td style={{ width: '50%', padding: '4px' }}></td>
+            <td style={{ width: '50%', padding: '4px', textAlign: 'center' }}>
+              <p style={{ margin: 0 }}>{lokasi}, {tgl}</p>
+              <div style={{ height: '50px' }} />
+              <p style={{ margin: 0, borderTop: '1px solid #000', paddingTop: '4px', display: 'inline-block', minWidth: '140px' }}></p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 export default function RepoInvoice() {
@@ -24,6 +149,12 @@ export default function RepoInvoice() {
   const [bulan, setBulan] = useState('ALL')
   const [sort, setSort] = useState<'DESC' | 'ASC'>('DESC')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+  // Kuitansi preview state
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null)
+  const [previewKontrak, setPreviewKontrak] = useState<Kontrak | null>(null)
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
 
   useEffect(() => { store.fetch() }, [])
 
@@ -62,6 +193,21 @@ export default function RepoInvoice() {
       addNotification('Invoice dihapus', 'success')
     } catch { addNotification('Gagal menghapus', 'error') }
     setDeleteTarget(null)
+  }
+
+  const handlePreviewKuitansi = async (invoice: Invoice) => {
+    setPreviewInvoice(invoice)
+    setPreviewKontrak(null)
+    setIsLoadingPreview(true)
+    setPreviewOpen(true)
+    try {
+      const kontrak = await client.get<Kontrak>(`/api/kontrak/${encodeURIComponent(invoice.no_kontrak)}`)
+      setPreviewKontrak(kontrak)
+    } catch {
+      setPreviewKontrak(null)
+    } finally {
+      setIsLoadingPreview(false)
+    }
   }
 
   const selCls = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-xs shadow-sm'
@@ -116,11 +262,9 @@ export default function RepoInvoice() {
                               <FileDown size={14} />
                             </Button>
                           </a>
-                          <a href={`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(item.no_invoice)}`} target="_blank">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600">
-                              <Receipt size={14} />
-                            </Button>
-                          </a>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" onClick={() => handlePreviewKuitansi(item)}>
+                            <Eye size={14} />
+                          </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => setDeleteTarget(item.no_invoice)}>
                             <Trash2 size={14} />
                           </Button>
@@ -144,6 +288,38 @@ export default function RepoInvoice() {
         isDestructive
         onConfirm={handleDelete}
       />
+
+      {/* Kuitansi Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-[660px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <Receipt size={16} className="text-emerald-600" />
+              Preview Kuitansi
+            </DialogTitle>
+          </DialogHeader>
+
+          {previewInvoice && (
+            <>
+              <div className="border rounded-lg p-5 bg-white">
+                <KuitansiPreview invoice={previewInvoice} kontrak={previewKontrak} />
+              </div>
+
+              <div className="flex justify-end">
+                <a
+                  href={`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(previewInvoice.no_invoice)}`}
+                  target="_blank"
+                >
+                  <Button variant="secondary" className="gap-2">
+                    <FileDown size={14} />
+                    Download Kuitansi .docx
+                  </Button>
+                </a>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
