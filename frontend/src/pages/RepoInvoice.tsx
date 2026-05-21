@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, FileDown, Trash2, Search } from 'lucide-react'
+import { Edit, FileDown, Trash2, Search, Receipt } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useAppStore } from '@/store/appStore'
@@ -114,6 +114,11 @@ export default function RepoInvoice() {
                           <a href={`/api/invoice/export?no_invoice=${encodeURIComponent(item.no_invoice)}`} target="_blank">
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600">
                               <FileDown size={14} />
+                            </Button>
+                          </a>
+                          <a href={`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(item.no_invoice)}`} target="_blank">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600">
+                              <Receipt size={14} />
                             </Button>
                           </a>
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => setDeleteTarget(item.no_invoice)}>
