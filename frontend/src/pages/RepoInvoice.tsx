@@ -46,110 +46,123 @@ function KuitansiPreview({ invoice, kontrak }: { invoice: Invoice; kontrak: Kont
   const nilaiKuitansi = fullNilaiTransaksi * ratio
   const terbilangK = terbilangRupiah(Math.floor(nilaiKuitansi))
 
-  const fmtNum = (v: number) => v > 0 ? v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'
+  const rp = (v: number) => 'Rp' + (v > 0 ? v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00')
   const lokasi = kontrak.lokasi || 'Makassar'
 
   const MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
   let tglFormatted = '-'
   if (invoice.tanggal_transaksi) {
-    const parts = invoice.tanggal_transaksi.split('-')
-    if (parts.length === 3) {
-      tglFormatted = `${parseInt(parts[2])} ${MONTHS[parseInt(parts[1])]} ${parts[0]}`
+    const d = new Date(invoice.tanggal_transaksi)
+    if (!isNaN(d.getTime())) {
+      tglFormatted = `${d.getDate()} ${MONTHS[d.getMonth() + 1]} ${d.getFullYear()}`
     }
   }
 
-  const lineH = { lineHeight: '1.15' }
+  // Match reference DOCX format: Calibri 11pt, line-height 1.15
+  const s = {
+    wrapper: { fontFamily: 'Calibri, Arial, sans-serif', fontSize: '11pt', color: '#000', lineHeight: '1.15' } as React.CSSProperties,
+    title: { textAlign: 'center', fontWeight: 'bold', textDecoration: 'underline', margin: '0 0 0 0', lineHeight: '1.15' } as React.CSSProperties,
+    para: { margin: '0', lineHeight: '1.15' } as React.CSSProperties,
+    through: { margin: '0 0 21px 0', lineHeight: '1.15' } as React.CSSProperties,
+    justify: { textAlign: 'justify', margin: '0', lineHeight: '1.15' } as React.CSSProperties,
+    center: { textAlign: 'center', margin: '0', lineHeight: '1.15' } as React.CSSProperties,
+  }
+
+  const tbl = { width: '100%', borderCollapse: 'collapse' as const, lineHeight: '1.15' }
+  const tdL = { padding: '1px 4px', verticalAlign: 'top' as const, width: '38%' }
+  const tdD = { padding: '1px 4px', verticalAlign: 'top' as const, width: '4%' }
+  const tdV = { padding: '1px 4px', verticalAlign: 'top' as const }
 
   return (
-    <div style={{ fontFamily: '"Calibri", Arial, sans-serif', color: '#000' }}>
-      {/* Title: center, bold, underline */}
-      <p style={{ textAlign: 'center', fontWeight: 'bold', textDecoration: 'underline', margin: '0 0 0 0', ...lineH }}>KUITANSI</p>
+    <div style={s.wrapper}>
+      {/* Title: center, bold, underline — exact match */}
+      <p style={s.title}>KUITANSI</p>
 
-      {/* No. */}
-      <p style={{ margin: '0', ...lineH }}>No.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{invoice.no_invoice}</p>
+      {/* No.     [no_invoice] */}
+      <p style={s.para}><span> </span>No.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{invoice.no_invoice}</p>
 
-      {/* Empty paragraphs for materai space */}
-      <p style={{ textAlign: 'center', margin: 0, ...lineH }}>&nbsp;</p>
-      <p style={{ margin: 0, ...lineH }}>&nbsp;</p>
+      {/* Spacer */}
+      <p style={s.center}>&nbsp;</p>
+      <p style={s.para}>&nbsp;</p>
 
-      {/* Melalui */}
-      <p style={{ margin: '0 0 21px 0', ...lineH }}>Melalui,</p>
+      {/* Melalui, — with 21pt space after */}
+      <p style={s.through}>Melalui,</p>
 
-      {/* Empty filler paragraphs */}
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
-      <p style={{ margin: 0, ...lineH }}>&nbsp;</p>
+      {/* Spacer paragraphs */}
+      <p style={s.justify}>&nbsp;</p>
+      <p style={s.justify}>&nbsp;</p>
+      <p style={s.justify}>&nbsp;</p>
+      <p style={s.para}>&nbsp;</p>
 
       {/* TABLE 1: Data Pembayaran */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', ...lineH }}>
+      <table style={tbl}>
         <tbody>
           <tr>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top', width: '38%' }}>Telah Diterima Dari</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top', width: '4%' }}>:</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>{(kontrak.pembeli || '-').split('\n')[0]}</td>
+            <td style={tdL}>Telah Diterima Dari</td>
+            <td style={tdD}>:</td>
+            <td style={tdV}>{(kontrak.pembeli || '-').split('\n')[0]}</td>
           </tr>
           <tr>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Banyaknya Uang<br />(Termasuk PPN)</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Rp{fmtNum(nilaiKuitansi)}</td>
+            <td style={tdL}>Banyaknya Uang<br />(Termasuk PPN)</td>
+            <td style={tdD}>:</td>
+            <td style={tdV}>{rp(nilaiKuitansi)}</td>
           </tr>
           <tr>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Terbilang</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top', textAlign: 'justify' }}>{terbilangK} Rupiah</td>
+            <td style={tdL}>Terbilang</td>
+            <td style={tdD}>:</td>
+            <td style={{ ...tdV, textAlign: 'justify' }}>{terbilangK}</td>
           </tr>
           <tr>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Untuk Pembayaran</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top', textAlign: 'justify' }}>Pembelian {kontrak.komoditi || '-'} sesuai Invoice No. {invoice.no_invoice}</td>
+            <td style={tdL}>Untuk Pembayaran</td>
+            <td style={tdD}>:</td>
+            <td style={{ ...tdV, textAlign: 'justify' }}>Pembelian {kontrak.komoditi || '-'} sesuai Invoice No. {invoice.no_invoice}</td>
           </tr>
         </tbody>
       </table>
 
       {/* Spacer */}
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={s.justify}>&nbsp;</p>
+      <p style={s.justify}>&nbsp;</p>
+      <p style={s.justify}>&nbsp;</p>
 
       {/* TABLE 2: Info Bank */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', ...lineH }}>
+      <table style={tbl}>
         <tbody>
           <tr>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top', width: '38%' }}>Bank Penerima</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top', width: '4%' }}>:</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>{kontrak.pembayaran_bank || 'Bank Rakyat Indonesia'}</td>
+            <td style={tdL}>Bank Penerima</td>
+            <td style={tdD}>:</td>
+            <td style={tdV}>{kontrak.pembayaran_bank || 'Bank Rakyat Indonesia'}</td>
           </tr>
           <tr>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Nama Pemilik Rekening</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>{kontrak.pembayaran_atas_nama || 'PT Perkebunan Nusantara I Regional 8'}</td>
+            <td style={tdL}>Nama Pemilik Rekening</td>
+            <td style={tdD}>:</td>
+            <td style={tdV}>{kontrak.pembayaran_atas_nama || 'PT Perkebunan Nusantara I Regional 8'}</td>
           </tr>
           <tr>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Nomor Rekening Penerima</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
-            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>{kontrak.pembayaran_rek_no || '0050-01-005356-30-0'}</td>
+            <td style={tdL}>Nomor Rekening Penerima</td>
+            <td style={tdD}>:</td>
+            <td style={tdV}>{kontrak.pembayaran_rek_no || '0050-01-005356-30-0'}</td>
           </tr>
         </tbody>
       </table>
 
       {/* Spacer */}
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
-      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={s.justify}>&nbsp;</p>
+      <p style={s.justify}>&nbsp;</p>
+      <p style={s.justify}>&nbsp;</p>
 
       {/* Signature */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', ...lineH }}>
+      <table style={tbl}>
         <tbody>
           <tr>
-            <td style={{ width: '50%', padding: '2px 4px', verticalAlign: 'top' }}></td>
-            <td style={{ width: '50%', padding: '2px 4px', verticalAlign: 'top', textAlign: 'center' }}>
+            <td style={{ width: '50%', padding: '1px 4px', verticalAlign: 'top' }}></td>
+            <td style={{ width: '50%', padding: '1px 4px', verticalAlign: 'top', textAlign: 'center' }}>
               {lokasi}, {tglFormatted}
             </td>
           </tr>
           <tr>
-            <td style={{ padding: '2px 4px' }}></td>
-            <td style={{ padding: '2px 4px', textAlign: 'center' }}></td>
+            <td style={{ padding: '1px 4px' }}></td>
+            <td style={{ padding: '1px 4px', textAlign: 'center' }}></td>
           </tr>
         </tbody>
       </table>

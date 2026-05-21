@@ -619,7 +619,7 @@ def generate_kuitansi_docx(invoice) -> io.BytesIO:
     tbl0 = doc.tables[0]
     _replace_cell_text(tbl0.cell(0, 2), _s(k.pembeli))
     _replace_cell_text(tbl0.cell(1, 2), 'Rp' + _id_fmt(nilai_kuitansi, 2))
-    _replace_cell_text(tbl0.cell(2, 2), terbilang_kuitansi + ' Rupiah')
+    _replace_cell_text(tbl0.cell(2, 2), terbilang_kuitansi)
     _replace_cell_text(tbl0.cell(3, 2), f'Pembelian {_s(k.komoditi)} sesuai Invoice No. {_s(invoice.no_invoice)}')
 
     # Table 1: Info Bank
