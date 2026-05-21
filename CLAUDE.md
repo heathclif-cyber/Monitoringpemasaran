@@ -65,7 +65,7 @@ Monitoringpemasaran/
   api/                 # API route modules (invoice, do, dashboard, laporan)
   endpoints/           # Kontrak endpoints
   services/            # Word docx generator, image generator, utils
-  templates/           # Jinja2 templates (legacy, tidak dipakai React)
+  templates/           # Jinja2 templates (legacy) + kuitansi_template.docx
   static/              # Legacy static files (tidak dipakai React)
   frontend/            # React SPA
     src/
@@ -78,7 +78,7 @@ Monitoringpemasaran/
       components/
         layout/        # AppLayout, Sidebar, Header
         ui/            # shadcn/ui primitives (button, card, badge, dialog, etc.)
-        common/        # StatCard, StatusBadge, ConfirmDialog, EmptyState, LoadingSkeleton, Toast
+        common/        # StatCard, StatusBadge, ConfirmDialog, EmptyState, LoadingSkeleton, Toast, DocxPreview
         feature/       # KontrakPreview, InvoicePreview (inline), DOPreview (inline)
 ```
 
@@ -131,10 +131,24 @@ Satu kontrak bisa punya beberapa invoice (pembayaran bertahap). Saat buat invoic
 
 ## Format Dokumen Baku
 
-Preview Kontrak, Invoice, DO mengikuti format persis dari `static/js/forms.js`:
 - `buildLivePreview()` → Kontrak: Arial 9pt, judul "KONTRAK PENJUALAN", tabel rowS/rowD
 - `buildInvoicePreview()` → Invoice: Calibri 9pt, tabel bordered 10 kolom, "Proforma Invoice"
 - `buildDOPreview()` → DO: Calibri 9pt, header PT PERKEBUNAN NUSANTARA I REGIONAL 8, 7 kolom
+
+## Kuitansi
+
+- Template: `templates/kuitansi_template.docx` (A4, Calibri, underline title)
+- Generator: `services/generator_word.py` → `generate_kuitansi_docx(invoice)`
+- Endpoint: `GET /api/invoice/export-kuitansi?no_invoice=XXX`
+- Nilai kuitansi = **pokok + PPN** (sebelum dikurangi PPh, berbeda dengan invoice)
+- Dihitung proporsional: `(pokok + PPN) × (jumlah_pembayaran / total_tagihan)`
+
+## Preview Dialog (Repository Pages)
+
+- Semua repository (RepoKontrak, RepoInvoice, RepoDO) pakai **docx-preview**
+- Klik ikon mata/receipt → fetch .docx → render via `DocxPreview` component
+- Preview = file yang akan di-download (WYSIWYG, identik dengan hasil download)
+- Component: `frontend/src/components/common/DocxPreview.tsx`
 
 ## Panduan Referensi
 
