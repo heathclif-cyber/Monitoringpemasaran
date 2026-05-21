@@ -21,7 +21,10 @@
       "Bash(awk NR==405 *)",
       "Bash(curl -s -X POST http://localhost:8000/api/invoice -H \"Content-Type: application/json\" -d '{\"no_invoice\":\"TEST-PARTIAL-01\",\"no_kontrak\":\"0160/HO-SUPCO/WASTE-L/N-I/I/2026\",\"tanggal_transaksi\":\"2026-05-13\",\"jumlah_pembayaran\":5000000}')",
       "Bash(curl *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(python *)"
     ]
   }
 }
