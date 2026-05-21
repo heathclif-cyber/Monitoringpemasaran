@@ -15,7 +15,7 @@ import {
   type LaporanFilters,
   DEFAULT_LAPORAN_FILTERS,
 } from '@/utils/laporanUtils'
-import { formatCurrency, formatCurrencyDec, formatNumberDec, formatDate, safe } from '@/lib/utils'
+import { formatCurrency, formatNumber, formatDate, safe } from '@/lib/utils'
 import type { LaporanRow } from '@/types'
 import * as XLSX from 'xlsx'
 
@@ -124,18 +124,18 @@ export default function LaporanPage() {
         <StatCard label="Kekurangan Bayar" value={formatCurrency(summary.sisaBayar)} />
         <StatCard
           label="Sisa Barang (DO)"
-          value={formatNumberDec(summary.sisaVolume)}
-          subtitle={`Butir: ${formatNumberDec(summary.sisaVolumeButir)}`}
+          value={formatNumber(summary.sisaVolume)}
+          subtitle={`Butir: ${formatNumber(summary.sisaVolumeButir)}`}
         />
         <StatCard
           label="Harga Rata-Rata (excl. PPN)"
-          value={`${formatCurrencyDec(summary.hargaRataKg)}/Kg`}
-          subtitle={`${formatCurrencyDec(summary.hargaRataButir)}/Butir`}
+          value={`${formatCurrency(summary.hargaRataKg)}/Kg`}
+          subtitle={`${formatCurrency(summary.hargaRataButir)}/Butir`}
         />
         <StatCard
           label="Barang Terkirim"
-          value={formatNumberDec(summary.barangTerkirimKg)}
-          subtitle={`Butir: ${formatNumberDec(summary.barangTerkirimButir)}`}
+          value={formatNumber(summary.barangTerkirimKg)}
+          subtitle={`Butir: ${formatNumber(summary.barangTerkirimButir)}`}
         />
       </div>
 
@@ -274,9 +274,9 @@ export default function LaporanPage() {
                         <td className="px-2 py-1.5 text-right text-blue-600 font-medium whitespace-nowrap">{formatCurrency(row.Pelunasan)}</td>
                         <td className="px-2 py-1.5 max-w-[180px] whitespace-normal break-words">{safe(row.Mitra_Pembeli)}</td>
                         <td className="px-2 py-1.5 max-w-[180px] whitespace-normal break-words">{safe(row.Deskripsi_Produk)}</td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatNumberDec(row.Jumlah_Kontrak)}</td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrencyDec(row.Harga_Satuan)}</td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatNumberDec(row.Jumlah_DO)}</td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatNumber(row.Jumlah_Kontrak)}</td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Harga_Satuan)}</td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatNumber(row.Jumlah_DO)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Pendapatan_Pokok)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Pajak_PPN)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.PPh_Nominal)}</td>
@@ -288,7 +288,7 @@ export default function LaporanPage() {
                           {(row.Sisa_Pembayaran || 0) <= 0 ? 'Lunas' : formatCurrency(row.Sisa_Pembayaran)}
                         </td>
                         <td className={`px-2 py-1.5 text-right font-bold whitespace-nowrap ${(row.Sisa_Volume || 0) <= 0 ? 'text-green-600' : 'text-amber-600'}`}>
-                          {(row.Sisa_Volume || 0) <= 0 ? 'Selesai' : formatNumberDec(row.Sisa_Volume)}
+                          {(row.Sisa_Volume || 0) <= 0 ? 'Selesai' : formatNumber(row.Sisa_Volume)}
                         </td>
                         <td className="px-2 py-1.5 whitespace-nowrap">{row.Bulan_Buku}</td>
                         {/* SAP fields - editable */}

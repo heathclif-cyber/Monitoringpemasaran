@@ -37,10 +37,7 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
         ppn_val = 0.0
         if str(kontrak.is_ppn or 'true').lower() == 'true':
             ppn_val = pokok * ((kontrak.ppn_persen or 0.0) / 100)
-        pph_val = 0.0
-        if str(kontrak.is_pph or 'false').lower() == 'true':
-            pph_val = pokok * ((kontrak.pph_persen or 0.0) / 100)
-        new_jumlah = pokok + ppn_val - pph_val
+        new_jumlah = pokok + ppn_val
 
         for inv in db_kontrak.invoices:
             inv.jumlah_pembayaran = new_jumlah
@@ -51,7 +48,7 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
             for do in inv.delivery_orders:
                 nominal = float(do.nominal_transfer or 0)
                 if new_jumlah > 0 and new_vol > 0:
-                    do.volume_do = round((nominal / new_jumlah) * new_vol, 2)
+                    do.volume_do = round((nominal / new_jumlah) * new_vol)
                 else:
                     do.volume_do = new_vol
                 do.selisih = new_jumlah - nominal

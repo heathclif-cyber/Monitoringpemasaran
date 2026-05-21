@@ -21,7 +21,7 @@ def angka_terbilang(angka):
     elif n < 1000000000:
         hasil = angka_terbilang(n // 1000000) + " Juta " + angka_terbilang(n % 1000000)
     elif n < 1000000000000:
-        hasil = angka_terbilang(n // 1000000000) + " Milyar " + angka_terbilang(n % 1000000000)
+        hasil = angka_terbilang(n // 1000000000) + " Miliar " + angka_terbilang(n % 1000000000)
     elif n < 1000000000000000:
         hasil = angka_terbilang(n // 1000000000000) + " Trilyun " + angka_terbilang(n % 1000000000000)
     else:

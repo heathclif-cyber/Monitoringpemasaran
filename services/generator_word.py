@@ -65,18 +65,18 @@ def _cp(cell):
 def _s(v, fb='-'):
     return str(v).strip() if v else fb
 
-def _id_fmt(v, decimals=2):
+def _id_fmt(v, decimals=0):
     if v is None: return '-'
     res = ("{:,." + str(decimals) + "f}").format(v).replace(",", "X").replace(".", ",").replace("X", ".")
     return res
 
 def _rp(v):
     if v is None: return '-'
-    return 'Rp' + _id_fmt(v, 2)
+    return 'Rp' + _id_fmt(v)
 
 def _rp_full(v):
-    if not v: return 'Rp0,00'
-    return 'Rp' + _id_fmt(v, 2)
+    if not v: return 'Rp0'
+    return 'Rp' + _id_fmt(v)
 
 MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 def _date(d):
@@ -97,7 +97,7 @@ def generate_contract_docx(k) -> io.BytesIO:
     sat = _s(k.satuan, 'Unit')
     nilai = k.nilai_transaksi or 0
 
-    vol_str = _id_fmt(vol, 2) + ' ' + sat if vol else '-'
+    vol_str = _id_fmt(vol) + ' ' + sat if vol else '-'
     harga_str = _rp_full(harga) + ' per ' + sat if harga else '-'
     premi_str = _rp(premi)
     jml_str = _rp_full(nilai) + (f" ({_s(k.terbilang)} Rupiah)" if k.terbilang else "")
@@ -302,8 +302,8 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
             p.add_run('\n')
             _run(p, v, bold=bsv)
 
-    # 17 rows
-    rows = [nr() for _ in range(17)]
+    # 16 rows (no PPh)
+    rows = [nr() for _ in range(16)]
 
     # Row 0 to 3 Left
     c_kepada = rows[0].cells[0]
@@ -402,15 +402,12 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     v = c_nil._tc.get_or_add_tcPr().find(qn('w:vAlign'))
     if v is not None: v.set(qn('w:val'), 'center')
 
-    # Hitung nilai kontrak penuh dari field mentah (hindari k.nilai_transaksi yg bisa sudah include PPN)
+    # Hitung nilai kontrak penuh — invoice = pokok + PPN, tanpa PPh
     pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
     ppn_val = 0.0
     if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
         ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
-    pph_val = 0.0
-    if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
-        pph_val = pokok * ((getattr(k, 'pph_persen', 0.0) or 0.0) / 100)
-    full_total = pokok + ppn_val - pph_val
+    full_total = pokok + ppn_val
 
     # Rasio proporsional invoice terhadap kontrak penuh
     inv_amount = float(invoice.jumlah_pembayaran or 0)
@@ -419,7 +416,6 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     display_vol = (k.volume or 0.0) * ratio
     display_pokok = pokok * ratio
     display_ppn = ppn_val * ratio
-    display_pph = pph_val * ratio
 
     # Row 11 (Item values) — proporsional ke invoice
     def c_txt(idx, text, align="left"):
@@ -434,7 +430,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_txt(3, '-')
     c_txt(4, _s(k.simbol))
     c_txt(5, '-')
-    c_txt(6, f" {_id_fmt(display_vol, 2).rstrip('0').rstrip(',')} ", 'right')
+    c_txt(6, f" {_id_fmt(display_vol)} ", 'right')
     c_txt(7, f" {_rp(k.harga_satuan).replace('Rp', '').strip()} ", 'right')
     c_txt(8, ' Rp')
     c_txt(9, f" {_rp(display_pokok).replace('Rp', '').strip()} ", 'right')
@@ -449,35 +445,25 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_ppnr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run(c_ppnr.paragraphs[0], f" {_rp(display_ppn).replace('Rp', '').strip()} ", bold=True)
 
-    # Row 13 (PPh val) — proporsional
-    c_pphl = rows[13].cells[0]
-    c_pphl.merge(rows[13].cells[7])
-    c_pphl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _run(c_pphl.paragraphs[0], f"PPh ", bold=True)
-    _run(rows[13].cells[8].paragraphs[0], ' Rp')
-    c_pphr = rows[13].cells[9]
-    c_pphr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _run(c_pphr.paragraphs[0], f" ({_rp(display_pph).replace('Rp', '').strip()}) " if display_pph > 0 else " - ", bold=True)
-
-    # Row 14 (Total)
-    c_totl = rows[14].cells[0]
-    c_totl.merge(rows[14].cells[7])
+    # Row 13 — Total (no PPh, invoice = pokok + PPN)
+    c_totl = rows[13].cells[0]
+    c_totl.merge(rows[13].cells[7])
     c_totl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run(c_totl.paragraphs[0], "Jumlah Pembayaran ", bold=True)
-    _run(rows[14].cells[8].paragraphs[0], ' Rp')
-    c_totr = rows[14].cells[9]
+    _run(rows[13].cells[8].paragraphs[0], ' Rp')
+    c_totr = rows[13].cells[9]
     c_totr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     _run(c_totr.paragraphs[0], f" {_rp(inv_amount).replace('Rp', '').strip()} ")
 
-    # Row 15 (Terbilang)
-    c_terb = rows[15].cells[0]
-    c_terb.merge(rows[15].cells[9])
+    # Row 14 (Terbilang)
+    c_terb = rows[14].cells[0]
+    c_terb.merge(rows[14].cells[9])
     _run(c_terb.paragraphs[0], "Terbilang:\n", bold=True)
     _run(c_terb.paragraphs[0], f"{invoice.terbilang_invoice or _s(k.terbilang, '')} Rupiah", italic=True)
 
-    # Row 16 (Transfer Ke)
-    c_trans = rows[16].cells[0]
-    c_trans.merge(rows[16].cells[9])
+    # Row 15 (Transfer Ke)
+    c_trans = rows[15].cells[0]
+    c_trans.merge(rows[15].cells[9])
     _run(c_trans.paragraphs[0], "Transfer Ke:\n", bold=True)
     bank_info = _s(k.pembayaran_bank, 'Bank Rakyat Indonesia')
     rek_info = _s(k.pembayaran_rek_no, 'No. 0050-01-005356-30-0')
@@ -503,19 +489,15 @@ def generate_kuitansi_docx(invoice) -> io.BytesIO:
     template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'kuitansi_template.docx')
     doc = Document(template_path)
 
-    # Hitung nilai kuitansi = pokok + PPN (sebelum PPh), proporsional
+    # Hitung nilai kuitansi = pokok + PPN (tanpa PPh), proporsional
     pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
     ppn_val = 0.0
     if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
         ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
-    pph_val = 0.0
-    if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
-        pph_val = pokok * ((getattr(k, 'pph_persen', 0.0) or 0.0) / 100)
 
     nilai_transaksi = pokok + ppn_val
-    total_tagihan = pokok + ppn_val - pph_val
     inv_amount = float(invoice.jumlah_pembayaran or 0)
-    ratio = (inv_amount / total_tagihan) if total_tagihan > 0 else 1.0
+    ratio = (inv_amount / nilai_transaksi) if nilai_transaksi > 0 else 1.0
     nilai_kuitansi = nilai_transaksi * ratio
     terbilang_kuitansi = terbilang_rupiah(math.floor(nilai_kuitansi))
 
@@ -556,7 +538,7 @@ def generate_kuitansi_docx(invoice) -> io.BytesIO:
     # Table 0: Data Pembayaran
     tbl0 = doc.tables[0]
     _replace_cell_text(tbl0.cell(0, 2), _s(k.pembeli))
-    _replace_cell_text(tbl0.cell(1, 2), 'Rp' + _id_fmt(nilai_kuitansi, 2))
+    _replace_cell_text(tbl0.cell(1, 2), 'Rp' + _id_fmt(nilai_kuitansi))
     _replace_cell_text(tbl0.cell(2, 2), terbilang_kuitansi)
     _replace_cell_text(tbl0.cell(3, 2), f'Pembelian {_s(k.komoditi)} sesuai Invoice No. {_s(invoice.no_invoice)}')
 
@@ -706,8 +688,8 @@ def generate_do_docx(do) -> io.BytesIO:
         _run(p, h, bold=True, size=10)
 
     # 8. Data Row
-    vol_str = _id_fmt(k.volume, 2).rstrip('0').rstrip(',') if (k.volume and k.volume > 0) else '-'
-    bale_str = _id_fmt(k.banyaknya_bale_karung, 2).rstrip('0').rstrip(',') if (k.banyaknya_bale_karung and k.banyaknya_bale_karung > 0) else '-'
+    vol_str = _id_fmt(k.volume) if (k.volume and k.volume > 0) else '-'
+    bale_str = _id_fmt(k.banyaknya_bale_karung) if (k.banyaknya_bale_karung and k.banyaknya_bale_karung > 0) else '-'
 
     data = [
         _s(k.kebun_produsen),

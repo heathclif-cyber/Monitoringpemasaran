@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { KontrakPreview } from '@/components/feature/KontrakPreview'
-import { formatCurrencyDec, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
 import {
   calculateKontrakPricing,
@@ -377,21 +377,21 @@ export default function KontrakPage() {
             {/* Quick calculation */}
             <div className="px-5 pb-4 grid grid-cols-2 gap-2 text-sm">
               <div className="text-slate-500">Nilai Pokok:</div>
-              <div className="text-right font-semibold">{formatCurrencyDec(pricing.pokok)}</div>
+              <div className="text-right font-semibold">{formatCurrency(pricing.pokok)}</div>
               {watchedFields.is_ppn !== 'false' && (
                 <>
                   <div className="text-slate-500">Nominal PPN ({watchedFields.ppn_persen || 11}%):</div>
-                  <div className="text-right">{formatCurrencyDec(pricing.nominalPpn)}</div>
+                  <div className="text-right">{formatCurrency(pricing.nominalPpn)}</div>
                 </>
               )}
               {watchedFields.is_pph === 'true' && (
                 <>
                   <div className="text-slate-500">Potongan PPh ({watchedFields.pph_persen || 0}%):</div>
-                  <div className="text-right text-red-600">-{formatCurrencyDec(pricing.nominalPph)}</div>
+                  <div className="text-right text-red-600">-{formatCurrency(pricing.nominalPph)}</div>
                 </>
               )}
               <div className="text-slate-700 font-semibold border-t pt-1">Total Tagihan:</div>
-              <div className="text-right font-bold text-brand-600 border-t pt-1">{formatCurrencyDec(pricing.totalTagihan)}</div>
+              <div className="text-right font-bold text-brand-600 border-t pt-1">{formatCurrency(pricing.totalTagihan)}</div>
               {pricing.totalTagihan > 0 && (
                 <>
                   <div className="text-slate-400 text-xs">Terbilang:</div>

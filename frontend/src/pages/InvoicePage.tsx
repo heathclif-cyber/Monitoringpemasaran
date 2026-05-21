@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
-import { formatCurrencyDec, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
 import { calculateKontrakPricing, calculateJatuhTempo } from '@/utils/kontrakUtils'
 import type { Kontrak } from '@/types'
@@ -29,15 +29,12 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
   const nilaiPokok = (vol * hrg) + premi
   const ppnPct = k.ppn_persen || 11
   const isPpn = String(k.is_ppn).toLowerCase() !== 'false'
-  const isPph = String(k.is_pph).toLowerCase() === 'true'
-  const pphPct = k.pph_persen || 0
 
-  // Full contract tax values
+  // Invoice = pokok + PPN, tanpa PPh
   const fullPpn = isPpn ? nilaiPokok * (ppnPct / 100) : 0
-  const fullPph = isPph ? nilaiPokok * (pphPct / 100) : 0
-  const fullTotal = nilaiPokok + fullPpn - fullPph
+  const fullTotal = nilaiPokok + fullPpn
 
-  // jumlah_pembayaran adalah final amount (pokok + PPN - PPh).
+  // jumlah_pembayaran adalah final amount (pokok + PPN).
   // Kosongkan/0 = auto full kontrak.
   const actualPayment = jumlahPembayaran > 0 ? jumlahPembayaran : fullTotal
   const ratio = fullTotal > 0 ? actualPayment / fullTotal : 1
@@ -46,12 +43,11 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
   const displayHrg = hrg
   const displayPokok = nilaiPokok * ratio
 
-  // PPN dan PPh di-breakdown proporsional dari actual payment
+  // PPN di-breakdown proporsional dari actual payment
   const nomPpn = fullPpn * ratio
-  const nomPph = fullPph * ratio
   const estTotal = actualPayment
   const lamaStr = k.lama_pembayaran_hari ? `${k.lama_pembayaran_hari} hari` : '-'
-  const fmtNum = (v: number) => v > 0 ? v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'
+  const fmtNum = (v: number) => v > 0 ? Math.round(v).toLocaleString('id-ID') : '-'
 
   const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '9pt', fontFamily: '"Calibri", Arial, sans-serif', color: '#000', border: '1px solid #000', backgroundColor: '#fff' }
   const tdStyle: React.CSSProperties = { border: '1px solid #000', padding: '4px 6px', verticalAlign: 'top' }
@@ -125,13 +121,6 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
             <td style={{ ...tdStyle, borderRight: 'none' }}>Rp</td>
             <td style={{ ...tdStyle, textAlign: 'right', borderLeft: 'none' }}><strong>{fmtNum(nomPpn)}</strong></td>
           </tr>
-          {isPph && (
-            <tr>
-              <td style={{ ...tdStyle, textAlign: 'right' }} colSpan={8}><strong>PPh</strong></td>
-              <td style={{ ...tdStyle, borderRight: 'none' }}>Rp</td>
-              <td style={{ ...tdStyle, textAlign: 'right', borderLeft: 'none' }}><strong>({fmtNum(nomPph)})</strong></td>
-            </tr>
-          )}
           <tr>
             <td style={{ ...tdStyle, textAlign: 'right' }} colSpan={8}><strong>Jumlah Pembayaran</strong></td>
             <td style={{ ...tdStyle, borderRight: 'none' }}>Rp</td>
@@ -250,7 +239,7 @@ export default function InvoicePage() {
     existingInvoices.reduce((sum: number, inv) => sum + (inv.jumlah_pembayaran || 0), 0),
   [existingInvoices])
 
-  const kontrakMax = pricing?.totalTagihan || 0
+  const kontrakMax = pricing?.nilaiTransaksi || 0
   const sisaKontrak = Math.max(0, kontrakMax - totalInvoiced)
   const progressPct = kontrakMax > 0 ? Math.round((totalInvoiced / kontrakMax) * 100) : 0
 
@@ -351,16 +340,16 @@ export default function InvoicePage() {
                   <span className="text-slate-500">Komoditi:</span>
                   <span>{k.komoditi || '-'}</span>
                   <span className="text-slate-500">Volume:</span>
-                  <span>{formatCurrencyDec(k.volume)} {k.satuan}</span>
+                  <span>{formatCurrency(k.volume)} {k.satuan}</span>
                   <span className="text-slate-500">Nilai Kontrak:</span>
-                  <span className="font-bold text-brand-600">{formatCurrencyDec(kontrakMax)}</span>
+                  <span className="font-bold text-brand-600">{formatCurrency(kontrakMax)}</span>
                 </div>
 
                 {/* Progress bar */}
                 <div className="border-t pt-3">
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-500">Total Ter-invoice: {formatCurrencyDec(totalInvoiced)}</span>
-                    <span className="text-slate-500">Sisa: {formatCurrencyDec(sisaKontrak)}</span>
+                    <span className="text-slate-500">Total Ter-invoice: {formatCurrency(totalInvoiced)}</span>
+                    <span className="text-slate-500">Sisa: {formatCurrency(sisaKontrak)}</span>
                   </div>
                   <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
                     <div
@@ -379,7 +368,7 @@ export default function InvoicePage() {
                       {existingInvoices.map((inv) => (
                         <div key={inv.no_invoice} className="flex justify-between text-xs text-slate-600 bg-gray-50 rounded px-2 py-1">
                           <span>{inv.no_invoice}</span>
-                          <span className="font-medium">{formatCurrencyDec(inv.jumlah_pembayaran)}</span>
+                          <span className="font-medium">{formatCurrency(inv.jumlah_pembayaran)}</span>
                         </div>
                       ))}
                     </div>
@@ -392,14 +381,14 @@ export default function InvoicePage() {
                   <div className="flex items-center gap-2 mt-1">
                     <input
                       type="number"
-                      step="any"
+                      step="1"
                       {...register('jumlah_pembayaran')}
                       className={ic}
-                      placeholder={formatCurrencyDec(sisaKontrak)}
+                      placeholder={formatCurrency(sisaKontrak)}
                     />
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
-                    Kosongkan untuk auto (nilai penuh kontrak). Maks: {formatCurrencyDec(sisaKontrak)}
+                    Kosongkan untuk auto (nilai penuh kontrak). Maks: {formatCurrency(sisaKontrak)}
                   </p>
                   {Number(watch('jumlah_pembayaran')) > 0 && kontrakMax > 0 && (
                     <p className="text-xs text-slate-500 mt-1">

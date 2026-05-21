@@ -37,7 +37,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
         for key, value in do.model_dump().items():
             setattr(db_do, key, value)
         db_do.selisih = selisih
-        db_do.volume_do = round(volume_do, 2)
+        db_do.volume_do = round(volume_do)
         db.commit()
         db.refresh(db_do)
         return db_do
@@ -45,7 +45,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
         new_do = models.DeliveryOrder(
             **do.model_dump(),
             selisih=selisih,
-            volume_do=round(volume_do, 2)
+            volume_do=round(volume_do)
         )
         db.add(new_do)
         db.commit()

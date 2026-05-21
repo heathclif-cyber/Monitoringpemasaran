@@ -70,9 +70,9 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
     </tr>
   )
 
-  const fmtRpLocal = (v: number) => v ? Number(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'
+  const fmtRpLocal = (v: number) => v ? Math.round(v).toLocaleString('id-ID') : '0'
   const fmtRpFull = (v: number) => 'Rp' + fmtRpLocal(v)
-  const fmtVol = (v: number, s: string) => v > 0 ? Number(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + (s || 'Unit') : '-'
+  const fmtVol = (v: number, s: string) => v > 0 ? Math.round(v).toLocaleString('id-ID') + ' ' + (s || 'Unit') : '-'
   const fmtHarga = (v: number, s: string) => v > 0 ? fmtRpFull(v) + ' per ' + (s || 'Unit') : '-'
   const fmtDateLocal = (dateStr?: string) => {
     if (!dateStr) return '____ __________ ____'

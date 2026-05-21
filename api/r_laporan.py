@@ -66,15 +66,13 @@ def get_laporan(db: Session = Depends(get_db)):
             pph_do = k_pph
 
         # Sisa pembayaran = Invoice total gross - sum of ALL DOs pelunasan for this invoice
-        # inv_total is the NET amount stored in database. We need to add back PPh to get GROSS Kewajiban.
+        # inv_total is now already gross (pokok + PPN, no PPh subtraction)
         if not inv_total or inv_total <= 0:
-            inv_total_net = k_nilai + k_ppn - k_pph
             inv_total_gross = k_nilai + k_ppn
         else:
-            inv_total_net = inv_total
-            inv_total_gross = inv_total + k_pph
+            inv_total_gross = inv_total
 
-        sisa_pembayaran = round(float(inv_total_gross) - float(total_do_nominal), 2) if (inv or do) else 0
+        sisa_pembayaran = round(float(inv_total_gross) - float(total_do_nominal)) if (inv or do) else 0
         
         # Determine pelunasan for THIS specific DO
         if do and str(getattr(do, 'is_pph_disetor', 'false')).lower() == 'true':
@@ -82,7 +80,7 @@ def get_laporan(db: Session = Depends(get_db)):
         else:
             pelunasan_do = do_nominal
         # Sisa volume = Kontrak volume - sum of ALL DOs volume for this invoice
-        sisa_volume = round(float(k_vol_local) - float(total_do_volume), 2)
+        sisa_volume = round(float(k_vol_local) - float(total_do_volume))
 
         # DPP (Harga Pokok, excl. PPN/PPh) = harga_satuan * volume_do + premi proporsional
         if k_vol_local > 0 and do:
@@ -108,13 +106,13 @@ def get_laporan(db: Session = Depends(get_db)):
             "Jumlah_Kontrak": k.volume or 0,
             "Harga_Satuan": k.harga_satuan or 0,
             "Jumlah_DO": do_volume,
-            "Pendapatan_Pokok": round(pendapatan_do, 2),
-            "DPP_Pokok": round(dpp_pokok, 2),
-            "Pajak_PPN": round(ppn_do, 2),
-            "PPh_Nominal": round(pph_do, 2),
+            "Pendapatan_Pokok": round(pendapatan_do),
+            "DPP_Pokok": round(dpp_pokok),
+            "Pajak_PPN": round(ppn_do),
+            "PPh_Nominal": round(pph_do),
             "PPh_Setor": do.is_pph_disetor if do else "false",
             "Kewajiban_Pembayaran": inv_total_gross,
-            "Pelunasan": round(pelunasan_do, 2),
+            "Pelunasan": round(pelunasan_do),
             "Sisa_Pembayaran": sisa_pembayaran,
             "Sisa_Volume": sisa_volume,
             "Bulan_Buku": get_bulan_buku(do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)),

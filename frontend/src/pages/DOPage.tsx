@@ -10,7 +10,7 @@ import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrencyDec } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { calculateProportionalVolume, calculateSelisih, getVolumePercentage } from '@/utils/doUtils'
 import type { Kontrak } from '@/types'
 
@@ -26,7 +26,7 @@ function DOPreviewContent({ noDo, noInv, tgl, unit, k, invTotal, nominal, kontra
   if (invTotal > 0 && kontrakVol > 0) {
     propVol = (nominal / invTotal) * kontrakVol
   }
-  const volStr = propVol > 0 ? Number(propVol).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (k.volume ? Number(k.volume).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-')
+  const volStr = propVol > 0 ? Math.round(propVol).toLocaleString('id-ID') : (k.volume ? Math.round(k.volume).toLocaleString('id-ID') : '-')
   const baleStr = k.banyaknya_bale_karung ? Number(k.banyaknya_bale_karung) : '-'
 
   const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '9pt', fontFamily: '"Calibri", Arial, sans-serif', color: '#000', border: '1px solid #000', backgroundColor: '#fff' }
@@ -295,10 +295,10 @@ export default function DOPage() {
                 <p className={`text-lg font-bold mt-1 ${
                   volumePct > 100 ? 'text-red-600' : volumePct > 0 ? 'text-green-600' : 'text-blue-600'
                 }`}>
-                  {formatCurrencyDec(volumeDo)} {currentKontrak?.satuan || ''}
-                  {volumePct > 0 && ` (${volumePct.toFixed(1)}%)`}
+                  {formatCurrency(volumeDo)} {currentKontrak?.satuan || ''}
+                  {volumePct > 0 && ` (${Math.round(volumePct)}%)`}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">Selisih: {formatCurrencyDec(selisih)}</p>
+                <p className="text-xs text-slate-500 mt-1">Selisih: {formatCurrency(selisih)}</p>
               </div>
             </CardContent>
           </Card>
@@ -314,8 +314,8 @@ export default function DOPage() {
                   <span className="text-slate-500">No Kontrak:</span><span className="font-medium">{currentKontrak.no_kontrak}</span>
                   <span className="text-slate-500">Pembeli:</span><span>{(currentKontrak.pembeli || '-').split('\n')[0]}</span>
                   <span className="text-slate-500">Komoditi:</span><span>{currentKontrak.komoditi || '-'}</span>
-                  <span className="text-slate-500">Volume Kontrak:</span><span>{formatCurrencyDec(kontrakVolume)} {currentKontrak.satuan}</span>
-                  <span className="text-slate-500">Total Invoice:</span><span className="font-semibold">{formatCurrencyDec(invoiceTotal)}</span>
+                  <span className="text-slate-500">Volume Kontrak:</span><span>{formatCurrency(kontrakVolume)} {currentKontrak.satuan}</span>
+                  <span className="text-slate-500">Total Invoice:</span><span className="font-semibold">{formatCurrency(invoiceTotal)}</span>
                 </div>
               </CardContent>
             </Card>

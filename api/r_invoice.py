@@ -18,17 +18,13 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
 
-    # Hitung nilai maksimum kontrak (full value)
+    # Hitung nilai maksimum kontrak (full value) — invoice = pokok + PPN, tanpa PPh
     pokok = ((db_kontrak.volume or 0.0) * (db_kontrak.harga_satuan or 0.0)) + (db_kontrak.premi or 0.0)
     ppn_val = 0.0
     if str(getattr(db_kontrak, 'is_ppn', 'true')).lower() == 'true':
         ppn_val = pokok * ((db_kontrak.ppn_persen or 0.0) / 100)
 
-    pph_val = 0.0
-    if str(getattr(db_kontrak, 'is_pph', 'false')).lower() == 'true':
-        pph_val = pokok * ((getattr(db_kontrak, 'pph_persen', 0.0) or 0.0) / 100)
-
-    nilai_maksimum = pokok + ppn_val - pph_val
+    nilai_maksimum = pokok + ppn_val
 
     # Jika user mengirim jumlah_pembayaran (partial), gunakan nilai tersebut
     # Jika None/0, gunakan nilai penuh kontrak (backward compatible)
