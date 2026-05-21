@@ -402,7 +402,26 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     v = c_nil._tc.get_or_add_tcPr().find(qn('w:vAlign'))
     if v is not None: v.set(qn('w:val'), 'center')
 
-    # Row 11 (Item values)
+    # Hitung nilai kontrak penuh dari field mentah (hindari k.nilai_transaksi yg bisa sudah include PPN)
+    pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
+    ppn_val = 0.0
+    if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
+        ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
+    pph_val = 0.0
+    if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
+        pph_val = pokok * ((getattr(k, 'pph_persen', 0.0) or 0.0) / 100)
+    full_total = pokok + ppn_val - pph_val
+
+    # Rasio proporsional invoice terhadap kontrak penuh
+    inv_amount = float(invoice.jumlah_pembayaran or 0)
+    ratio = (inv_amount / full_total) if full_total > 0 else 1.0
+
+    display_vol = (k.volume or 0.0) * ratio
+    display_pokok = pokok * ratio
+    display_ppn = ppn_val * ratio
+    display_pph = pph_val * ratio
+
+    # Row 11 (Item values) — proporsional ke invoice
     def c_txt(idx, text, align="left"):
         c = rows[11].cells[idx]
         if align == "right": c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -415,12 +434,12 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_txt(3, '-')
     c_txt(4, _s(k.simbol))
     c_txt(5, '-')
-    c_txt(6, f" {_id_fmt(k.volume, 2).rstrip('0').rstrip(',')} ", 'right')
+    c_txt(6, f" {_id_fmt(display_vol, 2).rstrip('0').rstrip(',')} ", 'right')
     c_txt(7, f" {_rp(k.harga_satuan).replace('Rp', '').strip()} ", 'right')
     c_txt(8, ' Rp')
-    c_txt(9, f" {_rp(k.nilai_transaksi).replace('Rp', '').strip()} ", 'right')
+    c_txt(9, f" {_rp(display_pokok).replace('Rp', '').strip()} ", 'right')
 
-    # Row 12 (PPN val)
+    # Row 12 (PPN val) — proporsional
     c_ppnl = rows[12].cells[0]
     c_ppnl.merge(rows[12].cells[7])
     c_ppnl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -428,13 +447,9 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     _run(rows[12].cells[8].paragraphs[0], ' Rp')
     c_ppnr = rows[12].cells[9]
     c_ppnr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _run(c_ppnr.paragraphs[0], f" {_rp(k.nominal_ppn).replace('Rp', '').strip()} ", bold=True)
+    _run(c_ppnr.paragraphs[0], f" {_rp(display_ppn).replace('Rp', '').strip()} ", bold=True)
 
-    # Row 13 (PPh val)
-    pph_val = 0.0
-    if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
-        pokok = (k.volume or 0) * (k.harga_satuan or 0) + (k.premi or 0)
-        pph_val = pokok * ((getattr(k, 'pph_persen', 0.0) or 0.0) / 100)
+    # Row 13 (PPh val) — proporsional
     c_pphl = rows[13].cells[0]
     c_pphl.merge(rows[13].cells[7])
     c_pphl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -442,7 +457,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     _run(rows[13].cells[8].paragraphs[0], ' Rp')
     c_pphr = rows[13].cells[9]
     c_pphr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _run(c_pphr.paragraphs[0], f" ({_rp(pph_val).replace('Rp', '').strip()}) " if pph_val > 0 else " - ", bold=True)
+    _run(c_pphr.paragraphs[0], f" ({_rp(display_pph).replace('Rp', '').strip()}) " if display_pph > 0 else " - ", bold=True)
 
     # Row 14 (Total)
     c_totl = rows[14].cells[0]
@@ -452,7 +467,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     _run(rows[14].cells[8].paragraphs[0], ' Rp')
     c_totr = rows[14].cells[9]
     c_totr.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _run(c_totr.paragraphs[0], f" {_rp(invoice.jumlah_pembayaran).replace('Rp', '').strip()} ")
+    _run(c_totr.paragraphs[0], f" {_rp(inv_amount).replace('Rp', '').strip()} ")
 
     # Row 15 (Terbilang)
     c_terb = rows[15].cells[0]
@@ -479,6 +494,165 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     doc.save(buf)
     buf.seek(0)
     return buf
+
+def generate_kuitansi_docx(invoice) -> io.BytesIO:
+    from services.utils import terbilang_rupiah
+    import math
+
+    k = invoice.kontrak
+    doc = Document()
+
+    # A4 portrait
+    sec = doc.sections[0]
+    sec.page_width = Cm(21.0)
+    sec.page_height = Cm(29.7)
+    sec.left_margin = Cm(3.0)
+    sec.right_margin = Cm(2.5)
+    sec.top_margin = Cm(2.0)
+    sec.bottom_margin = Cm(2.0)
+
+    # Hitung nilai kuitansi = pokok + PPN (sebelum PPh), proporsional
+    pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
+    ppn_val = 0.0
+    if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
+        ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
+    pph_val = 0.0
+    if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
+        pph_val = pokok * ((getattr(k, 'pph_persen', 0.0) or 0.0) / 100)
+
+    nilai_transaksi = pokok + ppn_val
+    total_tagihan = pokok + ppn_val - pph_val
+    inv_amount = float(invoice.jumlah_pembayaran or 0)
+    ratio = (inv_amount / total_tagihan) if total_tagihan > 0 else 1.0
+    nilai_kuitansi = nilai_transaksi * ratio
+    terbilang_kuitansi = terbilang_rupiah(math.floor(nilai_kuitansi))
+
+    # Judul
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _run(p_title, "KUITANSI", bold=True, size=14)
+    _para_fmt(p_title, sa=6)
+
+    # No
+    p_no = doc.add_paragraph()
+    _run(p_no, "No.     ")
+    _run(p_no, _s(invoice.no_invoice))
+    _para_fmt(p_no, sa=12)
+
+    # Spacer + Melalui
+    doc.add_paragraph()
+    doc.add_paragraph()
+    doc.add_paragraph()
+    doc.add_paragraph()
+    doc.add_paragraph()
+    p_melalui = doc.add_paragraph()
+    _run(p_melalui, "Melalui,")
+    _para_fmt(p_melalui, sa=6)
+
+    doc.add_paragraph()
+    doc.add_paragraph()
+    doc.add_paragraph()
+
+    # === TABLE 1: Data Pembayaran ===
+    tbl1 = doc.add_table(rows=4, cols=3)
+    tbl1.alignment = WD_TABLE_ALIGNMENT.LEFT
+    _no_borders(tbl1, is_table=True)
+
+    # Col widths
+    _cw(tbl1.cell(0, 0), 4.5)
+    _cw(tbl1.cell(0, 1), 1.0)
+    _cw(tbl1.cell(0, 2), 9.0)
+
+    def t1_cell(row, col, text, bold=False, right=False):
+        c = tbl1.cell(row, col)
+        p = _cp(c)
+        if right: p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        _run(p, text, bold=bold)
+        _valign_top(c)
+
+    t1_cell(0, 0, "Telah Diterima Dari")
+    t1_cell(0, 1, ":")
+    t1_cell(0, 2, _s(k.pembeli))
+
+    t1_cell(1, 0, "Banyaknya Uang\n(Termasuk PPN)")
+    t1_cell(1, 1, ":")
+    t1_cell(1, 2, _rp(nilai_kuitansi))
+
+    t1_cell(2, 0, "Terbilang")
+    t1_cell(2, 1, ":")
+    t1_cell(2, 2, terbilang_kuitansi)
+
+    t1_cell(3, 0, "Untuk Pembayaran")
+    t1_cell(3, 1, ":")
+    t1_cell(3, 2, f"Pembelian {_s(k.komoditi)} sesuai Invoice No. {_s(invoice.no_invoice)}")
+
+    # Spacer
+    doc.add_paragraph()
+    doc.add_paragraph()
+
+    # === TABLE 2: Info Bank ===
+    tbl2 = doc.add_table(rows=3, cols=3)
+    tbl2.alignment = WD_TABLE_ALIGNMENT.LEFT
+    _no_borders(tbl2, is_table=True)
+
+    _cw(tbl2.cell(0, 0), 4.5)
+    _cw(tbl2.cell(0, 1), 1.0)
+    _cw(tbl2.cell(0, 2), 9.0)
+
+    def t2_cell(row, col, text, bold=False):
+        c = tbl2.cell(row, col)
+        p = _cp(c)
+        _run(p, text, bold=bold)
+        _valign_top(c)
+
+    t2_cell(0, 0, "Bank Penerima")
+    t2_cell(0, 1, ":")
+    t2_cell(0, 2, _s(k.pembayaran_bank, 'Bank Rakyat Indonesia'))
+
+    t2_cell(1, 0, "Nama Pemilik Rekening")
+    t2_cell(1, 1, ":")
+    t2_cell(1, 2, _s(k.pembayaran_atas_nama, 'PT Perkebunan Nusantara I Regional 8'))
+
+    t2_cell(2, 0, "Nomor Rekening Penerima")
+    t2_cell(2, 1, ":")
+    t2_cell(2, 2, _s(k.pembayaran_rek_no, '0050-01-005356-30-0'))
+
+    # Spacer
+    doc.add_paragraph()
+    doc.add_paragraph()
+    doc.add_paragraph()
+
+    # === Signature area ===
+    tbl3 = doc.add_table(rows=2, cols=2)
+    tbl3.alignment = WD_TABLE_ALIGNMENT.LEFT
+    _no_borders(tbl3, is_table=True)
+
+    _cw(tbl3.cell(0, 0), 7.0)
+    _cw(tbl3.cell(0, 1), 7.5)
+
+    # Left side empty
+    p_sig_l1 = _cp(tbl3.cell(0, 0))
+    _run(p_sig_l1, "")
+    p_sig_l2 = _cp(tbl3.cell(1, 0))
+    _run(p_sig_l2, "")
+
+    # Right side: location + date
+    lokasi = _s(k.lokasi, 'Makassar')
+    p_loc = _cp(tbl3.cell(0, 1))
+    p_loc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _run(p_loc, f"{lokasi}, {_date(invoice.tanggal_transaksi)}")
+
+    # Signature line
+    p_sig_r = _cp(tbl3.cell(1, 1))
+    p_sig_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _run(p_sig_r, "")
+    _run(p_sig_r, "", size=6)  # spacer
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
 
 def generate_do_docx(do) -> io.BytesIO:
     doc = Document()

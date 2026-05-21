@@ -32,22 +32,24 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
   const isPph = String(k.is_pph).toLowerCase() === 'true'
   const pphPct = k.pph_persen || 0
 
-  // Gunakan jumlah_pembayaran dari form (partial) atau full kontrak value
-  const actualPayment = jumlahPembayaran > 0 ? jumlahPembayaran : nilaiPokok
-  const ratio = nilaiPokok > 0 ? actualPayment / nilaiPokok : 1
+  // Full contract tax values
+  const fullPpn = isPpn ? nilaiPokok * (ppnPct / 100) : 0
+  const fullPph = isPph ? nilaiPokok * (pphPct / 100) : 0
+  const fullTotal = nilaiPokok + fullPpn - fullPph
+
+  // jumlah_pembayaran adalah final amount (pokok + PPN - PPh).
+  // Kosongkan/0 = auto full kontrak.
+  const actualPayment = jumlahPembayaran > 0 ? jumlahPembayaran : fullTotal
+  const ratio = fullTotal > 0 ? actualPayment / fullTotal : 1
 
   const displayVol = vol * ratio
   const displayHrg = hrg
-  const displayPokok = actualPayment
+  const displayPokok = nilaiPokok * ratio
 
-  // PPN dan PPh dihitung proporsional dari actual payment
-  let nomPpn = 0
-  if (isPpn) nomPpn = displayPokok * (ppnPct / 100)
-
-  let nomPph = 0
-  if (isPph) nomPph = displayPokok * (pphPct / 100)
-
-  const estTotal = displayPokok + nomPpn - nomPph
+  // PPN dan PPh di-breakdown proporsional dari actual payment
+  const nomPpn = fullPpn * ratio
+  const nomPph = fullPph * ratio
+  const estTotal = actualPayment
   const lamaStr = k.lama_pembayaran_hari ? `${k.lama_pembayaran_hari} hari` : '-'
   const fmtNum = (v: number) => v > 0 ? v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'
 
@@ -281,6 +283,10 @@ export default function InvoicePage() {
     if (exportNo) window.open(`/api/invoice/export?no_invoice=${encodeURIComponent(exportNo)}`, '_blank')
   }
 
+  const handleExportKuitansi = () => {
+    if (exportNo) window.open(`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(exportNo)}`, '_blank')
+  }
+
   // Read ?edit= param to auto-load invoice for editing
   const [searchParams] = useSearchParams()
   const editNo = searchParams.get('edit')
@@ -411,9 +417,14 @@ export default function InvoicePage() {
               {isSubmitting ? 'Menyimpan...' : isExisting ? 'Simpan Perubahan' : 'Buat Invoice'}
             </Button>
             {exportNo && (
-              <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">
-                <FileDown size={14} /> Export .docx
-              </Button>
+              <>
+                <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">
+                  <FileDown size={14} /> Export .docx
+                </Button>
+                <Button type="button" variant="secondary" onClick={handleExportKuitansi} className="gap-2">
+                  <FileDown size={14} /> Export Kuitansi
+                </Button>
+              </>
             )}
             <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
               <RotateCcw size={14} /> Reset

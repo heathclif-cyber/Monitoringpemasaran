@@ -102,6 +102,21 @@ def export_invoice_docx(no_invoice: str, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/export-kuitansi")
+def export_kuitansi_docx(no_invoice: str, db: Session = Depends(get_db)):
+    from services.generator_word import generate_kuitansi_docx
+    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    buf = generate_kuitansi_docx(db_invoice)
+    safe_name = no_invoice.replace('/', '_').replace(' ', '_')
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="Kuitansi_{safe_name}.docx"'}
+    )
+
+
 @router.get("/{no_invoice:path}", response_model=schemas.InvoiceOut)
 def get_invoice(no_invoice: str, db: Session = Depends(get_db)):
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
