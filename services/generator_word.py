@@ -496,20 +496,12 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     return buf
 
 def generate_kuitansi_docx(invoice) -> io.BytesIO:
+    import copy, os, math
     from services.utils import terbilang_rupiah
-    import math
 
     k = invoice.kontrak
-    doc = Document()
-
-    # A4 portrait
-    sec = doc.sections[0]
-    sec.page_width = Cm(21.0)
-    sec.page_height = Cm(29.7)
-    sec.left_margin = Cm(3.0)
-    sec.right_margin = Cm(2.5)
-    sec.top_margin = Cm(2.0)
-    sec.bottom_margin = Cm(2.0)
+    template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'kuitansi_template.docx')
+    doc = Document(template_path)
 
     # Hitung nilai kuitansi = pokok + PPN (sebelum PPh), proporsional
     pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
@@ -527,126 +519,120 @@ def generate_kuitansi_docx(invoice) -> io.BytesIO:
     nilai_kuitansi = nilai_transaksi * ratio
     terbilang_kuitansi = terbilang_rupiah(math.floor(nilai_kuitansi))
 
-    # Judul
-    p_title = doc.add_paragraph()
-    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _run(p_title, "KUITANSI", bold=True, size=14)
-    _para_fmt(p_title, sa=6)
+    # Helper: replace text in a paragraph, keeping formatting of first run
+    def _replace_para(para, new_text):
+        if para.runs:
+            first_run = para.runs[0]
+            font = first_run.font
+            bold = font.bold
+            italic = font.italic
+            size = font.size
+            name = font.name
+            underline = font.underline
+        else:
+            bold = italic = underline = False
+            size = Pt(9)
+            name = 'Calibri'
+        for r in para.runs:
+            r.text = ''
+        para.runs[0].text = str(new_text)
+        if len(para.runs) > 1:
+            for r in para.runs[1:]:
+                r._element.getparent().remove(r._element)
 
-    # No
-    p_no = doc.add_paragraph()
-    _run(p_no, "No.     ")
-    _run(p_no, _s(invoice.no_invoice))
-    _para_fmt(p_no, sa=12)
+    def _replace_para_keep_first(para, prefix, new_text):
+        """Replace text after a prefix, keeping the prefix run intact"""
+        if para.runs:
+            first_run = para.runs[0]
+            font = first_run.font
+            bold = font.bold
+            italic = font.italic
+            size = font.size
+            name = font.name
+            underline = font.underline
+        else:
+            bold = italic = underline = False
+            size = Pt(9)
+            name = 'Calibri'
+        # Keep first run, clear rest
+        for i in range(1, len(para.runs)):
+            para.runs[i].text = ''
+        # Remove extra runs
+        while len(para.runs) > 2:
+            para.runs[-1]._element.getparent().remove(para.runs[-1]._element)
+        if len(para.runs) == 1:
+            para.runs[0].text = prefix + str(new_text)
+        else:
+            para.runs[0].text = prefix
+            para.runs[1].text = str(new_text)
 
-    # Spacer + Melalui
-    doc.add_paragraph()
-    doc.add_paragraph()
-    doc.add_paragraph()
-    doc.add_paragraph()
-    doc.add_paragraph()
-    p_melalui = doc.add_paragraph()
-    _run(p_melalui, "Melalui,")
-    _para_fmt(p_melalui, sa=6)
+    def _replace_cell_text(cell, new_text):
+        """Replace all text in a cell's first paragraph"""
+        p = cell.paragraphs[0]
+        # Get formatting from first run
+        if p.runs:
+            first = p.runs[0]
+            bold, italic, size, name, underline = first.font.bold, first.font.italic, first.font.size, first.font.name, first.font.underline
+        else:
+            bold = italic = underline = False
+            size = Pt(9)
+            name = 'Calibri'
+        # Clear all runs
+        for r in p.runs:
+            r._element.getparent().remove(r._element)
+        # Add single formatted run
+        from docx.oxml import OxmlElement
+        new_r = OxmlElement('w:r')
+        rpr = OxmlElement('w:rPr')
+        if bold: rpr.append(_make_prop('w:b'))
+        if italic: rpr.append(_make_prop('w:i'))
+        if underline: rpr.append(_make_prop('w:u', {'w:val': 'single'}))
+        sz = OxmlElement('w:sz')
+        sz.set(qn('w:val'), str(int(size.pt * 2)) if size else '18')
+        rpr.append(sz)
+        if name:
+            rf = OxmlElement('w:rFonts')
+            rf.set(qn('w:ascii'), name)
+            rf.set(qn('w:hAnsi'), name)
+            rpr.append(rf)
+        new_r.append(rpr)
+        t = OxmlElement('w:t')
+        t.text = str(new_text)
+        t.set(qn('xml:space'), 'preserve')
+        new_r.append(t)
+        p._element.append(new_r)
 
-    doc.add_paragraph()
-    doc.add_paragraph()
-    doc.add_paragraph()
+    def _make_prop(tag, attrs=None):
+        from docx.oxml import OxmlElement
+        el = OxmlElement(tag)
+        if attrs:
+            for k, v in attrs.items():
+                el.set(qn(k), v)
+        return el
 
-    # === TABLE 1: Data Pembayaran ===
-    tbl1 = doc.add_table(rows=4, cols=3)
-    tbl1.alignment = WD_TABLE_ALIGNMENT.LEFT
-    _no_borders(tbl1, is_table=True)
+    # --- Replace data in template ---
 
-    # Col widths
-    _cw(tbl1.cell(0, 0), 4.5)
-    _cw(tbl1.cell(0, 1), 1.0)
-    _cw(tbl1.cell(0, 2), 9.0)
+    # P[1]: No. [no_invoice]
+    _replace_para_keep_first(doc.paragraphs[1], 'No.     ', _s(invoice.no_invoice))
 
-    def t1_cell(row, col, text, bold=False, right=False):
-        c = tbl1.cell(row, col)
-        p = _cp(c)
-        if right: p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        _run(p, text, bold=bold)
-        _valign_top(c)
+    # Table 0: Data Pembayaran
+    tbl0 = doc.tables[0]
+    _replace_cell_text(tbl0.cell(0, 2), _s(k.pembeli))
+    _replace_cell_text(tbl0.cell(1, 2), 'Rp' + _id_fmt(nilai_kuitansi, 2))
+    _replace_cell_text(tbl0.cell(2, 2), terbilang_kuitansi + ' Rupiah')
+    _replace_cell_text(tbl0.cell(3, 2), f'Pembelian {_s(k.komoditi)} sesuai Invoice No. {_s(invoice.no_invoice)}')
 
-    t1_cell(0, 0, "Telah Diterima Dari")
-    t1_cell(0, 1, ":")
-    t1_cell(0, 2, _s(k.pembeli))
+    # Table 1: Info Bank
+    tbl1 = doc.tables[1]
+    _replace_cell_text(tbl1.cell(0, 2), _s(k.pembayaran_bank, 'Bank Rakyat Indonesia'))
+    _replace_cell_text(tbl1.cell(1, 2), _s(k.pembayaran_atas_nama, 'PT Perkebunan Nusantara I Regional 8'))
+    _replace_cell_text(tbl1.cell(2, 2), _s(k.pembayaran_rek_no, '0050-01-005356-30-0'))
 
-    t1_cell(1, 0, "Banyaknya Uang\n(Termasuk PPN)")
-    t1_cell(1, 1, ":")
-    t1_cell(1, 2, _rp(nilai_kuitansi))
-
-    t1_cell(2, 0, "Terbilang")
-    t1_cell(2, 1, ":")
-    t1_cell(2, 2, terbilang_kuitansi)
-
-    t1_cell(3, 0, "Untuk Pembayaran")
-    t1_cell(3, 1, ":")
-    t1_cell(3, 2, f"Pembelian {_s(k.komoditi)} sesuai Invoice No. {_s(invoice.no_invoice)}")
-
-    # Spacer
-    doc.add_paragraph()
-    doc.add_paragraph()
-
-    # === TABLE 2: Info Bank ===
-    tbl2 = doc.add_table(rows=3, cols=3)
-    tbl2.alignment = WD_TABLE_ALIGNMENT.LEFT
-    _no_borders(tbl2, is_table=True)
-
-    _cw(tbl2.cell(0, 0), 4.5)
-    _cw(tbl2.cell(0, 1), 1.0)
-    _cw(tbl2.cell(0, 2), 9.0)
-
-    def t2_cell(row, col, text, bold=False):
-        c = tbl2.cell(row, col)
-        p = _cp(c)
-        _run(p, text, bold=bold)
-        _valign_top(c)
-
-    t2_cell(0, 0, "Bank Penerima")
-    t2_cell(0, 1, ":")
-    t2_cell(0, 2, _s(k.pembayaran_bank, 'Bank Rakyat Indonesia'))
-
-    t2_cell(1, 0, "Nama Pemilik Rekening")
-    t2_cell(1, 1, ":")
-    t2_cell(1, 2, _s(k.pembayaran_atas_nama, 'PT Perkebunan Nusantara I Regional 8'))
-
-    t2_cell(2, 0, "Nomor Rekening Penerima")
-    t2_cell(2, 1, ":")
-    t2_cell(2, 2, _s(k.pembayaran_rek_no, '0050-01-005356-30-0'))
-
-    # Spacer
-    doc.add_paragraph()
-    doc.add_paragraph()
-    doc.add_paragraph()
-
-    # === Signature area ===
-    tbl3 = doc.add_table(rows=2, cols=2)
-    tbl3.alignment = WD_TABLE_ALIGNMENT.LEFT
-    _no_borders(tbl3, is_table=True)
-
-    _cw(tbl3.cell(0, 0), 7.0)
-    _cw(tbl3.cell(0, 1), 7.5)
-
-    # Left side empty
-    p_sig_l1 = _cp(tbl3.cell(0, 0))
-    _run(p_sig_l1, "")
-    p_sig_l2 = _cp(tbl3.cell(1, 0))
-    _run(p_sig_l2, "")
-
-    # Right side: location + date
+    # Table 2: Signature (date)
+    tbl2 = doc.tables[2]
     lokasi = _s(k.lokasi, 'Makassar')
-    p_loc = _cp(tbl3.cell(0, 1))
-    p_loc.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _run(p_loc, f"{lokasi}, {_date(invoice.tanggal_transaksi)}")
-
-    # Signature line
-    p_sig_r = _cp(tbl3.cell(1, 1))
-    p_sig_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _run(p_sig_r, "")
-    _run(p_sig_r, "", size=6)  # spacer
+    tgl_str = _date(invoice.tanggal_transaksi) if invoice.tanggal_transaksi else '-'
+    _replace_cell_text(tbl2.cell(0, 1), f'{lokasi}, {tgl_str}')
 
     buf = io.BytesIO()
     doc.save(buf)

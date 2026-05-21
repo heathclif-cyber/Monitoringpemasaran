@@ -48,92 +48,108 @@ function KuitansiPreview({ invoice, kontrak }: { invoice: Invoice; kontrak: Kont
 
   const fmtNum = (v: number) => v > 0 ? v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'
   const lokasi = kontrak.lokasi || 'Makassar'
-  const tgl = invoice.tanggal_transaksi
-    ? invoice.tanggal_transaksi.split('-').reverse().join('/')
-    : '-'
 
-  const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '10pt', fontFamily: '"Calibri", Arial, sans-serif', color: '#000' }
-  const tdL: React.CSSProperties = { padding: '4px 8px', verticalAlign: 'top', width: '38%' }
-  const tdC: React.CSSProperties = { padding: '4px 4px', verticalAlign: 'top', width: '4%', textAlign: 'center' }
-  const tdR: React.CSSProperties = { padding: '4px 8px', verticalAlign: 'top' }
+  const MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+  let tglFormatted = '-'
+  if (invoice.tanggal_transaksi) {
+    const parts = invoice.tanggal_transaksi.split('-')
+    if (parts.length === 3) {
+      tglFormatted = `${parseInt(parts[2])} ${MONTHS[parseInt(parts[1])]} ${parts[0]}`
+    }
+  }
+
+  const lineH = { lineHeight: '1.15' }
 
   return (
-    <div style={{ fontFamily: '"Calibri", Arial, sans-serif', fontSize: '10pt', color: '#000' }}>
-      {/* Title */}
-      <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14pt', margin: '0 0 12px 0' }}>KUITANSI</p>
+    <div style={{ fontFamily: '"Calibri", Arial, sans-serif', color: '#000' }}>
+      {/* Title: center, bold, underline */}
+      <p style={{ textAlign: 'center', fontWeight: 'bold', textDecoration: 'underline', margin: '0 0 0 0', ...lineH }}>KUITANSI</p>
 
-      {/* No */}
-      <p style={{ margin: '0 0 18px 0' }}>No.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{invoice.no_invoice}</p>
+      {/* No. */}
+      <p style={{ margin: '0', ...lineH }}>No.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{invoice.no_invoice}</p>
 
-      {/* Spacer for materai */}
-      <div style={{ height: '60px' }} />
+      {/* Empty paragraphs for materai space */}
+      <p style={{ textAlign: 'center', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={{ margin: 0, ...lineH }}>&nbsp;</p>
 
       {/* Melalui */}
-      <p style={{ margin: '0 0 24px 0' }}>Melalui,</p>
+      <p style={{ margin: '0 0 21px 0', ...lineH }}>Melalui,</p>
+
+      {/* Empty filler paragraphs */}
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={{ margin: 0, ...lineH }}>&nbsp;</p>
 
       {/* TABLE 1: Data Pembayaran */}
-      <table style={tableStyle}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', ...lineH }}>
         <tbody>
           <tr>
-            <td style={tdL}>Telah Diterima Dari</td>
-            <td style={tdC}>:</td>
-            <td style={tdR}>{(kontrak.pembeli || '-').split('\n')[0]}</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top', width: '38%' }}>Telah Diterima Dari</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top', width: '4%' }}>:</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>{(kontrak.pembeli || '-').split('\n')[0]}</td>
           </tr>
           <tr>
-            <td style={tdL}>Banyaknya Uang<br /><span style={{ fontSize: '8pt' }}>(Termasuk PPN)</span></td>
-            <td style={tdC}>:</td>
-            <td style={{ ...tdR, fontWeight: 'bold' }}>Rp{fmtNum(nilaiKuitansi)}</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Banyaknya Uang<br />(Termasuk PPN)</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Rp{fmtNum(nilaiKuitansi)}</td>
           </tr>
           <tr>
-            <td style={tdL}>Terbilang</td>
-            <td style={tdC}>:</td>
-            <td style={{ ...tdR, fontStyle: 'italic' }}>{terbilangK} Rupiah</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Terbilang</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top', textAlign: 'justify' }}>{terbilangK} Rupiah</td>
           </tr>
           <tr>
-            <td style={tdL}>Untuk Pembayaran</td>
-            <td style={tdC}>:</td>
-            <td style={tdR}>Pembelian {kontrak.komoditi || '-'} sesuai Invoice No. {invoice.no_invoice}</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Untuk Pembayaran</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top', textAlign: 'justify' }}>Pembelian {kontrak.komoditi || '-'} sesuai Invoice No. {invoice.no_invoice}</td>
           </tr>
         </tbody>
       </table>
 
       {/* Spacer */}
-      <div style={{ height: '28px' }} />
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
 
       {/* TABLE 2: Info Bank */}
-      <table style={tableStyle}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', ...lineH }}>
         <tbody>
           <tr>
-            <td style={tdL}>Bank Penerima</td>
-            <td style={tdC}>:</td>
-            <td style={tdR}>{kontrak.pembayaran_bank || 'Bank Rakyat Indonesia'}</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top', width: '38%' }}>Bank Penerima</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top', width: '4%' }}>:</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>{kontrak.pembayaran_bank || 'Bank Rakyat Indonesia'}</td>
           </tr>
           <tr>
-            <td style={tdL}>Nama Pemilik Rekening</td>
-            <td style={tdC}>:</td>
-            <td style={tdR}>{kontrak.pembayaran_atas_nama || 'PT Perkebunan Nusantara I Regional 8'}</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Nama Pemilik Rekening</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>{kontrak.pembayaran_atas_nama || 'PT Perkebunan Nusantara I Regional 8'}</td>
           </tr>
           <tr>
-            <td style={tdL}>Nomor Rekening Penerima</td>
-            <td style={tdC}>:</td>
-            <td style={tdR}>{kontrak.pembayaran_rek_no || '0050-01-005356-30-0'}</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>Nomor Rekening Penerima</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>:</td>
+            <td style={{ padding: '2px 4px', verticalAlign: 'top' }}>{kontrak.pembayaran_rek_no || '0050-01-005356-30-0'}</td>
           </tr>
         </tbody>
       </table>
 
       {/* Spacer */}
-      <div style={{ height: '40px' }} />
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
+      <p style={{ textAlign: 'justify', margin: 0, ...lineH }}>&nbsp;</p>
 
       {/* Signature */}
-      <table style={{ ...tableStyle, width: '100%' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', ...lineH }}>
         <tbody>
           <tr>
-            <td style={{ width: '50%', padding: '4px' }}></td>
-            <td style={{ width: '50%', padding: '4px', textAlign: 'center' }}>
-              <p style={{ margin: 0 }}>{lokasi}, {tgl}</p>
-              <div style={{ height: '50px' }} />
-              <p style={{ margin: 0, borderTop: '1px solid #000', paddingTop: '4px', display: 'inline-block', minWidth: '140px' }}></p>
+            <td style={{ width: '50%', padding: '2px 4px', verticalAlign: 'top' }}></td>
+            <td style={{ width: '50%', padding: '2px 4px', verticalAlign: 'top', textAlign: 'center' }}>
+              {lokasi}, {tglFormatted}
             </td>
+          </tr>
+          <tr>
+            <td style={{ padding: '2px 4px' }}></td>
+            <td style={{ padding: '2px 4px', textAlign: 'center' }}></td>
           </tr>
         </tbody>
       </table>
@@ -155,6 +171,10 @@ export default function RepoInvoice() {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null)
   const [previewKontrak, setPreviewKontrak] = useState<Kontrak | null>(null)
   const [isLoadingPreview, setIsLoadingPreview] = useState(false)
+
+  // Invoice preview state
+  const [invPreviewOpen, setInvPreviewOpen] = useState(false)
+  const [invPreviewItem, setInvPreviewItem] = useState<Invoice | null>(null)
 
   useEffect(() => { store.fetch() }, [])
 
@@ -193,6 +213,11 @@ export default function RepoInvoice() {
       addNotification('Invoice dihapus', 'success')
     } catch { addNotification('Gagal menghapus', 'error') }
     setDeleteTarget(null)
+  }
+
+  const handlePreviewInvoice = (invoice: Invoice) => {
+    setInvPreviewItem(invoice)
+    setInvPreviewOpen(true)
   }
 
   const handlePreviewKuitansi = async (invoice: Invoice) => {
@@ -257,13 +282,11 @@ export default function RepoInvoice() {
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600" onClick={() => navigate(`/invoice?edit=${item.no_invoice}`)}>
                             <Edit size={14} />
                           </Button>
-                          <a href={`/api/invoice/export?no_invoice=${encodeURIComponent(item.no_invoice)}`} target="_blank">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600">
-                              <FileDown size={14} />
-                            </Button>
-                          </a>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" onClick={() => handlePreviewKuitansi(item)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handlePreviewInvoice(item)}>
                             <Eye size={14} />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" onClick={() => handlePreviewKuitansi(item)}>
+                            <Receipt size={14} />
                           </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => setDeleteTarget(item.no_invoice)}>
                             <Trash2 size={14} />
@@ -288,6 +311,49 @@ export default function RepoInvoice() {
         isDestructive
         onConfirm={handleDelete}
       />
+
+      {/* Invoice Preview Dialog */}
+      <Dialog open={invPreviewOpen} onOpenChange={setInvPreviewOpen}>
+        <DialogContent className="max-w-[480px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <Eye size={16} className="text-blue-600" />
+              Preview Invoice
+            </DialogTitle>
+          </DialogHeader>
+
+          {invPreviewItem && (
+            <>
+              <div className="border rounded-lg p-5 bg-white">
+                <div className="text-sm space-y-2 font-sans">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <span className="text-slate-500">No Invoice</span><span className="font-medium">{invPreviewItem.no_invoice}</span>
+                    <span className="text-slate-500">No Kontrak</span><span>{invPreviewItem.no_kontrak}</span>
+                    <span className="text-slate-500">Tgl Transaksi</span><span>{formatDate(invPreviewItem.tanggal_transaksi)}</span>
+                    <span className="text-slate-500">Status</span><span>{invPreviewItem.status_invoice || 'Unpaid'}</span>
+                    <span className="text-slate-500">Jumlah Pembayaran</span><span className="font-bold text-brand-600">{formatCurrency(invPreviewItem.jumlah_pembayaran)}</span>
+                  </div>
+                  {invPreviewItem.terbilang_invoice && (
+                    <div className="border-t pt-2 mt-2">
+                      <p className="text-xs text-slate-500">Terbilang:</p>
+                      <p className="text-sm italic">{invPreviewItem.terbilang_invoice} Rupiah</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <a href={`/api/invoice/export?no_invoice=${encodeURIComponent(invPreviewItem.no_invoice)}`} target="_blank">
+                  <Button variant="secondary" className="gap-2">
+                    <FileDown size={14} />
+                    Download Invoice .docx
+                  </Button>
+                </a>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Kuitansi Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

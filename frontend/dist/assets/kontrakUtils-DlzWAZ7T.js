@@ -1,6 +1,0 @@
-function d(n,e,a,r,b,o,k){const t=n*e+a,i=r==="true"?t*(b/100):0,s=o==="true"?t*(k/100):0,l=t+i,m=l-s;return{pokok:t,nominalPpn:i,nominalPph:s,nilaiTransaksi:l,totalTagihan:m}}function u(n,e){if(!n)return"";const a=new Date(n);return a.setDate(a.getDate()+e),a.toISOString().split("T")[0]}function c(n,e){const a=n||15,r=e||15;return[`a. Pembayaran dilaksanakan selambat-lambatnya ${a} hari kalender setelah ditandatanganinya Kontrak penjualan`,"b. Penyerahan barang dilaksanakan setelah diterima bukti transfer pembayaran",`c. Pengambilan barang selambat-lambatnya ${r} hari kalender dari batas akhir tanggal pembayaran`,"d. Biaya-biaya yang terkait dengan administrasi Bank menjadi beban pembeli"].join(`
-`)}const g=`a. Pembayaran dilaksanakan selambat-lambatnya 15 hari kalender setelah ditandatanganinya Kontrak penjualan
-b. Penyerahan barang dilaksanakan setelah diterima bukti transfer pembayaran
-c. Pengambilan barang selambat-lambatnya 15 hari kalender dari batas akhir tanggal pembayaran
-d. Biaya-biaya yang terkait dengan administrasi Bank menjadi beban pembeli`,y="Mengacu kepada tata Cara dan Ketentuan Penjualan Komoditi Perkebunan PT Perkebunan Nusantara III (Persero)",P="PT Perkebunan Nusantara I Regional 8",h=`PT Perkebunan Nusantara I Regional 8
-Jalan Urip Sumoharjo No. 72-76, Kota Makassar`;export{h as D,P as a,u as b,d as c,y as d,g as e,c as g};

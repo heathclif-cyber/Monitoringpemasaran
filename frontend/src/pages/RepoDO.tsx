@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, FileDown, Trash2, Search } from 'lucide-react'
+import { Edit, FileDown, Trash2, Search, Eye, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useDOStore } from '@/store/doStore'
 import { useAppStore } from '@/store/appStore'
@@ -8,7 +8,10 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
-import { formatDate, safe } from '@/lib/utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { formatCurrency, formatDate, safe } from '@/lib/utils'
+import { client } from '@/lib/client'
+import type { DeliveryOrder } from '@/types'
 
 const MONTHS: Record<string, string> = {
   '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
@@ -25,6 +28,9 @@ export default function RepoDO() {
   const [unit, setUnit] = useState('ALL')
   const [sort, setSort] = useState<'DESC' | 'ASC'>('DESC')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewDO, setPreviewDO] = useState<DeliveryOrder | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => { store.fetch() }, [])
 
@@ -66,6 +72,20 @@ export default function RepoDO() {
       addNotification('DO dihapus', 'success')
     } catch { addNotification('Gagal menghapus', 'error') }
     setDeleteTarget(null)
+  }
+
+  const handlePreview = async (item: DeliveryOrder) => {
+    setPreviewOpen(true)
+    setPreviewDO(null)
+    setPreviewLoading(true)
+    try {
+      const full = await client.get<DeliveryOrder>(`/api/do/${encodeURIComponent(item.no_do)}`)
+      setPreviewDO(full)
+    } catch {
+      setPreviewDO(item)
+    } finally {
+      setPreviewLoading(false)
+    }
   }
 
   const selCls = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-xs shadow-sm'
@@ -119,11 +139,9 @@ export default function RepoDO() {
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600" onClick={() => navigate(`/delivery-order?edit=${item.no_do}`)}>
                             <Edit size={14} />
                           </Button>
-                          <a href={`/api/do/export?no_do=${encodeURIComponent(item.no_do)}`} target="_blank">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600">
-                              <FileDown size={14} />
-                            </Button>
-                          </a>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handlePreview(item)}>
+                            <Eye size={14} />
+                          </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => setDeleteTarget(item.no_do)}>
                             <Trash2 size={14} />
                           </Button>
@@ -147,6 +165,58 @@ export default function RepoDO() {
         isDestructive
         onConfirm={handleDelete}
       />
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <Eye size={16} className="text-blue-600" />
+              Preview Delivery Order
+            </DialogTitle>
+          </DialogHeader>
+
+          {previewLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 size={24} className="animate-spin text-slate-300" />
+            </div>
+          ) : previewDO ? (
+            <>
+              <div className="border rounded-lg p-5 bg-white">
+                <div className="text-sm space-y-2 font-sans">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <span className="text-slate-500">No DO</span><span className="font-medium">{previewDO.no_do}</span>
+                    <span className="text-slate-500">No Invoice</span><span>{previewDO.no_invoice}</span>
+                    <span className="text-slate-500">Tanggal DO</span><span>{formatDate(previewDO.tanggal_do)}</span>
+                    <span className="text-slate-500">Kepada Unit</span><span>{safe(previewDO.kepada_unit)}</span>
+                    <span className="text-slate-500">Nominal Transfer</span><span className="font-semibold">{formatCurrency(previewDO.nominal_transfer)}</span>
+                    <span className="text-slate-500">Volume DO</span><span>{formatCurrency(previewDO.volume_do)}</span>
+                    <span className="text-slate-500">PPh Disetor</span><span>{previewDO.is_pph_disetor === 'true' ? 'Sudah' : 'Belum'}</span>
+                  </div>
+                  {previewDO.invoice && (
+                    <div className="border-t pt-2 mt-2">
+                      <p className="text-xs font-semibold text-slate-500 mb-1">Invoice:</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                        <span className="text-slate-500">No Invoice</span><span>{previewDO.invoice.no_invoice}</span>
+                        <span className="text-slate-500">No Kontrak</span><span>{previewDO.invoice.no_kontrak}</span>
+                        <span className="text-slate-500">Tgl Transaksi</span><span>{formatDate(previewDO.invoice.tanggal_transaksi)}</span>
+                        <span className="text-slate-500">Jumlah</span><span className="font-semibold">{formatCurrency(previewDO.invoice.jumlah_pembayaran)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <a href={`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`} target="_blank">
+                  <Button variant="secondary" className="gap-2">
+                    <FileDown size={14} />
+                    Download DO .docx
+                  </Button>
+                </a>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

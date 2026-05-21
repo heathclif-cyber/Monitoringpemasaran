@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, FileDown, Trash2, Search } from 'lucide-react'
+import { Edit, FileDown, Trash2, Search, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate, safe } from '@/lib/utils'
+import { terbilangRupiah } from '@/utils/terbilang'
+import { calculateKontrakPricing } from '@/utils/kontrakUtils'
+import type { Kontrak } from '@/types'
 
 function formatMonthKey(dateStr: string): string {
   if (!dateStr) return ''
@@ -23,6 +26,35 @@ const MONTHS: Record<string, string> = {
   '09': 'September', '10': 'Oktober', '11': 'November', '12': 'Desember',
 }
 
+function KontrakMiniPreview({ data }: { data: Kontrak }) {
+  const pricing = calculateKontrakPricing(
+    data.volume || 0, data.harga_satuan || 0, data.premi || 0,
+    data.is_ppn || 'true', data.ppn_persen || 11,
+    data.is_pph || 'false', data.pph_persen || 0,
+  )
+  const fmt = (v: number) => v > 0 ? formatCurrency(v) : '-'
+
+  return (
+    <div className="text-sm space-y-2 font-sans">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+        <span className="text-slate-500">No Kontrak</span><span className="font-medium">{data.no_kontrak}</span>
+        <span className="text-slate-500">Tanggal</span><span>{formatDate(data.tanggal_kontrak)}</span>
+        <span className="text-slate-500">Pembeli</span><span>{(data.pembeli || '-').split('\n')[0]}</span>
+        <span className="text-slate-500">Komoditi</span><span>{safe(data.komoditi)}</span>
+        <span className="text-slate-500">Volume</span><span>{formatCurrency(data.volume)} {safe(data.satuan)}</span>
+        <span className="text-slate-500">Harga Satuan</span><span>{formatCurrency(data.harga_satuan)}</span>
+        <span className="text-slate-500">Premi</span><span>{formatCurrency(data.premi)}</span>
+        <span className="text-slate-500">PPN</span><span>{data.is_ppn !== 'false' ? `${data.ppn_persen || 11}%` : 'Tidak'}</span>
+        <span className="text-slate-500">PPh</span><span>{data.is_pph === 'true' ? `${data.pph_persen || 0}%` : 'Tidak'}</span>
+        <span className="text-slate-500">Pokok</span><span className="font-semibold">{fmt(pricing.pokok)}</span>
+        <span className="text-slate-500">PPN</span><span>{fmt(pricing.nominalPpn)}</span>
+        <span className="text-slate-500">PPh</span><span className="text-red-500">({fmt(pricing.nominalPph)})</span>
+        <span className="text-slate-500">Total Tagihan</span><span className="font-bold text-brand-600">{fmt(pricing.totalTagihan)}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function RepoKontrak() {
   const navigate = useNavigate()
   const store = useKontrakStore()
@@ -33,6 +65,8 @@ export default function RepoKontrak() {
   const [pembeli, setPembeli] = useState('ALL')
   const [sort, setSort] = useState<'DESC' | 'ASC'>('DESC')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewData, setPreviewData] = useState<Kontrak | null>(null)
 
   useEffect(() => { store.fetch() }, [])
 
@@ -76,6 +110,11 @@ export default function RepoKontrak() {
       addNotification('Gagal menghapus kontrak', 'error')
     }
     setDeleteTarget(null)
+  }
+
+  const handlePreview = (item: Kontrak) => {
+    setPreviewData(item)
+    setPreviewOpen(true)
   }
 
   const selCls = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-xs shadow-sm'
@@ -139,11 +178,9 @@ export default function RepoKontrak() {
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600" onClick={() => navigate(`/kontrak?edit=${item.no_kontrak}`)}>
                             <Edit size={14} />
                           </Button>
-                          <a href={`/api/kontrak/export?no_kontrak=${encodeURIComponent(item.no_kontrak)}`} target="_blank">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600">
-                              <FileDown size={14} />
-                            </Button>
-                          </a>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handlePreview(item)}>
+                            <Eye size={14} />
+                          </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => setDeleteTarget(item.no_kontrak)}>
                             <Trash2 size={14} />
                           </Button>
@@ -167,6 +204,33 @@ export default function RepoKontrak() {
         isDestructive
         onConfirm={handleDelete}
       />
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <Eye size={16} className="text-blue-600" />
+              Preview Kontrak
+            </DialogTitle>
+          </DialogHeader>
+
+          {previewData && (
+            <>
+              <div className="border rounded-lg p-5 bg-white">
+                <KontrakMiniPreview data={previewData} />
+              </div>
+              <div className="flex justify-end">
+                <a href={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} target="_blank">
+                  <Button variant="secondary" className="gap-2">
+                    <FileDown size={14} />
+                    Download Kontrak .docx
+                  </Button>
+                </a>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
