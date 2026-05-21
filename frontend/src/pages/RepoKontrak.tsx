@@ -10,8 +10,6 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate, safe } from '@/lib/utils'
-import { terbilangRupiah } from '@/utils/terbilang'
-import { calculateKontrakPricing } from '@/utils/kontrakUtils'
 import type { Kontrak } from '@/types'
 
 function formatMonthKey(dateStr: string): string {
@@ -24,35 +22,6 @@ const MONTHS: Record<string, string> = {
   '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
   '05': 'Mei', '06': 'Juni', '07': 'Juli', '08': 'Agustus',
   '09': 'September', '10': 'Oktober', '11': 'November', '12': 'Desember',
-}
-
-function KontrakMiniPreview({ data }: { data: Kontrak }) {
-  const pricing = calculateKontrakPricing(
-    data.volume || 0, data.harga_satuan || 0, data.premi || 0,
-    data.is_ppn || 'true', data.ppn_persen || 11,
-    data.is_pph || 'false', data.pph_persen || 0,
-  )
-  const fmt = (v: number) => v > 0 ? formatCurrency(v) : '-'
-
-  return (
-    <div className="text-sm space-y-2 font-sans">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-        <span className="text-slate-500">No Kontrak</span><span className="font-medium">{data.no_kontrak}</span>
-        <span className="text-slate-500">Tanggal</span><span>{formatDate(data.tanggal_kontrak)}</span>
-        <span className="text-slate-500">Pembeli</span><span>{(data.pembeli || '-').split('\n')[0]}</span>
-        <span className="text-slate-500">Komoditi</span><span>{safe(data.komoditi)}</span>
-        <span className="text-slate-500">Volume</span><span>{formatCurrency(data.volume)} {safe(data.satuan)}</span>
-        <span className="text-slate-500">Harga Satuan</span><span>{formatCurrency(data.harga_satuan)}</span>
-        <span className="text-slate-500">Premi</span><span>{formatCurrency(data.premi)}</span>
-        <span className="text-slate-500">PPN</span><span>{data.is_ppn !== 'false' ? `${data.ppn_persen || 11}%` : 'Tidak'}</span>
-        <span className="text-slate-500">PPh</span><span>{data.is_pph === 'true' ? `${data.pph_persen || 0}%` : 'Tidak'}</span>
-        <span className="text-slate-500">Pokok</span><span className="font-semibold">{fmt(pricing.pokok)}</span>
-        <span className="text-slate-500">PPN</span><span>{fmt(pricing.nominalPpn)}</span>
-        <span className="text-slate-500">PPh</span><span className="text-red-500">({fmt(pricing.nominalPph)})</span>
-        <span className="text-slate-500">Total Tagihan</span><span className="font-bold text-brand-600">{fmt(pricing.totalTagihan)}</span>
-      </div>
-    </div>
-  )
 }
 
 export default function RepoKontrak() {
@@ -206,7 +175,7 @@ export default function RepoKontrak() {
       />
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[780px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
               <Eye size={16} className="text-blue-600" />
@@ -216,8 +185,8 @@ export default function RepoKontrak() {
 
           {previewData && (
             <>
-              <div className="border rounded-lg p-5 bg-white">
-                <KontrakMiniPreview data={previewData} />
+              <div className="border rounded-lg bg-white overflow-hidden">
+                <iframe src={`/api/kontrak/preview?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} className="w-full h-[65vh] border-0" title="Preview Kontrak" />
               </div>
               <div className="flex justify-end">
                 <a href={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} target="_blank">

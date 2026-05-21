@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
+import mammoth
 
 import models
 import schemas
@@ -70,6 +71,18 @@ def export_do_docx(no_do: str, db: Session = Depends(get_db)):
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="DO_{safe_name}.docx"'}
     )
+
+
+@router.get("/preview", response_class=HTMLResponse)
+def preview_do_html(no_do: str = Query(...), db: Session = Depends(get_db)):
+    from services.generator_word import generate_do_docx
+    db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == no_do).first()
+    if not db_do:
+        raise HTTPException(status_code=404, detail="DO not found")
+    buf = generate_do_docx(db_do)
+    buf.seek(0)
+    result = mammoth.convert_to_html(buf)
+    return result.value
 
 
 @router.get("/{no_do:path}", response_model=schemas.DeliveryOrderOut)

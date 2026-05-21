@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
-import math
+import math, io, mammoth
 
 import models
 import schemas
@@ -115,6 +115,34 @@ def export_kuitansi_docx(no_invoice: str, db: Session = Depends(get_db)):
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="Kuitansi_{safe_name}.docx"'}
     )
+
+
+def _docx_to_html(buf: io.BytesIO) -> str:
+    buf.seek(0)
+    result = mammoth.convert_to_html(buf)
+    return result.value
+
+
+@router.get("/preview", response_class=HTMLResponse)
+def preview_invoice_html(no_invoice: str = Query(...), db: Session = Depends(get_db)):
+    from services.generator_word import generate_invoice_docx
+    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    buf = generate_invoice_docx(db_invoice)
+    html = _docx_to_html(buf)
+    return html
+
+
+@router.get("/preview-kuitansi", response_class=HTMLResponse)
+def preview_kuitansi_html(no_invoice: str = Query(...), db: Session = Depends(get_db)):
+    from services.generator_word import generate_kuitansi_docx
+    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    buf = generate_kuitansi_docx(db_invoice)
+    html = _docx_to_html(buf)
+    return html
 
 
 @router.get("/{no_invoice:path}", response_model=schemas.InvoiceOut)
