@@ -21,6 +21,7 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
     kondisi_penyerahan, waktu_penyerahan,
     lama_pembayaran_hari, levering,
     pembayaran_metode, pembayaran_cara, pembayaran_bank,
+    units,
   } = data
 
   const pricing = calculateKontrakPricing(
@@ -112,7 +113,17 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
           <RowD l1="Packaging" v1={safe(packaging)} l2="Symbol" v2={safe(simbol)} />
           <RowS label="Deskripsi Produk" value={safe(deskripsi_produk)} />
           <RowS label="Mutu" value={safe(mutu)} />
-          <RowS label="Produsen" value={safe(kebun_produsen)} />
+          {units && units.length > 0 ? (
+            <tr>
+              <td style={tdLbl}>Produsen</td>
+              <td style={tdCol}>:</td>
+              <td style={tdVal} colSpan={4}>
+                {units.map((u, i) => <div key={i}>{u.nama_unit}</div>)}
+              </td>
+            </tr>
+          ) : (
+            <RowS label="Produsen" value={safe(kebun_produsen)} />
+          )}
           <RowS label="Pelabuhan Muat" value={safe(pelabuhan_muat)} />
           <RowS label="Volume" value={fmtVol(volume || 0, satuan || 'Unit')} />
           <RowD l1="Harga Satuan" v1={fmtHarga(harga_satuan || 0, satuan || 'Unit')} l2="Premi" v2={premi && premi > 0 ? fmtRpLocal(premi) : '-'} />

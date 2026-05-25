@@ -1,6 +1,19 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import date
+
+class KontrakUnitInput(BaseModel):
+    nama_unit: str
+
+class KontrakUnitOut(BaseModel):
+    id: int
+    no_kontrak: str
+    nama_unit: str
+    urutan: int
+
+    class Config:
+        from_attributes = True
+
 
 class KontrakBase(BaseModel):
     no_kontrak: str
@@ -56,13 +69,14 @@ class KontrakBase(BaseModel):
     lokasi: Optional[str] = "Makassar"
 
 class KontrakCreate(KontrakBase):
-    pass
+    units: Optional[List[KontrakUnitInput]] = []
 
 class KontrakOut(KontrakBase):
     nilai_transaksi: float
     nominal_ppn: float
     jatuh_tempo_pembayaran: Optional[date]
     terbilang: Optional[str]
+    units: List[KontrakUnitOut] = []
 
     class Config:
         from_attributes = True

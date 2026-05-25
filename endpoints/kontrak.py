@@ -17,6 +17,9 @@ router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == kontrak.no_kontrak).first()
 
+    units_input = kontrak.units or []
+    kontrak_data = kontrak.model_dump(exclude={'units'})
+
     # Calculate fields
     pokok = ((kontrak.volume or 0.0) * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
     nominal_ppn = 0.0
@@ -27,27 +30,32 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     terbilang = terbilang_rupiah(math.floor(nilai_transaksi))
 
     if db_kontrak:
-        for key, value in kontrak.model_dump().items():
+        for key, value in kontrak_data.items():
             setattr(db_kontrak, key, value)
         db_kontrak.nilai_transaksi = nilai_transaksi
         db_kontrak.nominal_ppn = nominal_ppn
         db_kontrak.jatuh_tempo_pembayaran = jatuh_tempo_pembayaran
         db_kontrak.terbilang = terbilang
-        db.commit()
-        db.refresh(db_kontrak)
-        return db_kontrak
     else:
-        new_kontrak = models.Kontrak(
-            **kontrak.model_dump(),
+        db_kontrak = models.Kontrak(
+            **kontrak_data,
             nilai_transaksi=nilai_transaksi,
             nominal_ppn=nominal_ppn,
             jatuh_tempo_pembayaran=jatuh_tempo_pembayaran,
             terbilang=terbilang
         )
-        db.add(new_kontrak)
-        db.commit()
-        db.refresh(new_kontrak)
-        return new_kontrak
+        db.add(db_kontrak)
+
+    db.flush()
+
+    # Replace units
+    db.query(models.KontrakUnit).filter(models.KontrakUnit.no_kontrak == kontrak.no_kontrak).delete()
+    for i, unit in enumerate(units_input):
+        db.add(models.KontrakUnit(no_kontrak=kontrak.no_kontrak, nama_unit=unit.nama_unit, urutan=i))
+
+    db.commit()
+    db.refresh(db_kontrak)
+    return db_kontrak
 
 
 @router.get("", response_model=List[schemas.KontrakOut])

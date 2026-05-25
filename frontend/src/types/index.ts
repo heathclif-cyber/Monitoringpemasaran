@@ -21,6 +21,13 @@ export type SapField =
 // Entity Interfaces — matching backend models.py / schemas.py
 // ============================================================
 
+export interface KontrakUnit {
+  id: number
+  no_kontrak: string
+  nama_unit: string
+  urutan: number
+}
+
 export interface Kontrak {
   no_kontrak: string
   tanggal_kontrak: string // date
@@ -73,6 +80,7 @@ export interface Kontrak {
   nominal_ppn: number
   jatuh_tempo_pembayaran: string | null
   terbilang: string | null
+  units?: KontrakUnit[]
 }
 
 export interface Invoice {
@@ -281,6 +289,7 @@ export interface KontrakInput {
   syarat_syarat?: string
   dasar_ketentuan?: string
   lokasi?: string
+  units?: { nama_unit: string }[]
 }
 
 export interface InvoiceInput {

@@ -181,7 +181,13 @@ def generate_contract_docx(k) -> io.BytesIO:
     RD('Packaging', _s(k.packaging), 'Symbol', _s(k.simbol))
     RS('Deskripsi Produk', _s(k.deskripsi_produk))
     RS('Mutu', _s(k.mutu))
-    RS('Produsen', _s(k.kebun_produsen))
+    units = getattr(k, 'units', None) or []
+    if len(units) > 1:
+        RM('Produsen', [(u.nama_unit, False) for u in units])
+    elif len(units) == 1:
+        RS('Produsen', units[0].nama_unit)
+    else:
+        RS('Produsen', _s(k.kebun_produsen))
     RS('Pelabuhan Muat', _s(k.pelabuhan_muat))
     RS('Volume', vol_str)
     RD('Harga Satuan', harga_str, 'Premi', premi_str)

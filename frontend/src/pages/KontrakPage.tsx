@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Save, Eye, FileDown, RotateCcw } from 'lucide-react'
+import { Save, Eye, FileDown, RotateCcw, Plus, X } from 'lucide-react'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
@@ -75,6 +75,7 @@ export default function KontrakPage() {
   const [isExisting, setIsExisting] = useState(false)
   const [previewData, setPreviewData] = useState<Partial<KontrakFormData>>({})
   const [exportNo, setExportNo] = useState<string | null>(null)
+  const [unitList, setUnitList] = useState<string[]>([''])
 
   const form = useForm<KontrakFormData>({
     resolver: zodResolver(kontrakSchema),
@@ -168,6 +169,14 @@ export default function KontrakPage() {
           setValue(f, val)
         }
       }
+      // Load units — fallback ke kebun_produsen jika belum ada units
+      if (data.units && data.units.length > 0) {
+        setUnitList(data.units.map(u => u.nama_unit))
+      } else if (data.kebun_produsen) {
+        setUnitList([data.kebun_produsen])
+      } else {
+        setUnitList([''])
+      }
     } else {
       setIsExisting(false)
       setExportNo(null)
@@ -180,6 +189,7 @@ export default function KontrakPage() {
     setIsExisting(false)
     setExportNo(null)
     setKontrakNo('')
+    setUnitList([''])
   }
 
   // Submit
@@ -192,6 +202,7 @@ export default function KontrakPage() {
       }
       payload.pembayaran_atas_nama = 'PT Perkebunan Nusantara I Regional 8'
       payload.pembayaran_rek_no = 'No. 0050-01-005356-30-0'
+      payload.units = unitList.filter(u => u.trim()).map(nama_unit => ({ nama_unit }))
 
       await store.save(payload)
       setExportNo(data.no_kontrak)
@@ -327,8 +338,47 @@ export default function KontrakPage() {
                 </select>
               </div>
               <div><Label className="text-xs">Tahun Panen</Label><input {...register('tahun_panen')} className={ic} /></div>
-              <div><Label className="text-xs">Kebun Produsen</Label><input {...register('kebun_produsen')} className={ic} /></div>
               <div><Label className="text-xs">Deskripsi Produk</Label><input {...register('deskripsi_produk')} className={ic} /></div>
+              <div className="col-span-3">
+                <Label className="text-xs">Unit / Kebun Produsen</Label>
+                <div className="space-y-2 mt-1">
+                  {unitList.map((unit, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input
+                        value={unit}
+                        onChange={e => {
+                          const next = [...unitList]
+                          next[i] = e.target.value
+                          setUnitList(next)
+                        }}
+                        className={ic}
+                        placeholder={`Unit ${i + 1}`}
+                      />
+                      {unitList.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 text-slate-400 hover:text-red-500"
+                          onClick={() => setUnitList(unitList.filter((_, j) => j !== i))}
+                        >
+                          <X size={14} />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 text-xs"
+                    onClick={() => setUnitList([...unitList, ''])}
+                  >
+                    <Plus size={12} />
+                    Tambah Unit
+                  </Button>
+                </div>
+              </div>
               <div><Label className="text-xs">Mutu</Label><input {...register('mutu')} className={ic} /></div>
               <div><Label className="text-xs">Packaging</Label><input {...register('packaging')} className={ic} /></div>
               <div><Label className="text-xs">Simbol</Label><input {...register('simbol')} className={ic} /></div>
@@ -476,7 +526,7 @@ export default function KontrakPage() {
                 <p className="text-xs text-slate-400 mt-1">Isi form kontrak untuk melihat preview</p>
               </div>
             ) : (
-              <KontrakPreview data={watchedFields} />
+              <KontrakPreview data={{ ...watchedFields, units: unitList.filter(u => u.trim()).map((nama_unit, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit, urutan: i })) }} />
             )}
           </div>
         </div>

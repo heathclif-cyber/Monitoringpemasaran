@@ -64,6 +64,18 @@ class Kontrak(Base):
     terbilang = Column(String)
     
     invoices = relationship("Invoice", back_populates="kontrak", cascade="all, delete-orphan")
+    units = relationship("KontrakUnit", back_populates="kontrak", cascade="all, delete-orphan", order_by="KontrakUnit.urutan")
+
+class KontrakUnit(Base):
+    __tablename__ = "kontrak_unit"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    no_kontrak = Column(String, ForeignKey("kontrak.no_kontrak", ondelete="CASCADE"))
+    nama_unit = Column(String, nullable=False)
+    urutan = Column(Integer, default=0)
+
+    kontrak = relationship("Kontrak", back_populates="units")
+
 
 class Invoice(Base):
     __tablename__ = "invoice"
