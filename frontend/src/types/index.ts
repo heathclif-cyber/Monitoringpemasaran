@@ -215,10 +215,19 @@ export interface BulananChart {
   volume_butir: number[]
 }
 
+export interface SapBulanan {
+  labels: string[]
+  missing_kontrak: number[]
+  missing_so: number[]
+  missing_do: number[]
+  missing_billing: number[]
+}
+
 export interface DashboardCharts {
   komoditas: ChartData
   unit: ChartData
   bulanan: BulananChart
+  sap_bulanan: SapBulanan
 }
 
 export interface DashboardResponse {

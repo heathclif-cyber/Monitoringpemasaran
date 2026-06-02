@@ -48,6 +48,7 @@ def get_dashboard_data(
         pend_m = {f"{i:02d}": 0.0 for i in range(1, 13)}
         inv_m  = {f"{i:02d}": 0.0 for i in range(1, 13)}
         cash_m = {f"{i:02d}": 0.0 for i in range(1, 13)}
+        sap_m  = {f"{i:02d}": {"missing_kontrak": 0, "missing_so": 0, "missing_do": 0, "missing_billing": 0} for i in range(1, 13)}
         kom_map = {}
         unit_map = {}
         
@@ -82,6 +83,12 @@ def get_dashboard_data(
             
             m = do.rencana_pengambilan.month if do.rencana_pengambilan else do.tanggal_do.month if do.tanggal_do else 1
             pend_m[f"{m:02d}"] += pendapatan_do
+
+            sk = f"{m:02d}"
+            if not (do.kontrak_sap or '').strip(): sap_m[sk]["missing_kontrak"] += 1
+            if not (do.so_sap or '').strip():      sap_m[sk]["missing_so"] += 1
+            if not (do.do_sap or '').strip():      sap_m[sk]["missing_do"] += 1
+            if not (do.billing_sap or '').strip(): sap_m[sk]["missing_billing"] += 1
             
             if satuan == "butir":
                 vol_m_butir[f"{m:02d}"] += do_vol
@@ -129,6 +136,12 @@ def get_dashboard_data(
             pend_m[f"{m:02d}"] += nom
             cash_m[f"{m:02d}"] += nom
             inv_m[f"{m:02d}"] += nom
+
+            bk = f"{m:02d}"
+            if not (b.kontrak_sap or '').strip(): sap_m[bk]["missing_kontrak"] += 1
+            if not (b.so_sap or '').strip():      sap_m[bk]["missing_so"] += 1
+            if not (b.do_sap or '').strip():      sap_m[bk]["missing_do"] += 1
+            if not (b.billing_sap or '').strip(): sap_m[bk]["missing_billing"] += 1
             
             if satuan == "butir":
                 vol_m_butir[f"{m:02d}"] += vol
@@ -202,6 +215,13 @@ def get_dashboard_data(
                     "cashin": [cash_m[f"{i:02d}"] for i in range(1, 13)],
                     "volume_kg": [vol_m_kg[f"{i:02d}"] for i in range(1, 13)],
                     "volume_butir": [vol_m_butir[f"{i:02d}"] for i in range(1, 13)],
+                },
+                "sap_bulanan": {
+                    "labels": ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"],
+                    "missing_kontrak": [sap_m[f"{i:02d}"]["missing_kontrak"] for i in range(1, 13)],
+                    "missing_so":      [sap_m[f"{i:02d}"]["missing_so"]      for i in range(1, 13)],
+                    "missing_do":      [sap_m[f"{i:02d}"]["missing_do"]      for i in range(1, 13)],
+                    "missing_billing": [sap_m[f"{i:02d}"]["missing_billing"] for i in range(1, 13)],
                 }
             },
             "available_years": avail_y,

@@ -285,7 +285,7 @@ function SapStatus() {
   if (!data) return null
 
   const { sap_stats } = data.summary
-  const { sap_bulanan } = data.charts
+  const sap_bulanan = data.charts.sap_bulanan
 
   const summary = [
     { label: 'Kontrak SAP', value: sap_stats.missing_kontrak },
@@ -294,12 +294,12 @@ function SapStatus() {
     { label: 'Billing SAP', value: sap_stats.missing_billing },
   ]
 
-  const rows = sap_bulanan.labels.map((label, i) => ({
+  const rows = (sap_bulanan?.labels ?? []).map((label, i) => ({
     bulan: label,
-    kontrak: sap_bulanan.missing_kontrak[i] || 0,
-    so: sap_bulanan.missing_so[i] || 0,
-    do_: sap_bulanan.missing_do[i] || 0,
-    billing: sap_bulanan.missing_billing[i] || 0,
+    kontrak: sap_bulanan?.missing_kontrak[i] || 0,
+    so: sap_bulanan?.missing_so[i] || 0,
+    do_: sap_bulanan?.missing_do[i] || 0,
+    billing: sap_bulanan?.missing_billing[i] || 0,
   })).filter((r) => r.kontrak + r.so + r.do_ + r.billing > 0).reverse()
 
   const MissingBadge = ({ val }: { val: number }) =>
@@ -442,6 +442,7 @@ export default function Dashboard() {
       ) : data ? (
         <>
           <StatCards />
+          <SapStatus />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <TrendChart />
@@ -454,7 +455,6 @@ export default function Dashboard() {
           </div>
 
           <MonthlyBreakdown />
-          <SapStatus />
         </>
       ) : null}
     </div>
