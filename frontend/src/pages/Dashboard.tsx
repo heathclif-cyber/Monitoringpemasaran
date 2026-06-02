@@ -285,21 +285,42 @@ function SapStatus() {
   if (!data) return null
 
   const { sap_stats } = data.summary
-  const items = [
+  const { sap_bulanan } = data.charts
+
+  const summary = [
     { label: 'Kontrak SAP', value: sap_stats.missing_kontrak },
     { label: 'SO SAP (Inv)', value: sap_stats.missing_so },
     { label: 'DO SAP', value: sap_stats.missing_do },
     { label: 'Billing SAP', value: sap_stats.missing_billing },
   ]
 
+  const rows = sap_bulanan.labels.map((label, i) => ({
+    bulan: label,
+    kontrak: sap_bulanan.missing_kontrak[i] || 0,
+    so: sap_bulanan.missing_so[i] || 0,
+    do_: sap_bulanan.missing_do[i] || 0,
+    billing: sap_bulanan.missing_billing[i] || 0,
+  })).filter((r) => r.kontrak + r.so + r.do_ + r.billing > 0).reverse()
+
+  const MissingBadge = ({ val }: { val: number }) =>
+    val > 0 ? (
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
+        {val}
+      </span>
+    ) : (
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 text-xs">
+        ✓
+      </span>
+    )
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-sm font-semibold">Status Kelengkapan SAP</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {items.map((item) => (
+          {summary.map((item) => (
             <div key={item.label} className="text-center">
               <p className={`text-2xl font-bold ${item.value > 0 ? 'text-rose-600' : 'text-muted-foreground'}`}>
                 {item.value}
@@ -308,6 +329,34 @@ function SapStatus() {
             </div>
           ))}
         </div>
+
+        {rows.length > 0 && (
+          <div className="border-t pt-3">
+            <p className="text-xs text-muted-foreground mb-2">Per bulan · berdasarkan rencana pengambilan</p>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                  <th className="text-left px-3 py-2">Bulan</th>
+                  <th className="text-center px-3 py-2">Kontrak SAP</th>
+                  <th className="text-center px-3 py-2">SO SAP</th>
+                  <th className="text-center px-3 py-2">DO SAP</th>
+                  <th className="text-center px-3 py-2">Billing SAP</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {rows.map((row) => (
+                  <tr key={row.bulan} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-3 py-2 font-medium text-gray-700">{row.bulan}</td>
+                    <td className="px-3 py-2 text-center"><MissingBadge val={row.kontrak} /></td>
+                    <td className="px-3 py-2 text-center"><MissingBadge val={row.so} /></td>
+                    <td className="px-3 py-2 text-center"><MissingBadge val={row.do_} /></td>
+                    <td className="px-3 py-2 text-center"><MissingBadge val={row.billing} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
