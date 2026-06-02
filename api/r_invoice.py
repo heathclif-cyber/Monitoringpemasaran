@@ -68,7 +68,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
         return db_invoice
     else:
         new_invoice = models.Invoice(
-            **invoice.model_dump(),
+            **invoice.model_dump(exclude={'jumlah_pembayaran', 'terbilang_invoice'}),
             jumlah_pembayaran=jumlah_pembayaran,
             terbilang_invoice=terbilang_invoice
         )
