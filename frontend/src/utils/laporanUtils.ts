@@ -95,6 +95,16 @@ export function filterLaporanRows(rows: LaporanRow[], filters: LaporanFilters): 
       else return false
     }
 
+    if (filters.search) {
+      const q = filters.search.toLowerCase()
+      const haystack = [
+        row.No_DO, row.No_Invoice, row.No_Kontrak,
+        row.Mitra_Pembeli, row.Unit, row.Komoditi,
+        row.Kontrak_SAP, row.SO_SAP, row.DO_SAP, row.Billing, row.Superman,
+      ].filter(Boolean).join(' ').toLowerCase()
+      if (!haystack.includes(q)) return false
+    }
+
     return true
   })
 }
@@ -109,6 +119,7 @@ export interface LaporanFilters {
   tipe: 'ALL' | 'NO_BYPASS' | 'ONLY_BYPASS'
   sap: string
   statusBayar: string
+  search: string
 }
 
 export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = {
@@ -121,4 +132,5 @@ export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = {
   tipe: 'ALL',
   sap: 'ALL',
   statusBayar: 'ALL',
+  search: '',
 }
