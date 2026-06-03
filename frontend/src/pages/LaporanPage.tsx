@@ -35,6 +35,7 @@ export default function LaporanPage() {
   const units = useMemo(() => [...new Set(rows.map((r) => r.Unit).filter(Boolean))].sort(), [rows])
   const pembelis = useMemo(() => [...new Set(rows.map((r) => r.Mitra_Pembeli).filter(Boolean))].sort(), [rows])
   const komoditas = useMemo(() => [...new Set(rows.map((r) => r.Komoditi).filter(Boolean))].sort(), [rows])
+  const jenisKomoditas = useMemo(() => [...new Set(rows.map((r) => r.Deskripsi_Produk).filter(Boolean))].sort(), [rows])
 
   const filtered = useMemo(() => filterLaporanRows(rows, filters), [rows, filters])
   const summary = useMemo(() => calculateLaporanSummary(filtered), [filtered])
@@ -161,8 +162,8 @@ export default function LaporanPage() {
               </button>
             )}
           </div>
-          {/* Dropdown filters */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Dropdown filters — grid 4 kolom */}
+          <div className="grid grid-cols-4 gap-2">
             <select value={filters.unit} onChange={(e) => setFilters((f) => ({ ...f, unit: e.target.value }))} className={selCls}>
               <option value="ALL">Semua Unit</option>
               {units.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -171,13 +172,22 @@ export default function LaporanPage() {
               <option value="ALL">Semua Pembeli</option>
               {pembelis.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
+            <select value={filters.komoditi} onChange={(e) => setFilters((f) => ({ ...f, komoditi: e.target.value }))} className={selCls}>
+              <option value="ALL">Semua Komoditi</option>
+              {komoditas.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+            <select value={filters.jenisKomoditi} onChange={(e) => setFilters((f) => ({ ...f, jenisKomoditi: e.target.value }))} className={selCls}>
+              <option value="ALL">Semua Jenis Komoditi/Material</option>
+              {jenisKomoditas.map((j) => <option key={j} value={j}>{j}</option>)}
+            </select>
+
             <select value={filters.modeTanggal} onChange={(e) => setFilters((f) => ({ ...f, modeTanggal: e.target.value as 'TRANSFER' | 'RENCANA' }))} className={selCls}>
               <option value="TRANSFER">Berdasarkan Tgl Transfer</option>
               <option value="RENCANA">Berdasarkan Rencana Ambil</option>
             </select>
             {/* Month multi-select */}
             <div className="relative">
-              <button type="button" onClick={() => setShowMonths(!showMonths)} className={selCls}>
+              <button type="button" onClick={() => setShowMonths(!showMonths)} className={`${selCls} w-full text-left`}>
                 {filters.months.length === 0 ? 'Semua Bulan' : filters.months.length === 1 ? MONTHS_ID[parseInt(filters.months[0])] : `${filters.months.length} Bulan Terpilih`}
               </button>
               {showMonths && (
@@ -200,10 +210,6 @@ export default function LaporanPage() {
                 </div>
               )}
             </div>
-            <select value={filters.komoditi} onChange={(e) => setFilters((f) => ({ ...f, komoditi: e.target.value }))} className={selCls}>
-              <option value="ALL">Semua Komoditi</option>
-              {komoditas.map((k) => <option key={k} value={k}>{k}</option>)}
-            </select>
             <select value={filters.sort} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as 'DESC' | 'ASC' }))} className={selCls}>
               <option value="DESC">Terbaru ke Terlama</option>
               <option value="ASC">Terlama ke Terbaru</option>
@@ -213,6 +219,7 @@ export default function LaporanPage() {
               <option value="NO_BYPASS">Sembunyikan Bypass</option>
               <option value="ONLY_BYPASS">Hanya Bypass</option>
             </select>
+
             <select value={filters.sap} onChange={(e) => setFilters((f) => ({ ...f, sap: e.target.value }))} className={selCls}>
               <option value="ALL">Semua Status SAP</option>
               <option value="MISSING_SAP">Belum Lengkap</option>
@@ -223,14 +230,16 @@ export default function LaporanPage() {
               <option value="ALL_COMPLETE">Sudah Lengkap</option>
             </select>
             <select value={filters.statusBayar} onChange={(e) => setFilters((f) => ({ ...f, statusBayar: e.target.value }))} className={selCls}>
-              <option value="ALL">Semua Status</option>
+              <option value="ALL">Semua Status Bayar</option>
               <option value="BELUM">Belum Bayar</option>
               <option value="SEBAGIAN">Pembayaran Sebagian</option>
               <option value="LUNAS">Pembayaran Penuh / Lunas</option>
             </select>
-            <Button variant="outline" size="sm" onClick={() => setFilters(DEFAULT_LAPORAN_FILTERS)}>
-              Reset Filter
-            </Button>
+            <div className="flex items-center">
+              <Button variant="outline" size="sm" onClick={() => setFilters(DEFAULT_LAPORAN_FILTERS)} className="w-full">
+                Reset Filter
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

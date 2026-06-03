@@ -67,6 +67,7 @@ export function filterLaporanRows(rows: LaporanRow[], filters: LaporanFilters): 
     if (filters.unit !== 'ALL' && row.Unit !== filters.unit) return false
     if (filters.pembeli !== 'ALL' && row.Mitra_Pembeli !== filters.pembeli) return false
     if (filters.komoditi !== 'ALL' && row.Komoditi !== filters.komoditi) return false
+    if (filters.jenisKomoditi !== 'ALL' && row.Deskripsi_Produk !== filters.jenisKomoditi) return false
 
     if (filters.tipe === 'NO_BYPASS' && row.No_DO.startsWith('BYPASS-')) return false
     if (filters.tipe === 'ONLY_BYPASS' && !row.No_DO.startsWith('BYPASS-')) return false
@@ -113,6 +114,7 @@ export interface LaporanFilters {
   unit: string
   pembeli: string
   komoditi: string
+  jenisKomoditi: string
   months: string[]
   modeTanggal: 'TRANSFER' | 'RENCANA'
   sort: 'DESC' | 'ASC'
@@ -126,6 +128,7 @@ export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = {
   unit: 'ALL',
   pembeli: 'ALL',
   komoditi: 'ALL',
+  jenisKomoditi: 'ALL',
   months: [],
   modeTanggal: 'TRANSFER',
   sort: 'DESC',
