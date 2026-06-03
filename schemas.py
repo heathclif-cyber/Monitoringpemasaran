@@ -4,12 +4,14 @@ from datetime import date
 
 class KontrakUnitInput(BaseModel):
     nama_unit: str
+    volume: Optional[float] = 0.0
 
 class KontrakUnitOut(BaseModel):
     id: int
     no_kontrak: str
     nama_unit: str
     urutan: int
+    volume: float = 0.0
 
     class Config:
         from_attributes = True
@@ -87,7 +89,8 @@ class InvoiceBase(BaseModel):
     tanggal_transaksi: date
     status_invoice: Optional[str] = "Unpaid"
     pph_22_persen: Optional[float] = 0.0
-    jumlah_pembayaran: Optional[float] = None  # None = auto (full kontrak value), set value = partial
+    jumlah_pembayaran: Optional[float] = None  # None = auto (full/unit value), set value = partial
+    nama_unit: Optional[str] = None  # unit yang di-invoice; None = invoice kontrak keseluruhan
 
 class InvoiceCreate(InvoiceBase):
     pass
@@ -95,6 +98,7 @@ class InvoiceCreate(InvoiceBase):
 class InvoiceOut(InvoiceBase):
     jumlah_pembayaran: float
     terbilang_invoice: Optional[str]
+    nama_unit: Optional[str] = None
 
     class Config:
         from_attributes = True

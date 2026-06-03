@@ -73,6 +73,7 @@ class KontrakUnit(Base):
     no_kontrak = Column(String, ForeignKey("kontrak.no_kontrak", ondelete="CASCADE"))
     nama_unit = Column(String, nullable=False)
     urutan = Column(Integer, default=0)
+    volume = Column(Float, default=0.0)
 
     kontrak = relationship("Kontrak", back_populates="units")
 
@@ -86,10 +87,12 @@ class Invoice(Base):
     status_invoice = Column(String, default="Unpaid")
     pph_22_persen = Column(Float, default=0.0)
     
+    nama_unit = Column(String, nullable=True)
+
     # Calculated Fields
     jumlah_pembayaran = Column(Float, default=0.0)
     terbilang_invoice = Column(String)
-    
+
     kontrak = relationship("Kontrak", back_populates="invoices")
     delivery_orders = relationship("DeliveryOrder", back_populates="invoice", cascade="all, delete-orphan")
 

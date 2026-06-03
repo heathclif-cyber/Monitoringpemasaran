@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -151,6 +151,13 @@ export default function DOPage() {
     if (selectedInvoice) fetchInvoiceForDO(selectedInvoice)
   }, [selectedInvoice])
 
+  // Auto-populate kepada_unit dari nama_unit invoice saat invoice berhasil di-load
+  useEffect(() => {
+    if (currentInvoice?.nama_unit && !isExisting) {
+      setValue('kepada_unit', currentInvoice.nama_unit)
+    }
+  }, [currentInvoice])
+
   // Auto-load DO for edit
   const autoLoadDO = async () => {
     const no = form.getValues('no_do')
@@ -182,9 +189,15 @@ export default function DOPage() {
     }
   }, [selectedInvoice, isExisting, doStore.data])
 
-  // Volume calculation
+  // Jika invoice punya nama_unit, pakai volume unit untuk kalkulasi
+  const unitForDO = useMemo(() => {
+    if (!currentInvoice?.nama_unit || !currentKontrak?.units) return null
+    return currentKontrak.units.find(u => u.nama_unit === currentInvoice.nama_unit) || null
+  }, [currentInvoice, currentKontrak])
+
+  // Volume calculation — pakai unit volume jika ada
   const invoiceTotal = currentInvoice?.jumlah_pembayaran || 0
-  const kontrakVolume = currentKontrak?.volume || 0
+  const kontrakVolume = unitForDO?.volume || currentKontrak?.volume || 0
   const volumeDo = calculateProportionalVolume(Number(nominalTransfer) || 0, invoiceTotal, kontrakVolume)
   const selisih = calculateSelisih(invoiceTotal, Number(nominalTransfer) || 0)
   const volumePct = getVolumePercentage(volumeDo, kontrakVolume)
@@ -257,11 +270,21 @@ export default function DOPage() {
               </div>
               <div>
                 <Label className="text-xs">Kepada Unit</Label>
-                <input {...register('kepada_unit')} className={ic} list="unit-list" />
-                <datalist id="unit-list">
-                  <option value="Minahasa Halmahera" /><option value="Awaya Telpaputih" />
-                  <option value="Beteleme" /><option value="Kabaru" />
-                </datalist>
+                {currentInvoice?.nama_unit ? (
+                  <div>
+                    <input {...register('kepada_unit')} className={`${ic} bg-slate-50`} readOnly />
+                    <p className="text-xs text-slate-400 mt-1">Otomatis dari invoice (unit {currentInvoice.nama_unit})</p>
+                  </div>
+                ) : (
+                  <div>
+                    <select {...register('kepada_unit')} className={ic}>
+                      <option value="">-- Pilih Unit --</option>
+                      {['Minahasa-Halmahera','Beteleme','Awaya-Telpaputih','Takalar','Camming','Kabaru'].map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -314,7 +337,10 @@ export default function DOPage() {
                   <span className="text-slate-500">No Kontrak:</span><span className="font-medium">{currentKontrak.no_kontrak}</span>
                   <span className="text-slate-500">Pembeli:</span><span>{(currentKontrak.pembeli || '-').split('\n')[0]}</span>
                   <span className="text-slate-500">Komoditi:</span><span>{currentKontrak.komoditi || '-'}</span>
-                  <span className="text-slate-500">Volume Kontrak:</span><span>{formatCurrency(kontrakVolume)} {currentKontrak.satuan}</span>
+                  {currentInvoice.nama_unit && (
+                    <><span className="text-slate-500">Unit:</span><span className="font-medium text-brand-600">{currentInvoice.nama_unit}</span></>
+                  )}
+                  <span className="text-slate-500">{currentInvoice.nama_unit ? 'Volume Unit:' : 'Volume Kontrak:'}</span><span>{formatCurrency(kontrakVolume)} {currentKontrak.satuan}</span>
                   <span className="text-slate-500">Total Invoice:</span><span className="font-semibold">{formatCurrency(invoiceTotal)}</span>
                 </div>
               </CardContent>

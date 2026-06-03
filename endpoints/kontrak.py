@@ -20,8 +20,17 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     units_input = kontrak.units or []
     kontrak_data = kontrak.model_dump(exclude={'units'})
 
+    # Jika semua unit memiliki volume > 0, derive volume kontrak dari sum unit
+    units_with_vol = [u for u in units_input if (u.volume or 0) > 0]
+    if units_with_vol and len(units_with_vol) == len(units_input) and units_input:
+        derived_volume = sum(u.volume or 0.0 for u in units_input)
+        kontrak_data['volume'] = derived_volume
+        volume_for_calc = derived_volume
+    else:
+        volume_for_calc = kontrak.volume or 0.0
+
     # Calculate fields
-    pokok = ((kontrak.volume or 0.0) * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
+    pokok = (volume_for_calc * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
     nominal_ppn = 0.0
     if str(kontrak.is_ppn).lower() == 'true':
         nominal_ppn = pokok * ((kontrak.ppn_persen or 0.0) / 100)
@@ -51,7 +60,12 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     # Replace units
     db.query(models.KontrakUnit).filter(models.KontrakUnit.no_kontrak == kontrak.no_kontrak).delete()
     for i, unit in enumerate(units_input):
-        db.add(models.KontrakUnit(no_kontrak=kontrak.no_kontrak, nama_unit=unit.nama_unit, urutan=i))
+        db.add(models.KontrakUnit(
+            no_kontrak=kontrak.no_kontrak,
+            nama_unit=unit.nama_unit,
+            urutan=i,
+            volume=unit.volume or 0.0,
+        ))
 
     db.commit()
     db.refresh(db_kontrak)

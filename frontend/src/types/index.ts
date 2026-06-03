@@ -26,6 +26,7 @@ export interface KontrakUnit {
   no_kontrak: string
   nama_unit: string
   urutan: number
+  volume: number
 }
 
 export interface Kontrak {
@@ -89,6 +90,7 @@ export interface Invoice {
   tanggal_transaksi: string // date
   status_invoice: string
   pph_22_persen: number
+  nama_unit: string | null
   // Computed
   jumlah_pembayaran: number
   terbilang_invoice: string | null

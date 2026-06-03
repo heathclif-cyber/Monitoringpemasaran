@@ -148,6 +148,7 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
 const invoiceSchema = z.object({
   no_invoice: z.string().min(1, 'No Invoice wajib diisi'),
   no_kontrak: z.string().min(1, 'Kontrak wajib dipilih'),
+  nama_unit: z.string().optional(),
   tanggal_transaksi: z.string().min(1, 'Tanggal wajib diisi'),
   status_invoice: z.string().optional(),
   pph_22_persen: z.coerce.number().min(0),
@@ -169,6 +170,7 @@ export default function InvoicePage() {
     defaultValues: {
       no_invoice: '',
       no_kontrak: '',
+      nama_unit: '',
       tanggal_transaksi: new Date().toISOString().split('T')[0],
       status_invoice: 'Unpaid',
       pph_22_persen: 0,
@@ -178,6 +180,7 @@ export default function InvoicePage() {
 
   const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors, isSubmitting } } = form
   const selectedKontrak = watch('no_kontrak')
+  const selectedUnit = watch('nama_unit')
 
   // Fetch kontrak list on mount
   useEffect(() => {
@@ -201,6 +204,7 @@ export default function InvoicePage() {
       setIsExisting(true)
       setExportNo(no)
       setValue('no_kontrak', data.no_kontrak)
+      setValue('nama_unit', data.nama_unit || '')
       setValue('tanggal_transaksi', data.tanggal_transaksi)
     } else {
       setIsExisting(false)
@@ -229,28 +233,65 @@ export default function InvoicePage() {
       )
     : null
 
+  // Units dari kontrak yang dipilih; jika tidak ada, pakai fixed list
+  const FIXED_UNITS = ['Minahasa-Halmahera','Beteleme','Awaya-Telpaputih','Takalar','Camming','Kabaru']
+  const kontrakUnits = useMemo(() => k?.units && k.units.length > 0 ? k.units : [], [k])
+  const unitOptions = useMemo(() =>
+    kontrakUnits.length > 0
+      ? kontrakUnits.map(u => ({ nama_unit: u.nama_unit, volume: u.volume || 0 }))
+      : FIXED_UNITS.map(u => ({ nama_unit: u, volume: 0 })),
+  [kontrakUnits])
+
+  // Unit yang sedang dipilih di form
+  const selectedUnitObj = useMemo(() =>
+    kontrakUnits.find(u => u.nama_unit === selectedUnit) || null,
+  [kontrakUnits, selectedUnit])
+
+  const showUnitSelector = !!selectedKontrak && !!k
+
   // Kalkulasi multi-invoice: existing invoices, remaining, progress
   const existingInvoices = useMemo(() => {
     if (!selectedKontrak) return []
     return invoiceStore.data.filter((inv) => inv.no_kontrak === selectedKontrak && inv.no_invoice !== watch('no_invoice'))
   }, [selectedKontrak, invoiceStore.data, watch('no_invoice')])
 
-  const totalInvoiced = useMemo(() =>
-    existingInvoices.reduce((sum: number, inv) => sum + (inv.jumlah_pembayaran || 0), 0),
-  [existingInvoices])
-
   const kontrakMax = pricing?.nilaiTransaksi || 0
-  const sisaKontrak = Math.max(0, kontrakMax - totalInvoiced)
-  const progressPct = kontrakMax > 0 ? Math.round((totalInvoiced / kontrakMax) * 100) : 0
+
+  // Batas per-unit jika ada unit dipilih (hanya berlaku jika unit punya volume)
+  const unitMax = useMemo(() => {
+    if (!selectedUnit || !k || !kontrakMax) return kontrakMax
+    if (selectedUnitObj && selectedUnitObj.volume > 0 && (k.volume || 0) > 0) {
+      return kontrakMax * (selectedUnitObj.volume / k.volume)
+    }
+    return kontrakMax // tidak ada volume unit → gunakan max kontrak
+  }, [selectedUnit, selectedUnitObj, k, kontrakMax])
+
+  // Filter invoice untuk progress bar: per-unit jika unit dipilih, semua jika tidak
+  const invoicesForProgress = useMemo(() => {
+    if (selectedUnit) {
+      return existingInvoices.filter(inv => inv.nama_unit === selectedUnit)
+    }
+    return existingInvoices
+  }, [existingInvoices, selectedUnit])
+
+  const totalInvoiced = useMemo(() =>
+    invoicesForProgress.reduce((sum: number, inv) => sum + (inv.jumlah_pembayaran || 0), 0),
+  [invoicesForProgress])
+
+  const maxForProgress = selectedUnit ? unitMax : kontrakMax
+  const sisaKontrak = Math.max(0, maxForProgress - totalInvoiced)
+  const progressPct = maxForProgress > 0 ? Math.round((totalInvoiced / maxForProgress) * 100) : 0
 
   const onSubmit = async (data: InvoiceFormData) => {
     try {
       const payload: any = { ...data }
+      // Kirim nama_unit hanya jika dipilih
+      if (!data.nama_unit) delete payload.nama_unit
       // Kirim jumlah_pembayaran hanya jika user mengisinya (partial)
       if (data.jumlah_pembayaran && data.jumlah_pembayaran > 0) {
         payload.jumlah_pembayaran = data.jumlah_pembayaran
       } else {
-        delete payload.jumlah_pembayaran // backend will use full value
+        delete payload.jumlah_pembayaran // backend will use full/unit value
       }
       await invoiceStore.save(payload)
       setExportNo(data.no_invoice)
@@ -324,6 +365,20 @@ export default function InvoicePage() {
                 <Label className="text-xs">Tanggal Transaksi *</Label>
                 <input type="date" {...register('tanggal_transaksi')} className={ic} />
               </div>
+              {showUnitSelector && (
+                <div className="col-span-2">
+                  <Label className="text-xs">Unit yang Diinvoice</Label>
+                  <select {...register('nama_unit')} className={ic}>
+                    <option value="">-- Pilih Unit (opsional) --</option>
+                    {unitOptions.map(u => (
+                      <option key={u.nama_unit} value={u.nama_unit}>
+                        {u.nama_unit}{u.volume > 0 ? ` — ${u.volume.toLocaleString('id-ID')} ${k?.satuan || 'Kg'}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedUnit && <p className="text-xs text-slate-400 mt-1">Kosongkan jika invoice untuk keseluruhan kontrak</p>}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -347,8 +402,13 @@ export default function InvoicePage() {
 
                 {/* Progress bar */}
                 <div className="border-t pt-3">
+                  {selectedUnit && (
+                    <p className="text-xs font-semibold text-brand-600 mb-1">
+                      Unit: {selectedUnit} — Volume: {selectedUnitObj?.volume.toLocaleString('id-ID')} {k?.satuan}
+                    </p>
+                  )}
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-500">Total Ter-invoice: {formatCurrency(totalInvoiced)}</span>
+                    <span className="text-slate-500">Total Ter-invoice{selectedUnit ? ` (${selectedUnit})` : ''}: {formatCurrency(totalInvoiced)}</span>
                     <span className="text-slate-500">Sisa: {formatCurrency(sisaKontrak)}</span>
                   </div>
                   <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
@@ -357,17 +417,19 @@ export default function InvoicePage() {
                       style={{ width: `${Math.min(progressPct, 100)}%` }}
                     />
                   </div>
-                  <p className="text-xs text-slate-400 mt-1 text-right">{progressPct}% ter-invoice</p>
+                  <p className="text-xs text-slate-400 mt-1 text-right">{progressPct}% ter-invoice{selectedUnit ? ` (unit ${selectedUnit})` : ''}</p>
                 </div>
 
                 {/* Existing invoices list */}
-                {existingInvoices.length > 0 && (
+                {invoicesForProgress.length > 0 && (
                   <div className="border-t pt-2">
-                    <p className="text-xs font-semibold text-slate-600 mb-1">Invoice Sebelumnya:</p>
+                    <p className="text-xs font-semibold text-slate-600 mb-1">
+                      Invoice Sebelumnya{selectedUnit ? ` — ${selectedUnit}` : ''}:
+                    </p>
                     <div className="max-h-28 overflow-y-auto space-y-1">
-                      {existingInvoices.map((inv) => (
+                      {invoicesForProgress.map((inv) => (
                         <div key={inv.no_invoice} className="flex justify-between text-xs text-slate-600 bg-gray-50 rounded px-2 py-1">
-                          <span>{inv.no_invoice}</span>
+                          <span>{inv.no_invoice}{inv.nama_unit ? ` (${inv.nama_unit})` : ''}</span>
                           <span className="font-medium">{formatCurrency(inv.jumlah_pembayaran)}</span>
                         </div>
                       ))}
@@ -388,7 +450,7 @@ export default function InvoicePage() {
                     />
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
-                    Kosongkan untuk auto (nilai penuh kontrak). Maks: {formatCurrency(sisaKontrak)}
+                    Kosongkan untuk auto (nilai penuh{selectedUnit ? ` unit ${selectedUnit}` : ' kontrak'}). Maks: {formatCurrency(sisaKontrak)}
                   </p>
                   {Number(watch('jumlah_pembayaran')) > 0 && kontrakMax > 0 && (
                     <p className="text-xs text-slate-500 mt-1">

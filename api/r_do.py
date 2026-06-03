@@ -23,11 +23,18 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
     invoice_total = float(db_invoice.jumlah_pembayaran or 0)
     nominal = float(do.nominal_transfer or 0)
 
-    # Calculate proportional volume: (payment / invoice_total) * kontrak_volume
-    if invoice_total > 0 and kontrak_volume > 0:
-        volume_do = (nominal / invoice_total) * kontrak_volume
+    # Jika invoice terkait unit, pakai volume unit untuk perhitungan proporsional
+    volume_for_calc = kontrak_volume
+    if db_invoice.nama_unit and db_kontrak:
+        unit = next((u for u in db_kontrak.units if u.nama_unit == db_invoice.nama_unit), None)
+        if unit and (unit.volume or 0) > 0:
+            volume_for_calc = float(unit.volume)
+
+    # Calculate proportional volume: (payment / invoice_total) * volume_unit
+    if invoice_total > 0 and volume_for_calc > 0:
+        volume_do = (nominal / invoice_total) * volume_for_calc
     else:
-        volume_do = kontrak_volume  # fallback: full volume
+        volume_do = volume_for_calc  # fallback: full volume
 
     # Calculate selisih
     selisih = invoice_total - nominal
