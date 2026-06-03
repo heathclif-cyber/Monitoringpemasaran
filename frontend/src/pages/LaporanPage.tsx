@@ -105,28 +105,8 @@ export default function LaporanPage() {
   return (
     <div className="space-y-6">
       {/* Action buttons */}
-      <div className="flex justify-between items-center gap-4">
+      <div className="flex justify-between items-center">
         <h2 className="text-lg font-bold text-slate-900">Rekapitulasi Laporan Terintegrasi</h2>
-        <div className="flex items-center gap-2 flex-1 max-w-sm">
-          <div className="relative flex-1">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-              placeholder="Cari No DO, Invoice, Kontrak, Pembeli..."
-              className="h-9 w-full rounded-md border border-input bg-white pl-8 pr-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            {filters.search && (
-              <button
-                onClick={() => setFilters((f) => ({ ...f, search: '' }))}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetch} className="gap-1">
             <RefreshCw size={14} /> Refresh
@@ -161,7 +141,27 @@ export default function LaporanPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
+          {/* Search bar — full width */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              placeholder="Cari No DO, No Invoice, No Kontrak, Pembeli, SAP..."
+              className="h-9 w-full rounded-md border border-input bg-white pl-9 pr-8 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            {filters.search && (
+              <button
+                onClick={() => setFilters((f) => ({ ...f, search: '' }))}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-base leading-none"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {/* Dropdown filters */}
           <div className="flex flex-wrap items-center gap-3">
             <select value={filters.unit} onChange={(e) => setFilters((f) => ({ ...f, unit: e.target.value }))} className={selCls}>
               <option value="ALL">Semua Unit</option>
