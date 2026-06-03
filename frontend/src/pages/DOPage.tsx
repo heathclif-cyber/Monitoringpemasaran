@@ -179,15 +179,6 @@ export default function DOPage() {
     }
   }
 
-  // Auto-generate DO number
-  useEffect(() => {
-    if (!isExisting && selectedInvoice) {
-      const existingDOs = doStore.data.filter((d) => d.no_invoice === selectedInvoice)
-      const nextNum = existingDOs.length + 1
-      const base = selectedInvoice.replace(/^INV-/, '')
-      setValue('no_do', `${base}-${String(nextNum).padStart(2, '0')}`)
-    }
-  }, [selectedInvoice, isExisting, doStore.data])
 
   // Jika invoice punya nama_unit, pakai volume unit untuk kalkulasi
   const unitForDO = useMemo(() => {

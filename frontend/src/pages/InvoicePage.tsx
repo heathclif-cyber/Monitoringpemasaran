@@ -212,16 +212,6 @@ export default function InvoicePage() {
     }
   }
 
-  // Auto-generate invoice number when kontrak selected
-  useEffect(() => {
-    if (!isExisting && selectedKontrak) {
-      const existingInvoices = invoiceStore.data.filter((i) => i.no_kontrak === selectedKontrak)
-      const nextNum = existingInvoices.length + 1
-      const suffix = String(nextNum).padStart(2, '0')
-      const newNo = `${selectedKontrak}-${suffix}`
-      setValue('no_invoice', newNo)
-    }
-  }, [selectedKontrak, isExisting, invoiceStore.data])
 
   // Pricing
   const k = currentKontrak
