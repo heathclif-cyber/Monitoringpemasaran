@@ -102,7 +102,7 @@ def get_laporan(db: Session = Depends(get_db)):
             "Raw_Date": (do.tanggal_pembayaran.strftime("%Y-%m-%d") if (do and do.tanggal_pembayaran) else (inv.tanggal_transaksi.strftime("%Y-%m-%d") if inv and inv.tanggal_transaksi else (k.tanggal_kontrak.strftime("%Y-%m-%d") if k.tanggal_kontrak else ""))),
             "Jumlah_Transfer": do_nominal,
             "Mitra_Pembeli": k.pembeli or "",
-            "Deskripsi_Produk": (k.deskripsi_produk or k.komoditi) or "",
+            "Deskripsi_Produk": (k.jenis_komoditi or k.deskripsi_produk or k.komoditi) or "",
             "Jumlah_Kontrak": k.volume or 0,
             "Harga_Satuan": k.harga_satuan or 0,
             "Jumlah_DO": do_volume,

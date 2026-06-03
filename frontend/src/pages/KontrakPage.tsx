@@ -343,7 +343,23 @@ export default function KontrakPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
               <div><Label className="text-xs">Komoditi</Label><input {...register('komoditi')} className={ic} /></div>
-              <div><Label className="text-xs">Jenis Komoditi</Label><input {...register('jenis_komoditi')} className={ic} /></div>
+              <div>
+                <Label className="text-xs">Jenis Komoditi/Material</Label>
+                <select {...register('jenis_komoditi')} className={ic}>
+                  <option value="">-- Pilih Jenis --</option>
+                  <option>TBS (TANDAN BUAH SEGAR)</option>
+                  <option>Lump</option>
+                  <option>TH BR CR 3X</option>
+                  <option>TH BR CR 3X HITAM</option>
+                  <option>GULA GAPOKTAN</option>
+                  <option>Gula Kemasan 50 KG Milik PG</option>
+                  <option>KELAPA KUPAS</option>
+                  <option>KELAPA BUTIR</option>
+                  <option>Kopra</option>
+                  <option>SAPI PEJANTAN AFKIR</option>
+                  <option>CPO</option>
+                </select>
+              </div>
               <div>
                 <Label className="text-xs">Satuan</Label>
                 <select {...register('satuan')} className={ic}>

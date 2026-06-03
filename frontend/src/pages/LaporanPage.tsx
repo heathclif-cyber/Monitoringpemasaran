@@ -256,7 +256,7 @@ export default function LaporanPage() {
                     <th className="text-right px-3 py-2">Jumlah Transfer</th>
                     <th className="text-right px-3 py-2">Pelunasan (Inc. PPh)</th>
                     <th className="text-left px-3 py-2">Mitra Pembeli</th>
-                    <th className="text-left px-3 py-2">Deskripsi</th>
+                    <th className="text-left px-3 py-2">Jenis Komoditi/Material</th>
                     <th className="text-right px-3 py-2">Jml Kontrak</th>
                     <th className="text-right px-3 py-2">Harga Satuan</th>
                     <th className="text-right px-3 py-2">Jumlah DO</th>

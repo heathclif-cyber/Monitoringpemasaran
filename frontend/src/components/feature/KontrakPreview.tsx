@@ -109,7 +109,7 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
             <td style={tdVal} colSpan={4}><strong>{pblNama}</strong>{alamatPbl ? <><br />{alamatPbl}</> : null}</td>
           </tr>
           <RowS label="No. Referensi" value={safe(no_reff)} />
-          <RowD l1="Komoditi" v1={safe(komoditi)} l2="Jenis Komoditi" v2={safe(jenis_komoditi)} />
+          <RowD l1="Komoditi" v1={safe(komoditi)} l2="Jenis Komoditi/Material" v2={safe(jenis_komoditi)} />
           <RowD l1="Packaging" v1={safe(packaging)} l2="Symbol" v2={safe(simbol)} />
           <RowS label="Deskripsi Produk" value={safe(deskripsi_produk)} />
           <RowS label="Mutu" value={safe(mutu)} />
