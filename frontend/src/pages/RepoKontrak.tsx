@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, FileDown, Trash2, Search, Eye } from 'lucide-react'
+import { Edit, FileDown, Trash2, Search, Eye, GitBranch } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
@@ -145,13 +145,16 @@ export default function RepoKontrak() {
                       <td className="px-3 py-2.5 text-right font-bold">{formatCurrency(item.nilai_transaksi)}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex gap-1 justify-center">
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600" onClick={() => navigate(`/kontrak?edit=${item.no_kontrak}`)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600" title="Edit kontrak" onClick={() => navigate(`/kontrak?edit=${item.no_kontrak}`)}>
                             <Edit size={14} />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handlePreview(item)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" title="Trace pembayaran & barang" onClick={() => navigate(`/kontrak-trace?id=${encodeURIComponent(item.no_kontrak)}`)}>
+                            <GitBranch size={14} />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" title="Preview dokumen" onClick={() => handlePreview(item)}>
                             <Eye size={14} />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => setDeleteTarget(item.no_kontrak)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" title="Hapus kontrak" onClick={() => setDeleteTarget(item.no_kontrak)}>
                             <Trash2 size={14} />
                           </Button>
                         </div>

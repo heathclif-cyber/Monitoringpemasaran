@@ -195,6 +195,107 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
     return HTMLResponse(content=html)
 
 
+@router.get("/trace")
+def get_kontrak_trace(no_kontrak: str, db: Session = Depends(get_db)):
+    from sqlalchemy.orm import joinedload
+    k = db.query(models.Kontrak).options(
+        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders)
+    ).filter(models.Kontrak.no_kontrak == no_kontrak).first()
+
+    if not k:
+        raise HTTPException(status_code=404, detail="Kontrak not found")
+
+    k_vol = float(k.volume or 0)
+    k_nilai = float(k.nilai_transaksi or 0)
+
+    total_do_nominal = 0.0
+    total_do_volume = 0.0
+    invoices_data = []
+
+    for inv in k.invoices:
+        kewajiban = float(inv.jumlah_pembayaran or 0)
+        dos_data = []
+        inv_terbayar = 0.0
+
+        for do in inv.delivery_orders:
+            do_nominal = float(do.nominal_transfer or 0)
+            do_vol = float(do.volume_do or 0)
+            inv_terbayar += do_nominal
+            total_do_nominal += do_nominal
+            total_do_volume += do_vol
+            dos_data.append({
+                "no_do": do.no_do,
+                "tanggal_do": do.tanggal_do.isoformat() if do.tanggal_do else None,
+                "tanggal_pembayaran": do.tanggal_pembayaran.isoformat() if do.tanggal_pembayaran else None,
+                "rencana_pengambilan": do.rencana_pengambilan.isoformat() if do.rencana_pengambilan else None,
+                "kepada_unit": do.kepada_unit,
+                "nominal_transfer": do_nominal,
+                "volume_do": do_vol,
+                "selisih": float(do.selisih or 0),
+                "is_pph_disetor": do.is_pph_disetor or "false",
+            })
+
+        inv_sisa = round(kewajiban - inv_terbayar)
+        if inv_sisa <= 0:
+            pay_status = "LUNAS"
+        elif inv_terbayar > 0:
+            pay_status = "SEBAGIAN"
+        else:
+            pay_status = "BELUM"
+
+        invoices_data.append({
+            "no_invoice": inv.no_invoice,
+            "tanggal_transaksi": inv.tanggal_transaksi.isoformat() if inv.tanggal_transaksi else None,
+            "nama_unit": inv.nama_unit,
+            "jumlah_pembayaran": float(inv.jumlah_pembayaran or 0),
+            "kewajiban": kewajiban,
+            "total_terbayar": inv_terbayar,
+            "sisa_pembayaran": inv_sisa,
+            "persen_terbayar": round((inv_terbayar / kewajiban * 100) if kewajiban > 0 else 0, 1),
+            "payment_status": pay_status,
+            "jumlah_do": len(dos_data),
+            "delivery_orders": dos_data,
+        })
+
+    sisa_bayar = round(k_nilai - total_do_nominal)
+    sisa_vol = round(k_vol - total_do_volume)
+    persen_bayar = round((total_do_nominal / k_nilai * 100) if k_nilai > 0 else 0, 1)
+    persen_vol = round((total_do_volume / k_vol * 100) if k_vol > 0 else 0, 1)
+
+    if sisa_bayar <= 0:
+        overall_status = "LUNAS"
+    elif total_do_nominal > 0:
+        overall_status = "SEBAGIAN"
+    else:
+        overall_status = "BELUM"
+
+    return {
+        "no_kontrak": k.no_kontrak,
+        "tanggal_kontrak": k.tanggal_kontrak.isoformat() if k.tanggal_kontrak else None,
+        "jatuh_tempo_pembayaran": k.jatuh_tempo_pembayaran.isoformat() if k.jatuh_tempo_pembayaran else None,
+        "pembeli": k.pembeli,
+        "komoditi": k.komoditi,
+        "satuan": k.satuan,
+        "nilai_transaksi": k_nilai,
+        "volume": k_vol,
+        "kebun_produsen": k.kebun_produsen,
+        "summary": {
+            "total_nilai": k_nilai,
+            "total_terbayar": total_do_nominal,
+            "sisa_pembayaran": sisa_bayar,
+            "persen_terbayar": persen_bayar,
+            "total_volume": k_vol,
+            "total_volume_do": total_do_volume,
+            "sisa_volume": sisa_vol,
+            "persen_volume": persen_vol,
+            "jumlah_invoice": len(invoices_data),
+            "jumlah_do": sum(d["jumlah_do"] for d in invoices_data),
+            "overall_status": overall_status,
+        },
+        "invoices": invoices_data,
+    }
+
+
 @router.get("/{no_kontrak:path}", response_model=schemas.KontrakOut)
 def get_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == no_kontrak).first()

@@ -13,6 +13,7 @@ const BypassPage = lazy(() => import('@/pages/BypassPage'))
 const RepoKontrak = lazy(() => import('@/pages/RepoKontrak'))
 const RepoInvoice = lazy(() => import('@/pages/RepoInvoice'))
 const RepoDO = lazy(() => import('@/pages/RepoDO'))
+const TraceKontrak = lazy(() => import('@/pages/TraceKontrak'))
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/repo/kontrak" element={<RepoKontrak />} />
           <Route path="/repo/invoice" element={<RepoInvoice />} />
           <Route path="/repo/do" element={<RepoDO />} />
+          <Route path="/kontrak-trace" element={<TraceKontrak />} />
         </Route>
       </Routes>
       <Toast />

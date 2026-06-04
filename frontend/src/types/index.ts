@@ -345,6 +345,66 @@ export interface SapUpdateInput {
 }
 
 // ============================================================
+// Kontrak Trace (dari GET /api/kontrak/trace)
+// ============================================================
+
+export type PaymentStatus = 'LUNAS' | 'SEBAGIAN' | 'BELUM'
+
+export interface TraceDO {
+  no_do: string
+  tanggal_do: string | null
+  tanggal_pembayaran: string | null
+  rencana_pengambilan: string | null
+  kepada_unit: string | null
+  nominal_transfer: number
+  volume_do: number
+  selisih: number
+  is_pph_disetor: string
+}
+
+export interface TraceInvoice {
+  no_invoice: string
+  tanggal_transaksi: string | null
+  nama_unit: string | null
+  jumlah_pembayaran: number
+  kewajiban: number
+  total_terbayar: number
+  sisa_pembayaran: number
+  persen_terbayar: number
+  payment_status: PaymentStatus
+  jumlah_do: number
+  delivery_orders: TraceDO[]
+}
+
+export interface KontrakTraceSummary {
+  total_nilai: number
+  total_terbayar: number
+  sisa_pembayaran: number
+  persen_terbayar: number
+  total_volume: number
+  total_volume_do: number
+  sisa_volume: number
+  persen_volume: number
+  jumlah_invoice: number
+  jumlah_do: number
+  overall_status: PaymentStatus
+}
+
+export interface KontrakTrace {
+  no_kontrak: string
+  tanggal_kontrak: string | null
+  jatuh_tempo_pembayaran: string | null
+  pembeli: string | null
+  komoditi: string | null
+  satuan: string | null
+  nilai_transaksi: number
+  volume: number
+  kebun_produsen: string | null
+  summary: KontrakTraceSummary
+  invoices: TraceInvoice[]
+}
+
+// ============================================================
 // Notification
 // ============================================================
 
