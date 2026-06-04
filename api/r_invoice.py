@@ -35,8 +35,12 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
             raise HTTPException(status_code=400, detail=f"Unit '{nama_unit}' tidak ditemukan dalam kontrak")
         unit_volume = float(db_unit.volume or 0.0)
         # Nilai proporsional unit = (volume_unit / volume_kontrak) × nilai_maksimum
-        unit_ratio = (unit_volume / kontrak_volume) if kontrak_volume > 0 else 1.0
-        nilai_batas = nilai_maksimum * unit_ratio
+        # Jika unit tidak punya volume, gunakan nilai_maksimum penuh (satu unit = seluruh kontrak)
+        if unit_volume > 0 and kontrak_volume > 0:
+            unit_ratio = unit_volume / kontrak_volume
+            nilai_batas = nilai_maksimum * unit_ratio
+        else:
+            nilai_batas = nilai_maksimum
 
         if invoice.jumlah_pembayaran is not None and invoice.jumlah_pembayaran > 0:
             jumlah_pembayaran = float(invoice.jumlah_pembayaran)

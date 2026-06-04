@@ -264,9 +264,13 @@ export default function InvoicePage() {
     return existingInvoices
   }, [existingInvoices, selectedUnit])
 
-  const totalInvoiced = useMemo(() =>
+  const currentJumlah = Number(watch('jumlah_pembayaran')) || 0
+
+  const totalInvoicedExisting = useMemo(() =>
     invoicesForProgress.reduce((sum: number, inv) => sum + (inv.jumlah_pembayaran || 0), 0),
   [invoicesForProgress])
+
+  const totalInvoiced = totalInvoicedExisting + currentJumlah
 
   const maxForProgress = selectedUnit ? unitMax : kontrakMax
   const sisaKontrak = Math.max(0, maxForProgress - totalInvoiced)
@@ -398,8 +402,13 @@ export default function InvoicePage() {
                     </p>
                   )}
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-500">Total Ter-invoice{selectedUnit ? ` (${selectedUnit})` : ''}: {formatCurrency(totalInvoiced)}</span>
-                    <span className="text-slate-500">Sisa: {formatCurrency(sisaKontrak)}</span>
+                    <span className="text-slate-500">
+                      Total Ter-invoice{selectedUnit ? ` (${selectedUnit})` : ''}: {formatCurrency(totalInvoicedExisting)}
+                      {currentJumlah > 0 && (
+                        <span className="text-brand-600"> + {formatCurrency(currentJumlah)} = <strong>{formatCurrency(totalInvoiced)}</strong></span>
+                      )}
+                    </span>
+                    <span className="text-slate-500">Sisa: <strong className={currentJumlah > 0 ? 'text-brand-600' : ''}>{formatCurrency(sisaKontrak)}</strong></span>
                   </div>
                   <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
                     <div
