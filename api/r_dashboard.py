@@ -96,7 +96,18 @@ def get_dashboard_data(
                 vol_m_kg[f"{m:02d}"] += do_vol
             
             kom = k.komoditi or "Lainnya"
-            unt = k.kebun_produsen or "Lainnya"
+            # Unit priority: DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen > Kontrak.units[0]
+            unt = ""
+            if getattr(do, 'kepada_unit', None):
+                unt = do.kepada_unit
+            if not unt and do.invoice and do.invoice.nama_unit:
+                unt = do.invoice.nama_unit
+            if not unt:
+                unt = k.kebun_produsen or ""
+            if not unt and hasattr(k, 'units') and k.units:
+                unt = k.units[0].nama_unit or ""
+            if not unt:
+                unt = "Lainnya"
             kom_map[kom] = kom_map.get(kom, 0) + pendapatan_do
             unit_map[unt] = unit_map.get(unt, 0) + pendapatan_do
 
