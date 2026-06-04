@@ -24,8 +24,7 @@ COPY . .
 # Copy built frontend from stage 1
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-EXPOSE 8000
-
+# Railway auto-detects port from $PORT env var — do NOT hardcode EXPOSE
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"]
 
 # Railway: pakai $PORT dari environment Railway. Default 8000 untuk local.
