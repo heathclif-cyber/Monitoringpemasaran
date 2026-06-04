@@ -85,7 +85,7 @@ export default function TraceKontrak() {
   const satuan = data.satuan || 'Kg'
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-5">
       {/* breadcrumb / back */}
       <div className="flex items-center gap-3">
         <Button
@@ -146,7 +146,7 @@ export default function TraceKontrak() {
       </Card>
 
       {/* summary progress */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* pembayaran */}
         <Card>
           <CardHeader className="pb-2 pt-4 px-4">
@@ -215,6 +215,42 @@ export default function TraceKontrak() {
             </div>
             <div className="text-xs text-gray-400 pt-1 border-t">
               Total kontrak: {summary.total_volume.toLocaleString('id-ID')} {satuan}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ringkasan */}
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2 text-gray-700">
+              <Receipt size={15} className="text-indigo-500" />
+              Ringkasan Transaksi
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-3">
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between py-1.5 border-b">
+                <span className="text-gray-500">Status Keseluruhan</span>
+                <StatusBadge status={summary.overall_status} />
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b">
+                <span className="text-gray-500">Jumlah Invoice</span>
+                <span className="font-semibold">{summary.jumlah_invoice}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b">
+                <span className="text-gray-500">Jumlah DO</span>
+                <span className="font-semibold">{summary.jumlah_do}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b">
+                <span className="text-gray-500">Total Terbayar</span>
+                <span className="font-semibold text-emerald-700">{formatCurrency(summary.total_terbayar)}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-gray-500">Sisa Kewajiban</span>
+                <span className={`font-semibold ${summary.sisa_pembayaran > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {formatCurrency(Math.max(0, summary.sisa_pembayaran))}
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>
