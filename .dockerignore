@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.git/
+.gitignore
+frontend/node_modules/
+frontend/dist/
+*.db
+*.sqlite
+result.txt
+error.txt
+trace.txt
+.idea/
+.vscode/

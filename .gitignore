@@ -23,4 +23,6 @@ coverage.xml
 *.webp
 node_modules/
 .DS_Store
+*.log
+*.sql
 .env

@@ -1,33 +1,31 @@
-FROM python:3.9-slim
+# Stage 1: Build React frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PATH="/home/user/.local/bin:$PATH"
-
-# Set up a new user 'user' with UID 1000 for security
-RUN useradd -m -u 1000 user
+# Stage 2: Python backend
+FROM python:3.12-slim
 WORKDIR /app
 
-# Install system dependencies if needed (for psycopg2 or other libs)
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libpq-dev gcc && rm -rf /var/lib/apt/lists/*
 
-# Copy and install requirements
-COPY --chown=user ./requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all project files
-COPY --chown=user . /app
+COPY . .
 
-# Use the non-root user
-USER user
+# Copy built frontend from stage 1
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Hugging Face Spaces expects the app to run on port 7860
-EXPOSE 7860
+EXPOSE 8000
 
-# Run the app
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --proxy-headers --forwarded-allow-ips '*'"]
+
+# Railway: pakai $PORT dari environment Railway. Default 8000 untuk local.
