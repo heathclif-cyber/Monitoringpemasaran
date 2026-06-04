@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Save, FileDown, RotateCcw, Eye } from 'lucide-react'
@@ -178,7 +178,7 @@ export default function InvoicePage() {
     },
   })
 
-  const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors, isSubmitting } } = form
+  const { register, handleSubmit, reset, setValue, getValues, watch, control, formState: { errors, isSubmitting } } = form
   const selectedKontrak = watch('no_kontrak')
   const selectedUnit = watch('nama_unit')
 
@@ -264,7 +264,8 @@ export default function InvoicePage() {
     return existingInvoices
   }, [existingInvoices, selectedUnit])
 
-  const currentJumlah = Number(watch('jumlah_pembayaran')) || 0
+  const watchedJumlah = useWatch({ control, name: 'jumlah_pembayaran' })
+  const currentJumlah = Number(watchedJumlah) || 0
 
   const totalInvoicedExisting = useMemo(() =>
     invoicesForProgress.reduce((sum: number, inv) => sum + (inv.jumlah_pembayaran || 0), 0),
