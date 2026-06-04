@@ -91,11 +91,22 @@ def get_laporan(db: Session = Depends(get_db)):
         else:
             dpp_pokok = (k_harga_local * k_vol_local) + k_premi
 
+        # Unit: prioritas — DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen > Kontrak.units[0]
+        unit_val = ""
+        if do and getattr(do, 'kepada_unit', None):
+            unit_val = do.kepada_unit
+        if not unit_val and inv and getattr(inv, 'nama_unit', None):
+            unit_val = inv.nama_unit
+        if not unit_val:
+            unit_val = k.kebun_produsen or ""
+        if not unit_val and hasattr(k, 'units') and k.units:
+            unit_val = k.units[0].nama_unit or ""
+
         return {
             "No_DO": do.no_do if do else "",
             "No_Invoice": inv.no_invoice if inv else "",
             "No_Kontrak": k.no_kontrak or "",
-            "Unit": k.kebun_produsen or "",
+            "Unit": unit_val,
             "Komoditi": k.komoditi or "",
             "Billing_Date": format_date(inv.tanggal_transaksi) if inv else format_date(k.tanggal_kontrak),
             "Tanggal_Transfer": format_date(do.tanggal_pembayaran) if do else "",
