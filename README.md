@@ -3,9 +3,7 @@ Sales Document Automation & Reporting System.
 
 ## Configuration
 This project is configured for deployment on Railway (connected via GitHub).
-Database: Supabase (PostgreSQL)
+Database: Railway PostgreSQL
 Environment variables needed on Railway:
-- `SUPABASE_URL`
-- `SUPABASE_KEY`
-- `SUPABASE_DB_URL`
+- `DATABASE_URL`
 - `SECRET_KEY`

@@ -1,10 +1,10 @@
 """
-Script Migrasi Data: SQLite (Lokal) -> Supabase (PostgreSQL)
-=============================================================
-Jalankan sekali untuk memindahkan semua data dari blueprint.db ke Supabase.
+Script Migrasi Data: SQLite (Lokal) -> PostgreSQL (Railway)
+===========================================================
+Jalankan sekali untuk memindahkan semua data dari blueprint.db ke Railway PostgreSQL.
 
 Usage:
-    python migrate_to_supabase.py
+    python migrate_to_postgres.py
 
 Pastikan DATABASE_URL sudah diset di .env sebelum menjalankan script ini.
 """
@@ -22,16 +22,16 @@ except ImportError:
 
 # ---- Konfigurasi ----
 SQLITE_URL = "sqlite:///./blueprint.db"
-SUPABASE_URL = os.getenv("DATABASE_URL", "")
+PG_URL = os.getenv("DATABASE_URL", "")
 
-if not SUPABASE_URL or "sqlite" in SUPABASE_URL:
+if not PG_URL or "sqlite" in PG_URL:
     print("ERROR: DATABASE_URL tidak diset atau masih SQLite.")
-    print("Tolong set DATABASE_URL di file .env dengan URL Supabase Anda.")
+    print("Tolong set DATABASE_URL di file .env dengan URL PostgreSQL Anda.")
     sys.exit(1)
 
 # Fix postgres:// -> postgresql://
-if SUPABASE_URL.startswith("postgres://"):
-    SUPABASE_URL = SUPABASE_URL.replace("postgres://", "postgresql://", 1)
+if PG_URL.startswith("postgres://"):
+    PG_URL = PG_URL.replace("postgres://", "postgresql://", 1)
 
 # Strip pgbouncer param
 def _clean_url(url):
@@ -42,7 +42,7 @@ def _clean_url(url):
     kept = {k: v for k, v in parse_qs(parsed.query).items() if k not in UNSUPPORTED}
     return urlunparse(parsed._replace(query=urlencode(kept, doseq=True)))
 
-SUPABASE_URL_CLEAN = _clean_url(SUPABASE_URL)
+PG_URL_CLEAN = _clean_url(PG_URL)
 
 # ---- Setup Engines ----
 from sqlalchemy import create_engine, text
@@ -52,9 +52,9 @@ print("Menghubungkan ke SQLite (sumber)...")
 sqlite_engine = create_engine(SQLITE_URL, connect_args={"check_same_thread": False})
 SqliteSession = sessionmaker(bind=sqlite_engine)
 
-print("Menghubungkan ke Supabase (tujuan)...")
+print("Menghubungkan ke PostgreSQL (tujuan)...")
 pg_engine = create_engine(
-    SUPABASE_URL_CLEAN,
+    PG_URL_CLEAN,
     pool_pre_ping=True,
     connect_args={"connect_timeout": 10}
 )
@@ -65,8 +65,8 @@ PgSession = sessionmaker(bind=pg_engine)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import models
 
-# Buat tabel di Supabase jika belum ada
-print("Membuat tabel di Supabase jika belum ada...")
+# Buat tabel di PostgreSQL jika belum ada
+print("Membuat tabel di PostgreSQL jika belum ada...")
 models.Base.metadata.create_all(bind=pg_engine)
 
 from sqlalchemy import inspect, text
@@ -130,5 +130,5 @@ migrate_table(models.DeliveryOrder, "Delivery Order")
 migrate_table(models.LaporanBypass, "Laporan Bypass")
 
 print("\n=== MIGRASI SELESAI ===")
-print("Semua data dari SQLite sudah dipindahkan ke Supabase.")
+print("Semua data dari SQLite sudah dipindahkan ke PostgreSQL.")
 print("Silakan cek aplikasi di Hugging Face Spaces.")

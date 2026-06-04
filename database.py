@@ -24,7 +24,7 @@ if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
 def _clean_db_url(url: str) -> str:
     """
     Remove query parameters that psycopg2 does not understand,
-    e.g. ?pgbouncer=true added by Supabase connection pooler URLs.
+    e.g. ?pgbouncer=true added by connection pooler URLs (Railway, Supabase, etc).
     """
     parsed = urlparse(url)
     if not parsed.query:

@@ -9,12 +9,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from models import Kontrak
 from database import _clean_db_url
 
-# 1. Tentukan URL Database Tujuan (Supabase)
-SUPABASE_URL = "postgresql://postgres.azomqppnodduqhmbujxv:Sambalpedas1%40@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+# 1. Tentukan URL Database Tujuan (Railway PostgreSQL)
+DB_URL = os.getenv("DATABASE_URL", "sqlite:///./blueprint.db")
 
 # 2. Persiapan Koneksi ke Database
 engine = create_engine(
-    _clean_db_url(SUPABASE_URL),
+    _clean_db_url(DB_URL),
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
@@ -82,7 +82,7 @@ def parse_float(val):
 
 db = SessionLocal()
 try:
-    print("Mulai insert bulk data ke Supabase...")
+    print("Mulai insert bulk data ke PostgreSQL...")
     lines = RAW_DATA.strip().split("\n")
     inserted = 0
     skipped = 0

@@ -10,7 +10,7 @@ Aplikasi menghasilkan dokumen Kontrak Penjualan, Invoice, dan Delivery Order dal
 | Layer | Teknologi |
 |-------|-----------|
 | Backend | FastAPI (Python 3.12) + Uvicorn |
-| Database | PostgreSQL via Supabase (SQLAlchemy ORM) |
+| Database | PostgreSQL via Railway (SQLAlchemy ORM) |
 | Frontend | React 18 + TypeScript + Vite (di `frontend/`) |
 | Styling | Tailwind CSS + HSL CSS Variables |
 | UI Components | shadcn/ui (Radix primitives) |
@@ -28,7 +28,7 @@ cd D:\Apps-Dev\Monitoringpemasaran
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 - **JANGAN UBAH endpoint API tanpa diskusi** — format request/response sudah baku
-- .env ada di root untuk DATABASE_URL (Supabase PostgreSQL)
+- .env ada di root untuk DATABASE_URL (Railway PostgreSQL)
 - Model: `models.py`, Schema: `schemas.py`
 
 ### Frontend (React)
@@ -61,7 +61,7 @@ Monitoringpemasaran/
   main.py              # FastAPI entry point
   models.py            # SQLAlchemy ORM models
   schemas.py           # Pydantic request/response schemas
-  database.py          # DB connection (Supabase PostgreSQL)
+  database.py          # DB connection (Railway PostgreSQL)
   api/                 # API route modules (invoice, do, dashboard, laporan)
   endpoints/           # Kontrak endpoints
   services/            # Word docx generator, image generator, utils

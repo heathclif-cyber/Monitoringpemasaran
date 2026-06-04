@@ -1,5 +1,15 @@
 from huggingface_hub import HfApi
-api = HfApi(token="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")
+import os
+
+# API token dan DATABASE_URL dibaca dari environment variable
+HF_TOKEN = os.getenv("HF_TOKEN")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not HF_TOKEN or not DATABASE_URL:
+    print("Error: HF_TOKEN dan DATABASE_URL harus diset di environment")
+    exit(1)
+
+api = HfApi(token=HF_TOKEN)
 
 # Update Secret
 try:
@@ -7,10 +17,10 @@ try:
     api.add_space_secret(
         repo_id="heathclif/monitoring-pemasaran",
         key="DATABASE_URL",
-        value="postgresql://postgres.azomqppnodduqhmbujxv:Sambalpedas1%40@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+        value=DATABASE_URL  # Railway PostgreSQL URL
     )
     print("Secret updated successfully!")
-    
+
     print("Restarting Space...")
     api.restart_space("heathclif/monitoring-pemasaran")
     print("Space restarted successfully!")
