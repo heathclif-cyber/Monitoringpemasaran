@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Save, FileDown, RotateCcw, Eye } from 'lucide-react'
@@ -178,7 +178,7 @@ export default function InvoicePage() {
     },
   })
 
-  const { register, handleSubmit, reset, setValue, getValues, watch, control, formState: { errors, isSubmitting } } = form
+  const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors, isSubmitting } } = form
   const selectedKontrak = watch('no_kontrak')
   const selectedUnit = watch('nama_unit')
 
@@ -264,8 +264,8 @@ export default function InvoicePage() {
     return existingInvoices
   }, [existingInvoices, selectedUnit])
 
-  const watchedJumlah = useWatch({ control, name: 'jumlah_pembayaran' })
-  const currentJumlah = Number(watchedJumlah) || 0
+  // currentJumlah pakai watch() seperti terbilang — sudah terbukti reactive
+  const currentJumlah = Number(watch('jumlah_pembayaran')) || 0
 
   const totalInvoicedExisting = useMemo(() =>
     invoicesForProgress.reduce((sum: number, inv) => sum + (inv.jumlah_pembayaran || 0), 0),
@@ -404,12 +404,10 @@ export default function InvoicePage() {
                   )}
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-slate-500">
-                      Total Ter-invoice{selectedUnit ? ` (${selectedUnit})` : ''}: {formatCurrency(totalInvoicedExisting)}
-                      {currentJumlah > 0 && (
-                        <span className="text-brand-600"> + {formatCurrency(currentJumlah)} = <strong>{formatCurrency(totalInvoiced)}</strong></span>
-                      )}
+                      Total Ter-invoice{selectedUnit ? ` (${selectedUnit})` : ''}: <strong>{formatCurrency(totalInvoiced)}</strong>
+                      {currentJumlah > 0 && <span className="text-slate-400"> (sebelumnya: {formatCurrency(totalInvoicedExisting)})</span>}
                     </span>
-                    <span className="text-slate-500">Sisa: <strong className={currentJumlah > 0 ? 'text-brand-600' : ''}>{formatCurrency(sisaKontrak)}</strong></span>
+                    <span className="text-slate-500">Sisa: <strong className={sisaKontrak < maxForProgress ? 'text-brand-600' : 'text-slate-700'}>{formatCurrency(sisaKontrak)}</strong></span>
                   </div>
                   <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
                     <div
