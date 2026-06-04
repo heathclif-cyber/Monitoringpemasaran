@@ -65,6 +65,31 @@ def startup_event():
             add_column_safely("kontrak_unit", "volume", "FLOAT DEFAULT 0.0")
             add_column_safely("invoice", "nama_unit", "VARCHAR DEFAULT NULL")
 
+            # Normalize unit names (fix inconsistent spacing vs hyphens)
+            try:
+                from sqlalchemy import update as sql_update
+                fixes = [
+                    ("laporan_bypass", "unit", "Awaya Telpaputih", "Awaya-Telpaputih"),
+                    ("laporan_bypass", "unit", "Minahasa Halmahera", "Minahasa-Halmahera"),
+                    ("delivery_order", "kepada_unit", "Awaya Telpaputih", "Awaya-Telpaputih"),
+                    ("delivery_order", "kepada_unit", "Minahasa Halmahera", "Minahasa-Halmahera"),
+                    ("invoice", "nama_unit", "Awaya Telpaputih", "Awaya-Telpaputih"),
+                    ("invoice", "nama_unit", "Minahasa Halmahera", "Minahasa-Halmahera"),
+                    ("kontrak", "kebun_produsen", "Awaya Telpaputih", "Awaya-Telpaputih"),
+                    ("kontrak", "kebun_produsen", "Minahasa Halmahera", "Minahasa-Halmahera"),
+                ]
+                for tbl, col, old, new in fixes:
+                    stmt = sql_update(models.Base.metadata.tables[tbl]).where(
+                        getattr(models.Base.metadata.tables[tbl].c, col) == old
+                    ).values({col: new})
+                    result = db.execute(stmt)
+                    if result.rowcount > 0:
+                        logger.info(f"Normalized {result.rowcount} rows: {tbl}.{col} '{old}' -> '{new}'")
+                db.commit()
+            except Exception as norm_err:
+                db.rollback()
+                logger.warning(f"Unit normalization skipped: {norm_err}")
+
             logger.info("Migration routine finished.")
         except Exception as migrate_err:
             logger.error(f"Migration routine failed: {migrate_err}")

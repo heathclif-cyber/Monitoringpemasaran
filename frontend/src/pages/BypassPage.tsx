@@ -94,8 +94,8 @@ export default function BypassPage() {
                 <Label className="text-xs">Unit *</Label>
                 <input {...register('unit')} className={ic} list="unit-list" />
                 <datalist id="unit-list">
-                  <option value="Minahasa Halmahera" /><option value="Awaya Telpaputih" />
-                  <option value="Beteleme" /><option value="Kabaru" />
+                  <option value="Minahasa-Halmahera" /><option value="Awaya-Telpaputih" />
+                  <option value="Beteleme" /><option value="Kabaru" /><option value="Takalar" /><option value="Camming" />
                 </datalist>
                 {errors.unit && <p className="text-xs text-red-500 mt-1">{errors.unit.message}</p>}
               </div>
