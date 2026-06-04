@@ -296,11 +296,18 @@ function SapStatus() {
 
   const rows = (sap_bulanan?.labels ?? []).map((label, i) => ({
     bulan: label,
+    monthIndex: i + 1,
     kontrak: sap_bulanan?.missing_kontrak[i] || 0,
     so: sap_bulanan?.missing_so[i] || 0,
     do_: sap_bulanan?.missing_do[i] || 0,
     billing: sap_bulanan?.missing_billing[i] || 0,
-  })).filter((r) => r.kontrak + r.so + r.do_ + r.billing > 0).reverse()
+  })).filter((r) => {
+    const hasData = r.kontrak + r.so + r.do_ + r.billing > 0
+    const now = new Date()
+    const selYear = data.selected_year || now.getFullYear()
+    const isPastOrCurrent = selYear < now.getFullYear() || (selYear === now.getFullYear() && r.monthIndex <= now.getMonth() + 1)
+    return hasData || isPastOrCurrent
+  }).reverse()
 
   const MissingBadge = ({ val }: { val: number }) =>
     val > 0 ? (
