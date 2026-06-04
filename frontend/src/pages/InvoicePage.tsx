@@ -164,6 +164,7 @@ export default function InvoicePage() {
   const { addNotification } = useAppStore()
   const [exportNo, setExportNo] = useState<string | null>(null)
   const [isExisting, setIsExisting] = useState(false)
+  const [liveJumlah, setLiveJumlah] = useState(0)
 
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
@@ -264,8 +265,8 @@ export default function InvoicePage() {
     return existingInvoices
   }, [existingInvoices, selectedUnit])
 
-  // currentJumlah pakai watch() seperti terbilang — sudah terbukti reactive
-  const currentJumlah = Number(watch('jumlah_pembayaran')) || 0
+  // Live-tracking jumlah_pembayaran via onInput DOM event — bypass RHF watch
+  const currentJumlah = liveJumlah
 
   const totalInvoicedExisting = useMemo(() =>
     invoicesForProgress.reduce((sum: number, inv) => sum + (inv.jumlah_pembayaran || 0), 0),
@@ -302,6 +303,7 @@ export default function InvoicePage() {
     reset()
     setIsExisting(false)
     setExportNo(null)
+    setLiveJumlah(0)
   }
 
   const handleExport = () => {
@@ -439,13 +441,24 @@ export default function InvoicePage() {
                 <div className="border-t pt-3">
                   <Label className="text-xs">Jumlah Pembayaran Invoice Ini *</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="number"
-                      step="1"
-                      {...register('jumlah_pembayaran')}
-                      className={ic}
-                      placeholder={formatCurrency(sisaKontrak)}
-                    />
+                    {(() => {
+                      const reg = register('jumlah_pembayaran')
+                      return (
+                        <input
+                          type="number"
+                          step="1"
+                          name={reg.name}
+                          ref={reg.ref}
+                          onBlur={reg.onBlur}
+                          onChange={(e) => {
+                            reg.onChange(e)
+                            setLiveJumlah(Number(e.target.value) || 0)
+                          }}
+                          className={ic}
+                          placeholder={formatCurrency(sisaKontrak)}
+                        />
+                      )
+                    })()}
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
                     Kosongkan untuk auto (nilai penuh{selectedUnit ? ` unit ${selectedUnit}` : ' kontrak'}). Maks: {formatCurrency(sisaKontrak)}
