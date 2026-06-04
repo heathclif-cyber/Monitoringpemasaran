@@ -28,7 +28,8 @@ cd D:\Apps-Dev\Monitoringpemasaran
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 - **JANGAN UBAH endpoint API tanpa diskusi** — format request/response sudah baku
-- .env ada di root untuk DATABASE_URL (Railway PostgreSQL)
+- `.env` wajib ada di root dengan `DATABASE_URL` (Railway PostgreSQL) — **tidak ada fallback SQLite**
+- Driver: auto-detect `psycopg2` → `psycopg` (v3). Install salah satu: `pip install psycopg[binary]`
 - Model: `models.py`, Schema: `schemas.py`
 
 ### Frontend (React)
@@ -61,7 +62,7 @@ Monitoringpemasaran/
   main.py              # FastAPI entry point
   models.py            # SQLAlchemy ORM models
   schemas.py           # Pydantic request/response schemas
-  database.py          # DB connection (Railway PostgreSQL)
+  database.py          # DB connection (Railway PostgreSQL, no SQLite fallback)
   api/                 # API route modules (invoice, do, dashboard, laporan)
   endpoints/           # Kontrak endpoints
   services/            # Word docx generator, image generator, utils
