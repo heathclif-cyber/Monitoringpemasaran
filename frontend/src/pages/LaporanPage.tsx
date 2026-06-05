@@ -266,7 +266,7 @@ export default function LaporanPage() {
                     <th className="text-right px-3 py-2">Pelunasan (Inc. PPh)</th>
                     <th className="text-left px-3 py-2">Mitra Pembeli</th>
                     <th className="text-left px-3 py-2">Jenis Komoditi/Material</th>
-                    <th className="text-right px-3 py-2">Jml Kontrak</th>
+                    <th className="text-right px-3 py-2">Jml Invoice</th>
                     <th className="text-right px-3 py-2">Harga Satuan</th>
                     <th className="text-right px-3 py-2">Jumlah DO</th>
                     <th className="text-right px-3 py-2">Pendapatan Pokok</th>
@@ -303,7 +303,7 @@ export default function LaporanPage() {
                         <td className="px-2 py-1.5 text-right text-blue-600 font-medium whitespace-nowrap">{formatCurrency(row.Pelunasan)}</td>
                         <td className="px-2 py-1.5 max-w-[180px] whitespace-normal break-words">{safe(row.Mitra_Pembeli)}</td>
                         <td className="px-2 py-1.5 max-w-[180px] whitespace-normal break-words">{safe(row.Deskripsi_Produk)}</td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatNumber(row.Jumlah_Kontrak)}</td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{row.Jumlah_Invoice > 0 ? formatCurrency(row.Jumlah_Invoice) : '-'}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Harga_Satuan)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatNumber(row.Jumlah_DO)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Pendapatan_Pokok)}</td>

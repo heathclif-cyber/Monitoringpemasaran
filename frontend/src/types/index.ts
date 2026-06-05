@@ -157,7 +157,7 @@ export interface LaporanRow {
   Pelunasan: number
   Mitra_Pembeli: string
   Deskripsi_Produk: string
-  Jumlah_Kontrak: number
+  Jumlah_Invoice: number
   Harga_Satuan: number
   Jumlah_DO: number
   Pendapatan_Pokok: number
