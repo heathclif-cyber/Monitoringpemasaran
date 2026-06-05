@@ -47,12 +47,12 @@ export function calculateLaporanSummary(rows: LaporanRow[]): LaporanSummary {
       result.sisaVolumeButir += row.Sisa_Volume || 0
       result.barangTerkirimButir += row.Jumlah_DO || 0
       totalButirVolume += row.Jumlah_DO || 0
-      totalButirPendapatan += row.DPP_Pokok || 0
+      totalButirPendapatan += row.Pendapatan_Pokok || 0
     } else {
       result.sisaVolume += row.Sisa_Volume || 0
       result.barangTerkirimKg += row.Jumlah_DO || 0
       totalKgVolume += row.Jumlah_DO || 0
-      totalKgPendapatan += row.DPP_Pokok || 0
+      totalKgPendapatan += row.Pendapatan_Pokok || 0
     }
   }
 
