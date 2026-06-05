@@ -10,6 +10,7 @@ import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency } from '@/lib/utils'
 import { calculateProportionalVolume, calculateSelisih, getVolumePercentage } from '@/utils/doUtils'
 import type { Kontrak } from '@/types'
@@ -238,12 +239,16 @@ export default function DOPage() {
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">No Invoice *</Label>
-                <select {...register('no_invoice')} className={ic}>
-                  <option value="">-- Pilih Invoice --</option>
-                  {invoiceStore.data.map((i) => (
-                    <option key={i.no_invoice} value={i.no_invoice}>{i.no_invoice}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  options={invoiceStore.data.map((i) => ({
+                    value: i.no_invoice,
+                    label: i.no_invoice,
+                  }))}
+                  value={watch('no_invoice')}
+                  onChange={(v) => setValue('no_invoice', v, { shouldValidate: true })}
+                  placeholder="-- Pilih / Cari Invoice --"
+                />
+                {errors.no_invoice && <p className="text-xs text-red-500 mt-1">{errors.no_invoice.message}</p>}
               </div>
               <div>
                 <Label className="text-xs">No DO *</Label>

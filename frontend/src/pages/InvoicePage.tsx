@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
 import { calculateKontrakPricing, calculateJatuhTempo } from '@/utils/kontrakUtils'
@@ -338,14 +339,16 @@ export default function InvoicePage() {
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">No Kontrak *</Label>
-                <select {...register('no_kontrak')} className={ic}>
-                  <option value="">-- Pilih Kontrak --</option>
-                  {kontrakStore.data.map((k) => (
-                    <option key={k.no_kontrak} value={k.no_kontrak}>
-                      {k.no_kontrak} - {k.pembeli?.split('\n')[0] || ''}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  options={kontrakStore.data.map((k) => ({
+                    value: k.no_kontrak,
+                    label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''}`,
+                  }))}
+                  value={watch('no_kontrak')}
+                  onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
+                  placeholder="-- Pilih / Cari Kontrak --"
+                />
+                {errors.no_kontrak && <p className="text-xs text-red-500 mt-1">{errors.no_kontrak.message}</p>}
               </div>
               <div>
                 <Label className="text-xs">No Invoice *</Label>
