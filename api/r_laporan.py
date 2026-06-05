@@ -31,39 +31,42 @@ def get_laporan(db: Session = Depends(get_db)):
     def build_row(k, inv, do, inv_total=0, k_vol=0, total_do_nominal=0, total_do_volume=0):
         do_volume = float(do.volume_do or 0) if do else 0
         do_nominal = float(do.nominal_transfer or 0) if do else 0
-        # Pendapatan Pokok for this DO = proportional: (volume_do / kontrak_vol) * nilai_transaksi
         k_vol_local = float(k.volume or 0)
         k_harga_local = float(k.harga_satuan or 0)
         k_premi = float(k.premi or 0)
+        # k_pokok = volume × harga + premi, sebelum PPN
+        k_pokok = (k_vol_local * k_harga_local) + k_premi
         k_nilai = float(k.nilai_transaksi or 0)
         k_ppn = float(k.nominal_ppn or 0)
-        
+
         if k_nilai <= 0:
-            k_nilai = (k_vol_local * k_harga_local) + k_premi
-        
+            k_nilai = k_pokok
+
         if str(getattr(k, 'is_ppn', 'true')).lower() == 'false':
             k_ppn = 0.0
-        elif k_ppn <= 0 and k_nilai > 0:
+        elif k_ppn <= 0 and k_pokok > 0:
             k_ppn_persen = float(getattr(k, 'ppn_persen', 0) or 0)
             if k_ppn_persen > 0:
-                k_ppn = k_nilai * (k_ppn_persen / 100)
-            elif inv and float(inv.jumlah_pembayaran or 0) > k_nilai:
-                k_ppn = float(inv.jumlah_pembayaran) - k_nilai
+                k_ppn = k_pokok * (k_ppn_persen / 100)
+            elif inv and float(inv.jumlah_pembayaran or 0) > k_pokok:
+                k_ppn = float(inv.jumlah_pembayaran) - k_pokok
 
         k_pph = 0.0
         if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
             k_pph_p = float(getattr(k, 'pph_persen', 0) or 0)
-            k_pph = k_nilai * (k_pph_p / 100)
+            k_pph = k_pokok * (k_pph_p / 100)
 
         if k_vol_local > 0 and do:
             ratio = do_volume / k_vol_local
-            pendapatan_do = k_nilai * ratio
+            pendapatan_do = k_pokok * ratio   # pokok saja, sebelum PPN
             ppn_do = k_ppn * ratio
             pph_do = k_pph * ratio
         else:
-            pendapatan_do = k_nilai
+            pendapatan_do = k_pokok            # pokok saja, sebelum PPN
             ppn_do = k_ppn
             pph_do = k_pph
+
+        pendapatan_setelah_ppn = round(pendapatan_do + ppn_do)
 
         # Sisa pembayaran = Invoice total gross - sum of ALL DOs pelunasan for this invoice
         # inv_total is now already gross (pokok + PPN, no PPh subtraction)
@@ -118,6 +121,7 @@ def get_laporan(db: Session = Depends(get_db)):
             "Harga_Satuan": k.harga_satuan or 0,
             "Jumlah_DO": do_volume,
             "Pendapatan_Pokok": round(pendapatan_do),
+            "Pendapatan_Setelah_PPN": pendapatan_setelah_ppn,
             "DPP_Pokok": round(dpp_pokok),
             "Pajak_PPN": round(ppn_do),
             "PPh_Nominal": round(pph_do),
@@ -195,6 +199,7 @@ def get_laporan(db: Session = Depends(get_db)):
             "Jumlah_DO": b.volume or 0,
             "Satuan": b.satuan or "Kg",
             "Pendapatan_Pokok": b.nominal or 0,
+            "Pendapatan_Setelah_PPN": b.nominal or 0,
             "Pajak_PPN": 0,
             "PPh_Nominal": 0,
             "PPh_Setor": "false",

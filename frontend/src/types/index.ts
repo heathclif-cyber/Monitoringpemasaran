@@ -161,6 +161,7 @@ export interface LaporanRow {
   Harga_Satuan: number
   Jumlah_DO: number
   Pendapatan_Pokok: number
+  Pendapatan_Setelah_PPN: number
   DPP_Pokok: number
   Pajak_PPN: number
   PPh_Nominal: number

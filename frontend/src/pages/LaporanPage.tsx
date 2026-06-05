@@ -270,6 +270,7 @@ export default function LaporanPage() {
                     <th className="text-right px-3 py-2">Harga Satuan</th>
                     <th className="text-right px-3 py-2">Jumlah DO</th>
                     <th className="text-right px-3 py-2">Pendapatan Pokok</th>
+                    <th className="text-right px-3 py-2">Pendapatan Setelah PPN</th>
                     <th className="text-right px-3 py-2">Pajak PPN</th>
                     <th className="text-right px-3 py-2">PPh</th>
                     <th className="text-center px-3 py-2">PPh Setor?</th>
@@ -307,6 +308,7 @@ export default function LaporanPage() {
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Harga_Satuan)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatNumber(row.Jumlah_DO)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Pendapatan_Pokok)}</td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Pendapatan_Setelah_PPN)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.Pajak_PPN)}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatCurrency(row.PPh_Nominal)}</td>
                         <td className="px-2 py-1.5 text-center">
