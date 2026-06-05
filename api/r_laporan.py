@@ -126,7 +126,7 @@ def get_laporan(db: Session = Depends(get_db)):
             "Pajak_PPN": round(ppn_do),
             "PPh_Nominal": round(pph_do),
             "PPh_Setor": do.is_pph_disetor if do else "false",
-            "Kewajiban_Pembayaran": inv_total_gross,
+            "Kewajiban_Pembayaran": round(pendapatan_setelah_ppn - pph_do),
             "Pelunasan": round(pelunasan_do),
             "Sisa_Pembayaran": sisa_pembayaran,
             "Sisa_Volume": sisa_volume,
