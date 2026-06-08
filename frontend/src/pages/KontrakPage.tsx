@@ -84,7 +84,9 @@ export default function KontrakPage() {
   const [isExisting, setIsExisting] = useState(false)
   const [previewData, setPreviewData] = useState<Partial<KontrakFormData>>({})
   const [exportNo, setExportNo] = useState<string | null>(null)
-  const [unitList, setUnitList] = useState<{ nama_unit: string; volume: number }[]>([{ nama_unit: '', volume: 0 }])
+  const [unitList, setUnitList] = useState<{ nama_unit: string; volume: number; komoditi: string; jenis_komoditi: string; satuan: string; tahun_panen: string; deskripsi_produk: string }[]>([
+    { nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }
+  ])
 
   const form = useForm<KontrakFormData>({
     resolver: zodResolver(kontrakSchema),
@@ -179,12 +181,26 @@ export default function KontrakPage() {
         }
       }
       // Load units — fallback ke kebun_produsen jika belum ada units
+      // Fallback material fields dari kontrak-level jika unit tidak punya
+      const fbKomoditi = data.komoditi || ''
+      const fbJenis = data.jenis_komoditi || ''
+      const fbSatuan = data.satuan || 'Kg'
+      const fbTahun = data.tahun_panen || ''
+      const fbDeskripsi = data.deskripsi_produk || ''
       if (data.units && data.units.length > 0) {
-        setUnitList(data.units.map(u => ({ nama_unit: u.nama_unit, volume: u.volume || 0 })))
+        setUnitList(data.units.map(u => ({
+          nama_unit: u.nama_unit,
+          volume: u.volume || 0,
+          komoditi: u.komoditi || fbKomoditi,
+          jenis_komoditi: u.jenis_komoditi || fbJenis,
+          satuan: u.satuan || fbSatuan,
+          tahun_panen: u.tahun_panen || fbTahun,
+          deskripsi_produk: u.deskripsi_produk || fbDeskripsi,
+        })))
       } else if (data.kebun_produsen) {
-        setUnitList([{ nama_unit: data.kebun_produsen, volume: 0 }])
+        setUnitList([{ nama_unit: data.kebun_produsen, volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])
       } else {
-        setUnitList([{ nama_unit: '', volume: 0 }])
+        setUnitList([{ nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])
       }
     } else {
       setIsExisting(false)
@@ -198,7 +214,7 @@ export default function KontrakPage() {
     setIsExisting(false)
     setExportNo(null)
     setKontrakNo('')
-    setUnitList([{ nama_unit: '', volume: 0 }])
+    setUnitList([{ nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])
   }
 
   // Submit
@@ -212,7 +228,24 @@ export default function KontrakPage() {
       payload.pembayaran_atas_nama = 'PT Perkebunan Nusantara I Regional 8'
       payload.pembayaran_rek_no = 'No. 0050-01-005356-30-0'
       const validUnits = unitList.filter(u => u.nama_unit.trim())
-      payload.units = validUnits.map(u => ({ nama_unit: u.nama_unit, volume: u.volume || 0 }))
+      payload.units = validUnits.map(u => ({
+        nama_unit: u.nama_unit,
+        volume: u.volume || 0,
+        komoditi: u.komoditi || undefined,
+        jenis_komoditi: u.jenis_komoditi || undefined,
+        satuan: u.satuan || undefined,
+        tahun_panen: u.tahun_panen || undefined,
+        deskripsi_produk: u.deskripsi_produk || undefined,
+      }))
+      // Sync kontrak-level material dari unit pertama
+      if (validUnits.length > 0) {
+        const first = validUnits[0]
+        if (first.komoditi) payload.komoditi = first.komoditi
+        if (first.jenis_komoditi) payload.jenis_komoditi = first.jenis_komoditi
+        if (first.satuan) payload.satuan = first.satuan
+        if (first.tahun_panen) payload.tahun_panen = first.tahun_panen
+        if (first.deskripsi_produk) payload.deskripsi_produk = first.deskripsi_produk
+      }
       // Jika semua unit punya volume > 0, derive total volume dari sum
       if (validUnits.length > 0 && validUnits.every(u => (u.volume || 0) > 0)) {
         payload.volume = validUnits.reduce((s, u) => s + (u.volume || 0), 0)
@@ -341,95 +374,139 @@ export default function KontrakPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Data Barang & Produksi</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-4">
-              <div><Label className="text-xs">Komoditi</Label><input {...register('komoditi')} className={ic} /></div>
+            <CardContent className="space-y-3">
               <div>
-                <Label className="text-xs">Jenis Komoditi/Material</Label>
-                <select {...register('jenis_komoditi')} className={ic}>
-                  <option value="">-- Pilih Jenis --</option>
-                  <option>TBS (TANDAN BUAH SEGAR)</option>
-                  <option>Lump</option>
-                  <option>TH BR CR 3X</option>
-                  <option>TH BR CR 3X HITAM</option>
-                  <option>GULA GAPOKTAN</option>
-                  <option>Gula Kemasan 50 KG Milik PG</option>
-                  <option>KELAPA KUPAS</option>
-                  <option>KELAPA BUTIR</option>
-                  <option>Kopra</option>
-                  <option>SAPI PEJANTAN AFKIR</option>
-                  <option>CPO</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs">Satuan</Label>
-                <select {...register('satuan')} className={ic}>
-                  <option value="Kg">Kg</option>
-                  <option value="Butir">Butir</option>
-                </select>
-              </div>
-              <div><Label className="text-xs">Tahun Panen</Label><input {...register('tahun_panen')} className={ic} /></div>
-              <div><Label className="text-xs">Deskripsi Produk</Label><input {...register('deskripsi_produk')} className={ic} /></div>
-              <div className="col-span-3">
-                <Label className="text-xs">Unit / Kebun Produsen</Label>
+                <Label className="text-xs">Unit / Kebun Produsen & Material</Label>
                 <div className="space-y-2 mt-1">
                   {unitList.map((unit, i) => {
                     const isLainnya = unit.nama_unit !== '' && !FIXED_UNITS.includes(unit.nama_unit)
                     const selectValue = isLainnya ? '__lainnya__' : unit.nama_unit
-                    const sel = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring'
+                    const sel = 'h-9 rounded-md border border-input bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring'
                     return (
-                      <div key={i} className="flex gap-2 items-center">
-                        <select
-                          value={selectValue}
-                          onChange={e => {
-                            const next = [...unitList]
-                            if (e.target.value === '__lainnya__') {
-                              next[i] = { ...next[i], nama_unit: '' }
-                            } else {
-                              next[i] = { ...next[i], nama_unit: e.target.value }
-                            }
-                            setUnitList(next)
-                          }}
-                          className={`${sel} flex-1 min-w-0`}
-                        >
-                          <option value="">Unit Produksi</option>
-                          {FIXED_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                          <option value="__lainnya__">Lainnya (isi manual)</option>
-                        </select>
-                        {(selectValue === '__lainnya__' || isLainnya) && (
+                      <div key={i} className="border rounded-lg p-2 space-y-2 bg-slate-50/50">
+                        {/* Row 1: Material fields */}
+                        <div className="flex gap-2 items-center">
                           <input
-                            value={unit.nama_unit}
+                            value={unit.komoditi}
                             onChange={e => {
                               const next = [...unitList]
-                              next[i] = { ...next[i], nama_unit: e.target.value }
+                              next[i] = { ...next[i], komoditi: e.target.value }
+                              setUnitList(next)
+                            }}
+                            className={`${sel} w-28 shrink-0`}
+                            placeholder="Komoditi"
+                            list="komoditi-datalist"
+                          />
+                          <select
+                            value={unit.jenis_komoditi}
+                            onChange={e => {
+                              const next = [...unitList]
+                              next[i] = { ...next[i], jenis_komoditi: e.target.value }
+                              setUnitList(next)
+                            }}
+                            className={`${sel} w-36 shrink-0`}
+                          >
+                            <option value="">-- Jenis Material --</option>
+                            <option>TBS (TANDAN BUAH SEGAR)</option>
+                            <option>Lump</option>
+                            <option>TH BR CR 3X</option>
+                            <option>TH BR CR 3X HITAM</option>
+                            <option>GULA GAPOKTAN</option>
+                            <option>Gula Kemasan 50 KG Milik PG</option>
+                            <option>KELAPA KUPAS</option>
+                            <option>KELAPA BUTIR</option>
+                            <option>Kopra</option>
+                            <option>SAPI PEJANTAN AFKIR</option>
+                            <option>CPO</option>
+                          </select>
+                          <select
+                            value={unit.satuan}
+                            onChange={e => {
+                              const next = [...unitList]
+                              next[i] = { ...next[i], satuan: e.target.value }
+                              setUnitList(next)
+                            }}
+                            className={`${sel} w-20 shrink-0`}
+                          >
+                            <option value="Kg">Kg</option>
+                            <option value="Butir">Butir</option>
+                          </select>
+                          <input
+                            value={unit.tahun_panen}
+                            onChange={e => {
+                              const next = [...unitList]
+                              next[i] = { ...next[i], tahun_panen: e.target.value }
+                              setUnitList(next)
+                            }}
+                            className={`${sel} w-24 shrink-0`}
+                            placeholder="Thn Panen"
+                          />
+                          <input
+                            value={unit.deskripsi_produk}
+                            onChange={e => {
+                              const next = [...unitList]
+                              next[i] = { ...next[i], deskripsi_produk: e.target.value }
                               setUnitList(next)
                             }}
                             className={`${sel} flex-1 min-w-0`}
-                            placeholder="Nama unit..."
+                            placeholder="Deskripsi"
                           />
-                        )}
-                        <input
-                          type="number"
-                          step="any"
-                          value={unit.volume || ''}
-                          onChange={e => {
-                            const next = [...unitList]
-                            next[i] = { ...next[i], volume: parseFloat(e.target.value) || 0 }
-                            setUnitList(next)
-                          }}
-                          className={`${sel} w-32 shrink-0`}
-                          placeholder="Volume"
-                        />
-                        {unitList.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 shrink-0 text-slate-400 hover:text-red-500"
-                            onClick={() => setUnitList(unitList.filter((_, j) => j !== i))}
+                        </div>
+                        {/* Row 2: Unit + Volume */}
+                        <div className="flex gap-2 items-center">
+                          <select
+                            value={selectValue}
+                            onChange={e => {
+                              const next = [...unitList]
+                              if (e.target.value === '__lainnya__') {
+                                next[i] = { ...next[i], nama_unit: '' }
+                              } else {
+                                next[i] = { ...next[i], nama_unit: e.target.value }
+                              }
+                              setUnitList(next)
+                            }}
+                            className={`${sel} flex-1 min-w-0`}
                           >
-                            <X size={14} />
-                          </Button>
-                        )}
+                            <option value="">Unit Produksi</option>
+                            {FIXED_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                            <option value="__lainnya__">Lainnya (isi manual)</option>
+                          </select>
+                          {(selectValue === '__lainnya__' || isLainnya) && (
+                            <input
+                              value={unit.nama_unit}
+                              onChange={e => {
+                                const next = [...unitList]
+                                next[i] = { ...next[i], nama_unit: e.target.value }
+                                setUnitList(next)
+                              }}
+                              className={`${sel} flex-1 min-w-0`}
+                              placeholder="Nama unit..."
+                            />
+                          )}
+                          <input
+                            type="number"
+                            step="any"
+                            value={unit.volume || ''}
+                            onChange={e => {
+                              const next = [...unitList]
+                              next[i] = { ...next[i], volume: parseFloat(e.target.value) || 0 }
+                              setUnitList(next)
+                            }}
+                            className={`${sel} w-32 shrink-0`}
+                            placeholder="Volume"
+                          />
+                          {unitList.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 shrink-0 text-slate-400 hover:text-red-500"
+                              onClick={() => setUnitList(unitList.filter((_, j) => j !== i))}
+                            >
+                              <X size={14} />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
@@ -439,42 +516,55 @@ export default function KontrakPage() {
                       variant="outline"
                       size="sm"
                       className="gap-1 text-xs"
-                      onClick={() => setUnitList([...unitList, { nama_unit: '', volume: 0 }])}
+                      onClick={() => setUnitList([...unitList, { nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])}
                     >
                       <Plus size={12} />
                       Tambah Unit
                     </Button>
                     {unitList.filter(u => u.nama_unit.trim() && (u.volume || 0) > 0).length > 0 && (
                       <span className="text-xs text-slate-500">
-                        Total: {unitList.filter(u => u.nama_unit.trim()).reduce((s, u) => s + (u.volume || 0), 0).toLocaleString('id-ID')} {watchedFields.satuan || 'Kg'}
+                        Total: {unitList.filter(u => u.nama_unit.trim()).reduce((s, u) => s + (u.volume || 0), 0).toLocaleString('id-ID')} {unitList.filter(u => u.nama_unit.trim()).length > 0 ? (unitList.filter(u => u.nama_unit.trim())[0]?.satuan || 'Kg') : 'Kg'}
                       </span>
                     )}
                   </div>
                 </div>
+                <datalist id="komoditi-datalist">
+                  <option value="Kelapa" />
+                  <option value="Tebu" />
+                  <option value="Sawit" />
+                  <option value="Karet" />
+                  <option value="Kopi" />
+                  <option value="Kakao" />
+                  <option value="Sapi" />
+                  <option value="Garam" />
+                </datalist>
               </div>
-              <div><Label className="text-xs">Mutu</Label><input {...register('mutu')} className={ic} /></div>
-              <div><Label className="text-xs">Packaging</Label><input {...register('packaging')} className={ic} /></div>
-              <div><Label className="text-xs">Simbol</Label><input {...register('simbol')} className={ic} /></div>
-              <div><Label className="text-xs">Pelabuhan Muat</Label><input {...register('pelabuhan_muat')} className={ic} /></div>
-              <div><Label className="text-xs">Chop</Label><input {...register('chop')} className={ic} /></div>
-              <div><Label className="text-xs">Pack Qty</Label><input type="number" step="any" {...register('pack_qty')} className={ic} /></div>
-              <div><Label className="text-xs">Banyak Bale/Karung</Label><input type="number" step="any" {...register('banyaknya_bale_karung')} className={ic} /></div>
-              <div>
-                <Label className="text-xs">PPN</Label>
-                <select {...register('is_ppn')} className={ic}>
-                  <option value="true">Ya (PPN)</option>
-                  <option value="false">Tidak (Non-PPN)</option>
-                </select>
+              {/* Remaining fields */}
+              <div className="grid grid-cols-3 gap-4">
+                <div><Label className="text-xs">Mutu</Label><input {...register('mutu')} className={ic} /></div>
+                <div><Label className="text-xs">Packaging</Label><input {...register('packaging')} className={ic} /></div>
+                <div><Label className="text-xs">Simbol</Label><input {...register('simbol')} className={ic} /></div>
+                <div><Label className="text-xs">Pelabuhan Muat</Label><input {...register('pelabuhan_muat')} className={ic} /></div>
+                <div><Label className="text-xs">Chop</Label><input {...register('chop')} className={ic} /></div>
+                <div><Label className="text-xs">Pack Qty</Label><input type="number" step="any" {...register('pack_qty')} className={ic} /></div>
+                <div><Label className="text-xs">Banyak Bale/Karung</Label><input type="number" step="any" {...register('banyaknya_bale_karung')} className={ic} /></div>
+                <div>
+                  <Label className="text-xs">PPN</Label>
+                  <select {...register('is_ppn')} className={ic}>
+                    <option value="true">Ya (PPN)</option>
+                    <option value="false">Tidak (Non-PPN)</option>
+                  </select>
+                </div>
+                <div><Label className="text-xs">PPN %</Label><input type="number" step="any" {...register('ppn_persen')} className={ic} /></div>
+                <div>
+                  <Label className="text-xs">PPh</Label>
+                  <select {...register('is_pph')} className={ic}>
+                    <option value="false">Tidak</option>
+                    <option value="true">Ya</option>
+                  </select>
+                </div>
+                <div><Label className="text-xs">PPh %</Label><input type="number" step="any" {...register('pph_persen')} className={ic} /></div>
               </div>
-              <div><Label className="text-xs">PPN %</Label><input type="number" step="any" {...register('ppn_persen')} className={ic} /></div>
-              <div>
-                <Label className="text-xs">PPh</Label>
-                <select {...register('is_pph')} className={ic}>
-                  <option value="false">Tidak</option>
-                  <option value="true">Ya</option>
-                </select>
-              </div>
-              <div><Label className="text-xs">PPh %</Label><input type="number" step="any" {...register('pph_persen')} className={ic} /></div>
             </CardContent>
           </Card>
 
@@ -610,7 +700,7 @@ export default function KontrakPage() {
                 <p className="text-xs text-slate-400 mt-1">Isi form kontrak untuk melihat preview</p>
               </div>
             ) : (
-              <KontrakPreview data={{ ...watchedFields, units: unitList.filter(u => u.nama_unit.trim()).map((u, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit: u.nama_unit, urutan: i, volume: u.volume || 0 })) }} />
+              <KontrakPreview data={{ ...watchedFields, units: unitList.filter(u => u.nama_unit.trim()).map((u, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit: u.nama_unit, urutan: i, volume: u.volume || 0, komoditi: u.komoditi || null, jenis_komoditi: u.jenis_komoditi || null, satuan: u.satuan || null, tahun_panen: u.tahun_panen || null, deskripsi_produk: u.deskripsi_produk || null })) }} />
             )}
           </div>
         </div>

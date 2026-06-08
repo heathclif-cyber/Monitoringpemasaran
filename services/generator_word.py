@@ -182,10 +182,17 @@ def generate_contract_docx(k) -> io.BytesIO:
     RS('Deskripsi Produk', _s(k.deskripsi_produk))
     RS('Mutu', _s(k.mutu))
     units = getattr(k, 'units', None) or []
+    has_materials = any(getattr(u, 'komoditi', None) for u in units)
     if len(units) > 1:
-        RM('Produsen', [(u.nama_unit, False) for u in units])
+        # Multi-unit — tampilkan tabel rincian
+        RM('Unit Produsen', [(f"{u.nama_unit}" + (f" — {u.komoditi} {u.jenis_komoditi or ''}".strip() if getattr(u, 'komoditi', None) else ''), False) for u in units])
     elif len(units) == 1:
-        RS('Produsen', units[0].nama_unit)
+        prefix = f"{units[0].nama_unit}"
+        if getattr(units[0], 'komoditi', None):
+            prefix += f" — {units[0].komoditi}"
+            if getattr(units[0], 'jenis_komoditi', None):
+                prefix += f" ({units[0].jenis_komoditi})"
+        RS('Produsen', prefix)
     else:
         RS('Produsen', _s(k.kebun_produsen))
     RS('Pelabuhan Muat', _s(k.pelabuhan_muat))

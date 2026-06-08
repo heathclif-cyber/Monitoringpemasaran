@@ -27,6 +27,11 @@ export interface KontrakUnit {
   nama_unit: string
   urutan: number
   volume: number
+  komoditi?: string | null
+  jenis_komoditi?: string | null
+  satuan?: string | null
+  tahun_panen?: string | null
+  deskripsi_produk?: string | null
 }
 
 export interface Kontrak {
@@ -301,7 +306,7 @@ export interface KontrakInput {
   syarat_syarat?: string
   dasar_ketentuan?: string
   lokasi?: string
-  units?: { nama_unit: string }[]
+  units?: { nama_unit: string; volume?: number; komoditi?: string; jenis_komoditi?: string; satuan?: string; tahun_panen?: string; deskripsi_produk?: string }[]
 }
 
 export interface InvoiceInput {

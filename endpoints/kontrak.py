@@ -65,7 +65,26 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
             nama_unit=unit.nama_unit,
             urutan=i,
             volume=unit.volume or 0.0,
+            komoditi=unit.komoditi,
+            jenis_komoditi=unit.jenis_komoditi,
+            satuan=unit.satuan,
+            tahun_panen=unit.tahun_panen,
+            deskripsi_produk=unit.deskripsi_produk,
         ))
+
+    # Sync kontrak-level fields dari unit pertama sebagai fallback
+    if units_input:
+        first = units_input[0]
+        if first.komoditi:
+            db_kontrak.komoditi = first.komoditi
+        if first.jenis_komoditi:
+            db_kontrak.jenis_komoditi = first.jenis_komoditi
+        if first.satuan:
+            db_kontrak.satuan = first.satuan
+        if first.tahun_panen:
+            db_kontrak.tahun_panen = first.tahun_panen
+        if first.deskripsi_produk:
+            db_kontrak.deskripsi_produk = first.deskripsi_produk
 
     db.commit()
     db.refresh(db_kontrak)
@@ -131,12 +150,33 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
 
     syarat_rows = ''.join(f'<li>{ln}</li>' for ln in s(k.syarat_syarat, '').split('\n') if ln.strip())
 
+    # Build produsen/unit row — tampilkan multi-material jika ada unit dengan info material
+    units_db = getattr(k, 'units', None) or []
+    if units_db:
+        unit_parts = []
+        for u in units_db:
+            u_text = f"<strong>{u.nama_unit}</strong>"
+            mat = getattr(u, 'komoditi', None)
+            if mat:
+                u_text += f" — {mat}"
+                jm = getattr(u, 'jenis_komoditi', None)
+                if jm:
+                    u_text += f" ({jm})"
+            vol_u = u.volume or 0
+            if vol_u > 0:
+                sat_u = getattr(u, 'satuan', None) or s(k.satuan, 'Unit')
+                u_text += f" ({vol_u:,.0f} {sat_u})"
+            unit_parts.append(u_text)
+        produsen_html = '<br>'.join(unit_parts)
+    else:
+        produsen_html = s(k.kebun_produsen)
+
     html = f'''
     <div style="font-family:'Arial',sans-serif;font-size:9pt;color:#000;padding:14px;background:white">
       <h2 style="text-align:center;margin:0 0 2px;font-size:11pt;text-decoration:underline;"><strong>KONTRAK PENJUALAN</strong></h2>
       <p style="text-align:center;margin:2px 0 0;font-size:9pt">Nomor : {s(k.no_kontrak)}</p>
       <p style="text-align:center;margin:2px 0 16px;font-size:9pt">Bid Offer Nomor : {s(k.bid_offer_nomor)}</p>
-      
+
       <table style="width:100%;border-collapse:collapse;font-size:9pt;">
         {row('Pemilik Komoditas', "<strong>" + s(k.pemilik_komoditas) + "</strong>")}
         <tr><td {TD_LBL}>Penjual</td><td {TD_COL}>:</td><td {TD_VAL} colspan="4"><strong>{s(k.penjual).replace(chr(10), '<br>')}</strong></td></tr>
@@ -146,7 +186,7 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
         {rowD('Packaging', s(k.packaging), 'Symbol', s(k.simbol))}
         {row('Deskripsi Produk', s(k.deskripsi_produk))}
         {row('Mutu', s(k.mutu))}
-        {row('Produsen', s(k.kebun_produsen))}
+        {row('Produsen / Unit', produsen_html)}
         {row('Pelabuhan Muat', s(k.pelabuhan_muat))}
         {row('Volume', f'{vol:,.0f}'.replace(",",".") + " " + satuan)}
         {rowD('Harga Satuan', fmt_rp(harga) + " per " + satuan, 'Premi', fmt_rp(premi) if premi else "-")}

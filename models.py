@@ -75,6 +75,13 @@ class KontrakUnit(Base):
     urutan = Column(Integer, default=0)
     volume = Column(Float, default=0.0)
 
+    # Material fields — satu kontrak bisa punya beberapa material via unit
+    komoditi = Column(String)
+    jenis_komoditi = Column(String)
+    satuan = Column(String)
+    tahun_panen = Column(String)
+    deskripsi_produk = Column(String)
+
     kontrak = relationship("Kontrak", back_populates="units")
 
 

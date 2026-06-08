@@ -109,18 +109,53 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
             <td style={tdVal} colSpan={4}><strong>{pblNama}</strong>{alamatPbl ? <><br />{alamatPbl}</> : null}</td>
           </tr>
           <RowS label="No. Referensi" value={safe(no_reff)} />
-          <RowD l1="Komoditi" v1={safe(komoditi)} l2="Jenis Komoditi/Material" v2={safe(jenis_komoditi)} />
-          <RowD l1="Packaging" v1={safe(packaging)} l2="Symbol" v2={safe(simbol)} />
-          <RowS label="Deskripsi Produk" value={safe(deskripsi_produk)} />
+          {units && units.length > 0 && units.some(u => u.komoditi) ? (
+            <>
+              <tr>
+                <td style={tdLbl}>Komoditi</td><td style={tdCol}>:</td>
+                <td style={tdVal} colSpan={4}>{safe(units[0]?.komoditi || komoditi)}</td>
+              </tr>
+              <tr>
+                <td style={tdLbl}>Jenis Komoditi</td><td style={tdCol}>:</td>
+                <td style={tdVal} colSpan={4}>{safe(units[0]?.jenis_komoditi || jenis_komoditi)}</td>
+              </tr>
+              <RowD l1="Packaging" v1={safe(packaging)} l2="Symbol" v2={safe(simbol)} />
+              <RowS label="Deskripsi Produk" value={safe(units[0]?.deskripsi_produk || deskripsi_produk)} />
+            </>
+          ) : (
+            <>
+              <RowD l1="Komoditi" v1={safe(komoditi)} l2="Jenis Komoditi/Material" v2={safe(jenis_komoditi)} />
+              <RowD l1="Packaging" v1={safe(packaging)} l2="Symbol" v2={safe(simbol)} />
+              <RowS label="Deskripsi Produk" value={safe(deskripsi_produk)} />
+            </>
+          )}
           <RowS label="Mutu" value={safe(mutu)} />
           {units && units.length > 0 ? (
-            <tr>
-              <td style={tdLbl}>Produsen</td>
-              <td style={tdCol}>:</td>
-              <td style={tdVal} colSpan={4}>
-                {units.map((u, i) => <div key={i}>{u.nama_unit}</div>)}
-              </td>
-            </tr>
+            <>
+              <tr>
+                <td style={tdLbl}>Produsen / Unit</td>
+                <td style={tdCol}>:</td>
+                <td style={tdVal} colSpan={4}>
+                  <table style={{ width: '100%', fontSize: '9pt', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {units.map((u, i) => {
+                        const material = u.komoditi ? `${u.komoditi}${u.jenis_komoditi ? ` - ${u.jenis_komoditi}` : ''}` : ''
+                        const volStr = u.volume > 0 ? ` (${Math.round(u.volume).toLocaleString('id-ID')} ${u.satuan || satuan || 'Unit'})` : ''
+                        return (
+                          <tr key={i}>
+                            <td style={{ padding: '1px 4px 1px 0', verticalAlign: 'top' }}>
+                              <strong>{u.nama_unit}</strong>
+                              {material && <span style={{ color: '#64748b' }}> — {material}</span>}
+                              {volStr && <span style={{ color: '#64748b' }}>{volStr}</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </>
           ) : (
             <RowS label="Produsen" value={safe(kebun_produsen)} />
           )}

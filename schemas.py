@@ -5,6 +5,11 @@ from datetime import date
 class KontrakUnitInput(BaseModel):
     nama_unit: str
     volume: Optional[float] = 0.0
+    komoditi: Optional[str] = None
+    jenis_komoditi: Optional[str] = None
+    satuan: Optional[str] = None
+    tahun_panen: Optional[str] = None
+    deskripsi_produk: Optional[str] = None
 
 class KontrakUnitOut(BaseModel):
     id: int
@@ -12,6 +17,11 @@ class KontrakUnitOut(BaseModel):
     nama_unit: str
     urutan: int
     volume: float = 0.0
+    komoditi: Optional[str] = None
+    jenis_komoditi: Optional[str] = None
+    satuan: Optional[str] = None
+    tahun_panen: Optional[str] = None
+    deskripsi_produk: Optional[str] = None
 
     class Config:
         from_attributes = True
