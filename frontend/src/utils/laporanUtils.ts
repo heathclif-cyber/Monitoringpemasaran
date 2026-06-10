@@ -64,10 +64,10 @@ export function calculateLaporanSummary(rows: LaporanRow[]): LaporanSummary {
 
 export function filterLaporanRows(rows: LaporanRow[], filters: LaporanFilters): LaporanRow[] {
   return rows.filter((row) => {
-    if (filters.unit !== 'ALL' && row.Unit !== filters.unit) return false
-    if (filters.pembeli !== 'ALL' && row.Mitra_Pembeli !== filters.pembeli) return false
-    if (filters.komoditi !== 'ALL' && row.Komoditi !== filters.komoditi) return false
-    if (filters.jenisKomoditi !== 'ALL' && row.Deskripsi_Produk !== filters.jenisKomoditi) return false
+    if (filters.unit.length > 0 && !filters.unit.includes(row.Unit)) return false
+    if (filters.pembeli.length > 0 && !filters.pembeli.includes(row.Mitra_Pembeli)) return false
+    if (filters.komoditi.length > 0 && !filters.komoditi.includes(row.Komoditi)) return false
+    if (filters.jenisKomoditi.length > 0 && !filters.jenisKomoditi.includes(row.Deskripsi_Produk)) return false
 
     if (filters.tipe === 'NO_BYPASS' && row.No_DO.startsWith('BYPASS-')) return false
     if (filters.tipe === 'ONLY_BYPASS' && !row.No_DO.startsWith('BYPASS-')) return false
@@ -111,10 +111,10 @@ export function filterLaporanRows(rows: LaporanRow[], filters: LaporanFilters): 
 }
 
 export interface LaporanFilters {
-  unit: string
-  pembeli: string
-  komoditi: string
-  jenisKomoditi: string
+  unit: string[]
+  pembeli: string[]
+  komoditi: string[]
+  jenisKomoditi: string[]
   months: string[]
   modeTanggal: 'TRANSFER' | 'RENCANA'
   sort: 'DESC' | 'ASC'
@@ -125,10 +125,10 @@ export interface LaporanFilters {
 }
 
 export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = {
-  unit: 'ALL',
-  pembeli: 'ALL',
-  komoditi: 'ALL',
-  jenisKomoditi: 'ALL',
+  unit: [],
+  pembeli: [],
+  komoditi: [],
+  jenisKomoditi: [],
   months: [],
   modeTanggal: 'TRANSFER',
   sort: 'DESC',

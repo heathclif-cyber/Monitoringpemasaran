@@ -28,6 +28,10 @@ export default function LaporanPage() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [showMonths, setShowMonths] = useState(false)
+  const [showUnits, setShowUnits] = useState(false)
+  const [showPembelis, setShowPembelis] = useState(false)
+  const [showKomoditis, setShowKomoditis] = useState(false)
+  const [showJenisKomoditis, setShowJenisKomoditis] = useState(false)
 
   useEffect(() => { fetch() }, [])
 
@@ -101,6 +105,22 @@ export default function LaporanPage() {
     }))
   }
 
+  const handleToggle = (key: 'unit' | 'pembeli' | 'komoditi' | 'jenisKomoditi', val: string) => {
+    setFilters((f) => ({
+      ...f,
+      [key]: (f[key] as string[]).includes(val)
+        ? (f[key] as string[]).filter((x) => x !== val)
+        : [...(f[key] as string[]), val],
+    }))
+  }
+
+  const handleToggleAll = (key: 'unit' | 'pembeli' | 'komoditi' | 'jenisKomoditi', options: string[]) => {
+    setFilters((f) => ({
+      ...f,
+      [key]: (f[key] as string[]).length === options.length ? [] : [...options],
+    }))
+  }
+
   const selCls = 'h-9 rounded-md border border-input bg-white px-2 py-1 text-xs shadow-sm'
 
   return (
@@ -164,22 +184,90 @@ export default function LaporanPage() {
           </div>
           {/* Dropdown filters — grid 4 kolom */}
           <div className="grid grid-cols-4 gap-2">
-            <select value={filters.unit} onChange={(e) => setFilters((f) => ({ ...f, unit: e.target.value }))} className={selCls}>
-              <option value="ALL">Semua Unit</option>
-              {units.map((u) => <option key={u} value={u}>{u}</option>)}
-            </select>
-            <select value={filters.pembeli} onChange={(e) => setFilters((f) => ({ ...f, pembeli: e.target.value }))} className={selCls}>
-              <option value="ALL">Semua Pembeli</option>
-              {pembelis.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select value={filters.komoditi} onChange={(e) => setFilters((f) => ({ ...f, komoditi: e.target.value }))} className={selCls}>
-              <option value="ALL">Semua Komoditi</option>
-              {komoditas.map((k) => <option key={k} value={k}>{k}</option>)}
-            </select>
-            <select value={filters.jenisKomoditi} onChange={(e) => setFilters((f) => ({ ...f, jenisKomoditi: e.target.value }))} className={selCls}>
-              <option value="ALL">Semua Jenis Komoditi/Material</option>
-              {jenisKomoditas.map((j) => <option key={j} value={j}>{j}</option>)}
-            </select>
+            {/* Unit multi-select */}
+            <div className="relative">
+              <button type="button" onClick={() => { setShowUnits(!showUnits); setShowPembelis(false); setShowKomoditis(false); setShowJenisKomoditis(false) }} className={`${selCls} w-full text-left truncate`}>
+                {filters.unit.length === 0 ? 'Semua Unit' : filters.unit.length === 1 ? filters.unit[0] : `${filters.unit.length} Unit Terpilih`}
+              </button>
+              {showUnits && (
+                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-56 max-h-60 overflow-y-auto" onMouseLeave={() => setShowUnits(false)}>
+                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer font-medium">
+                    <input type="checkbox" checked={filters.unit.length === units.length && units.length > 0} onChange={() => handleToggleAll('unit', units)} />
+                    Pilih Semua
+                  </label>
+                  <hr className="my-1" />
+                  {units.map((u) => (
+                    <label key={u} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
+                      <input type="checkbox" checked={filters.unit.includes(u)} onChange={() => handleToggle('unit', u)} />
+                      {u}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Pembeli multi-select */}
+            <div className="relative">
+              <button type="button" onClick={() => { setShowPembelis(!showPembelis); setShowUnits(false); setShowKomoditis(false); setShowJenisKomoditis(false) }} className={`${selCls} w-full text-left truncate`}>
+                {filters.pembeli.length === 0 ? 'Semua Pembeli' : filters.pembeli.length === 1 ? filters.pembeli[0] : `${filters.pembeli.length} Pembeli Terpilih`}
+              </button>
+              {showPembelis && (
+                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-64 max-h-60 overflow-y-auto" onMouseLeave={() => setShowPembelis(false)}>
+                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer font-medium">
+                    <input type="checkbox" checked={filters.pembeli.length === pembelis.length && pembelis.length > 0} onChange={() => handleToggleAll('pembeli', pembelis)} />
+                    Pilih Semua
+                  </label>
+                  <hr className="my-1" />
+                  {pembelis.map((p) => (
+                    <label key={p} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
+                      <input type="checkbox" checked={filters.pembeli.includes(p)} onChange={() => handleToggle('pembeli', p)} />
+                      {p}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Komoditi multi-select */}
+            <div className="relative">
+              <button type="button" onClick={() => { setShowKomoditis(!showKomoditis); setShowUnits(false); setShowPembelis(false); setShowJenisKomoditis(false) }} className={`${selCls} w-full text-left truncate`}>
+                {filters.komoditi.length === 0 ? 'Semua Komoditi' : filters.komoditi.length === 1 ? filters.komoditi[0] : `${filters.komoditi.length} Komoditi Terpilih`}
+              </button>
+              {showKomoditis && (
+                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-48 max-h-60 overflow-y-auto" onMouseLeave={() => setShowKomoditis(false)}>
+                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer font-medium">
+                    <input type="checkbox" checked={filters.komoditi.length === komoditas.length && komoditas.length > 0} onChange={() => handleToggleAll('komoditi', komoditas)} />
+                    Pilih Semua
+                  </label>
+                  <hr className="my-1" />
+                  {komoditas.map((k) => (
+                    <label key={k} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
+                      <input type="checkbox" checked={filters.komoditi.includes(k)} onChange={() => handleToggle('komoditi', k)} />
+                      {k}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Jenis Komoditi/Material multi-select */}
+            <div className="relative">
+              <button type="button" onClick={() => { setShowJenisKomoditis(!showJenisKomoditis); setShowUnits(false); setShowPembelis(false); setShowKomoditis(false) }} className={`${selCls} w-full text-left truncate`}>
+                {filters.jenisKomoditi.length === 0 ? 'Semua Jenis Material' : filters.jenisKomoditi.length === 1 ? filters.jenisKomoditi[0] : `${filters.jenisKomoditi.length} Material Terpilih`}
+              </button>
+              {showJenisKomoditis && (
+                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-64 max-h-60 overflow-y-auto" onMouseLeave={() => setShowJenisKomoditis(false)}>
+                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer font-medium">
+                    <input type="checkbox" checked={filters.jenisKomoditi.length === jenisKomoditas.length && jenisKomoditas.length > 0} onChange={() => handleToggleAll('jenisKomoditi', jenisKomoditas)} />
+                    Pilih Semua
+                  </label>
+                  <hr className="my-1" />
+                  {jenisKomoditas.map((j) => (
+                    <label key={j} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
+                      <input type="checkbox" checked={filters.jenisKomoditi.includes(j)} onChange={() => handleToggle('jenisKomoditi', j)} />
+                      {j}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <select value={filters.modeTanggal} onChange={(e) => setFilters((f) => ({ ...f, modeTanggal: e.target.value as 'TRANSFER' | 'RENCANA' }))} className={selCls}>
               <option value="TRANSFER">Berdasarkan Tgl Transfer</option>
