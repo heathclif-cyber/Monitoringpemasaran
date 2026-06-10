@@ -38,16 +38,16 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
         # Jika unit tidak punya volume, gunakan nilai_maksimum penuh (satu unit = seluruh kontrak)
         if unit_volume > 0 and kontrak_volume > 0:
             unit_ratio = unit_volume / kontrak_volume
-            nilai_batas = nilai_maksimum * unit_ratio
+            nilai_batas = round(nilai_maksimum * unit_ratio)
         else:
-            nilai_batas = nilai_maksimum
+            nilai_batas = round(nilai_maksimum)
 
         if invoice.jumlah_pembayaran is not None and invoice.jumlah_pembayaran > 0:
-            jumlah_pembayaran = float(invoice.jumlah_pembayaran)
+            jumlah_pembayaran = round(float(invoice.jumlah_pembayaran))
         else:
             jumlah_pembayaran = nilai_batas
 
-        if jumlah_pembayaran > nilai_batas + 0.01:
+        if jumlah_pembayaran > nilai_batas:
             raise HTTPException(
                 status_code=400,
                 detail=f"Jumlah pembayaran (Rp {jumlah_pembayaran:,.0f}) melebihi nilai unit {nama_unit} (Rp {nilai_batas:,.0f})"
@@ -62,7 +62,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
             for inv in existing_unit_invoices
             if inv.no_invoice != invoice.no_invoice
         )
-        if total_unit_existing + jumlah_pembayaran > nilai_batas + 0.01:
+        if total_unit_existing + jumlah_pembayaran > nilai_batas:
             sisa = nilai_batas - total_unit_existing
             raise HTTPException(
                 status_code=400,
@@ -70,12 +70,13 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
             )
     else:
         # Validasi terhadap keseluruhan kontrak (backward compatible)
+        nilai_maksimum = round(nilai_maksimum)
         if invoice.jumlah_pembayaran is not None and invoice.jumlah_pembayaran > 0:
-            jumlah_pembayaran = float(invoice.jumlah_pembayaran)
+            jumlah_pembayaran = round(float(invoice.jumlah_pembayaran))
         else:
             jumlah_pembayaran = nilai_maksimum
 
-        if jumlah_pembayaran > nilai_maksimum + 0.01:
+        if jumlah_pembayaran > nilai_maksimum:
             raise HTTPException(
                 status_code=400,
                 detail=f"Jumlah pembayaran (Rp {jumlah_pembayaran:,.0f}) melebihi nilai kontrak (Rp {nilai_maksimum:,.0f})"
@@ -85,7 +86,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
             models.Invoice.no_kontrak == invoice.no_kontrak
         ).all()
         total_existing = sum(float(inv.jumlah_pembayaran or 0) for inv in existing_invoices if inv.no_invoice != invoice.no_invoice)
-        if total_existing + jumlah_pembayaran > nilai_maksimum + 0.01:
+        if total_existing + jumlah_pembayaran > nilai_maksimum:
             sisa = nilai_maksimum - total_existing
             raise HTTPException(
                 status_code=400,

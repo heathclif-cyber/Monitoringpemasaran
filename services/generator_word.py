@@ -179,7 +179,7 @@ def generate_contract_docx(k) -> io.BytesIO:
     RS('No. Referensi', _s(k.no_reff))
     RD('Komoditi', _s(k.komoditi), 'Jenis Komoditi', _s(k.jenis_komoditi))
     RD('Packaging', _s(k.packaging), 'Symbol', _s(k.simbol))
-    RS('Deskripsi Produk', _s(k.deskripsi_produk))
+    RS('Deskripsi Produk', _s(k.jenis_komoditi or k.deskripsi_produk))
     RS('Mutu', _s(k.mutu))
     units = getattr(k, 'units', None) or []
     has_materials = any(getattr(u, 'komoditi', None) for u in units)
@@ -362,7 +362,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     # Row 5 to 7 Left
     c_desc = rows[5].cells[0]
     c_desc.merge(rows[7].cells[4])
-    add_rt(c_desc, 'Deskripsi Produk:', _s(k.komoditi), bf=True, bsv=True)
+    add_rt(c_desc, 'Deskripsi Produk:', _s(k.jenis_komoditi or k.deskripsi_produk), bf=True, bsv=True)
 
     # Row 5 Right
     c_jt = rows[5].cells[5]

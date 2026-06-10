@@ -120,13 +120,13 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
                 <td style={tdVal} colSpan={4}>{safe(units[0]?.jenis_komoditi || jenis_komoditi)}</td>
               </tr>
               <RowD l1="Packaging" v1={safe(packaging)} l2="Symbol" v2={safe(simbol)} />
-              <RowS label="Deskripsi Produk" value={safe(units[0]?.deskripsi_produk || deskripsi_produk)} />
+              <RowS label="Deskripsi Produk" value={safe(units[0]?.jenis_komoditi || units[0]?.deskripsi_produk || jenis_komoditi || deskripsi_produk)} />
             </>
           ) : (
             <>
               <RowD l1="Komoditi" v1={safe(komoditi)} l2="Jenis Komoditi/Material" v2={safe(jenis_komoditi)} />
               <RowD l1="Packaging" v1={safe(packaging)} l2="Symbol" v2={safe(simbol)} />
-              <RowS label="Deskripsi Produk" value={safe(deskripsi_produk)} />
+              <RowS label="Deskripsi Produk" value={safe(jenis_komoditi || deskripsi_produk)} />
             </>
           )}
           <RowS label="Mutu" value={safe(mutu)} />

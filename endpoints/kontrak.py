@@ -184,7 +184,7 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
         {row('No. Referensi', s(k.no_reff))}
         {rowD('Komoditi', s(k.komoditi), 'Jenis Komoditi', s(k.jenis_komoditi))}
         {rowD('Packaging', s(k.packaging), 'Symbol', s(k.simbol))}
-        {row('Deskripsi Produk', s(k.deskripsi_produk))}
+        {row('Deskripsi Produk', s(k.jenis_komoditi or k.deskripsi_produk))}
         {row('Mutu', s(k.mutu))}
         {row('Produsen / Unit', produsen_html)}
         {row('Pelabuhan Muat', s(k.pelabuhan_muat))}
