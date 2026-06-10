@@ -16,16 +16,16 @@ import { calculateProportionalVolume, calculateSelisih, getVolumePercentage } fr
 import type { Kontrak } from '@/types'
 
 // Exact replica of forms.js buildDOPreview() format
-function DOPreviewContent({ noDo, noInv, tgl, unit, k, invTotal, nominal, kontrakVol }: {
+function DOPreviewContent({ noDo, noInv, tgl, unit, k, nilaiPenuh, nominal, kontrakVol }: {
   noDo: string; noInv: string; tgl: string; unit: string; k: Partial<Kontrak>;
-  invTotal: number; nominal: number; kontrakVol: number;
+  nilaiPenuh: number; nominal: number; kontrakVol: number;
 }) {
   const pembeli = k.pembeli ? k.pembeli.split('\n')[0] : '-'
   const tglDoStr = tgl ? tgl.split('-').reverse().join('/') : '-'
 
   let propVol = 0
-  if (invTotal > 0 && kontrakVol > 0) {
-    propVol = (nominal / invTotal) * kontrakVol
+  if (nilaiPenuh > 0 && kontrakVol > 0) {
+    propVol = (nominal / nilaiPenuh) * kontrakVol
   }
   const volStr = propVol > 0 ? Math.round(propVol).toLocaleString('id-ID') : (k.volume ? Math.round(k.volume).toLocaleString('id-ID') : '-')
   const baleStr = k.banyaknya_bale_karung ? Number(k.banyaknya_bale_karung) : '-'
@@ -190,7 +190,24 @@ export default function DOPage() {
   // Volume calculation — pakai unit volume jika ada
   const invoiceTotal = currentInvoice?.jumlah_pembayaran || 0
   const kontrakVolume = unitForDO?.volume || currentKontrak?.volume || 0
-  const volumeDo = calculateProportionalVolume(Number(nominalTransfer) || 0, invoiceTotal, kontrakVolume)
+
+  // Nilai penuh unit/kontrak = denominator yang benar untuk volume proporsional
+  // (bukan invoice.jumlah_pembayaran yang bisa berupa pembayaran parsial)
+  const nilaiUnitPenuh = useMemo(() => {
+    if (!currentKontrak) return 0
+    const vol = currentKontrak.volume || 0
+    const harga = currentKontrak.harga_satuan || 0
+    const premi = currentKontrak.premi || 0
+    const isppn = String(currentKontrak.is_ppn).toLowerCase() === 'true'
+    const ppnPct = (currentKontrak.ppn_persen || 0) / 100
+    if (!vol) return 0
+    const ratio = kontrakVolume / vol
+    const pokokFull = vol * harga + premi
+    const ppnFull = isppn ? pokokFull * ppnPct : 0
+    return Math.round((pokokFull + ppnFull) * ratio)
+  }, [currentKontrak, kontrakVolume])
+
+  const volumeDo = calculateProportionalVolume(Number(nominalTransfer) || 0, nilaiUnitPenuh, kontrakVolume)
   const selisih = calculateSelisih(invoiceTotal, Number(nominalTransfer) || 0)
   const volumePct = getVolumePercentage(volumeDo, kontrakVolume)
 
@@ -337,7 +354,8 @@ export default function DOPage() {
                     <><span className="text-slate-500">Unit:</span><span className="font-medium text-brand-600">{currentInvoice.nama_unit}</span></>
                   )}
                   <span className="text-slate-500">{currentInvoice.nama_unit ? 'Volume Unit:' : 'Volume Kontrak:'}</span><span>{formatCurrency(kontrakVolume)} {currentKontrak.satuan}</span>
-                  <span className="text-slate-500">Total Invoice:</span><span className="font-semibold">{formatCurrency(invoiceTotal)}</span>
+                  <span className="text-slate-500">Nilai Penuh Unit:</span><span className="text-slate-700">{formatCurrency(nilaiUnitPenuh)}</span>
+                  <span className="text-slate-500">Invoice ini:</span><span className="font-semibold">{formatCurrency(invoiceTotal)}{nilaiUnitPenuh > 0 ? ` (${Math.round(invoiceTotal / nilaiUnitPenuh * 100)}%)` : ''}</span>
                 </div>
               </CardContent>
             </Card>
@@ -381,7 +399,7 @@ export default function DOPage() {
                 tgl={watch('tanggal_do') || ''}
                 unit={watch('kepada_unit') || '-'}
                 k={currentKontrak || {}}
-                invTotal={invoiceTotal}
+                nilaiPenuh={nilaiUnitPenuh}
                 nominal={Number(nominalTransfer) || 0}
                 kontrakVol={kontrakVolume}
               />

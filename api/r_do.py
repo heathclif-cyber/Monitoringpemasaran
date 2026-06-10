@@ -30,13 +30,26 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
         if unit and (unit.volume or 0) > 0:
             volume_for_calc = float(unit.volume)
 
-    # Calculate proportional volume: (payment / invoice_total) * volume_unit
-    if invoice_total > 0 and volume_for_calc > 0:
-        volume_do = (nominal / invoice_total) * volume_for_calc
+    # Hitung nilai penuh kontrak/unit — denominator yang benar untuk volume proporsional.
+    # Menggunakan nilai penuh (bukan invoice.jumlah_pembayaran) agar pembayaran parsial
+    # tidak salah memberikan 100% volume ketika hanya membayar sebagian kontrak.
+    harga_satuan = float(db_kontrak.harga_satuan or 0) if db_kontrak else 0
+    premi = float(db_kontrak.premi or 0) if db_kontrak else 0
+    is_ppn = str(getattr(db_kontrak, 'is_ppn', 'true')).lower() == 'true' if db_kontrak else False
+    ppn_persen = float(db_kontrak.ppn_persen or 0) / 100 if db_kontrak else 0
+
+    unit_ratio = (volume_for_calc / kontrak_volume) if kontrak_volume > 0 else 1.0
+    pokok_full = (kontrak_volume * harga_satuan) + premi
+    ppn_full = pokok_full * ppn_persen if is_ppn else 0.0
+    nilai_unit_penuh = (pokok_full + ppn_full) * unit_ratio
+
+    # volume_do = (nominal / nilai_unit_penuh) × volume_unit
+    if nilai_unit_penuh > 0 and volume_for_calc > 0:
+        volume_do = (nominal / nilai_unit_penuh) * volume_for_calc
     else:
         volume_do = volume_for_calc  # fallback: full volume
 
-    # Calculate selisih
+    # Calculate selisih — sisa dari invoice yang belum ditransfer
     selisih = invoice_total - nominal
 
     db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == do.no_do).first()

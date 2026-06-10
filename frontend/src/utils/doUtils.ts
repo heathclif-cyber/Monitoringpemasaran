@@ -1,12 +1,12 @@
 export function calculateProportionalVolume(
   nominal: number,
-  invoiceTotal: number,
-  kontrakVolume: number,
+  nilaiPenuh: number,
+  unitVolume: number,
 ): number {
-  if (invoiceTotal > 0 && kontrakVolume > 0) {
-    return Math.round((nominal / invoiceTotal) * kontrakVolume)
+  if (nilaiPenuh > 0 && unitVolume > 0) {
+    return Math.round((nominal / nilaiPenuh) * unitVolume)
   }
-  return kontrakVolume || 0
+  return unitVolume || 0
 }
 
 export function calculateSelisih(invoiceTotal: number, nominal: number): number {
