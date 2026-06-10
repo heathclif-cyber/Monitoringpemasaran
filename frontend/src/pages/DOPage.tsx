@@ -69,7 +69,7 @@ function DOPreviewContent({ noDo, noInv, tgl, unit, k, invTotal, nominal, kontra
               <table style={{ width: '100%', border: 'none', padding: 0, margin: 0, marginTop: '4px', fontSize: '9pt' }}>
                 <tbody>
                   <tr><td style={{ width: '100px' }}>Kepada</td><td style={{ width: '10px' }}>:</td><td>{pembeli}</td></tr>
-                  <tr><td>Jenis Barang</td><td>:</td><td>{k.komoditi || '-'} <span style={{ display: 'inline-block', width: '100px' }} /> Tahun panen: {k.tahun_panen || '-'}</td></tr>
+                  <tr><td>Jenis Barang</td><td>:</td><td>{k.jenis_komoditi || k.komoditi || '-'} <span style={{ display: 'inline-block', width: '100px' }} /> Tahun panen: {k.tahun_panen || '-'}</td></tr>
                 </tbody>
               </table>
             </td>
@@ -85,7 +85,7 @@ function DOPreviewContent({ noDo, noInv, tgl, unit, k, invTotal, nominal, kontra
           </tr>
           <tr>
             <td style={{ ...tdCenter, height: '100px' }}>{k.kebun_produsen || '-'}</td>
-            <td style={tdCenter}>{k.deskripsi_produk || k.komoditi || '-'}</td>
+            <td style={tdCenter}>{k.jenis_komoditi || k.deskripsi_produk || k.komoditi || '-'}</td>
             <td style={tdCenter}>{baleStr}</td>
             <td style={tdCenter}>{k.no_kav_chop || '-'}</td>
             <td style={tdStyle}>{k.no_kontrak || '-'}</td>

@@ -81,7 +81,7 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
           <tr>
             <td style={tdStyle} colSpan={5} rowSpan={3}>
               <strong>Deskripsi Produk:</strong><br />
-              <strong>{k.komoditi || '-'}</strong>
+              <strong>{k.jenis_komoditi || k.komoditi || '-'}</strong>
             </td>
             <td style={tdStyle} colSpan={5}><strong>Tanggal Jatuh Tempo:</strong><br />{lamaStr}</td>
           </tr>
@@ -107,7 +107,7 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
           </tr>
           <tr>
             <td style={tdStyle}>-</td>
-            <td style={tdStyle}>{k.komoditi || '-'}</td>
+            <td style={tdStyle}>{k.jenis_komoditi || k.komoditi || '-'}</td>
             <td style={tdStyle}>{k.packaging || '-'}</td>
             <td style={tdStyle}>-</td>
             <td style={tdStyle}>{k.simbol || '-'}</td>
