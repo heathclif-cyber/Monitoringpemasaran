@@ -117,10 +117,17 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
               </tr>
               <tr>
                 <td style={tdLbl}>Jenis Komoditi</td><td style={tdCol}>:</td>
-                <td style={tdVal} colSpan={4}>{safe(units[0]?.jenis_komoditi || jenis_komoditi)}</td>
+                <td style={tdVal} colSpan={4}>
+                  {[...new Set(units.map(u => u.jenis_komoditi).filter(Boolean))].join(' / ') || safe(jenis_komoditi)}
+                </td>
               </tr>
               <RowD l1="Packaging" v1={safe(packaging)} l2="Symbol" v2={safe(simbol)} />
-              <RowS label="Deskripsi Produk" value={safe(units[0]?.jenis_komoditi || units[0]?.deskripsi_produk || jenis_komoditi || deskripsi_produk)} />
+              <tr>
+                <td style={tdLbl}>Deskripsi Produk</td><td style={tdCol}>:</td>
+                <td style={tdVal} colSpan={4}>
+                  {[...new Set(units.map(u => u.jenis_komoditi || u.deskripsi_produk).filter(Boolean))].join(' / ') || safe(jenis_komoditi || deskripsi_produk)}
+                </td>
+              </tr>
             </>
           ) : (
             <>
