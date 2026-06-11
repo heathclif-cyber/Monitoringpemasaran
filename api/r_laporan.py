@@ -56,13 +56,26 @@ def get_laporan(db: Session = Depends(get_db)):
             k_pph_p = float(getattr(k, 'pph_persen', 0) or 0)
             k_pph = k_pokok * (k_pph_p / 100)
 
-        if k_vol_local > 0 and do:
-            ratio = do_volume / k_vol_local
-            pendapatan_do = k_pokok * ratio   # pokok saja, sebelum PPN
-            ppn_do = k_ppn * ratio
-            pph_do = k_pph * ratio
+        # Financial values based on invoice, not full contract
+        inv_gross = float(inv.jumlah_pembayaran or 0) if inv else 0
+        if inv_gross > 0:
+            ppn_rate = float(getattr(k, 'ppn_persen', 0) or 0) / 100
+            is_ppn_flag = str(getattr(k, 'is_ppn', 'true')).lower() != 'false'
+            is_pph_flag = str(getattr(k, 'is_pph', 'false')).lower() == 'true'
+            pph_rate_val = float(getattr(k, 'pph_persen', 0) or 0) / 100
+            if is_ppn_flag and ppn_rate > 0:
+                pokok_inv = inv_gross / (1 + ppn_rate)
+                ppn_inv = inv_gross - pokok_inv
+            else:
+                pokok_inv = inv_gross
+                ppn_inv = 0.0
+            pph_inv = pokok_inv * pph_rate_val if is_pph_flag else 0.0
+            do_ratio = (float(do.nominal_transfer or 0) / inv_gross) if do else 1.0
+            pendapatan_do = pokok_inv * do_ratio
+            ppn_do = ppn_inv * do_ratio
+            pph_do = pph_inv * do_ratio
         else:
-            pendapatan_do = k_pokok            # pokok saja, sebelum PPN
+            pendapatan_do = k_pokok
             ppn_do = k_ppn
             pph_do = k_pph
 
