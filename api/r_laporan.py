@@ -105,6 +105,15 @@ def get_laporan(db: Session = Depends(get_db)):
         if not unit_val and hasattr(k, 'units') and k.units:
             unit_val = k.units[0].nama_unit or ""
 
+        # Jenis Komoditi/Material: cari dari KontrakUnit yang sesuai unit_val
+        jenis_komoditi_val = ""
+        if hasattr(k, 'units') and k.units and unit_val:
+            matched_unit = next((u for u in k.units if u.nama_unit == unit_val), None)
+            if matched_unit:
+                jenis_komoditi_val = matched_unit.jenis_komoditi or ""
+        if not jenis_komoditi_val:
+            jenis_komoditi_val = k.jenis_komoditi or k.deskripsi_produk or k.komoditi or ""
+
         return {
             "No_DO": do.no_do if do else "",
             "No_Invoice": inv.no_invoice if inv else "",
@@ -116,7 +125,7 @@ def get_laporan(db: Session = Depends(get_db)):
             "Raw_Date": (do.tanggal_pembayaran.strftime("%Y-%m-%d") if (do and do.tanggal_pembayaran) else (inv.tanggal_transaksi.strftime("%Y-%m-%d") if inv and inv.tanggal_transaksi else (k.tanggal_kontrak.strftime("%Y-%m-%d") if k.tanggal_kontrak else ""))),
             "Jumlah_Transfer": do_nominal,
             "Mitra_Pembeli": k.pembeli or "",
-            "Deskripsi_Produk": (k.jenis_komoditi or k.deskripsi_produk or k.komoditi) or "",
+            "Deskripsi_Produk": jenis_komoditi_val,
             "Jumlah_Invoice": float(inv.jumlah_pembayaran or 0) if inv else 0,
             "Harga_Satuan": k.harga_satuan or 0,
             "Jumlah_DO": do_volume,
