@@ -261,7 +261,7 @@ export default function DOPage() {
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Data Dokumen</CardTitle>
@@ -282,13 +282,18 @@ export default function DOPage() {
               </div>
               <div>
                 <Label className="text-xs">No DO *</Label>
-                <Input {...register('no_do')} list="do-datalist" />
-                <datalist id="do-datalist">
-                  {doStore.data.map((d) => <option key={d.no_do} value={d.no_do} />)}
-                </datalist>
-                <button type="button" onClick={autoLoadDO} className="text-xs text-brand-600 mt-1 hover:underline">
-                  Cari / Load DO
-                </button>
+                <SearchableSelect
+                  options={doStore.data.map((d) => ({
+                    value: d.no_do,
+                    label: d.no_do,
+                  }))}
+                  value={watch('no_do')}
+                  allowCustom
+                  onChange={(v) => setValue('no_do', v, { shouldValidate: true })}
+                  onValueCommit={() => autoLoadDO()}
+                  placeholder="Ketik baru atau pilih dari daftar"
+                />
+                <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih DO lama → data terisi otomatis.</p>
               </div>
               <div>
                 <Label className="text-xs">Tanggal DO *</Label>

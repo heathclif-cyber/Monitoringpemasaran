@@ -134,7 +134,7 @@ export default function BAPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -161,13 +161,18 @@ export default function BAPage() {
             </div>
             <div>
               <Label className="text-xs">No Berita Acara *</Label>
-              <Input {...register('no_ba')} list="ba-datalist" />
-              <datalist id="ba-datalist">
-                {baStore.data.map((b) => <option key={b.no_ba} value={b.no_ba} />)}
-              </datalist>
-              <button type="button" onClick={autoLoadBA} className="text-xs text-brand-600 mt-1 hover:underline">
-                Cari / Load BA
-              </button>
+              <SearchableSelect
+                options={baStore.data.map((b) => ({
+                  value: b.no_ba,
+                  label: `${b.no_ba} — ${b.no_kontrak}`,
+                }))}
+                value={watch('no_ba')}
+                allowCustom
+                onChange={(v) => setValue('no_ba', v, { shouldValidate: true })}
+                onValueCommit={() => autoLoadBA()}
+                placeholder="Ketik baru atau pilih dari daftar"
+              />
+              <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih BA lama → data terisi otomatis.</p>
               {errors.no_ba && <p className="text-xs text-red-500 mt-1">{errors.no_ba.message}</p>}
             </div>
             <div>
@@ -182,10 +187,10 @@ export default function BAPage() {
             </div>
             <div>
               <Label className="text-xs">Unit</Label>
-              <Input {...register('nama_unit')} list="unit-list" />
-              <datalist id="unit-list">
-                {FIXED_UNITS.map((u) => <option key={u} value={u} />)}
-              </datalist>
+              <NativeSelect {...register('nama_unit')}>
+                <option value="">-- Pilih Unit --</option>
+                {FIXED_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </NativeSelect>
             </div>
             <div>
               <Label className="text-xs">Komoditi</Label>

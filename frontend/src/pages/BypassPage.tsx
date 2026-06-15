@@ -78,7 +78,7 @@ export default function BypassPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
         <div className="grid grid-cols-2 gap-6">
           {/* Left: Informasi Dasar */}
           <Card>
@@ -91,11 +91,15 @@ export default function BypassPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-xs">Unit *</Label>
-                <Input {...register('unit')} list="unit-list" />
-                <datalist id="unit-list">
-                  <option value="Minahasa-Halmahera" /><option value="Awaya-Telpaputih" />
-                  <option value="Beteleme" /><option value="Kabaru" /><option value="Takalar" /><option value="Camming" />
-                </datalist>
+                <NativeSelect {...register('unit')}>
+                  <option value="">-- Pilih Unit --</option>
+                  <option value="Minahasa-Halmahera">Minahasa-Halmahera</option>
+                  <option value="Awaya-Telpaputih">Awaya-Telpaputih</option>
+                  <option value="Beteleme">Beteleme</option>
+                  <option value="Kabaru">Kabaru</option>
+                  <option value="Takalar">Takalar</option>
+                  <option value="Camming">Camming</option>
+                </NativeSelect>
                 {errors.unit && <p className="text-xs text-red-500 mt-1">{errors.unit.message}</p>}
               </div>
               <div>

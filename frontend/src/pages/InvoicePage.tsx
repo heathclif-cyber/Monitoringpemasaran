@@ -348,7 +348,7 @@ export default function InvoicePage() {
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Data Dokumen</CardTitle>
@@ -369,13 +369,18 @@ export default function InvoicePage() {
               </div>
               <div>
                 <Label className="text-xs">No Invoice *</Label>
-                <Input {...register('no_invoice')} list="invoice-datalist" />
-                <datalist id="invoice-datalist">
-                  {invoiceStore.data.map((i) => <option key={i.no_invoice} value={i.no_invoice} />)}
-                </datalist>
-                <button type="button" onClick={(e) => { e.preventDefault(); autoLoadInvoice(); }} className="text-xs text-brand-600 mt-1 hover:underline">
-                  Cari / Load Invoice
-                </button>
+                <SearchableSelect
+                  options={invoiceStore.data.map((i) => ({
+                    value: i.no_invoice,
+                    label: i.no_invoice,
+                  }))}
+                  value={watch('no_invoice')}
+                  allowCustom
+                  onChange={(v) => setValue('no_invoice', v, { shouldValidate: true })}
+                  onValueCommit={() => autoLoadInvoice()}
+                  placeholder="Ketik baru atau pilih dari daftar"
+                />
+                <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih invoice lama → data terisi otomatis.</p>
                 {errors.no_invoice && <p className="text-xs text-red-500 mt-1">{errors.no_invoice.message}</p>}
               </div>
               <div>

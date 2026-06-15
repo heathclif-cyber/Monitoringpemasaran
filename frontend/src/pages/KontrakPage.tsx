@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { KontrakPreview } from '@/components/feature/KontrakPreview'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
@@ -366,7 +367,7 @@ export default function KontrakPage() {
           activeStep={activeStep}
           onStepClick={(i) => { if (i <= activeStep) setActiveStep(i) }}
         />
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
           {activeStep === 0 && (
           <>
           {/* Data Dasar */}
@@ -377,25 +378,21 @@ export default function KontrakPage() {
             <CardContent className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
                 <Label className="text-xs">No Kontrak *</Label>
-                <Input
-                  {...register('no_kontrak')}
-                  placeholder="Ketik baru atau pilih dari daftar"
-                  list="kontrak-datalist"
-                  onBlur={(e) => {
-                    register('no_kontrak').onBlur(e)
-                    const no = e.target.value.trim()
-                    if (no) loadKontrakByNo(no)
+                <SearchableSelect
+                  options={store.data.map((k) => ({
+                    value: k.no_kontrak,
+                    label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''}`,
+                  }))}
+                  value={selectedNoKontrak || ''}
+                  allowCustom
+                  onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
+                  onValueCommit={(v) => {
+                    if (v && store.data.some((k) => k.no_kontrak === v)) loadKontrakByNo(v)
                   }}
+                  placeholder="Ketik baru atau pilih dari daftar"
                 />
-                <datalist id="kontrak-datalist">
-                  {store.data.map((k) => (
-                    <option key={k.no_kontrak} value={k.no_kontrak}>
-                      {k.pembeli ? k.pembeli.split('\n')[0] : ''}
-                    </option>
-                  ))}
-                </datalist>
                 <p className="text-xs text-slate-400 mt-1">
-                  Pilih dari daftar → data terisi otomatis. Nomor baru → buat kontrak baru.
+                  Daftar dari database. Pilih → data terisi otomatis. Nomor baru → buat kontrak baru.
                 </p>
                 {errors.no_kontrak && <p className="text-xs text-red-500 mt-1">{errors.no_kontrak.message}</p>}
               </div>
@@ -484,7 +481,6 @@ export default function KontrakPage() {
                             }}
                             className={`${sel} w-28 shrink-0`}
                             placeholder="Komoditi"
-                            list="komoditi-datalist"
                           />
                           <NativeSelect
                             value={unit.jenis_komoditi}
@@ -619,16 +615,6 @@ export default function KontrakPage() {
                     )}
                   </div>
                 </div>
-                <datalist id="komoditi-datalist">
-                  <option value="Kelapa" />
-                  <option value="Tebu" />
-                  <option value="Sawit" />
-                  <option value="Karet" />
-                  <option value="Kopi" />
-                  <option value="Kakao" />
-                  <option value="Sapi" />
-                  <option value="Garam" />
-                </datalist>
               </div>
               {/* Remaining fields */}
               <div className="grid grid-cols-3 gap-4">
