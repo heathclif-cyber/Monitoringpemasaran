@@ -30,7 +30,7 @@ class KontrakUnitOut(BaseModel):
 class KontrakBase(BaseModel):
     no_kontrak: str
     tanggal_kontrak: date
-    status: Optional[str] = "Draft"
+    status: Optional[str] = "Active"
     pembeli: Optional[str] = None
     nama_direktur: Optional[str] = None
     alamat_pembeli: Optional[str] = None

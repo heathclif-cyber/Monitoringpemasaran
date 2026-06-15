@@ -20,6 +20,7 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
 
     units_input = kontrak.units or []
     kontrak_data = kontrak.model_dump(exclude={'units'})
+    kontrak_data['status'] = 'Active'
 
     # Jika semua unit memiliki volume > 0, derive volume kontrak dari sum unit
     units_with_vol = [u for u in units_input if (u.volume or 0) > 0]

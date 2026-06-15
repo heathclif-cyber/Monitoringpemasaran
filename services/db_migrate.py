@@ -55,6 +55,8 @@ def run_migrations() -> None:
         add_column_safely(db, "invoice", "nama_unit", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "delivery_order", "link_berita_acara_serah_terima", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "kontrak", "tipe_alur", "VARCHAR DEFAULT 'STANDAR'")
+        db.execute(text("UPDATE kontrak SET status = 'Active' WHERE status IS NULL OR status = 'Draft'"))
+        db.commit()
         add_column_safely(db, "invoice", "no_ba", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "delivery_order", "no_ba", "VARCHAR DEFAULT NULL")
 

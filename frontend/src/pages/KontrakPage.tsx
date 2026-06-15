@@ -46,7 +46,6 @@ const kontrakSchema = z.object({
   no_kontrak: z.string().min(1, 'No Kontrak wajib diisi'),
   tanggal_kontrak: z.string().min(1, 'Tanggal wajib diisi'),
   lokasi: z.string().optional(),
-  status: z.string().optional(),
   pembeli: z.string().min(1, 'Pembeli wajib diisi'),
   nama_direktur: z.string().optional(),
   alamat_pembeli: z.string().optional(),
@@ -106,7 +105,6 @@ export default function KontrakPage() {
       no_kontrak: '',
       tanggal_kontrak: new Date().toISOString().split('T')[0],
       lokasi: 'Makassar',
-      status: 'Draft',
       tipe_alur: 'STANDAR',
       pembeli: '',
       nama_direktur: '',
@@ -175,7 +173,7 @@ export default function KontrakPage() {
       setIsExisting(true)
       setExportNo(trimmed)
       const fields: (keyof KontrakFormData)[] = [
-        'no_kontrak', 'tanggal_kontrak', 'lokasi', 'status', 'tipe_alur', 'pembeli',
+        'no_kontrak', 'tanggal_kontrak', 'lokasi', 'tipe_alur', 'pembeli',
         'nama_direktur', 'alamat_pembeli', 'penjual', 'pemilik_komoditas',
         'no_reff', 'komoditi', 'jenis_komoditi', 'satuan', 'tahun_panen',
         'kebun_produsen', 'simbol', 'packaging', 'deskripsi_produk', 'mutu',
@@ -250,7 +248,7 @@ export default function KontrakPage() {
   // Submit
   const onSubmit = async (data: KontrakFormData) => {
     try {
-      const payload: any = { ...data }
+      const payload: any = { ...data, status: 'Active' }
       // Include default fields
       if (!data.syarat_syarat) {
         payload.syarat_syarat = generateSyaratSyarat(data.lama_pembayaran_hari || 15, data.penyerahan_hari || 15)
@@ -383,13 +381,6 @@ export default function KontrakPage() {
               <div>
                 <Label className="text-xs">Tanggal *</Label>
                 <Input type="date" {...register('tanggal_kontrak')} />
-              </div>
-              <div>
-                <Label className="text-xs">Status</Label>
-                <NativeSelect {...register('status')}>
-                  <option value="Draft">Draft</option>
-                  <option value="Active">Active</option>
-                </NativeSelect>
               </div>
               <div>
                 <Label className="text-xs">Tipe Alur</Label>

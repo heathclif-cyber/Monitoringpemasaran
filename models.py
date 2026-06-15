@@ -8,7 +8,7 @@ class Kontrak(Base):
     
     no_kontrak = Column(String, primary_key=True, index=True)
     tanggal_kontrak = Column(Date, nullable=False)
-    status = Column(String, default="Draft")
+    status = Column(String, default="Active")
     pembeli = Column(String)
     nama_direktur = Column(String)
     alamat_pembeli = Column(String)
