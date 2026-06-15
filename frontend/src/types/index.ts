@@ -211,6 +211,39 @@ export interface DocumentStatusResponse {
   entity_types: DocumentEntityType[]
 }
 
+export interface DocumentSlot {
+  doc_type: DocumentDocType
+  label: string
+  uploaded: boolean
+  file_name: string | null
+  web_url: string | null
+  uploaded_at: string | null
+  document_id: number | null
+}
+
+export interface DocumentCompletenessSummary {
+  total: number
+  uploaded: number
+  missing: number
+}
+
+export interface DocumentCompleteness {
+  entity_type: DocumentEntityType
+  entity_id: string
+  display_label: string
+  sublabel: string | null
+  slots: DocumentSlot[]
+  summary: DocumentCompletenessSummary
+  related: DocumentCompleteness[]
+}
+
+export interface DocumentReference {
+  entity_type: DocumentEntityType
+  entity_id: string
+  label: string
+  sublabel: string | null
+}
+
 // ============================================================
 // Dashboard Types
 // ============================================================

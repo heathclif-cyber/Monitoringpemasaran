@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -22,6 +22,22 @@ router = APIRouter(prefix="/api/documents", tags=["Documents"])
 VALID_ENTITY_TYPES = {"kontrak", "invoice", "do", "bypass"}
 VALID_DOC_TYPES = {"kontrak", "invoice", "kuitansi", "do", "deklarasi", "berita_acara"}
 
+DOC_TYPE_LABELS = {
+    "kontrak": "Dokumen Kontrak",
+    "invoice": "Invoice",
+    "kuitansi": "Kuitansi",
+    "do": "Delivery Order",
+    "deklarasi": "Deklarasi Penerimaan",
+    "berita_acara": "Berita Acara Serah Terima",
+}
+
+ENTITY_DOC_REQUIREMENTS: dict[str, list[str]] = {
+    "kontrak": ["kontrak"],
+    "invoice": ["invoice", "kuitansi"],
+    "do": ["do", "deklarasi", "berita_acara"],
+    "bypass": ["deklarasi"],
+}
+
 
 def _validate_entity(db: Session, entity_type: str, entity_id: str) -> None:
     if entity_type == "kontrak":
@@ -40,6 +56,125 @@ def _validate_entity(db: Session, entity_type: str, entity_id: str) -> None:
             raise HTTPException(status_code=400, detail="ID bypass tidak valid") from exc
         if not db.query(models.LaporanBypass).filter(models.LaporanBypass.id == bypass_id).first():
             raise HTTPException(status_code=404, detail="Data bypass tidak ditemukan")
+
+
+def _build_slots(db: Session, entity_type: str, entity_id: str) -> list[schemas.DocumentSlotOut]:
+    required = ENTITY_DOC_REQUIREMENTS.get(entity_type, [])
+    uploads = (
+        db.query(models.DocumentUpload)
+        .filter(
+            models.DocumentUpload.entity_type == entity_type,
+            models.DocumentUpload.entity_id == entity_id,
+        )
+        .order_by(models.DocumentUpload.uploaded_at.desc())
+        .all()
+    )
+    by_type = {u.doc_type: u for u in uploads}
+
+    slots: list[schemas.DocumentSlotOut] = []
+    for doc_type in required:
+        upload = by_type.get(doc_type)
+        slots.append(
+            schemas.DocumentSlotOut(
+                doc_type=doc_type,
+                label=DOC_TYPE_LABELS.get(doc_type, doc_type),
+                uploaded=upload is not None,
+                file_name=upload.file_name if upload else None,
+                web_url=upload.web_url if upload else None,
+                uploaded_at=upload.uploaded_at if upload else None,
+                document_id=upload.id if upload else None,
+            )
+        )
+    return slots
+
+
+def _summarize_slots(slots: list[schemas.DocumentSlotOut]) -> schemas.DocumentCompletenessSummary:
+    uploaded = sum(1 for s in slots if s.uploaded)
+    total = len(slots)
+    return schemas.DocumentCompletenessSummary(total=total, uploaded=uploaded, missing=total - uploaded)
+
+
+def _completeness_for_entity(
+    db: Session,
+    entity_type: str,
+    entity_id: str,
+    *,
+    display_label: str,
+    sublabel: Optional[str] = None,
+    include_related: bool = False,
+) -> schemas.DocumentCompletenessOut:
+    slots = _build_slots(db, entity_type, entity_id)
+    related: list[schemas.DocumentCompletenessOut] = []
+
+    if include_related and entity_type == "kontrak":
+        invoices = (
+            db.query(models.Invoice)
+            .filter(models.Invoice.no_kontrak == entity_id)
+            .order_by(models.Invoice.tanggal_transaksi.desc())
+            .all()
+        )
+        for inv in invoices:
+            inv_item = _completeness_for_entity(
+                db,
+                "invoice",
+                inv.no_invoice,
+                display_label=inv.no_invoice,
+                sublabel=f"Kontrak: {entity_id}",
+            )
+            dos = (
+                db.query(models.DeliveryOrder)
+                .filter(models.DeliveryOrder.no_invoice == inv.no_invoice)
+                .order_by(models.DeliveryOrder.tanggal_do.desc())
+                .all()
+            )
+            inv_item.related = [
+                _completeness_for_entity(
+                    db,
+                    "do",
+                    do.no_do,
+                    display_label=do.no_do,
+                    sublabel=f"Invoice: {inv.no_invoice}",
+                )
+                for do in dos
+            ]
+            related.append(inv_item)
+    elif include_related and entity_type == "invoice":
+        dos = (
+            db.query(models.DeliveryOrder)
+            .filter(models.DeliveryOrder.no_invoice == entity_id)
+            .order_by(models.DeliveryOrder.tanggal_do.desc())
+            .all()
+        )
+        related = [
+            _completeness_for_entity(
+                db,
+                "do",
+                do.no_do,
+                display_label=do.no_do,
+                sublabel=f"Invoice: {entity_id}",
+            )
+            for do in dos
+        ]
+
+    summary = _summarize_slots(slots)
+    for child in related:
+        summary.total += child.summary.total
+        summary.uploaded += child.summary.uploaded
+        summary.missing += child.summary.missing
+        for grandchild in child.related:
+            summary.total += grandchild.summary.total
+            summary.uploaded += grandchild.summary.uploaded
+            summary.missing += grandchild.summary.missing
+
+    return schemas.DocumentCompletenessOut(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        display_label=display_label,
+        sublabel=sublabel,
+        slots=slots,
+        summary=summary,
+        related=related,
+    )
 
 
 def _sync_entity_link(
@@ -136,6 +271,132 @@ def oauth_callback(code: Optional[str] = None, error: Optional[str] = None, erro
   <p>Redirect URI yang dipakai: <code>{MS_REDIRECT_URI}</code></p>
 </body>
 </html>"""
+    )
+
+
+@router.get("/references", response_model=List[schemas.DocumentReferenceOut])
+def list_references(
+    entity_type: str = Query(...),
+    q: str = Query(default=""),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    entity_type = entity_type.strip().lower()
+    if entity_type not in VALID_ENTITY_TYPES:
+        raise HTTPException(status_code=400, detail="entity_type tidak valid")
+
+    term = f"%{q.strip()}%" if q.strip() else None
+    results: list[schemas.DocumentReferenceOut] = []
+
+    if entity_type == "kontrak":
+        query = db.query(models.Kontrak).order_by(models.Kontrak.tanggal_kontrak.desc())
+        if term:
+            query = query.filter(
+                (models.Kontrak.no_kontrak.ilike(term))
+                | (models.Kontrak.pembeli.ilike(term))
+            )
+        for row in query.limit(limit).all():
+            results.append(
+                schemas.DocumentReferenceOut(
+                    entity_type="kontrak",
+                    entity_id=row.no_kontrak,
+                    label=row.no_kontrak,
+                    sublabel=row.pembeli,
+                )
+            )
+    elif entity_type == "invoice":
+        query = db.query(models.Invoice).order_by(models.Invoice.tanggal_transaksi.desc())
+        if term:
+            query = query.filter(
+                (models.Invoice.no_invoice.ilike(term))
+                | (models.Invoice.no_kontrak.ilike(term))
+            )
+        for row in query.limit(limit).all():
+            results.append(
+                schemas.DocumentReferenceOut(
+                    entity_type="invoice",
+                    entity_id=row.no_invoice,
+                    label=row.no_invoice,
+                    sublabel=row.no_kontrak,
+                )
+            )
+    elif entity_type == "do":
+        query = db.query(models.DeliveryOrder).order_by(models.DeliveryOrder.tanggal_do.desc())
+        if term:
+            query = query.filter(
+                (models.DeliveryOrder.no_do.ilike(term))
+                | (models.DeliveryOrder.no_invoice.ilike(term))
+            )
+        for row in query.limit(limit).all():
+            results.append(
+                schemas.DocumentReferenceOut(
+                    entity_type="do",
+                    entity_id=row.no_do,
+                    label=row.no_do,
+                    sublabel=row.no_invoice,
+                )
+            )
+    else:
+        query = db.query(models.LaporanBypass).order_by(models.LaporanBypass.tanggal.desc())
+        if term:
+            query = query.filter(
+                (models.LaporanBypass.unit.ilike(term))
+                | (models.LaporanBypass.komoditi.ilike(term))
+                | (models.LaporanBypass.pembeli.ilike(term))
+            )
+        for row in query.limit(limit).all():
+            results.append(
+                schemas.DocumentReferenceOut(
+                    entity_type="bypass",
+                    entity_id=str(row.id),
+                    label=f"BYPASS-{row.id}",
+                    sublabel=f"{row.unit or '-'} · {row.komoditi or '-'}",
+                )
+            )
+
+    return results
+
+
+@router.get("/completeness", response_model=schemas.DocumentCompletenessOut)
+def document_completeness(
+    entity_type: str = Query(...),
+    entity_id: str = Query(...),
+    include_related: bool = Query(default=True),
+    db: Session = Depends(get_db),
+):
+    entity_type = entity_type.strip().lower()
+    entity_id = entity_id.strip()
+    if entity_type not in VALID_ENTITY_TYPES:
+        raise HTTPException(status_code=400, detail="entity_type tidak valid")
+    if not entity_id:
+        raise HTTPException(status_code=400, detail="entity_id wajib diisi")
+
+    _validate_entity(db, entity_type, entity_id)
+
+    display_label = entity_id
+    sublabel: Optional[str] = None
+
+    if entity_type == "kontrak":
+        row = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == entity_id).first()
+        sublabel = row.pembeli if row else None
+    elif entity_type == "invoice":
+        row = db.query(models.Invoice).filter(models.Invoice.no_invoice == entity_id).first()
+        sublabel = row.no_kontrak if row else None
+    elif entity_type == "do":
+        row = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == entity_id).first()
+        sublabel = row.no_invoice if row else None
+    elif entity_type == "bypass":
+        row = db.query(models.LaporanBypass).filter(models.LaporanBypass.id == int(entity_id)).first()
+        display_label = f"BYPASS-{entity_id}"
+        sublabel = f"{row.unit or '-'} · {row.komoditi or '-'}" if row else None
+
+    return _completeness_for_entity(
+        db,
+        entity_type,
+        entity_id,
+        display_label=display_label,
+        sublabel=sublabel,
+        include_related=include_related and entity_type in {"kontrak", "invoice"},
     )
 
 

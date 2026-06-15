@@ -147,3 +147,39 @@ class DocumentUploadOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DocumentSlotOut(BaseModel):
+    doc_type: str
+    label: str
+    uploaded: bool
+    file_name: Optional[str] = None
+    web_url: Optional[str] = None
+    uploaded_at: Optional[datetime] = None
+    document_id: Optional[int] = None
+
+
+class DocumentCompletenessSummary(BaseModel):
+    total: int
+    uploaded: int
+    missing: int
+
+
+class DocumentCompletenessOut(BaseModel):
+    entity_type: str
+    entity_id: str
+    display_label: str
+    sublabel: Optional[str] = None
+    slots: List[DocumentSlotOut]
+    summary: DocumentCompletenessSummary
+    related: List["DocumentCompletenessOut"] = []
+
+
+class DocumentReferenceOut(BaseModel):
+    entity_type: str
+    entity_id: str
+    label: str
+    sublabel: Optional[str] = None
+
+
+DocumentCompletenessOut.model_rebuild()
