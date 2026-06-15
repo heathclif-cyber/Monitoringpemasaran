@@ -7,6 +7,7 @@ import math, io, mammoth
 import models
 import schemas
 from database import get_db
+from services.cache import api_cache
 from services.utils import terbilang_rupiah
 
 router = APIRouter(prefix="/api/invoice", tags=["Invoice"])
@@ -105,6 +106,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
         db_invoice.jumlah_pembayaran = jumlah_pembayaran
         db_invoice.terbilang_invoice = terbilang_invoice
         db.commit()
+        api_cache.invalidate_reporting()
         db.refresh(db_invoice)
         return db_invoice
     else:
@@ -115,6 +117,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
         )
         db.add(new_invoice)
         db.commit()
+        api_cache.invalidate_reporting()
         db.refresh(new_invoice)
         return new_invoice
 
@@ -196,4 +199,5 @@ def delete_invoice(no_invoice: str, db: Session = Depends(get_db)):
     
     db.delete(db_invoice)
     db.commit()
+    api_cache.invalidate_reporting()
     return {"success": True, "message": "Invoice deleted successfully"}

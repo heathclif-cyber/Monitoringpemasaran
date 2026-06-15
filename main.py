@@ -9,8 +9,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-import models
-from database import engine, SessionLocal
+
 
 # --- Router imports ---
 from endpoints.kontrak import router as kontrak_router
@@ -26,82 +25,14 @@ app = FastAPI(title="PTPN I - Sales Document Automation")
 @app.on_event("startup")
 def startup_event():
     logger.info("Application starting up...")
-    try:
-        # Create tables on startup to avoid blocking the main import thread
-        logger.info("Initializing database tables...")
-        models.Base.metadata.create_all(bind=engine)
-        
-        # --- MIGRATION: Ensure new columns exist ---
-        from sqlalchemy import text
+    if os.getenv("RUN_DB_MIGRATE", "").lower() in ("1", "true", "yes"):
         try:
-            db = SessionLocal()
-            logger.info("Migrating missing columns (PPh, volume, etc)...")
-            
-            # Helper to add column safely
-            def add_column_safely(table, col, type_def):
-                try:
-                    # Try Postgres style first (IF NOT EXISTS)
-                    db.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {type_def}"))
-                    db.commit()
-                except Exception:
-                    db.rollback()
-                    try:
-                        # Try SQLite/Standard style (will fail if exists)
-                        db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_def}"))
-                        db.commit()
-                    except Exception:
-                        db.rollback() # Likely already exists
-            
-            add_column_safely("laporan_bypass", "volume", "FLOAT DEFAULT 0.0")
-            add_column_safely("laporan_bypass", "satuan", "VARCHAR DEFAULT 'Kg'")
-            add_column_safely("delivery_order", "volume_do", "FLOAT DEFAULT 0.0")
-            add_column_safely("delivery_order", "is_pph_disetor", "VARCHAR DEFAULT 'false'")
-            add_column_safely("kontrak", "is_ppn", "VARCHAR DEFAULT 'true'")
-            add_column_safely("kontrak", "ppn_persen", "FLOAT DEFAULT 11.0")
-            add_column_safely("kontrak", "is_pph", "VARCHAR DEFAULT 'false'")
-            add_column_safely("kontrak", "pph_persen", "FLOAT DEFAULT 0.0")
-            add_column_safely("delivery_order", "rencana_pengambilan", "DATE DEFAULT NULL")
-            add_column_safely("delivery_order", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
-            add_column_safely("laporan_bypass", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
-            add_column_safely("kontrak_unit", "volume", "FLOAT DEFAULT 0.0")
-            add_column_safely("invoice", "nama_unit", "VARCHAR DEFAULT NULL")
-            add_column_safely("delivery_order", "link_berita_acara_serah_terima", "VARCHAR DEFAULT NULL")
-
-            # Normalize unit names (fix inconsistent spacing vs hyphens)
-            try:
-                from sqlalchemy import update as sql_update
-                fixes = [
-                    ("laporan_bypass", "unit", "Awaya Telpaputih", "Awaya-Telpaputih"),
-                    ("laporan_bypass", "unit", "Minahasa Halmahera", "Minahasa-Halmahera"),
-                    ("delivery_order", "kepada_unit", "Awaya Telpaputih", "Awaya-Telpaputih"),
-                    ("delivery_order", "kepada_unit", "Minahasa Halmahera", "Minahasa-Halmahera"),
-                    ("invoice", "nama_unit", "Awaya Telpaputih", "Awaya-Telpaputih"),
-                    ("invoice", "nama_unit", "Minahasa Halmahera", "Minahasa-Halmahera"),
-                    ("kontrak", "kebun_produsen", "Awaya Telpaputih", "Awaya-Telpaputih"),
-                    ("kontrak", "kebun_produsen", "Minahasa Halmahera", "Minahasa-Halmahera"),
-                ]
-                for tbl, col, old, new in fixes:
-                    stmt = sql_update(models.Base.metadata.tables[tbl]).where(
-                        getattr(models.Base.metadata.tables[tbl].c, col) == old
-                    ).values({col: new})
-                    result = db.execute(stmt)
-                    if result.rowcount > 0:
-                        logger.info(f"Normalized {result.rowcount} rows: {tbl}.{col} '{old}' -> '{new}'")
-                db.commit()
-            except Exception as norm_err:
-                db.rollback()
-                logger.warning(f"Unit normalization skipped: {norm_err}")
-
-            logger.info("Migration routine finished.")
-        except Exception as migrate_err:
-            logger.error(f"Migration routine failed: {migrate_err}")
-        finally:
-            db.close()
-
-        logger.info("Database initialization complete.")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        # We don't raise here so the app can still start and show health check status
+            from services.db_migrate import run_migrations
+            run_migrations()
+        except Exception as e:
+            logger.error("Database migration failed: %s", e)
+    else:
+        logger.info("Skipping DB migration (set RUN_DB_MIGRATE=true to run on startup)")
 
 os.makedirs("static/css", exist_ok=True)
 os.makedirs("static/js", exist_ok=True)

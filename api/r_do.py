@@ -7,6 +7,7 @@ import mammoth
 import models
 import schemas
 from database import get_db
+from services.cache import api_cache
 
 router = APIRouter(prefix="/api/do", tags=["Delivery Order"])
 
@@ -59,6 +60,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
         db_do.selisih = selisih
         db_do.volume_do = round(volume_do)
         db.commit()
+        api_cache.invalidate_reporting()
         db.refresh(db_do)
         return db_do
     else:
@@ -69,6 +71,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
         )
         db.add(new_do)
         db.commit()
+        api_cache.invalidate_reporting()
         db.refresh(new_do)
         return new_do
 
@@ -119,4 +122,5 @@ def delete_do(no_do: str, db: Session = Depends(get_db)):
     
     db.delete(db_do)
     db.commit()
+    api_cache.invalidate_reporting()
     return {"success": True, "message": "DO deleted successfully"}

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import models
-from database import get_db
+from database import SessionLocal
+from services.cache import api_cache
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
@@ -13,8 +14,13 @@ def get_dashboard_data(
     year: int = Query(default=2026, description="Tahun filter"),
     unit: str = Query(default="ALL", description="Filter by unit (kebun_produsen)"),
     komoditi: str = Query(default="ALL", description="Filter by komoditi"),
-    db: Session = Depends(get_db)
 ):
+    cache_key = f"dashboard:{year}:{unit}:{komoditi}"
+    cached = api_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    db = SessionLocal()
     try:
         from sqlalchemy.orm import joinedload
         
@@ -63,7 +69,11 @@ def get_dashboard_data(
         total_nilai_invoice = 0.0
         
         # 1. ACCRUAL (Pendapatan & Volume)
-        dos_pend = base_do_pend.options(joinedload(models.DeliveryOrder.invoice).joinedload(models.Invoice.kontrak)).all()
+        dos_pend = base_do_pend.options(
+            joinedload(models.DeliveryOrder.invoice)
+            .joinedload(models.Invoice.kontrak)
+            .joinedload(models.Kontrak.units)
+        ).all()
         for do in dos_pend:
             k = do.invoice.kontrak
             do_vol = float(do.volume_do or 0)
@@ -186,7 +196,7 @@ def get_dashboard_data(
         k_b = set(str(r[0]) for r in db.query(models.LaporanBypass.komoditi).distinct().all() if r[0] and r[0] != "-")
         avail_k = sorted(list(k_k | k_b))
 
-        return {
+        result = {
             "summary": {
                 "total_kontrak": total_kontrak,
                 "total_invoice": total_invoice_count,
@@ -242,8 +252,12 @@ def get_dashboard_data(
             "available_komoditas": avail_k,
             "selected_komoditi": str(komoditi),
         }
+        api_cache.set(cache_key, result)
+        return result
 
     except Exception as e:
         import traceback
         print(traceback.format_exc())
         return {"error": str(e)}
+    finally:
+        db.close()

@@ -6,7 +6,8 @@ import calendar
 from typing import List
 
 import models
-from database import get_db
+from database import get_db, SessionLocal
+from services.cache import api_cache
 
 router = APIRouter(prefix="/api/laporan", tags=["Laporan"])
 
@@ -20,10 +21,10 @@ def get_bulan_buku(d):
               "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     return f"{d.month:02d}-{months[d.month]}"
 
-@router.get("")
-def get_laporan(db: Session = Depends(get_db)):
+def _build_laporan_rows(db: Session):
     kontraks = db.query(models.Kontrak).options(
-        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders)
+        joinedload(models.Kontrak.units),
+        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders),
     ).all()
 
     rows = []
@@ -241,6 +242,21 @@ def get_laporan(db: Session = Depends(get_db)):
 
     return rows
 
+
+@router.get("")
+def get_laporan():
+    cached = api_cache.get("laporan:all")
+    if cached is not None:
+        return cached
+
+    db = SessionLocal()
+    try:
+        rows = _build_laporan_rows(db)
+        api_cache.set("laporan:all", rows)
+        return rows
+    finally:
+        db.close()
+
 @router.put("/update-sap")
 def update_sap_fields(data: dict, db: Session = Depends(get_db)):
     no_do = data.get("No_DO")
@@ -273,6 +289,7 @@ def update_sap_fields(data: dict, db: Session = Depends(get_db)):
         if "Link_Berita_Acara_Serah_Terima" in data: do.link_berita_acara_serah_terima = data["Link_Berita_Acara_Serah_Terima"]
     
     db.commit()
+    api_cache.invalidate_reporting()
     return {"success": True}
 
 @router.post("/create-bypass")
@@ -293,6 +310,7 @@ def create_bypass_entry(data: dict, db: Session = Depends(get_db)):
         )
         db.add(new_rec)
         db.commit()
+        api_cache.invalidate_reporting()
         return {"success": True, "id": new_rec.id}
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -317,6 +335,7 @@ def update_bypass_entry(data: dict, db: Session = Depends(get_db)):
         if "Satuan" in data: rec.satuan = data["Satuan"]
         
         db.commit()
+        api_cache.invalidate_reporting()
         return {"success": True}
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -329,6 +348,7 @@ def delete_bypass_entry(bypass_id: int, db: Session = Depends(get_db)):
     
     db.delete(rec)
     db.commit()
+    api_cache.invalidate_reporting()
     return {"success": True}
 
 @router.post("/seed-beteleme")
@@ -394,4 +414,5 @@ def seed_beteleme(db: Session = Depends(get_db)):
             count += 1
     
     db.commit()
+    api_cache.invalidate_reporting()
     return {"success": True, "inserted": count}

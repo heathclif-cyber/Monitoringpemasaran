@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import timedelta
 from typing import List
 import math
@@ -9,6 +9,7 @@ import models
 import schemas
 from database import get_db
 from services.utils import terbilang_rupiah
+from services.cache import api_cache
 
 router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 
@@ -87,13 +88,20 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
             db_kontrak.deskripsi_produk = first.deskripsi_produk
 
     db.commit()
+    api_cache.invalidate_reporting()
     db.refresh(db_kontrak)
     return db_kontrak
 
 
 @router.get("", response_model=List[schemas.KontrakOut])
 def get_kontraks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(models.Kontrak).offset(skip).limit(limit).all()
+    return (
+        db.query(models.Kontrak)
+        .options(joinedload(models.Kontrak.units))
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.get("/export")
@@ -350,4 +358,5 @@ def delete_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
     
     db.delete(db_kontrak)
     db.commit()
+    api_cache.invalidate_reporting()
     return {"success": True, "message": "Kontrak deleted successfully"}
