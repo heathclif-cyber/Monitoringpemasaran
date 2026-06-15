@@ -8,6 +8,7 @@ import models
 import schemas
 from database import get_db
 from services.cache import api_cache
+from services.ba_utils import is_payung_ba, get_ba_for_entity
 
 router = APIRouter(prefix="/api/do", tags=["Delivery Order"])
 
@@ -23,39 +24,56 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
     kontrak_volume = float(db_kontrak.volume or 0) if db_kontrak else 0
     invoice_total = float(db_invoice.jumlah_pembayaran or 0)
     nominal = float(do.nominal_transfer or 0)
+    payung_ba = is_payung_ba(db_kontrak)
 
-    # Jika invoice terkait unit, pakai volume unit untuk perhitungan proporsional
-    volume_for_calc = kontrak_volume
-    if db_invoice.nama_unit and db_kontrak:
-        unit = next((u for u in db_kontrak.units if u.nama_unit == db_invoice.nama_unit), None)
-        if unit and (unit.volume or 0) > 0:
-            volume_for_calc = float(unit.volume)
+    no_ba = do.no_ba or db_invoice.no_ba
+    db_ba = get_ba_for_entity(db, no_ba) if payung_ba else None
 
-    # Hitung nilai penuh kontrak/unit — denominator yang benar untuk volume proporsional.
-    # Menggunakan nilai penuh (bukan invoice.jumlah_pembayaran) agar pembayaran parsial
-    # tidak salah memberikan 100% volume ketika hanya membayar sebagian kontrak.
-    harga_satuan = float(db_kontrak.harga_satuan or 0) if db_kontrak else 0
-    premi = float(db_kontrak.premi or 0) if db_kontrak else 0
-    is_ppn = str(getattr(db_kontrak, 'is_ppn', 'true')).lower() == 'true' if db_kontrak else False
-    ppn_persen = float(db_kontrak.ppn_persen or 0) / 100 if db_kontrak else 0
-
-    unit_ratio = (volume_for_calc / kontrak_volume) if kontrak_volume > 0 else 1.0
-    pokok_full = (kontrak_volume * harga_satuan) + premi
-    ppn_full = pokok_full * ppn_persen if is_ppn else 0.0
-    nilai_unit_penuh = (pokok_full + ppn_full) * unit_ratio
-
-    # volume_do = (nominal / nilai_unit_penuh) × volume_unit
-    if nilai_unit_penuh > 0 and volume_for_calc > 0:
-        volume_do = (nominal / nilai_unit_penuh) * volume_for_calc
+    if payung_ba:
+        if not db_ba:
+            raise HTTPException(status_code=400, detail="Kontrak payung wajib memilih Berita Acara (no_ba)")
+        if db_ba.no_kontrak != db_invoice.no_kontrak:
+            raise HTTPException(status_code=400, detail="BA tidak sesuai dengan kontrak invoice")
+        volume_do = float(db_ba.volume_ba or 0)
+        rencana_pengambilan = db_ba.tanggal_ba
     else:
-        volume_do = volume_for_calc  # fallback: full volume
+        if do.no_ba:
+            raise HTTPException(status_code=400, detail="no_ba hanya untuk kontrak PAYUNG_BA")
+
+        # Jika invoice terkait unit, pakai volume unit untuk perhitungan proporsional
+        volume_for_calc = kontrak_volume
+        if db_invoice.nama_unit and db_kontrak:
+            unit = next((u for u in db_kontrak.units if u.nama_unit == db_invoice.nama_unit), None)
+            if unit and (unit.volume or 0) > 0:
+                volume_for_calc = float(unit.volume)
+
+        harga_satuan = float(db_kontrak.harga_satuan or 0) if db_kontrak else 0
+        premi = float(db_kontrak.premi or 0) if db_kontrak else 0
+        is_ppn = str(getattr(db_kontrak, 'is_ppn', 'true')).lower() == 'true' if db_kontrak else False
+        ppn_persen = float(db_kontrak.ppn_persen or 0) / 100 if db_kontrak else 0
+
+        unit_ratio = (volume_for_calc / kontrak_volume) if kontrak_volume > 0 else 1.0
+        pokok_full = (kontrak_volume * harga_satuan) + premi
+        ppn_full = pokok_full * ppn_persen if is_ppn else 0.0
+        nilai_unit_penuh = (pokok_full + ppn_full) * unit_ratio
+
+        if nilai_unit_penuh > 0 and volume_for_calc > 0:
+            volume_do = (nominal / nilai_unit_penuh) * volume_for_calc
+        else:
+            volume_do = volume_for_calc
+        rencana_pengambilan = do.rencana_pengambilan
 
     # Calculate selisih — sisa dari invoice yang belum ditransfer
     selisih = invoice_total - nominal
 
+    do_payload = do.model_dump()
+    if payung_ba and db_ba:
+        do_payload["no_ba"] = db_ba.no_ba
+        do_payload["rencana_pengambilan"] = db_ba.tanggal_ba
+
     db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == do.no_do).first()
     if db_do:
-        for key, value in do.model_dump().items():
+        for key, value in do_payload.items():
             setattr(db_do, key, value)
         db_do.selisih = selisih
         db_do.volume_do = round(volume_do)
@@ -65,7 +83,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
         return db_do
     else:
         new_do = models.DeliveryOrder(
-            **do.model_dump(),
+            **do_payload,
             selisih=selisih,
             volume_do=round(volume_do)
         )

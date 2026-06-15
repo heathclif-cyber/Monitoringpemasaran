@@ -19,18 +19,21 @@ import type {
   DocumentUpload,
 } from '@/types'
 
-const ENTITY_TYPE_LABELS: Record<DocumentEntityType, string> = {
+type UploadEntityType = Exclude<DocumentEntityType, 'bypass'>
+const UPLOAD_ENTITY_TYPES: UploadEntityType[] = ['kontrak', 'invoice', 'do', 'ba']
+
+const ENTITY_TYPE_LABELS: Record<UploadEntityType, string> = {
   kontrak: 'Kontrak',
   invoice: 'Invoice',
   do: 'Delivery Order (DO)',
-  bypass: 'Bypass Laporan',
+  ba: 'Berita Acara',
 }
 
-const ENTITY_REF_LABELS: Record<DocumentEntityType, string> = {
+const ENTITY_REF_LABELS: Record<UploadEntityType, string> = {
   kontrak: 'Pilih No. Kontrak',
   invoice: 'Pilih No. Invoice',
   do: 'Pilih No. DO',
-  bypass: 'Pilih Data Bypass',
+  ba: 'Pilih No. BA',
 }
 
 function CompletenessBadge({ summary }: { summary: DocumentCompleteness['summary'] }) {
@@ -193,7 +196,7 @@ function CompletenessGroup({
 export default function UploadPage() {
   const { addNotification } = useAppStore()
   const [status, setStatus] = useState<DocumentStatusResponse | null>(null)
-  const [entityType, setEntityType] = useState<DocumentEntityType>('kontrak')
+  const [entityType, setEntityType] = useState<UploadEntityType>('kontrak')
   const [entityId, setEntityId] = useState('')
   const [references, setReferences] = useState<DocumentReference[]>([])
   const [loadingRefs, setLoadingRefs] = useState(false)
@@ -290,10 +293,10 @@ export default function UploadPage() {
             <Label className="text-xs">Jenis Referensi Dokumen</Label>
             <NativeSelect
               value={entityType}
-              onChange={(e) => setEntityType(e.target.value as DocumentEntityType)}
+              onChange={(e) => setEntityType(e.target.value as UploadEntityType)}
               className="mt-1"
             >
-              {(Object.keys(ENTITY_TYPE_LABELS) as DocumentEntityType[]).map((t) => (
+              {UPLOAD_ENTITY_TYPES.map((t) => (
                 <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
               ))}
             </NativeSelect>
@@ -356,7 +359,7 @@ export default function UploadPage() {
           <p><strong>Kontrak:</strong> Dokumen Kontrak</p>
           <p><strong>Invoice:</strong> Invoice, Kuitansi</p>
           <p><strong>DO:</strong> Delivery Order, Deklarasi Penerimaan, Berita Acara Serah Terima</p>
-          <p><strong>Bypass:</strong> Deklarasi Penerimaan</p>
+          <p><strong>BA:</strong> Berita Acara Serah Terima</p>
           {entityType === 'kontrak' && (
             <p className="pt-2 text-foreground">Pilih kontrak untuk melihat juga status invoice & DO terkait.</p>
           )}

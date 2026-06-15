@@ -1,5 +1,33 @@
 import type { LaporanRow } from '@/types'
 
+const MONTHS_ID = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+
+export const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
+export const MONTH_LABELS = Object.fromEntries(MONTH_OPTIONS.map((m, i) => [m, MONTHS_ID[i + 1]]))
+
+export function getCurrentMonthKey(): string {
+  return String(new Date().getMonth() + 1).padStart(2, '0')
+}
+
+function extractMonthKey(row: LaporanRow, mode: 'TRANSFER' | 'RENCANA'): string {
+  if (mode === 'RENCANA') {
+    const rencana = row.Rencana_Pengambilan || ''
+    if (rencana.length >= 7) return rencana.slice(5, 7)
+    return row.Bulan_Buku?.slice(0, 2) || ''
+  }
+
+  const raw = row.Raw_Date || ''
+  if (raw.length >= 7) return raw.slice(5, 7)
+
+  const transfer = row.Tanggal_Transfer || ''
+  if (transfer.includes('/')) {
+    const parts = transfer.split('/')
+    if (parts.length === 3) return parts[1].padStart(2, '0')
+  }
+
+  return row.Bulan_Buku?.slice(0, 2) || ''
+}
+
 export interface LaporanSummary {
   cashIn: number
   pendapatan: number
@@ -73,8 +101,8 @@ export function filterLaporanRows(rows: LaporanRow[], filters: LaporanFilters): 
     if (filters.tipe === 'ONLY_BYPASS' && !row.No_DO.startsWith('BYPASS-')) return false
 
     if (filters.months.length > 0) {
-      const bulanBuku = row.Bulan_Buku || ''
-      if (!filters.months.some((m) => bulanBuku.startsWith(m))) return false
+      const monthKey = extractMonthKey(row, filters.modeTanggal)
+      if (!monthKey || !filters.months.includes(monthKey)) return false
     }
 
     if (filters.sap !== 'ALL') {
@@ -124,16 +152,21 @@ export interface LaporanFilters {
   search: string
 }
 
-export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = {
-  unit: [],
-  pembeli: [],
-  komoditi: [],
-  jenisKomoditi: [],
-  months: [],
-  modeTanggal: 'TRANSFER',
-  sort: 'DESC',
-  tipe: 'ALL',
-  sap: 'ALL',
-  statusBayar: 'ALL',
-  search: '',
+export function createDefaultLaporanFilters(): LaporanFilters {
+  return {
+    unit: [],
+    pembeli: [],
+    komoditi: [],
+    jenisKomoditi: [],
+    months: [getCurrentMonthKey()],
+    modeTanggal: 'TRANSFER',
+    sort: 'DESC',
+    tipe: 'ALL',
+    sap: 'ALL',
+    statusBayar: 'ALL',
+    search: '',
+  }
 }
+
+/** @deprecated Use createDefaultLaporanFilters() agar bulan selalu bulan berjalan */
+export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = createDefaultLaporanFilters()

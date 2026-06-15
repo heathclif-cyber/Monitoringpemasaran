@@ -3,6 +3,8 @@
 // ============================================================
 
 export type KontrakStatus = 'Draft' | 'Active'
+export type TipeAlur = 'STANDAR' | 'PAYUNG_BA'
+export type BAStatus = 'Draft' | 'Selesai' | 'Ter-invoice'
 export type InvoiceStatus = 'Unpaid' | 'Paid'
 export type Satuan = 'Kg' | 'Butir'
 export type PpnStatus = 'true' | 'false'
@@ -18,7 +20,7 @@ export type SapField =
   | 'link_deklarasi_penerimaan'
   | 'link_berita_acara_serah_terima'
 
-export type DocumentEntityType = 'kontrak' | 'invoice' | 'do' | 'bypass'
+export type DocumentEntityType = 'kontrak' | 'invoice' | 'do' | 'bypass' | 'ba'
 export type DocumentDocType = 'kontrak' | 'invoice' | 'kuitansi' | 'do' | 'deklarasi' | 'berita_acara'
 
 // ============================================================
@@ -85,6 +87,7 @@ export interface Kontrak {
   syarat_syarat: string | null
   dasar_ketentuan: string | null
   lokasi: string | null
+  tipe_alur?: TipeAlur | string
   // Computed
   nilai_transaksi: number
   nominal_ppn: number
@@ -100,6 +103,7 @@ export interface Invoice {
   status_invoice: string
   pph_22_persen: number
   nama_unit: string | null
+  no_ba?: string | null
   // Computed
   jumlah_pembayaran: number
   terbilang_invoice: string | null
@@ -117,6 +121,7 @@ export interface DeliveryOrder {
   nominal_transfer: number
   is_pph_disetor: string
   rencana_pengambilan: string | null
+  no_ba?: string | null
   // SAP fields
   superman: string | null
   kontrak_sap: string | null
@@ -130,6 +135,27 @@ export interface DeliveryOrder {
   volume_do: number
   // Joined
   invoice?: Invoice
+}
+
+export interface BeritaAcara {
+  no_ba: string
+  no_kontrak: string
+  tanggal_ba: string
+  volume_ba: number
+  nama_unit?: string | null
+  komoditi?: string | null
+  deskripsi?: string | null
+  link_berita_acara?: string | null
+  status: BAStatus | string
+}
+
+export interface BAAvailable {
+  no_ba: string
+  tanggal_ba: string | null
+  volume_ba: number
+  nama_unit?: string | null
+  komoditi?: string | null
+  status: string
 }
 
 export interface LaporanBypass {
@@ -180,6 +206,8 @@ export interface LaporanRow {
   Sisa_Pembayaran: number
   Sisa_Volume: number
   Bulan_Buku: string
+  No_BA?: string
+  Tanggal_BA?: string
   Rencana_Pengambilan: string
   Raw_Date: string
   Superman: string
@@ -365,6 +393,7 @@ export interface KontrakInput {
   syarat_syarat?: string
   dasar_ketentuan?: string
   lokasi?: string
+  tipe_alur?: TipeAlur | string
   units?: { nama_unit: string; volume?: number; komoditi?: string; jenis_komoditi?: string; satuan?: string; tahun_panen?: string; deskripsi_produk?: string }[]
 }
 
@@ -374,6 +403,21 @@ export interface InvoiceInput {
   tanggal_transaksi: string
   status_invoice?: string
   pph_22_persen?: number
+  no_ba?: string
+  jumlah_pembayaran?: number
+  nama_unit?: string
+}
+
+export interface BeritaAcaraInput {
+  no_ba: string
+  no_kontrak: string
+  tanggal_ba: string
+  volume_ba: number
+  nama_unit?: string
+  komoditi?: string
+  deskripsi?: string
+  link_berita_acara?: string
+  status?: string
 }
 
 export interface DeliveryOrderInput {
@@ -386,6 +430,7 @@ export interface DeliveryOrderInput {
   nominal_transfer?: number
   is_pph_disetor?: string
   rencana_pengambilan?: string | null
+  no_ba?: string
 }
 
 export interface BypassInput {

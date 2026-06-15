@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { FileDown, RotateCcw, Save } from 'lucide-react'
 import { useDOStore } from '@/store/doStore'
 import { useInvoiceStore } from '@/store/invoiceStore'
+import { useBAStore } from '@/store/baStore'
 import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -117,6 +118,7 @@ const doSchema = z.object({
   nominal_transfer: z.coerce.number().min(0),
   is_pph_disetor: z.string().optional(),
   rencana_pengambilan: z.string().optional(),
+  no_ba: z.string().optional(),
 })
 
 type DOFormData = z.infer<typeof doSchema>
@@ -124,6 +126,7 @@ type DOFormData = z.infer<typeof doSchema>
 export default function DOPage() {
   const doStore = useDOStore()
   const invoiceStore = useInvoiceStore()
+  const baStore = useBAStore()
   const { currentInvoice, currentKontrak, fetchInvoiceForDO } = doStore
   const { addNotification } = useAppStore()
   const [exportNo, setExportNo] = useState<string | null>(null)
@@ -155,6 +158,10 @@ export default function DOPage() {
   useEffect(() => {
     if (selectedInvoice) fetchInvoiceForDO(selectedInvoice)
   }, [selectedInvoice])
+
+  useEffect(() => {
+    if (currentInvoice?.no_kontrak) baStore.fetch(currentInvoice.no_kontrak)
+  }, [currentInvoice?.no_kontrak])
 
   // Auto-populate kepada_unit dari nama_unit invoice saat invoice berhasil di-load
   useEffect(() => {
@@ -211,7 +218,11 @@ export default function DOPage() {
     return Math.round((pokokFull + ppnFull) * ratio)
   }, [currentKontrak, kontrakVolume])
 
-  const volumeDo = calculateProportionalVolume(Number(nominalTransfer) || 0, nilaiUnitPenuh, kontrakVolume)
+  const isPayungBA = String(currentKontrak?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
+  const linkedBA = currentInvoice?.no_ba
+  const volumeDo = isPayungBA
+    ? (baStore.data.find((b) => b.no_ba === linkedBA)?.volume_ba || 0)
+    : calculateProportionalVolume(Number(nominalTransfer) || 0, nilaiUnitPenuh, kontrakVolume)
   const selisih = calculateSelisih(invoiceTotal, Number(nominalTransfer) || 0)
   const volumePct = getVolumePercentage(volumeDo, kontrakVolume)
 
@@ -319,7 +330,19 @@ export default function DOPage() {
               </div>
               <div>
                 <Label className="text-xs">Rencana Pengambilan</Label>
-                <Input type="date" {...register('rencana_pengambilan')} />
+                {isPayungBA ? (
+                  <div>
+                    <Input
+                      type="date"
+                      value={baStore.data.find((b) => b.no_ba === linkedBA)?.tanggal_ba || ''}
+                      className="bg-slate-50"
+                      readOnly
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Otomatis dari tanggal BA (pengakuan pendapatan)</p>
+                  </div>
+                ) : (
+                  <Input type="date" {...register('rencana_pengambilan')} />
+                )}
               </div>
               <div>
                 <Label className="text-xs">PPh Disetor</Label>
@@ -357,6 +380,12 @@ export default function DOPage() {
                   <span className="text-slate-500">{currentInvoice.nama_unit ? 'Volume Unit:' : 'Volume Kontrak:'}</span><span>{formatCurrency(kontrakVolume)} {currentKontrak.satuan}</span>
                   <span className="text-slate-500">Nilai Penuh Unit:</span><span className="text-slate-700">{formatCurrency(nilaiUnitPenuh)}</span>
                   <span className="text-slate-500">Invoice ini:</span><span className="font-semibold">{formatCurrency(invoiceTotal)}{nilaiUnitPenuh > 0 ? ` (${Math.round(invoiceTotal / nilaiUnitPenuh * 100)}%)` : ''}</span>
+                  {isPayungBA && linkedBA && (
+                    <>
+                      <span className="text-slate-500">Berita Acara:</span>
+                      <span className="font-medium text-brand-600">{linkedBA}</span>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -8,6 +8,7 @@ from typing import List
 import models
 from database import get_db, SessionLocal
 from services.cache import api_cache
+from services.ba_utils import is_payung_ba
 
 router = APIRouter(prefix="/api/laporan", tags=["Laporan"])
 
@@ -25,6 +26,8 @@ def _build_laporan_rows(db: Session):
     kontraks = db.query(models.Kontrak).options(
         joinedload(models.Kontrak.units),
         joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders),
+        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.berita_acara),
+        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders).joinedload(models.DeliveryOrder.berita_acara),
     ).all()
 
     rows = []
@@ -108,9 +111,19 @@ def _build_laporan_rows(db: Session):
         else:
             dpp_pokok = (k_harga_local * k_vol_local) + k_premi
 
-        # Unit: prioritas — DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen > Kontrak.units[0]
+        ba_ref = None
+        if do and getattr(do, "berita_acara", None):
+            ba_ref = do.berita_acara
+        elif inv and getattr(inv, "berita_acara", None):
+            ba_ref = inv.berita_acara
+
+        ba_date = ba_ref.tanggal_ba if ba_ref else None
+
+        # Unit: prioritas — BA.nama_unit > DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen
         unit_val = ""
-        if do and getattr(do, 'kepada_unit', None):
+        if ba_ref and getattr(ba_ref, "nama_unit", None):
+            unit_val = ba_ref.nama_unit
+        if not unit_val and do and getattr(do, 'kepada_unit', None):
             unit_val = do.kepada_unit
         if not unit_val and inv and getattr(inv, 'nama_unit', None):
             unit_val = inv.nama_unit
@@ -153,8 +166,18 @@ def _build_laporan_rows(db: Session):
             "Pelunasan": round(pelunasan_do),
             "Sisa_Pembayaran": sisa_pembayaran,
             "Sisa_Volume": sisa_volume,
-            "Bulan_Buku": get_bulan_buku(do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)),
-            "Rencana_Pengambilan": do.rencana_pengambilan.strftime("%Y-%m-%d") if do and getattr(do, 'rencana_pengambilan', None) else "",
+            "No_BA": ba_ref.no_ba if ba_ref else "",
+            "Tanggal_BA": ba_date.strftime("%Y-%m-%d") if ba_date else "",
+            "Bulan_Buku": get_bulan_buku(
+                ba_date if (is_payung_ba(k) and ba_date) else (
+                    do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)
+                )
+            ),
+            "Rencana_Pengambilan": (
+                ba_date.strftime("%Y-%m-%d") if (is_payung_ba(k) and ba_date) else (
+                    do.rencana_pengambilan.strftime("%Y-%m-%d") if do and getattr(do, 'rencana_pengambilan', None) else ""
+                )
+            ),
             "Superman": do.superman if do else "",
             "Kontrak_SAP": do.kontrak_sap if do else "",
             "SO_SAP": do.so_sap if do else "",

@@ -9,6 +9,7 @@ import {
   Zap,
   Archive,
   CloudUpload,
+  ClipboardList,
 } from 'lucide-react'
 import {
   CommandDialog,
@@ -25,6 +26,7 @@ const NAV_COMMANDS = [
   { label: 'Buat Kontrak', to: '/kontrak', icon: FileText, group: 'Menu' },
   { label: 'Cetak Invoice', to: '/invoice', icon: Receipt, group: 'Menu' },
   { label: 'Delivery Order', to: '/delivery-order', icon: Truck, group: 'Menu' },
+  { label: 'Berita Acara', to: '/berita-acara', icon: ClipboardList, group: 'Menu' },
   { label: 'Upload Dokumen', to: '/upload', icon: CloudUpload, group: 'Menu' },
   { label: 'Laporan Digital', to: '/laporan', icon: Table, group: 'Menu' },
   { label: 'Input Bypass', to: '/bypass', icon: Zap, group: 'Menu' },

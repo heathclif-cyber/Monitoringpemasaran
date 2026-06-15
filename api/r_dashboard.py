@@ -72,7 +72,9 @@ def get_dashboard_data(
         dos_pend = base_do_pend.options(
             joinedload(models.DeliveryOrder.invoice)
             .joinedload(models.Invoice.kontrak)
-            .joinedload(models.Kontrak.units)
+            .joinedload(models.Kontrak.units),
+            joinedload(models.DeliveryOrder.berita_acara),
+            joinedload(models.DeliveryOrder.invoice).joinedload(models.Invoice.berita_acara),
         ).all()
         for do in dos_pend:
             k = do.invoice.kontrak
@@ -81,7 +83,15 @@ def get_dashboard_data(
             k_nilai = float(k.nilai_transaksi or 0)
             if k_nilai <= 0: k_nilai = (k_vol * float(k.harga_satuan or 0)) + float(k.premi or 0)
             
-            pendapatan_do = k_nilai * (do_vol / k_vol) if k_vol > 0 else k_nilai
+            if str(getattr(k, "tipe_alur", "STANDAR")).upper() == "PAYUNG_BA" and k_vol <= 0:
+                from services.ba_utils import calculate_ba_pokok
+                pokok = calculate_ba_pokok(k, do_vol)
+                ppn = 0.0
+                if str(getattr(k, "is_ppn", "true")).lower() == "true":
+                    ppn = pokok * (float(k.ppn_persen or 0) / 100)
+                pendapatan_do = pokok + ppn
+            else:
+                pendapatan_do = k_nilai * (do_vol / k_vol) if k_vol > 0 else k_nilai
             
             satuan = (k.satuan or "Kg").lower()
             if satuan == "butir":
@@ -91,7 +101,14 @@ def get_dashboard_data(
             
             total_pendapatan += pendapatan_do
             
-            m = do.rencana_pengambilan.month if do.rencana_pengambilan else do.tanggal_do.month if do.tanggal_do else 1
+            ba_date = None
+            if str(getattr(k, "tipe_alur", "STANDAR")).upper() == "PAYUNG_BA":
+                ba_ref = do.berita_acara or do.invoice.berita_acara
+                ba_date = ba_ref.tanggal_ba if ba_ref else None
+            if ba_date:
+                m = ba_date.month
+            else:
+                m = do.rencana_pengambilan.month if do.rencana_pengambilan else do.tanggal_do.month if do.tanggal_do else 1
             pend_m[f"{m:02d}"] += pendapatan_do
 
             sk = f"{m:02d}"

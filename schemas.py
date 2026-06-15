@@ -79,6 +79,7 @@ class KontrakBase(BaseModel):
     syarat_syarat: Optional[str] = "a. Pembayaran dilaksanakan selambat-lambatnya 15 hari kalender setelah ditandatanganinya Kontrak penjualan\nb. Penyerahan barang dilaksanakan setelah diterima bukti transfer pembayaran\nc. Pengambilan barang selambat-lambatnya 15 hari kalender dari batas akhir tanggal pembayaran\nd. Biaya-biaya yang terkait dengan administrasi Bank menjadi beban pembeli"
     dasar_ketentuan: Optional[str] = "Mengacu kepada tata Cara dan Ketentuan Penjualan Komoditi Perkebunan PT Perkebunan Nusantara III (Persero)"
     lokasi: Optional[str] = "Makassar"
+    tipe_alur: Optional[str] = "STANDAR"
 
 class KontrakCreate(KontrakBase):
     units: Optional[List[KontrakUnitInput]] = []
@@ -101,6 +102,7 @@ class InvoiceBase(BaseModel):
     pph_22_persen: Optional[float] = 0.0
     jumlah_pembayaran: Optional[float] = None  # None = auto (full/unit value), set value = partial
     nama_unit: Optional[str] = None  # unit yang di-invoice; None = invoice kontrak keseluruhan
+    no_ba: Optional[str] = None  # wajib untuk kontrak PAYUNG_BA
 
 class InvoiceCreate(InvoiceBase):
     pass
@@ -109,6 +111,7 @@ class InvoiceOut(InvoiceBase):
     jumlah_pembayaran: float
     terbilang_invoice: Optional[str]
     nama_unit: Optional[str] = None
+    no_ba: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -123,6 +126,7 @@ class DeliveryOrderBase(BaseModel):
     nominal_transfer: Optional[float] = 0.0
     is_pph_disetor: Optional[str] = "false"
     rencana_pengambilan: Optional[date] = None
+    no_ba: Optional[str] = None
 
 class DeliveryOrderCreate(DeliveryOrderBase):
     pass
@@ -131,6 +135,27 @@ class DeliveryOrderOut(DeliveryOrderBase):
     selisih: float
     volume_do: Optional[float] = 0.0
 
+    class Config:
+        from_attributes = True
+
+
+class BeritaAcaraBase(BaseModel):
+    no_ba: str
+    no_kontrak: str
+    tanggal_ba: date
+    volume_ba: float = 0.0
+    nama_unit: Optional[str] = None
+    komoditi: Optional[str] = None
+    deskripsi: Optional[str] = None
+    link_berita_acara: Optional[str] = None
+    status: Optional[str] = "Draft"
+
+
+class BeritaAcaraCreate(BeritaAcaraBase):
+    pass
+
+
+class BeritaAcaraOut(BeritaAcaraBase):
     class Config:
         from_attributes = True
 

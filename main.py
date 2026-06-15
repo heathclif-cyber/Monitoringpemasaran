@@ -18,6 +18,7 @@ from api.r_do import router as do_router
 from api.r_dashboard import router as dashboard_router
 from api.r_laporan import router as laporan_router
 from api.r_documents import router as documents_router
+from api.r_ba import router as ba_router
 
 # --- App Initialization ---
 app = FastAPI(title="PTPN I - Sales Document Automation")
@@ -54,6 +55,7 @@ app.include_router(do_router)
 app.include_router(dashboard_router)
 app.include_router(laporan_router)
 app.include_router(documents_router)
+app.include_router(ba_router)
 
 
 # --- Root Page: serve React SPA or fallback to Jinja2 ---

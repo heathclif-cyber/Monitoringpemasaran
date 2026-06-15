@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { FileDown, RotateCcw, Save } from 'lucide-react'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useKontrakStore } from '@/store/kontrakStore'
+import { useBAStore } from '@/store/baStore'
 import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -156,6 +157,7 @@ const invoiceSchema = z.object({
   status_invoice: z.string().optional(),
   pph_22_persen: z.coerce.number().min(0),
   jumlah_pembayaran: z.coerce.number().min(0).optional(),
+  no_ba: z.string().optional(),
 })
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>
@@ -179,12 +181,15 @@ export default function InvoicePage() {
       status_invoice: 'Unpaid',
       pph_22_persen: 0,
       jumlah_pembayaran: 0,
+      no_ba: '',
     },
   })
 
   const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors, isSubmitting } } = form
   const selectedKontrak = watch('no_kontrak')
   const selectedUnit = watch('nama_unit')
+  const selectedBA = watch('no_ba')
+  const baStore = useBAStore()
 
   // Fetch kontrak list on mount
   useEffect(() => {
@@ -196,6 +201,7 @@ export default function InvoicePage() {
   useEffect(() => {
     if (selectedKontrak) {
       fetchKontrakForInvoice(selectedKontrak)
+      baStore.fetchAvailable(selectedKontrak)
     }
   }, [selectedKontrak])
 
@@ -209,6 +215,7 @@ export default function InvoicePage() {
       setExportNo(no)
       setValue('no_kontrak', data.no_kontrak)
       setValue('nama_unit', data.nama_unit || '')
+      setValue('no_ba', data.no_ba || '')
       setValue('tanggal_transaksi', data.tanggal_transaksi)
     } else {
       setIsExisting(false)
@@ -219,6 +226,7 @@ export default function InvoicePage() {
 
   // Pricing
   const k = currentKontrak
+  const isPayungBA = String(k?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
   const pricing = k
     ? calculateKontrakPricing(
         k.volume || 0, k.harga_satuan || 0, k.premi || 0,
@@ -286,6 +294,15 @@ export default function InvoicePage() {
       const payload: any = { ...data }
       // Kirim nama_unit hanya jika dipilih
       if (!data.nama_unit) delete payload.nama_unit
+      if (isPayungBA) {
+        if (!data.no_ba) {
+          addNotification('Kontrak payung wajib memilih Berita Acara', 'error')
+          return
+        }
+        payload.no_ba = data.no_ba
+      } else {
+        delete payload.no_ba
+      }
       // Kirim jumlah_pembayaran hanya jika user mengisinya (partial)
       if (data.jumlah_pembayaran && data.jumlah_pembayaran > 0) {
         payload.jumlah_pembayaran = data.jumlah_pembayaran
@@ -365,7 +382,23 @@ export default function InvoicePage() {
                 <Label className="text-xs">Tanggal Transaksi *</Label>
                 <Input type="date" {...register('tanggal_transaksi')} />
               </div>
-              {showUnitSelector && (
+              {isPayungBA && (
+                <div className="col-span-2">
+                  <Label className="text-xs">Berita Acara *</Label>
+                  <NativeSelect {...register('no_ba')}>
+                    <option value="">-- Pilih BA --</option>
+                    {baStore.available.map((b) => (
+                      <option key={b.no_ba} value={b.no_ba}>
+                        {b.no_ba} — {b.volume_ba?.toLocaleString('id-ID')} {k?.satuan || 'Kg'} ({b.tanggal_ba})
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Invoice payung wajib terhubung ke BA. Nilai dihitung proporsional volume BA.
+                  </p>
+                </div>
+              )}
+              {showUnitSelector && !isPayungBA && (
                 <div className="col-span-2">
                   <Label className="text-xs">Unit yang Diinvoice</Label>
                   <NativeSelect {...register('nama_unit')}>
@@ -397,6 +430,12 @@ export default function InvoicePage() {
                   <span>{formatCurrency(k.volume)} {k.satuan}</span>
                   <span className="text-slate-500">Nilai Kontrak:</span>
                   <span className="font-bold text-brand-600">{formatCurrency(kontrakMax)}</span>
+                  {isPayungBA && selectedBA && (
+                    <>
+                      <span className="text-slate-500">BA Dipilih:</span>
+                      <span className="font-medium text-brand-600">{selectedBA}</span>
+                    </>
+                  )}
                 </div>
 
                 {/* Progress bar */}

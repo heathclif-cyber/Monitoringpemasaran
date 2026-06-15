@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { KontrakPreview } from '@/components/feature/KontrakPreview'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
 import {
@@ -83,6 +84,7 @@ const kontrakSchema = z.object({
   catatan: z.string().optional(),
   syarat_syarat: z.string().optional(),
   dasar_ketentuan: z.string().optional(),
+  tipe_alur: z.string().optional(),
 })
 
 type KontrakFormData = z.infer<typeof kontrakSchema>
@@ -90,7 +92,6 @@ type KontrakFormData = z.infer<typeof kontrakSchema>
 export default function KontrakPage() {
   const store = useKontrakStore()
   const { addNotification } = useAppStore()
-  const [kontrakNo, setKontrakNo] = useState('')
   const [isExisting, setIsExisting] = useState(false)
   const [previewData, setPreviewData] = useState<Partial<KontrakFormData>>({})
   const [exportNo, setExportNo] = useState<string | null>(null)
@@ -106,6 +107,7 @@ export default function KontrakPage() {
       tanggal_kontrak: new Date().toISOString().split('T')[0],
       lokasi: 'Makassar',
       status: 'Draft',
+      tipe_alur: 'STANDAR',
       pembeli: '',
       nama_direktur: '',
       alamat_pembeli: '',
@@ -150,6 +152,7 @@ export default function KontrakPage() {
 
   // Watch all fields for live preview
   const watchedFields = watch()
+  const isPayungBA = String(watchedFields.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
 
   const pricing = calculateKontrakPricing(
     Number(watchedFields.volume) || 0,
@@ -163,18 +166,16 @@ export default function KontrakPage() {
 
   const jatuhTempo = calculateJatuhTempo(watchedFields.tanggal_kontrak || '', Number(watchedFields.lama_pembayaran_hari) || 15)
 
-  // Auto-load kontrak for edit
-  const autoLoadKontrak = useCallback(async () => {
-    const no = form.getValues('no_kontrak')
-    if (!no || no === kontrakNo) return
-    setKontrakNo(no)
+  const loadKontrakByNo = useCallback(async (no: string) => {
+    const trimmed = no?.trim()
+    if (!trimmed) return
 
-    const data = await store.fetchOne(no)
+    const data = await store.fetchOne(trimmed)
     if (data) {
       setIsExisting(true)
-      setExportNo(no)
+      setExportNo(trimmed)
       const fields: (keyof KontrakFormData)[] = [
-        'no_kontrak', 'tanggal_kontrak', 'lokasi', 'status', 'pembeli',
+        'no_kontrak', 'tanggal_kontrak', 'lokasi', 'status', 'tipe_alur', 'pembeli',
         'nama_direktur', 'alamat_pembeli', 'penjual', 'pemilik_komoditas',
         'no_reff', 'komoditi', 'jenis_komoditi', 'satuan', 'tahun_panen',
         'kebun_produsen', 'simbol', 'packaging', 'deskripsi_produk', 'mutu',
@@ -217,7 +218,25 @@ export default function KontrakPage() {
       setIsExisting(false)
       setExportNo(null)
     }
-  }, [form, kontrakNo, store])
+  }, [store, setValue])
+
+  const selectedNoKontrak = watch('no_kontrak')
+
+  useEffect(() => {
+    store.fetch()
+  }, [])
+
+  useEffect(() => {
+    const no = selectedNoKontrak?.trim()
+    if (!no) {
+      setIsExisting(false)
+      setExportNo(null)
+      return
+    }
+    if (store.data.some((k) => k.no_kontrak === no)) {
+      loadKontrakByNo(no)
+    }
+  }, [selectedNoKontrak, store.data, loadKontrakByNo])
 
   // Reset everything
   const handleReset = () => {
@@ -225,7 +244,6 @@ export default function KontrakPage() {
     setActiveStep(0)
     setIsExisting(false)
     setExportNo(null)
-    setKontrakNo('')
     setUnitList([{ nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])
   }
 
@@ -258,8 +276,10 @@ export default function KontrakPage() {
         if (first.tahun_panen) payload.tahun_panen = first.tahun_panen
         if (first.deskripsi_produk) payload.deskripsi_produk = first.deskripsi_produk
       }
-      // Jika semua unit punya volume > 0, derive total volume dari sum
-      if (validUnits.length > 0 && validUnits.every(u => (u.volume || 0) > 0)) {
+      if (String(data.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA') {
+        payload.volume = 0
+        payload.units = validUnits.map((u) => ({ ...u, volume: 0 }))
+      } else if (validUnits.length > 0 && validUnits.every(u => (u.volume || 0) > 0)) {
         payload.volume = validUnits.reduce((s, u) => s + (u.volume || 0), 0)
       }
 
@@ -285,11 +305,8 @@ export default function KontrakPage() {
   useEffect(() => {
     if (editNo) {
       setValue('no_kontrak', editNo)
-      // Trigger auto-load after a tick so form is ready
-      const t = setTimeout(() => autoLoadKontrak(), 100)
-      return () => clearTimeout(t)
     }
-  }, [editNo])
+  }, [editNo, setValue])
 
   // Regenerate syarat on lama/ambil change
   useEffect(() => {
@@ -309,7 +326,7 @@ export default function KontrakPage() {
       return trigger(['no_kontrak', 'tanggal_kontrak', 'pembeli'])
     }
     if (step === 2) {
-      return trigger(['volume', 'harga_satuan'])
+      return isPayungBA ? trigger(['harga_satuan']) : trigger(['volume', 'harga_satuan'])
     }
     return true
   }
@@ -339,12 +356,28 @@ export default function KontrakPage() {
               <CardTitle className="text-sm font-semibold">Data Dasar</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
-              <div>
+              <div className="col-span-2">
                 <Label className="text-xs">No Kontrak *</Label>
-                <Input {...register('no_kontrak')} placeholder="No Kontrak" list="kontrak-datalist" />
+                <Input
+                  {...register('no_kontrak')}
+                  placeholder="Ketik baru atau pilih dari daftar"
+                  list="kontrak-datalist"
+                  onBlur={(e) => {
+                    register('no_kontrak').onBlur(e)
+                    const no = e.target.value.trim()
+                    if (no) loadKontrakByNo(no)
+                  }}
+                />
                 <datalist id="kontrak-datalist">
-                  {store.data.map((k) => <option key={k.no_kontrak} value={k.no_kontrak} />)}
+                  {store.data.map((k) => (
+                    <option key={k.no_kontrak} value={k.no_kontrak}>
+                      {k.pembeli ? k.pembeli.split('\n')[0] : ''}
+                    </option>
+                  ))}
                 </datalist>
+                <p className="text-xs text-slate-400 mt-1">
+                  Pilih dari daftar → data terisi otomatis. Nomor baru → buat kontrak baru.
+                </p>
                 {errors.no_kontrak && <p className="text-xs text-red-500 mt-1">{errors.no_kontrak.message}</p>}
               </div>
               <div>
@@ -359,11 +392,20 @@ export default function KontrakPage() {
                 </NativeSelect>
               </div>
               <div>
+                <Label className="text-xs">Tipe Alur</Label>
+                <NativeSelect {...register('tipe_alur')}>
+                  <option value="STANDAR">Standar (Invoice → DO)</option>
+                  <option value="PAYUNG_BA">Payung + Berita Acara</option>
+                </NativeSelect>
+                {isPayungBA && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Kontrak payung tidak memuat volume — volume dicatat per Berita Acara saat barang dikirim.
+                  </p>
+                )}
+              </div>
+              <div>
                 <Label className="text-xs">Lokasi</Label>
                 <Input {...register('lokasi')}  />
-              </div>
-              <div className="self-end">
-                <Button type="button" variant="outline" size="sm" onClick={autoLoadKontrak}>Cari / Load</Button>
               </div>
             </CardContent>
           </Card>
@@ -518,6 +560,7 @@ export default function KontrakPage() {
                               placeholder="Nama unit..."
                             />
                           )}
+                          {!isPayungBA && (
                           <Input
                             type="number"
                             step="any"
@@ -530,6 +573,7 @@ export default function KontrakPage() {
                             className={`${sel} w-32 shrink-0`}
                             placeholder="Volume"
                           />
+                          )}
                           {unitList.length > 1 && (
                             <Button
                               type="button"
@@ -608,9 +652,10 @@ export default function KontrakPage() {
           <>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Harga & Volume</CardTitle>
+              <CardTitle className="text-sm font-semibold">{isPayungBA ? 'Harga Satuan' : 'Harga & Volume'}</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
+              {!isPayungBA && (
               <div>
                 <Label className="text-xs">Volume *</Label>
                 {(() => {
@@ -626,6 +671,7 @@ export default function KontrakPage() {
                   )
                 })()}
               </div>
+              )}
               <div>
                 <Label className="text-xs">Harga Satuan *</Label>
                 <Input type="number" step="any" {...register('harga_satuan')}  />

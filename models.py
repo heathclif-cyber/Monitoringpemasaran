@@ -57,6 +57,7 @@ class Kontrak(Base):
     syarat_syarat = Column(String, default="a. Pembayaran dilaksanakan selambat-lambatnya 15 hari kalender setelah ditandatanganinya Kontrak penjualan\nb. Penyerahan barang dilaksanakan setelah diterima bukti transfer pembayaran\nc. Pengambilan barang selambat-lambatnya 15 hari kalender dari batas akhir tanggal pembayaran\nd. Biaya-biaya yang terkait dengan administrasi Bank menjadi beban pembeli")
     dasar_ketentuan = Column(String, default="Mengacu kepada tata Cara dan Ketentuan Penjualan Komoditi Perkebunan PT Perkebunan Nusantara III (Persero)")
     lokasi = Column(String, default="Makassar")
+    tipe_alur = Column(String, default="STANDAR")  # STANDAR | PAYUNG_BA
     
     # Calculated Fields
     nilai_transaksi = Column(Float, default=0.0)
@@ -66,6 +67,7 @@ class Kontrak(Base):
     
     invoices = relationship("Invoice", back_populates="kontrak", cascade="all, delete-orphan")
     units = relationship("KontrakUnit", back_populates="kontrak", cascade="all, delete-orphan", order_by="KontrakUnit.urutan")
+    berita_acara = relationship("BeritaAcara", back_populates="kontrak", cascade="all, delete-orphan")
 
 class KontrakUnit(Base):
     __tablename__ = "kontrak_unit"
@@ -96,12 +98,14 @@ class Invoice(Base):
     pph_22_persen = Column(Float, default=0.0)
     
     nama_unit = Column(String, nullable=True)
+    no_ba = Column(String, ForeignKey("berita_acara.no_ba"), nullable=True)
 
     # Calculated Fields
     jumlah_pembayaran = Column(Float, default=0.0)
     terbilang_invoice = Column(String)
 
     kontrak = relationship("Kontrak", back_populates="invoices")
+    berita_acara = relationship("BeritaAcara", back_populates="invoice", foreign_keys=[no_ba])
     delivery_orders = relationship("DeliveryOrder", back_populates="invoice", cascade="all, delete-orphan")
 
 class DeliveryOrder(Base):
@@ -109,6 +113,7 @@ class DeliveryOrder(Base):
     
     no_do = Column(String, primary_key=True, index=True)
     no_invoice = Column(String, ForeignKey("invoice.no_invoice"))
+    no_ba = Column(String, ForeignKey("berita_acara.no_ba"), nullable=True)
     tanggal_do = Column(Date, nullable=False)
     kepada_unit = Column(String)
     alamat_unit = Column(String)
@@ -132,6 +137,26 @@ class DeliveryOrder(Base):
     volume_do = Column(Float, default=0.0)
     
     invoice = relationship("Invoice", back_populates="delivery_orders")
+    berita_acara = relationship("BeritaAcara", back_populates="delivery_orders", foreign_keys=[no_ba])
+
+
+class BeritaAcara(Base):
+    __tablename__ = "berita_acara"
+
+    no_ba = Column(String, primary_key=True, index=True)
+    no_kontrak = Column(String, ForeignKey("kontrak.no_kontrak", ondelete="CASCADE"), nullable=False)
+    tanggal_ba = Column(Date, nullable=False)
+    volume_ba = Column(Float, default=0.0)
+    nama_unit = Column(String, nullable=True)
+    komoditi = Column(String, nullable=True)
+    deskripsi = Column(String, nullable=True)
+    link_berita_acara = Column(String, nullable=True)
+    status = Column(String, default="Draft")  # Draft | Selesai | Ter-invoice
+
+    kontrak = relationship("Kontrak", back_populates="berita_acara")
+    invoice = relationship("Invoice", back_populates="berita_acara", foreign_keys="Invoice.no_ba", uselist=False)
+    delivery_orders = relationship("DeliveryOrder", back_populates="berita_acara", foreign_keys="DeliveryOrder.no_ba")
+
 
 class LaporanBypass(Base):
     __tablename__ = "laporan_bypass"

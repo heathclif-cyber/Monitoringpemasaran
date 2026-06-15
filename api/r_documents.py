@@ -19,7 +19,7 @@ from services.onedrive import (
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
-VALID_ENTITY_TYPES = {"kontrak", "invoice", "do", "bypass"}
+VALID_ENTITY_TYPES = {"kontrak", "invoice", "do", "bypass", "ba"}
 VALID_DOC_TYPES = {"kontrak", "invoice", "kuitansi", "do", "deklarasi", "berita_acara"}
 
 DOC_TYPE_LABELS = {
@@ -36,6 +36,7 @@ ENTITY_DOC_REQUIREMENTS: dict[str, list[str]] = {
     "invoice": ["invoice", "kuitansi"],
     "do": ["do", "deklarasi", "berita_acara"],
     "bypass": ["deklarasi"],
+    "ba": ["berita_acara"],
 }
 
 
@@ -56,6 +57,9 @@ def _validate_entity(db: Session, entity_type: str, entity_id: str) -> None:
             raise HTTPException(status_code=400, detail="ID bypass tidak valid") from exc
         if not db.query(models.LaporanBypass).filter(models.LaporanBypass.id == bypass_id).first():
             raise HTTPException(status_code=404, detail="Data bypass tidak ditemukan")
+    elif entity_type == "ba":
+        if not db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == entity_id).first():
+            raise HTTPException(status_code=404, detail="Berita Acara tidak ditemukan")
 
 
 def _build_slots(db: Session, entity_type: str, entity_id: str) -> list[schemas.DocumentSlotOut]:
@@ -201,6 +205,10 @@ def _sync_entity_link(
         rec = db.query(models.LaporanBypass).filter(models.LaporanBypass.id == bypass_id).first()
         if rec:
             rec.link_deklarasi_penerimaan = web_url
+    elif entity_type == "ba" and doc_type == "berita_acara":
+        ba = db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == entity_id).first()
+        if ba:
+            ba.link_berita_acara = web_url
 
 
 @router.get("/status")
@@ -336,6 +344,22 @@ def list_references(
                     sublabel=row.no_invoice,
                 )
             )
+    elif entity_type == "ba":
+        query = db.query(models.BeritaAcara).order_by(models.BeritaAcara.tanggal_ba.desc())
+        if term:
+            query = query.filter(
+                (models.BeritaAcara.no_ba.ilike(term))
+                | (models.BeritaAcara.no_kontrak.ilike(term))
+            )
+        for row in query.limit(limit).all():
+            results.append(
+                schemas.DocumentReferenceOut(
+                    entity_type="ba",
+                    entity_id=row.no_ba,
+                    label=row.no_ba,
+                    sublabel=row.no_kontrak,
+                )
+            )
     else:
         query = db.query(models.LaporanBypass).order_by(models.LaporanBypass.tanggal.desc())
         if term:
@@ -389,6 +413,9 @@ def document_completeness(
         row = db.query(models.LaporanBypass).filter(models.LaporanBypass.id == int(entity_id)).first()
         display_label = f"BYPASS-{entity_id}"
         sublabel = f"{row.unit or '-'} · {row.komoditi or '-'}" if row else None
+    elif entity_type == "ba":
+        row = db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == entity_id).first()
+        sublabel = row.no_kontrak if row else None
 
     return _completeness_for_entity(
         db,
