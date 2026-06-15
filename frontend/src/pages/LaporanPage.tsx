@@ -236,41 +236,41 @@ export default function LaporanPage() {
             <EmptyState title="Tidak ada data laporan" />
           ) : (
             <div className="overflow-auto max-h-[70vh]">
-              <table className="text-xs" style={{ minWidth: '3600px' }}>
-                <thead>
-                  <tr className="border-b bg-muted/50 text-xs font-medium text-muted-foreground sticky top-0 z-10">
-                    <th className="text-left px-3 py-2">No. DO</th>
-                    <th className="text-left px-3 py-2">No Invoice</th>
-                    <th className="text-left px-3 py-2">No Kontrak</th>
-                    <th className="text-left px-3 py-2">Unit</th>
-                    <th className="text-left px-3 py-2">Komoditi</th>
-                    <th className="text-center px-3 py-2">Satuan</th>
-                    <th className="text-left px-3 py-2">Billing Date</th>
-                    <th className="text-left px-3 py-2">Tgl Transfer</th>
-                    <th className="text-right px-3 py-2">Jumlah Transfer</th>
-                    <th className="text-right px-3 py-2">Pelunasan (Inc. PPh)</th>
-                    <th className="text-left px-3 py-2">Mitra Pembeli</th>
-                    <th className="text-left px-3 py-2">Jenis Komoditi/Material</th>
-                    <th className="text-right px-3 py-2">Jml Invoice</th>
-                    <th className="text-right px-3 py-2">Harga Satuan</th>
-                    <th className="text-right px-3 py-2">Jumlah DO</th>
-                    <th className="text-right px-3 py-2">Pendapatan Pokok</th>
-                    <th className="text-right px-3 py-2">Pendapatan Setelah PPN</th>
-                    <th className="text-right px-3 py-2">Pajak PPN</th>
-                    <th className="text-right px-3 py-2">PPh</th>
-                    <th className="text-center px-3 py-2">PPh Setor?</th>
-                    <th className="text-right px-3 py-2">Kewajiban (Gross)</th>
-                    <th className="text-right px-3 py-2">Sisa Bayar</th>
-                    <th className="text-right px-3 py-2">Sisa Volume</th>
-                    <th className="text-left px-3 py-2">Bulan Buku</th>
-                    <th className="text-left px-3 py-2">Superman</th>
-                    <th className="text-left px-3 py-2">Kontrak SAP</th>
-                    <th className="text-left px-3 py-2">SO SAP</th>
-                    <th className="text-left px-3 py-2">DO SAP</th>
-                    <th className="text-left px-3 py-2">Billing</th>
-                    <th className="text-left px-3 py-2">Link Deklarasi</th>
-                    <th className="text-left px-3 py-2">Berita Acara</th>
-                    <th className="text-center px-3 py-2">Aksi</th>
+              <table className="text-xs border-separate border-spacing-0" style={{ minWidth: '3600px' }}>
+                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_th]:px-3 [&_th]:py-2 [&_th]:border-b [&_th]:border-border">
+                  <tr className="text-xs font-medium text-muted-foreground">
+                    <th className="text-left">No. DO</th>
+                    <th className="text-left">No Invoice</th>
+                    <th className="text-left">No Kontrak</th>
+                    <th className="text-left">Unit</th>
+                    <th className="text-left">Komoditi</th>
+                    <th className="text-center">Satuan</th>
+                    <th className="text-left">Billing Date</th>
+                    <th className="text-left">Tgl Transfer</th>
+                    <th className="text-right">Jumlah Transfer</th>
+                    <th className="text-right">Pelunasan (Inc. PPh)</th>
+                    <th className="text-left">Mitra Pembeli</th>
+                    <th className="text-left">Jenis Komoditi/Material</th>
+                    <th className="text-right">Jml Invoice</th>
+                    <th className="text-right">Harga Satuan</th>
+                    <th className="text-right">Jumlah DO</th>
+                    <th className="text-right">Pendapatan Pokok</th>
+                    <th className="text-right">Pendapatan Setelah PPN</th>
+                    <th className="text-right">Pajak PPN</th>
+                    <th className="text-right">PPh</th>
+                    <th className="text-center">PPh Setor?</th>
+                    <th className="text-right">Kewajiban (Gross)</th>
+                    <th className="text-right">Sisa Bayar</th>
+                    <th className="text-right">Sisa Volume</th>
+                    <th className="text-left">Bulan Buku</th>
+                    <th className="text-left">Superman</th>
+                    <th className="text-left">Kontrak SAP</th>
+                    <th className="text-left">SO SAP</th>
+                    <th className="text-left">DO SAP</th>
+                    <th className="text-left">Billing</th>
+                    <th className="text-left">Link Deklarasi</th>
+                    <th className="text-left">Berita Acara</th>
+                    <th className="text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
