@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton'
 import { Toast } from '@/components/common/Toast'
+import { CommandPalette } from '@/components/common/CommandPalette'
 
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const KontrakPage = lazy(() => import('@/pages/KontrakPage'))
@@ -33,6 +34,7 @@ export default function App() {
         </Route>
       </Routes>
       <Toast />
+      <CommandPalette />
     </Suspense>
   )
 }

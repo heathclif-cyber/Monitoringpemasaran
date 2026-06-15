@@ -3,12 +3,15 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Save, FileDown, RotateCcw, Eye, AlertTriangle, CheckCircle } from 'lucide-react'
+import { FileDown, RotateCcw, Save } from 'lucide-react'
 import { useDOStore } from '@/store/doStore'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
+import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency } from '@/lib/utils'
@@ -243,10 +246,8 @@ export default function DOPage() {
     }
   }, [editNo])
 
-  const ic = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm w-full focus:outline-none focus:ring-1 focus:ring-ring'
-
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <Card>
@@ -269,7 +270,7 @@ export default function DOPage() {
               </div>
               <div>
                 <Label className="text-xs">No DO *</Label>
-                <input {...register('no_do')} className={ic} list="do-datalist" />
+                <Input {...register('no_do')} list="do-datalist" />
                 <datalist id="do-datalist">
                   {doStore.data.map((d) => <option key={d.no_do} value={d.no_do} />)}
                 </datalist>
@@ -279,23 +280,23 @@ export default function DOPage() {
               </div>
               <div>
                 <Label className="text-xs">Tanggal DO *</Label>
-                <input type="date" {...register('tanggal_do')} className={ic} />
+                <Input type="date" {...register('tanggal_do')} />
               </div>
               <div>
                 <Label className="text-xs">Kepada Unit</Label>
                 {currentInvoice?.nama_unit ? (
                   <div>
-                    <input {...register('kepada_unit')} className={`${ic} bg-slate-50`} readOnly />
+                    <Input {...register('kepada_unit')} className="bg-slate-50" readOnly />
                     <p className="text-xs text-slate-400 mt-1">Otomatis dari invoice (unit {currentInvoice.nama_unit})</p>
                   </div>
                 ) : (
                   <div>
-                    <select {...register('kepada_unit')} className={ic}>
+                    <NativeSelect {...register('kepada_unit')}>
                       <option value="">-- Pilih Unit --</option>
                       {['Minahasa-Halmahera','Beteleme','Awaya-Telpaputih','Takalar','Camming','Kabaru'].map(u => (
                         <option key={u} value={u}>{u}</option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </div>
                 )}
               </div>
@@ -309,22 +310,22 @@ export default function DOPage() {
             <CardContent className="grid grid-cols-3 gap-4">
               <div>
                 <Label className="text-xs">Tanggal Pembayaran</Label>
-                <input type="date" {...register('tanggal_pembayaran')} className={ic} />
+                <Input type="date" {...register('tanggal_pembayaran')} />
               </div>
               <div>
                 <Label className="text-xs">Nominal Transfer</Label>
-                <input type="number" step="any" {...register('nominal_transfer')} className={ic} />
+                <Input type="number" step="any" {...register('nominal_transfer')} />
               </div>
               <div>
                 <Label className="text-xs">Rencana Pengambilan</Label>
-                <input type="date" {...register('rencana_pengambilan')} className={ic} />
+                <Input type="date" {...register('rencana_pengambilan')} />
               </div>
               <div>
                 <Label className="text-xs">PPh Disetor</Label>
-                <select {...register('is_pph_disetor')} className={ic}>
+                <NativeSelect {...register('is_pph_disetor')}>
                   <option value="false">Belum</option>
                   <option value="true">Sudah</option>
-                </select>
+                </NativeSelect>
               </div>
               <div>
                 <Label className="text-xs">Volume Dapat Diambil</Label>
@@ -339,8 +340,7 @@ export default function DOPage() {
             </CardContent>
           </Card>
 
-          {/* Invoice & Kontrak Summary */}
-          {currentInvoice && currentKontrak && (
+          {currentInvoice && currentKontrak ? (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold">Data Riwayat Invoice & Kontrak</CardTitle>
@@ -359,9 +359,15 @@ export default function DOPage() {
                 </div>
               </CardContent>
             </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Pilih No Invoice untuk melihat ringkasan kontrak dan invoice.
+              </CardContent>
+            </Card>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={isSubmitting} className="gap-2">
               <Save size={14} />
               {isSubmitting ? 'Menyimpan...' : isExisting ? 'Simpan Perubahan' : 'Terbitkan DO'}
@@ -378,35 +384,22 @@ export default function DOPage() {
         </form>
       </div>
 
-      {/* Preview — exact format from forms.js buildDOPreview() */}
-      <div className="w-[600px] shrink-0">
-        <div className="sticky top-[76px] max-h-[calc(100vh-100px)] overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-800">Preview Delivery Order</span>
-            <Eye size={14} className="text-slate-400" />
-          </div>
-          <div className="p-2.5">
-            {!currentInvoice && !currentKontrak ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Eye size={32} className="text-slate-300 mb-3" />
-                <p className="text-sm text-slate-500 font-medium">Belum ada data</p>
-                <p className="text-xs text-slate-400 mt-1">Pilih No Invoice untuk melihat preview</p>
-              </div>
-            ) : (
-              <DOPreviewContent
-                noDo={watch('no_do') || '[No DO]'}
-                noInv={selectedInvoice || '[No Invoice]'}
-                tgl={watch('tanggal_do') || ''}
-                unit={watch('kepada_unit') || '-'}
-                k={currentKontrak || {}}
-                nilaiPenuh={nilaiUnitPenuh}
-                nominal={Number(nominalTransfer) || 0}
-                kontrakVol={kontrakVolume}
-              />
-            )}
-          </div>
-        </div>
-      </div>
+      <PreviewPanel
+        title="Preview Delivery Order"
+        isEmpty={!currentInvoice && !currentKontrak}
+        emptyDescription="Pilih No Invoice untuk melihat preview"
+      >
+        <DOPreviewContent
+          noDo={watch('no_do') || '[No DO]'}
+          noInv={selectedInvoice || '[No Invoice]'}
+          tgl={watch('tanggal_do') || ''}
+          unit={watch('kepada_unit') || '-'}
+          k={currentKontrak || {}}
+          nilaiPenuh={nilaiUnitPenuh}
+          nominal={Number(nominalTransfer) || 0}
+          kontrakVol={kontrakVolume}
+        />
+      </PreviewPanel>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, FileDown, Trash2, Search, Eye } from 'lucide-react'
+import { Edit, FileDown, Trash2, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useDOStore } from '@/store/doStore'
 import { useAppStore } from '@/store/appStore'
@@ -10,6 +10,9 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DocxPreview } from '@/components/common/DocxPreview'
+import { SearchInput } from '@/components/common/SearchInput'
+import { FilterBar, FilterSelect } from '@/components/common/FilterBar'
+import { DataTable } from '@/components/common/DataTable'
 import { formatDate, safe } from '@/lib/utils'
 import type { DeliveryOrder } from '@/types'
 
@@ -73,75 +76,59 @@ export default function RepoDO() {
     setDeleteTarget(null)
   }
 
-  const handlePreview = (item: DeliveryOrder) => {
-    setPreviewDO(item)
-    setPreviewOpen(true)
-  }
-
-  const selCls = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-xs shadow-sm'
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input placeholder="Cari..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 pl-9 pr-3 rounded-md border border-input bg-white text-sm shadow-sm w-full" />
-        </div>
-        <select value={bulan} onChange={(e) => setBulan(e.target.value)} className={selCls}>
-          <option value="ALL">Semua Bulan</option>
-          {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
-        <select value={unit} onChange={(e) => setUnit(e.target.value)} className={selCls}>
-          <option value="ALL">Semua Unit</option>
-          {units.map((u) => u && <option key={u} value={u!}>{u}</option>)}
-        </select>
-        <select value={sort} onChange={(e) => setSort(e.target.value as 'DESC' | 'ASC')} className={selCls}>
-          <option value="DESC">Terbaru ke Terlama</option>
-          <option value="ASC">Terlama ke Terbaru</option>
-        </select>
-      </div>
+      <FilterBar>
+        <SearchInput value={search} onChange={setSearch} placeholder="Cari no DO, invoice..." />
+        <FilterSelect value={bulan} onChange={setBulan} options={[{ value: 'ALL', label: 'Semua Bulan' }, ...months]} />
+        <FilterSelect
+          value={unit}
+          onChange={setUnit}
+          options={[{ value: 'ALL', label: 'Semua Unit' }, ...units.filter(Boolean).map((u) => ({ value: u!, label: u! }))]}
+        />
+        <FilterSelect
+          value={sort}
+          onChange={(v) => setSort(v as 'DESC' | 'ASC')}
+          options={[
+            { value: 'DESC', label: 'Terbaru ke Terlama' },
+            { value: 'ASC', label: 'Terlama ke Terbaru' },
+          ]}
+        />
+      </FilterBar>
 
-      <Card>
+      <Card className="border-slate-200/80">
         <CardContent className="p-0">
           {store.isLoading ? <TableSkeleton rows={5} cols={5} /> : filtered.length === 0 ? (
             <EmptyState title="Belum ada data DO" />
           ) : (
-            <div className="overflow-auto max-h-[65vh]">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-gray-500 text-xs uppercase tracking-wide sticky top-0 z-10">
-                    <th className="text-left px-3 py-2">No DO</th>
-                    <th className="text-left px-3 py-2">No Invoice</th>
-                    <th className="text-left px-3 py-2">Tanggal DO</th>
-                    <th className="text-left px-3 py-2">Unit Tujuan</th>
-                    <th className="text-center px-3 py-2">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filtered.map((item) => (
-                    <tr key={item.no_do} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-3 py-2.5 font-medium">{item.no_do}</td>
-                      <td className="px-3 py-2.5 text-slate-600">{item.no_invoice}</td>
-                      <td className="px-3 py-2.5 text-slate-600">{formatDate(item.tanggal_do)}</td>
-                      <td className="px-3 py-2.5">{safe(item.kepada_unit)}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex gap-1 justify-center">
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600" onClick={() => navigate(`/delivery-order?edit=${item.no_do}`)}>
-                            <Edit size={14} />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handlePreview(item)}>
-                            <Eye size={14} />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => setDeleteTarget(item.no_do)}>
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              data={filtered}
+              keyExtractor={(item) => item.no_do}
+              columns={[
+                { key: 'no', header: 'No DO', render: (item) => <span className="font-medium">{item.no_do}</span> },
+                { key: 'inv', header: 'No Invoice', render: (item) => <span className="text-slate-600">{item.no_invoice}</span> },
+                { key: 'tgl', header: 'Tanggal DO', render: (item) => formatDate(item.tanggal_do) },
+                { key: 'unit', header: 'Unit Tujuan', render: (item) => safe(item.kepada_unit) },
+                {
+                  key: 'aksi',
+                  header: 'Aksi',
+                  align: 'center',
+                  render: (item) => (
+                    <div className="flex gap-0.5 justify-center">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => navigate(`/delivery-order?edit=${item.no_do}`)}>
+                        <Edit size={14} />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => { setPreviewDO(item); setPreviewOpen(true) }}>
+                        <Eye size={14} />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(item.no_do)}>
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+            />
           )}
         </CardContent>
       </Card>
@@ -160,18 +147,17 @@ export default function RepoDO() {
         <DialogContent className="max-w-[750px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
-              <Eye size={16} className="text-blue-600" />
+              <Eye size={16} className="text-primary" />
               Preview Delivery Order
             </DialogTitle>
           </DialogHeader>
-
           {previewDO && (
             <>
               <div className="border rounded-lg bg-white overflow-hidden">
                 <DocxPreview url={`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`} />
               </div>
               <div className="flex justify-end">
-                <a href={`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`} target="_blank">
+                <a href={`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`} target="_blank" rel="noreferrer">
                   <Button variant="secondary" className="gap-2">
                     <FileDown size={14} />
                     Download DO .docx

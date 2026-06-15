@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Download, Search } from 'lucide-react'
+import { RefreshCw, Download } from 'lucide-react'
 import { useLaporanStore } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { StatCard } from '@/components/common/StatCard'
+import { SearchInput } from '@/components/common/SearchInput'
+import { MultiSelectFilter } from '@/components/common/MultiSelectFilter'
+import { FilterSelect } from '@/components/common/FilterBar'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
@@ -20,6 +23,8 @@ import type { LaporanRow } from '@/types'
 import * as XLSX from 'xlsx'
 
 const MONTHS_ID = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
+const MONTH_LABELS = Object.fromEntries(MONTH_OPTIONS.map((m, i) => [m, MONTHS_ID[i + 1]]))
 
 export default function LaporanPage() {
   const { rows, isLoading, fetch, updateSapField, deleteBypass } = useLaporanStore()
@@ -27,11 +32,6 @@ export default function LaporanPage() {
   const [filters, setFilters] = useState<LaporanFilters>(DEFAULT_LAPORAN_FILTERS)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
-  const [showMonths, setShowMonths] = useState(false)
-  const [showUnits, setShowUnits] = useState(false)
-  const [showPembelis, setShowPembelis] = useState(false)
-  const [showKomoditis, setShowKomoditis] = useState(false)
-  const [showJenisKomoditis, setShowJenisKomoditis] = useState(false)
 
   useEffect(() => { fetch() }, [])
 
@@ -87,55 +87,15 @@ export default function LaporanPage() {
     XLSX.writeFile(wb, 'Laporan_Digital.xlsx')
   }
 
-  const handleToggleAllMonths = () => {
-    if (filters.months.length === 12) {
-      setFilters((f) => ({ ...f, months: [] }))
-    } else {
-      setFilters((f) => ({
-        ...f,
-        months: Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')),
-      }))
-    }
-  }
-
-  const handleToggleMonth = (m: string) => {
-    setFilters((f) => ({
-      ...f,
-      months: f.months.includes(m) ? f.months.filter((x) => x !== m) : [...f.months, m],
-    }))
-  }
-
-  const handleToggle = (key: 'unit' | 'pembeli' | 'komoditi' | 'jenisKomoditi', val: string) => {
-    setFilters((f) => ({
-      ...f,
-      [key]: (f[key] as string[]).includes(val)
-        ? (f[key] as string[]).filter((x) => x !== val)
-        : [...(f[key] as string[]), val],
-    }))
-  }
-
-  const handleToggleAll = (key: 'unit' | 'pembeli' | 'komoditi' | 'jenisKomoditi', options: string[]) => {
-    setFilters((f) => ({
-      ...f,
-      [key]: (f[key] as string[]).length === options.length ? [] : [...options],
-    }))
-  }
-
-  const selCls = 'h-9 rounded-md border border-input bg-white px-2 py-1 text-xs shadow-sm'
-
   return (
     <div className="space-y-6">
-      {/* Action buttons */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold text-slate-900">Rekapitulasi Laporan Terintegrasi</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetch} className="gap-1">
-            <RefreshCw size={14} /> Refresh
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleExportExcel} className="gap-1">
-            <Download size={14} /> Export Excel
-          </Button>
-        </div>
+      <div className="flex justify-end gap-2 -mt-2 mb-2">
+        <Button variant="outline" size="sm" onClick={fetch} className="gap-1">
+          <RefreshCw size={14} /> Refresh
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleExportExcel} className="gap-1">
+          <Download size={14} /> Export Excel
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -163,171 +123,107 @@ export default function LaporanPage() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4 space-y-3">
-          {/* Search bar — full width */}
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-              placeholder="Cari No DO, No Invoice, No Kontrak, Pembeli, SAP..."
-              className="h-9 w-full rounded-md border border-input bg-white pl-9 pr-8 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          <SearchInput
+            value={filters.search}
+            onChange={(v) => setFilters((f) => ({ ...f, search: v }))}
+            placeholder="Cari No DO, No Invoice, No Kontrak, Pembeli, SAP..."
+            className="max-w-none w-full"
+          />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            <MultiSelectFilter
+              label="Unit"
+              allLabel="Semua Unit"
+              options={units}
+              selected={filters.unit}
+              onChange={(unit) => setFilters((f) => ({ ...f, unit }))}
+              className="w-full"
             />
-            {filters.search && (
-              <button
-                onClick={() => setFilters((f) => ({ ...f, search: '' }))}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-base leading-none"
-              >
-                ×
-              </button>
-            )}
-          </div>
-          {/* Dropdown filters — grid 4 kolom */}
-          <div className="grid grid-cols-4 gap-2">
-            {/* Unit multi-select */}
-            <div className="relative">
-              <button type="button" onClick={() => { setShowUnits(!showUnits); setShowPembelis(false); setShowKomoditis(false); setShowJenisKomoditis(false) }} className={`${selCls} w-full text-left truncate`}>
-                {filters.unit.length === 0 ? 'Semua Unit' : filters.unit.length === 1 ? filters.unit[0] : `${filters.unit.length} Unit Terpilih`}
-              </button>
-              {showUnits && (
-                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-56 max-h-60 overflow-y-auto" onMouseLeave={() => setShowUnits(false)}>
-                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer font-medium">
-                    <input type="checkbox" checked={filters.unit.length === units.length && units.length > 0} onChange={() => handleToggleAll('unit', units)} />
-                    Pilih Semua
-                  </label>
-                  <hr className="my-1" />
-                  {units.map((u) => (
-                    <label key={u} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
-                      <input type="checkbox" checked={filters.unit.includes(u)} onChange={() => handleToggle('unit', u)} />
-                      {u}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Pembeli multi-select */}
-            <div className="relative">
-              <button type="button" onClick={() => { setShowPembelis(!showPembelis); setShowUnits(false); setShowKomoditis(false); setShowJenisKomoditis(false) }} className={`${selCls} w-full text-left truncate`}>
-                {filters.pembeli.length === 0 ? 'Semua Pembeli' : filters.pembeli.length === 1 ? filters.pembeli[0] : `${filters.pembeli.length} Pembeli Terpilih`}
-              </button>
-              {showPembelis && (
-                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-64 max-h-60 overflow-y-auto" onMouseLeave={() => setShowPembelis(false)}>
-                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer font-medium">
-                    <input type="checkbox" checked={filters.pembeli.length === pembelis.length && pembelis.length > 0} onChange={() => handleToggleAll('pembeli', pembelis)} />
-                    Pilih Semua
-                  </label>
-                  <hr className="my-1" />
-                  {pembelis.map((p) => (
-                    <label key={p} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
-                      <input type="checkbox" checked={filters.pembeli.includes(p)} onChange={() => handleToggle('pembeli', p)} />
-                      {p}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Komoditi multi-select */}
-            <div className="relative">
-              <button type="button" onClick={() => { setShowKomoditis(!showKomoditis); setShowUnits(false); setShowPembelis(false); setShowJenisKomoditis(false) }} className={`${selCls} w-full text-left truncate`}>
-                {filters.komoditi.length === 0 ? 'Semua Komoditi' : filters.komoditi.length === 1 ? filters.komoditi[0] : `${filters.komoditi.length} Komoditi Terpilih`}
-              </button>
-              {showKomoditis && (
-                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-48 max-h-60 overflow-y-auto" onMouseLeave={() => setShowKomoditis(false)}>
-                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer font-medium">
-                    <input type="checkbox" checked={filters.komoditi.length === komoditas.length && komoditas.length > 0} onChange={() => handleToggleAll('komoditi', komoditas)} />
-                    Pilih Semua
-                  </label>
-                  <hr className="my-1" />
-                  {komoditas.map((k) => (
-                    <label key={k} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
-                      <input type="checkbox" checked={filters.komoditi.includes(k)} onChange={() => handleToggle('komoditi', k)} />
-                      {k}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Jenis Komoditi/Material multi-select */}
-            <div className="relative">
-              <button type="button" onClick={() => { setShowJenisKomoditis(!showJenisKomoditis); setShowUnits(false); setShowPembelis(false); setShowKomoditis(false) }} className={`${selCls} w-full text-left truncate`}>
-                {filters.jenisKomoditi.length === 0 ? 'Semua Jenis Material' : filters.jenisKomoditi.length === 1 ? filters.jenisKomoditi[0] : `${filters.jenisKomoditi.length} Material Terpilih`}
-              </button>
-              {showJenisKomoditis && (
-                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-64 max-h-60 overflow-y-auto" onMouseLeave={() => setShowJenisKomoditis(false)}>
-                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer font-medium">
-                    <input type="checkbox" checked={filters.jenisKomoditi.length === jenisKomoditas.length && jenisKomoditas.length > 0} onChange={() => handleToggleAll('jenisKomoditi', jenisKomoditas)} />
-                    Pilih Semua
-                  </label>
-                  <hr className="my-1" />
-                  {jenisKomoditas.map((j) => (
-                    <label key={j} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
-                      <input type="checkbox" checked={filters.jenisKomoditi.includes(j)} onChange={() => handleToggle('jenisKomoditi', j)} />
-                      {j}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <select value={filters.modeTanggal} onChange={(e) => setFilters((f) => ({ ...f, modeTanggal: e.target.value as 'TRANSFER' | 'RENCANA' }))} className={selCls}>
-              <option value="TRANSFER">Berdasarkan Tgl Transfer</option>
-              <option value="RENCANA">Berdasarkan Rencana Ambil</option>
-            </select>
-            {/* Month multi-select */}
-            <div className="relative">
-              <button type="button" onClick={() => setShowMonths(!showMonths)} className={`${selCls} w-full text-left`}>
-                {filters.months.length === 0 ? 'Semua Bulan' : filters.months.length === 1 ? MONTHS_ID[parseInt(filters.months[0])] : `${filters.months.length} Bulan Terpilih`}
-              </button>
-              {showMonths && (
-                <div className="absolute z-20 mt-1 bg-white border rounded-md shadow-lg p-2 w-48 max-h-60 overflow-y-auto"
-                  onMouseLeave={() => setShowMonths(false)}
-                  onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setShowMonths(false) }}>
-                  <label className="flex items-center gap-2 text-xs py-1 cursor-pointer">
-                    <input type="checkbox" checked={filters.months.length === 12} onChange={handleToggleAllMonths} />
-                    Pilih Semua
-                  </label>
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const m = String(i + 1).padStart(2, '0')
-                    return (
-                      <label key={m} className="flex items-center gap-2 text-xs py-1 cursor-pointer">
-                        <input type="checkbox" checked={filters.months.includes(m)} onChange={() => handleToggleMonth(m)} />
-                        {MONTHS_ID[i + 1]}
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-            <select value={filters.sort} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as 'DESC' | 'ASC' }))} className={selCls}>
-              <option value="DESC">Terbaru ke Terlama</option>
-              <option value="ASC">Terlama ke Terbaru</option>
-            </select>
-            <select value={filters.tipe} onChange={(e) => setFilters((f) => ({ ...f, tipe: e.target.value as 'ALL' | 'NO_BYPASS' | 'ONLY_BYPASS' }))} className={selCls}>
-              <option value="ALL">Semua Data</option>
-              <option value="NO_BYPASS">Sembunyikan Bypass</option>
-              <option value="ONLY_BYPASS">Hanya Bypass</option>
-            </select>
-
-            <select value={filters.sap} onChange={(e) => setFilters((f) => ({ ...f, sap: e.target.value }))} className={selCls}>
-              <option value="ALL">Semua Status SAP</option>
-              <option value="MISSING_SAP">Belum Lengkap</option>
-              <option value="NO_KONTRAK_SAP">Tanpa Kontrak SAP</option>
-              <option value="NO_SO_SAP">Tanpa SO SAP</option>
-              <option value="NO_DO_SAP">Tanpa DO SAP</option>
-              <option value="NO_BILLING_SAP">Tanpa Billing SAP</option>
-              <option value="ALL_COMPLETE">Sudah Lengkap</option>
-            </select>
-            <select value={filters.statusBayar} onChange={(e) => setFilters((f) => ({ ...f, statusBayar: e.target.value }))} className={selCls}>
-              <option value="ALL">Semua Status Bayar</option>
-              <option value="BELUM">Belum Bayar</option>
-              <option value="SEBAGIAN">Pembayaran Sebagian</option>
-              <option value="LUNAS">Pembayaran Penuh / Lunas</option>
-            </select>
-            <div className="flex items-center">
-              <Button variant="outline" size="sm" onClick={() => setFilters(DEFAULT_LAPORAN_FILTERS)} className="w-full">
-                Reset Filter
-              </Button>
-            </div>
+            <MultiSelectFilter
+              label="Pembeli"
+              allLabel="Semua Pembeli"
+              options={pembelis}
+              selected={filters.pembeli}
+              onChange={(pembeli) => setFilters((f) => ({ ...f, pembeli }))}
+              className="w-full"
+              contentWidth="w-64"
+            />
+            <MultiSelectFilter
+              label="Komoditi"
+              allLabel="Semua Komoditi"
+              options={komoditas}
+              selected={filters.komoditi}
+              onChange={(komoditi) => setFilters((f) => ({ ...f, komoditi }))}
+              className="w-full"
+            />
+            <MultiSelectFilter
+              label="Material"
+              allLabel="Semua Jenis Material"
+              options={jenisKomoditas}
+              selected={filters.jenisKomoditi}
+              onChange={(jenisKomoditi) => setFilters((f) => ({ ...f, jenisKomoditi }))}
+              className="w-full"
+              contentWidth="w-64"
+            />
+            <MultiSelectFilter
+              label="Bulan"
+              allLabel="Semua Bulan"
+              options={MONTH_OPTIONS}
+              optionLabels={MONTH_LABELS}
+              selected={filters.months}
+              onChange={(months) => setFilters((f) => ({ ...f, months }))}
+              className="w-full"
+            />
+            <FilterSelect
+              value={filters.modeTanggal}
+              onChange={(v) => setFilters((f) => ({ ...f, modeTanggal: v as 'TRANSFER' | 'RENCANA' }))}
+              options={[
+                { value: 'TRANSFER', label: 'Berdasarkan Tgl Transfer' },
+                { value: 'RENCANA', label: 'Berdasarkan Rencana Ambil' },
+              ]}
+            />
+            <FilterSelect
+              value={filters.sort}
+              onChange={(v) => setFilters((f) => ({ ...f, sort: v as 'DESC' | 'ASC' }))}
+              options={[
+                { value: 'DESC', label: 'Terbaru ke Terlama' },
+                { value: 'ASC', label: 'Terlama ke Terbaru' },
+              ]}
+            />
+            <FilterSelect
+              value={filters.tipe}
+              onChange={(v) => setFilters((f) => ({ ...f, tipe: v as 'ALL' | 'NO_BYPASS' | 'ONLY_BYPASS' }))}
+              options={[
+                { value: 'ALL', label: 'Semua Data' },
+                { value: 'NO_BYPASS', label: 'Sembunyikan Bypass' },
+                { value: 'ONLY_BYPASS', label: 'Hanya Bypass' },
+              ]}
+            />
+            <FilterSelect
+              value={filters.sap}
+              onChange={(v) => setFilters((f) => ({ ...f, sap: v }))}
+              options={[
+                { value: 'ALL', label: 'Semua Status SAP' },
+                { value: 'MISSING_SAP', label: 'Belum Lengkap' },
+                { value: 'NO_KONTRAK_SAP', label: 'Tanpa Kontrak SAP' },
+                { value: 'NO_SO_SAP', label: 'Tanpa SO SAP' },
+                { value: 'NO_DO_SAP', label: 'Tanpa DO SAP' },
+                { value: 'NO_BILLING_SAP', label: 'Tanpa Billing SAP' },
+                { value: 'ALL_COMPLETE', label: 'Sudah Lengkap' },
+              ]}
+            />
+            <FilterSelect
+              value={filters.statusBayar}
+              onChange={(v) => setFilters((f) => ({ ...f, statusBayar: v }))}
+              options={[
+                { value: 'ALL', label: 'Semua Status Bayar' },
+                { value: 'BELUM', label: 'Belum Bayar' },
+                { value: 'SEBAGIAN', label: 'Pembayaran Sebagian' },
+                { value: 'LUNAS', label: 'Pembayaran Penuh / Lunas' },
+              ]}
+            />
+            <Button variant="outline" size="sm" onClick={() => setFilters(DEFAULT_LAPORAN_FILTERS)} className="h-9">
+              Reset Filter
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -341,7 +237,7 @@ export default function LaporanPage() {
             <div className="overflow-auto max-h-[70vh]">
               <table className="text-xs" style={{ minWidth: '3600px' }}>
                 <thead>
-                  <tr className="border-b bg-gray-50 text-gray-500 text-xs uppercase tracking-wide sticky top-0 z-10">
+                  <tr className="border-b bg-slate-50 text-xs font-medium text-muted-foreground sticky top-0 z-10">
                     <th className="text-left px-3 py-2">No. DO</th>
                     <th className="text-left px-3 py-2">No Invoice</th>
                     <th className="text-left px-3 py-2">No Kontrak</th>

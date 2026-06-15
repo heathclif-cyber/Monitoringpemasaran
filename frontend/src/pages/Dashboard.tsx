@@ -18,17 +18,31 @@ import { TrendingUp, Wallet, Box, FileText, AlertTriangle, RefreshCw } from 'luc
 import { useDashboardStore } from '@/store/dashboardStore'
 import { useAppStore } from '@/store/appStore'
 import { StatCard } from '@/components/common/StatCard'
+import { FilterBar, FilterSelect } from '@/components/common/FilterBar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { CardSkeleton } from '@/components/common/LoadingSkeleton'
 import { formatCurrency, formatNumber, formatNumberDec, formatShortNumber } from '@/lib/utils'
+import { calcMonthOverMonthTrend } from '@/lib/trendUtils'
 
-const CHART_COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+const CHART_COLORS = ['#059669', '#10b981', '#34d399', '#6ee7b7', '#047857', '#065f46', '#0d9488', '#14b8a6']
+const CHART_PRIMARY = '#059669'
+const CHART_SECONDARY = '#10b981'
+const CHART_TERTIARY = '#f59e0b'
 
 function StatCards() {
   const data = useDashboardStore((s) => s.data)
   if (!data) return null
-  const { summary } = data
+  const { summary, charts } = data
+  const { bulanan } = charts
+
+  const pendapatanTrend = calcMonthOverMonthTrend(bulanan.pendapatan)
+  const cashInTrend = calcMonthOverMonthTrend(bulanan.cashin)
+  const volumeTrend = calcMonthOverMonthTrend(
+    bulanan.labels.map((_, i) => (bulanan.volume_kg[i] || 0) + (bulanan.volume_butir[i] || 0)),
+  )
+  const invoiceTrend = calcMonthOverMonthTrend(bulanan.invoice)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -36,23 +50,27 @@ function StatCards() {
         label="Pendapatan (Omset)"
         value={formatCurrency(summary.total_pendapatan)}
         icon={TrendingUp}
+        trend={pendapatanTrend}
       />
       <StatCard
         label="Cash In"
         value={formatCurrency(summary.total_cash_in)}
         icon={Wallet}
+        trend={cashInTrend}
       />
       <StatCard
         label="Volume Realisasi"
         value={formatNumber(summary.total_volume_all)}
         subtitle={`${formatNumberDec(summary.total_volume_kg)} Kg | ${formatNumberDec(summary.total_volume_butir)} Butir`}
         icon={Box}
+        trend={volumeTrend}
       />
       <StatCard
         label="Invoice & DO"
         value={`${summary.total_invoice} / ${summary.total_do}`}
         subtitle="Invoice / DO"
         icon={FileText}
+        trend={invoiceTrend}
       />
     </div>
   )
@@ -82,9 +100,9 @@ function TrendChart() {
             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatShortNumber(v)} />
             <Tooltip formatter={(value: number) => formatCurrency(value)} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Line type="monotone" dataKey="Pendapatan" stroke="#4f46e5" strokeWidth={2} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="Invoice" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="Cash In" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="Pendapatan" stroke={CHART_PRIMARY} strokeWidth={2} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="Invoice" stroke={CHART_SECONDARY} strokeWidth={2} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="Cash In" stroke={CHART_TERTIARY} strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </CardContent>
@@ -234,12 +252,12 @@ function MonthlyBreakdown() {
       <CardContent className="p-0">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
-              <th className="text-left px-4 py-2">Bulan</th>
-              <th className="text-right px-4 py-2">Pendapatan (Omset)</th>
-              <th className="text-right px-4 py-2">Nilai Invoice</th>
-              <th className="text-right px-4 py-2">Cash In</th>
-              <th className="text-right px-4 py-2">Selisih</th>
+            <tr className="border-b bg-slate-50 text-xs font-medium text-muted-foreground">
+              <th className="text-left px-4 py-2.5">Bulan</th>
+              <th className="text-right px-4 py-2.5">Pendapatan (Omset)</th>
+              <th className="text-right px-4 py-2.5">Nilai Invoice</th>
+              <th className="text-right px-4 py-2.5">Cash In</th>
+              <th className="text-right px-4 py-2.5">Selisih</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -342,12 +360,12 @@ function SapStatus() {
             <p className="text-xs text-muted-foreground mb-2">Per bulan · berdasarkan rencana pengambilan</p>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
-                  <th className="text-left px-3 py-2">Bulan</th>
-                  <th className="text-center px-3 py-2">Kontrak SAP</th>
-                  <th className="text-center px-3 py-2">SO SAP</th>
-                  <th className="text-center px-3 py-2">DO SAP</th>
-                  <th className="text-center px-3 py-2">Billing SAP</th>
+                <tr className="border-b bg-slate-50 text-xs font-medium text-muted-foreground">
+                  <th className="text-left px-3 py-2.5">Bulan</th>
+                  <th className="text-center px-3 py-2.5">Kontrak SAP</th>
+                  <th className="text-center px-3 py-2.5">SO SAP</th>
+                  <th className="text-center px-3 py-2.5">DO SAP</th>
+                  <th className="text-center px-3 py-2.5">Billing SAP</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -394,38 +412,32 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={filters.year}
-          onChange={(e) => setFilters({ year: Number(e.target.value) })}
-          className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
-        >
-          {availableYears.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-        <select
-          value={filters.unit}
-          onChange={(e) => setFilters({ unit: e.target.value })}
-          className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
-        >
-          <option value="ALL">Semua Unit</option>
-          {availableUnits.map((u) => (
-            <option key={u} value={u}>{u}</option>
-          ))}
-        </select>
-        <select
-          value={filters.komoditi}
-          onChange={(e) => setFilters({ komoditi: e.target.value })}
-          className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
-        >
-          <option value="ALL">Semua Komoditi</option>
-          {availableKomoditas.map((k) => (
-            <option key={k} value={k}>{k}</option>
-          ))}
-        </select>
-      </div>
+      <FilterBar>
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground shrink-0">Tahun</Label>
+          <FilterSelect
+            value={String(filters.year)}
+            onChange={(v) => setFilters({ year: Number(v) })}
+            options={availableYears.map((y) => ({ value: String(y), label: String(y) }))}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground shrink-0">Unit</Label>
+          <FilterSelect
+            value={filters.unit}
+            onChange={(v) => setFilters({ unit: v })}
+            options={[{ value: 'ALL', label: 'Semua Unit' }, ...availableUnits.map((u) => ({ value: u, label: u }))]}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground shrink-0">Komoditi</Label>
+          <FilterSelect
+            value={filters.komoditi}
+            onChange={(v) => setFilters({ komoditi: v })}
+            options={[{ value: 'ALL', label: 'Semua Komoditi' }, ...availableKomoditas.map((k) => ({ value: k, label: k }))]}
+          />
+        </div>
+      </FilterBar>
 
       {fetchError ? (
         <Card>

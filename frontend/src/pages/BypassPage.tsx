@@ -7,6 +7,7 @@ import { useLaporanStore } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -75,8 +76,6 @@ export default function BypassPage() {
     setEditId(null)
   }
 
-  const ic = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm w-full focus:outline-none focus:ring-1 focus:ring-ring'
-
   return (
     <div className="max-w-4xl mx-auto">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -92,7 +91,7 @@ export default function BypassPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-xs">Unit *</Label>
-                <input {...register('unit')} className={ic} list="unit-list" />
+                <Input {...register('unit')} list="unit-list" />
                 <datalist id="unit-list">
                   <option value="Minahasa-Halmahera" /><option value="Awaya-Telpaputih" />
                   <option value="Beteleme" /><option value="Kabaru" /><option value="Takalar" /><option value="Camming" />
@@ -101,12 +100,12 @@ export default function BypassPage() {
               </div>
               <div>
                 <Label className="text-xs">Komoditi *</Label>
-                <input {...register('komoditi')} className={ic} />
+                <Input {...register('komoditi')} />
                 {errors.komoditi && <p className="text-xs text-red-500 mt-1">{errors.komoditi.message}</p>}
               </div>
               <div>
                 <Label className="text-xs">Tanggal *</Label>
-                <input type="date" {...register('tanggal')} className={ic} />
+                <Input type="date" {...register('tanggal')} />
               </div>
             </CardContent>
           </Card>
@@ -120,23 +119,23 @@ export default function BypassPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">Volume *</Label>
-                  <input type="number" step="any" {...register('volume')} className={ic} />
+                  <Input type="number" step="any" {...register('volume')} />
                 </div>
                 <div>
                   <Label className="text-xs">Satuan</Label>
-                  <select {...register('satuan')} className={ic}>
+                  <NativeSelect {...register('satuan')}>
                     <option value="Kg">Kg</option>
                     <option value="Butir">Butir</option>
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
               <div>
                 <Label className="text-xs">Nominal *</Label>
-                <input type="number" step="any" {...register('nominal')} className={ic} />
+                <Input type="number" step="any" {...register('nominal')} />
               </div>
               <div>
                 <Label className="text-xs">Pembeli *</Label>
-                <input {...register('pembeli')} className={ic} />
+                <Input {...register('pembeli')} />
                 {errors.pembeli && <p className="text-xs text-red-500 mt-1">{errors.pembeli.message}</p>}
               </div>
               <div>

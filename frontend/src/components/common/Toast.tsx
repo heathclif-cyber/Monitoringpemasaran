@@ -1,6 +1,6 @@
 import { useAppStore } from '@/store/appStore'
 import { cn } from '@/lib/utils'
-import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react'
 
 const ICON_MAP = {
   success: CheckCircle,
@@ -25,21 +25,30 @@ const ICON_COLOR_MAP = {
 
 export function Toast() {
   const notifications = useAppStore((s) => s.notifications)
+  const removeNotification = useAppStore((s) => s.removeNotification)
 
   return (
-    <div className="fixed top-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
+    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
       {notifications.map((n) => {
         const Icon = ICON_MAP[n.type]
         return (
           <div
             key={n.id}
             className={cn(
-              'min-w-[320px] px-5 py-4 rounded-2xl bg-white shadow-xl border-l-[6px] flex items-center gap-3 pointer-events-auto animate-in slide-in-from-right-full',
+              'min-w-[280px] max-w-sm px-4 py-3 rounded-lg bg-card shadow-lg border border-border flex items-center gap-3 pointer-events-auto',
               COLOR_MAP[n.type],
             )}
           >
-            <Icon size={16} className={cn('shrink-0', ICON_COLOR_MAP[n.type])} />
-            <span className="text-sm font-semibold text-slate-800">{n.message}</span>
+            <Icon size={15} className={cn('shrink-0', ICON_COLOR_MAP[n.type])} />
+            <span className="text-sm font-medium text-foreground flex-1">{n.message}</span>
+            <button
+              type="button"
+              onClick={() => removeNotification(n.id)}
+              className="text-slate-400 hover:text-slate-600 shrink-0"
+              aria-label="Tutup notifikasi"
+            >
+              <X size={14} />
+            </button>
           </div>
         )
       })}

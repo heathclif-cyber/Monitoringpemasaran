@@ -1,15 +1,28 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { getPageMeta } from '@/lib/pageMeta'
+import { PageTransition } from '@/components/common/PageTransition'
 
 export function AppLayout() {
+  const location = useLocation()
+  const meta = getPageMeta(location.pathname)
+
   return (
-    <div className="min-h-screen bg-gray-50/80">
+    <div className="min-h-screen bg-background">
       <Sidebar />
       <Header />
-      <main className="pt-[56px] min-h-screen" style={{ marginLeft: 'var(--sidebar-width, 224px)' }}>
-        <div className="p-5">
-          <Outlet />
+      <main
+        className="min-h-screen pt-14 transition-[margin-left] duration-200"
+        style={{ marginLeft: 'var(--sidebar-width, 240px)' }}
+      >
+        <div className="mx-auto max-w-[1600px] p-5 lg:p-6">
+          {meta.description && (
+            <p className="text-sm text-muted-foreground mb-5 -mt-1">{meta.description}</p>
+          )}
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
         </div>
       </main>
     </div>

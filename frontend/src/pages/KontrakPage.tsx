@@ -3,12 +3,15 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Save, Eye, FileDown, RotateCcw, Plus, X } from 'lucide-react'
+import { FileDown, RotateCcw, Plus, X } from 'lucide-react'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
+import { PreviewPanel } from '@/components/common/PreviewPanel'
+import { FormStepper, FormStepActions, type FormStep } from '@/components/common/FormStepper'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { KontrakPreview } from '@/components/feature/KontrakPreview'
@@ -21,6 +24,12 @@ import {
   DEFAULT_SYARAT,
   DEFAULT_KETENTUAN,
 } from '@/utils/kontrakUtils'
+
+const KONTRAK_STEPS: FormStep[] = [
+  { id: 'identitas', label: 'Identitas', description: 'Data dasar & pihak' },
+  { id: 'komoditas', label: 'Komoditas', description: 'Barang & produksi' },
+  { id: 'finalisasi', label: 'Finalisasi', description: 'Nilai, bayar & syarat' },
+]
 
 const FIXED_UNITS = [
   'Minahasa-Halmahera',
@@ -87,6 +96,7 @@ export default function KontrakPage() {
   const [unitList, setUnitList] = useState<{ nama_unit: string; volume: number; komoditi: string; jenis_komoditi: string; satuan: string; tahun_panen: string; deskripsi_produk: string }[]>([
     { nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }
   ])
+  const [activeStep, setActiveStep] = useState(0)
 
   const form = useForm<KontrakFormData>({
     resolver: zodResolver(kontrakSchema),
@@ -135,7 +145,7 @@ export default function KontrakPage() {
     },
   })
 
-  const { register, handleSubmit, reset, setValue, watch, getValues, formState: { errors, isSubmitting } } = form
+  const { register, handleSubmit, reset, setValue, watch, getValues, trigger, formState: { errors, isSubmitting } } = form
 
   // Watch all fields for live preview
   const watchedFields = watch()
@@ -211,6 +221,7 @@ export default function KontrakPage() {
   // Reset everything
   const handleReset = () => {
     reset()
+    setActiveStep(0)
     setIsExisting(false)
     setExportNo(null)
     setKontrakNo('')
@@ -292,14 +303,35 @@ export default function KontrakPage() {
     return () => sub.unsubscribe()
   }, [form])
 
-  // Input class
-  const ic = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm w-full focus:outline-none focus:ring-1 focus:ring-ring'
+  const validateStep = async (step: number): Promise<boolean> => {
+    if (step === 0) {
+      return trigger(['no_kontrak', 'tanggal_kontrak', 'pembeli'])
+    }
+    if (step === 2) {
+      return trigger(['volume', 'harga_satuan'])
+    }
+    return true
+  }
+
+  const handleNextStep = async () => {
+    const ok = await validateStep(activeStep)
+    if (ok) setActiveStep((s) => Math.min(s + 1, KONTRAK_STEPS.length - 1))
+  }
+
+  const handleBackStep = () => setActiveStep((s) => Math.max(s - 1, 0))
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col lg:flex-row gap-6">
       {/* Left: Form */}
       <div className="flex-1 min-w-0">
+        <FormStepper
+          steps={KONTRAK_STEPS}
+          activeStep={activeStep}
+          onStepClick={(i) => { if (i <= activeStep) setActiveStep(i) }}
+        />
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {activeStep === 0 && (
+          <>
           {/* Data Dasar */}
           <Card>
             <CardHeader className="pb-3">
@@ -308,7 +340,7 @@ export default function KontrakPage() {
             <CardContent className="grid grid-cols-3 gap-4">
               <div>
                 <Label className="text-xs">No Kontrak *</Label>
-                <input {...register('no_kontrak')} className={ic} placeholder="No Kontrak" list="kontrak-datalist" />
+                <Input {...register('no_kontrak')} placeholder="No Kontrak" list="kontrak-datalist" />
                 <datalist id="kontrak-datalist">
                   {store.data.map((k) => <option key={k.no_kontrak} value={k.no_kontrak} />)}
                 </datalist>
@@ -316,18 +348,18 @@ export default function KontrakPage() {
               </div>
               <div>
                 <Label className="text-xs">Tanggal *</Label>
-                <input type="date" {...register('tanggal_kontrak')} className={ic} />
+                <Input type="date" {...register('tanggal_kontrak')} />
               </div>
               <div>
                 <Label className="text-xs">Status</Label>
-                <select {...register('status')} className={ic}>
+                <NativeSelect {...register('status')}>
                   <option value="Draft">Draft</option>
                   <option value="Active">Active</option>
-                </select>
+                </NativeSelect>
               </div>
               <div>
                 <Label className="text-xs">Lokasi</Label>
-                <input {...register('lokasi')} className={ic} />
+                <Input {...register('lokasi')}  />
               </div>
               <div className="self-end">
                 <Button type="button" variant="outline" size="sm" onClick={autoLoadKontrak}>Cari / Load</Button>
@@ -343,12 +375,12 @@ export default function KontrakPage() {
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Pembeli *</Label>
-                <input {...register('pembeli')} className={ic} />
+                <Input {...register('pembeli')}  />
                 {errors.pembeli && <p className="text-xs text-red-500 mt-1">{errors.pembeli.message}</p>}
               </div>
               <div>
                 <Label className="text-xs">Nama Direktur</Label>
-                <input {...register('nama_direktur')} className={ic} />
+                <Input {...register('nama_direktur')}  />
               </div>
               <div className="col-span-2">
                 <Label className="text-xs">Alamat Pembeli</Label>
@@ -360,16 +392,18 @@ export default function KontrakPage() {
               </div>
               <div>
                 <Label className="text-xs">Pemilik Komoditas</Label>
-                <input {...register('pemilik_komoditas')} className={ic} />
+                <Input {...register('pemilik_komoditas')}  />
               </div>
               <div>
                 <Label className="text-xs">No. Reff</Label>
-                <input {...register('no_reff')} className={ic} />
+                <Input {...register('no_reff')}  />
               </div>
             </CardContent>
           </Card>
+          </>
+          )}
 
-          {/* Data Barang & Produksi */}
+          {activeStep === 1 && (
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Data Barang & Produksi</CardTitle>
@@ -381,12 +415,12 @@ export default function KontrakPage() {
                   {unitList.map((unit, i) => {
                     const isLainnya = unit.nama_unit !== '' && !FIXED_UNITS.includes(unit.nama_unit)
                     const selectValue = isLainnya ? '__lainnya__' : unit.nama_unit
-                    const sel = 'h-9 rounded-md border border-input bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring'
+                    const sel = 'text-xs'
                     return (
                       <div key={i} className="border rounded-lg p-2 space-y-2 bg-slate-50/50">
                         {/* Row 1: Material fields */}
                         <div className="flex gap-2 items-center">
-                          <input
+                          <Input
                             value={unit.komoditi}
                             onChange={e => {
                               const next = [...unitList]
@@ -397,7 +431,7 @@ export default function KontrakPage() {
                             placeholder="Komoditi"
                             list="komoditi-datalist"
                           />
-                          <select
+                          <NativeSelect
                             value={unit.jenis_komoditi}
                             onChange={e => {
                               const next = [...unitList]
@@ -418,8 +452,8 @@ export default function KontrakPage() {
                             <option>Kopra</option>
                             <option>SAPI PEJANTAN AFKIR</option>
                             <option>CPO</option>
-                          </select>
-                          <select
+                          </NativeSelect>
+                          <NativeSelect
                             value={unit.satuan}
                             onChange={e => {
                               const next = [...unitList]
@@ -430,8 +464,8 @@ export default function KontrakPage() {
                           >
                             <option value="Kg">Kg</option>
                             <option value="Butir">Butir</option>
-                          </select>
-                          <input
+                          </NativeSelect>
+                          <Input
                             value={unit.tahun_panen}
                             onChange={e => {
                               const next = [...unitList]
@@ -441,7 +475,7 @@ export default function KontrakPage() {
                             className={`${sel} w-24 shrink-0`}
                             placeholder="Thn Panen"
                           />
-                          <input
+                          <Input
                             value={unit.deskripsi_produk}
                             onChange={e => {
                               const next = [...unitList]
@@ -454,7 +488,7 @@ export default function KontrakPage() {
                         </div>
                         {/* Row 2: Unit + Volume */}
                         <div className="flex gap-2 items-center">
-                          <select
+                          <NativeSelect
                             value={selectValue}
                             onChange={e => {
                               const next = [...unitList]
@@ -470,9 +504,9 @@ export default function KontrakPage() {
                             <option value="">Unit Produksi</option>
                             {FIXED_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                             <option value="__lainnya__">Lainnya (isi manual)</option>
-                          </select>
+                          </NativeSelect>
                           {(selectValue === '__lainnya__' || isLainnya) && (
-                            <input
+                            <Input
                               value={unit.nama_unit}
                               onChange={e => {
                                 const next = [...unitList]
@@ -483,7 +517,7 @@ export default function KontrakPage() {
                               placeholder="Nama unit..."
                             />
                           )}
-                          <input
+                          <Input
                             type="number"
                             step="any"
                             value={unit.volume || ''}
@@ -541,34 +575,36 @@ export default function KontrakPage() {
               </div>
               {/* Remaining fields */}
               <div className="grid grid-cols-3 gap-4">
-                <div><Label className="text-xs">Mutu</Label><input {...register('mutu')} className={ic} /></div>
-                <div><Label className="text-xs">Packaging</Label><input {...register('packaging')} className={ic} /></div>
-                <div><Label className="text-xs">Simbol</Label><input {...register('simbol')} className={ic} /></div>
-                <div><Label className="text-xs">Pelabuhan Muat</Label><input {...register('pelabuhan_muat')} className={ic} /></div>
-                <div><Label className="text-xs">Chop</Label><input {...register('chop')} className={ic} /></div>
-                <div><Label className="text-xs">Pack Qty</Label><input type="number" step="any" {...register('pack_qty')} className={ic} /></div>
-                <div><Label className="text-xs">Banyak Bale/Karung</Label><input type="number" step="any" {...register('banyaknya_bale_karung')} className={ic} /></div>
+                <div><Label className="text-xs">Mutu</Label><Input {...register('mutu')}  /></div>
+                <div><Label className="text-xs">Packaging</Label><Input {...register('packaging')}  /></div>
+                <div><Label className="text-xs">Simbol</Label><Input {...register('simbol')}  /></div>
+                <div><Label className="text-xs">Pelabuhan Muat</Label><Input {...register('pelabuhan_muat')}  /></div>
+                <div><Label className="text-xs">Chop</Label><Input {...register('chop')}  /></div>
+                <div><Label className="text-xs">Pack Qty</Label><Input type="number" step="any" {...register('pack_qty')}  /></div>
+                <div><Label className="text-xs">Banyak Bale/Karung</Label><Input type="number" step="any" {...register('banyaknya_bale_karung')}  /></div>
                 <div>
                   <Label className="text-xs">PPN</Label>
-                  <select {...register('is_ppn')} className={ic}>
+                  <NativeSelect {...register('is_ppn')}>
                     <option value="true">Ya (PPN)</option>
                     <option value="false">Tidak (Non-PPN)</option>
-                  </select>
+                  </NativeSelect>
                 </div>
-                <div><Label className="text-xs">PPN %</Label><input type="number" step="any" {...register('ppn_persen')} className={ic} /></div>
+                <div><Label className="text-xs">PPN %</Label><Input type="number" step="any" {...register('ppn_persen')}  /></div>
                 <div>
                   <Label className="text-xs">PPh</Label>
-                  <select {...register('is_pph')} className={ic}>
+                  <NativeSelect {...register('is_pph')}>
                     <option value="false">Tidak</option>
                     <option value="true">Ya</option>
-                  </select>
+                  </NativeSelect>
                 </div>
-                <div><Label className="text-xs">PPh %</Label><input type="number" step="any" {...register('pph_persen')} className={ic} /></div>
+                <div><Label className="text-xs">PPh %</Label><Input type="number" step="any" {...register('pph_persen')}  /></div>
               </div>
             </CardContent>
           </Card>
+          )}
 
-          {/* Harga & Volume */}
+          {activeStep === 2 && (
+          <>
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Harga & Volume</CardTitle>
@@ -580,22 +616,22 @@ export default function KontrakPage() {
                   const validUnitsWithVol = unitList.filter(u => u.nama_unit.trim() && (u.volume || 0) > 0)
                   const derivedVol = validUnitsWithVol.length > 0 && validUnitsWithVol.length === unitList.filter(u => u.nama_unit.trim()).length
                   return derivedVol ? (
-                    <div className={`${ic} bg-slate-50 text-slate-600 flex items-center`}>
+                    <div className="flex h-9 items-center rounded-md border border-input bg-slate-50 px-3 text-sm text-slate-600">
                       {validUnitsWithVol.reduce((s, u) => s + (u.volume || 0), 0).toLocaleString('id-ID')}
                       <span className="text-xs text-slate-400 ml-2">(dari unit)</span>
                     </div>
                   ) : (
-                    <input type="number" step="any" {...register('volume')} className={ic} />
+                    <Input type="number" step="any" {...register('volume')}  />
                   )
                 })()}
               </div>
               <div>
                 <Label className="text-xs">Harga Satuan *</Label>
-                <input type="number" step="any" {...register('harga_satuan')} className={ic} />
+                <Input type="number" step="any" {...register('harga_satuan')}  />
               </div>
               <div>
                 <Label className="text-xs">Premi</Label>
-                <input type="number" step="any" {...register('premi')} className={ic} />
+                <Input type="number" step="any" {...register('premi')}  />
               </div>
             </CardContent>
             {/* Quick calculation */}
@@ -633,18 +669,17 @@ export default function KontrakPage() {
               <CardTitle className="text-sm font-semibold">Ketentuan & Pembayaran</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
-              <div><Label className="text-xs">Kondisi Penyerahan</Label><input {...register('kondisi_penyerahan')} className={ic} /></div>
-              <div><Label className="text-xs">Waktu Penyerahan</Label><input {...register('waktu_penyerahan')} className={ic} /></div>
-              <div><Label className="text-xs">Lama Pembayaran (hari)</Label><input type="number" {...register('lama_pembayaran_hari')} className={ic} /></div>
-              <div><Label className="text-xs">Penyerahan (hari)</Label><input type="number" {...register('penyerahan_hari')} className={ic} /></div>
-              <div><Label className="text-xs">Levering</Label><input {...register('levering')} className={ic} /></div>
-              <div><Label className="text-xs">Metode Bayar</Label><input {...register('pembayaran_metode')} className={ic} /></div>
-              <div><Label className="text-xs">Cara Bayar</Label><input {...register('pembayaran_cara')} className={ic} /></div>
-              <div><Label className="text-xs">Bank</Label><input {...register('pembayaran_bank')} className={ic} /></div>
+              <div><Label className="text-xs">Kondisi Penyerahan</Label><Input {...register('kondisi_penyerahan')}  /></div>
+              <div><Label className="text-xs">Waktu Penyerahan</Label><Input {...register('waktu_penyerahan')}  /></div>
+              <div><Label className="text-xs">Lama Pembayaran (hari)</Label><Input type="number" {...register('lama_pembayaran_hari')}  /></div>
+              <div><Label className="text-xs">Penyerahan (hari)</Label><Input type="number" {...register('penyerahan_hari')}  /></div>
+              <div><Label className="text-xs">Levering</Label><Input {...register('levering')}  /></div>
+              <div><Label className="text-xs">Metode Bayar</Label><Input {...register('pembayaran_metode')}  /></div>
+              <div><Label className="text-xs">Cara Bayar</Label><Input {...register('pembayaran_cara')}  /></div>
+              <div><Label className="text-xs">Bank</Label><Input {...register('pembayaran_bank')}  /></div>
             </CardContent>
           </Card>
 
-          {/* Terms */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Syarat & Ketentuan</CardTitle>
@@ -656,7 +691,7 @@ export default function KontrakPage() {
               </div>
               <div>
                 <Label className="text-xs">Dasar Ketentuan</Label>
-                <input {...register('dasar_ketentuan')} className={ic} />
+                <Input {...register('dasar_ketentuan')}  />
               </div>
               <div>
                 <Label className="text-xs">Catatan</Label>
@@ -664,47 +699,42 @@ export default function KontrakPage() {
               </div>
             </CardContent>
           </Card>
+          </>
+          )}
 
-          {/* Action buttons */}
-          <div className="flex gap-3">
-            <Button type="submit" disabled={isSubmitting} className="gap-2">
-              <Save size={14} />
-              {isSubmitting ? 'Menyimpan...' : isExisting ? 'Simpan Perubahan' : 'Simpan & Preview'}
-            </Button>
-            {exportNo && (
-              <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">
-                <FileDown size={14} />
-                Export .docx
-              </Button>
-            )}
-            <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
-              <RotateCcw size={14} />
-              Reset
-            </Button>
-          </div>
+          <FormStepActions
+            activeStep={activeStep}
+            totalSteps={KONTRAK_STEPS.length}
+            onBack={handleBackStep}
+            onNext={handleNextStep}
+            isSubmitting={isSubmitting}
+            submitLabel={isExisting ? 'Simpan Perubahan' : 'Simpan & Preview'}
+            extraActions={
+              <>
+                {exportNo && activeStep === KONTRAK_STEPS.length - 1 && (
+                  <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">
+                    <FileDown size={14} />
+                    Export .docx
+                  </Button>
+                )}
+                <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
+                  <RotateCcw size={14} />
+                  Reset
+                </Button>
+              </>
+            }
+          />
         </form>
       </div>
 
-      {/* Right: Live Preview Panel */}
-      <div className="w-[600px] shrink-0">
-        <div className="sticky top-[76px] max-h-[calc(100vh-100px)] overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-800">Live Preview</span>
-            <Eye size={14} className="text-slate-400" />
-          </div>
-          <div className="p-5">
-            {!watchedFields.no_kontrak && !watchedFields.pembeli ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Eye size={32} className="text-slate-300 mb-3" />
-                <p className="text-sm text-slate-500 font-medium">Preview akan muncul di sini</p>
-                <p className="text-xs text-slate-400 mt-1">Isi form kontrak untuk melihat preview</p>
-              </div>
-            ) : (
-              <KontrakPreview data={{ ...watchedFields, units: unitList.filter(u => u.nama_unit.trim()).map((u, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit: u.nama_unit, urutan: i, volume: u.volume || 0, komoditi: u.komoditi || null, jenis_komoditi: u.jenis_komoditi || null, satuan: u.satuan || null, tahun_panen: u.tahun_panen || null, deskripsi_produk: u.deskripsi_produk || null })) }} />
-            )}
-          </div>
-        </div>
-      </div>
+      <PreviewPanel
+        title="Live Preview"
+        isEmpty={!watchedFields.no_kontrak && !watchedFields.pembeli}
+        emptyTitle="Preview akan muncul di sini"
+        emptyDescription="Isi form kontrak untuk melihat preview"
+      >
+        <KontrakPreview data={{ ...watchedFields, units: unitList.filter(u => u.nama_unit.trim()).map((u, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit: u.nama_unit, urutan: i, volume: u.volume || 0, komoditi: u.komoditi || null, jenis_komoditi: u.jenis_komoditi || null, satuan: u.satuan || null, tahun_panen: u.tahun_panen || null, deskripsi_produk: u.deskripsi_produk || null })) }} />
+      </PreviewPanel>
     </div>
   )
 }

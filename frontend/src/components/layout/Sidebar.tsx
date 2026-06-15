@@ -9,8 +9,12 @@ import {
   Zap,
   Archive,
   ChevronDown,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store/appStore'
+import { Button } from '@/components/ui/button'
 
 interface NavItemDef {
   label: string
@@ -20,15 +24,15 @@ interface NavItemDef {
 }
 
 const navItems: NavItemDef[] = [
-  { label: 'Dashboard', to: '/', icon: <LayoutDashboard size={15} /> },
-  { label: 'Buat Kontrak', to: '/kontrak', icon: <FileText size={15} /> },
-  { label: 'Cetak Invoice', to: '/invoice', icon: <Receipt size={15} /> },
-  { label: 'Delivery Order', to: '/delivery-order', icon: <Truck size={15} /> },
-  { label: 'Laporan Digital', to: '/laporan', icon: <Table size={15} /> },
-  { label: 'Input Bypass', to: '/bypass', icon: <Zap size={15} /> },
+  { label: 'Dashboard', to: '/', icon: <LayoutDashboard size={16} /> },
+  { label: 'Buat Kontrak', to: '/kontrak', icon: <FileText size={16} /> },
+  { label: 'Cetak Invoice', to: '/invoice', icon: <Receipt size={16} /> },
+  { label: 'Delivery Order', to: '/delivery-order', icon: <Truck size={16} /> },
+  { label: 'Laporan Digital', to: '/laporan', icon: <Table size={16} /> },
+  { label: 'Input Bypass', to: '/bypass', icon: <Zap size={16} /> },
   {
     label: 'Repository',
-    icon: <Archive size={15} />,
+    icon: <Archive size={16} />,
     children: [
       { label: 'Kontrak', to: '/repo/kontrak' },
       { label: 'Invoice', to: '/repo/invoice' },
@@ -37,24 +41,53 @@ const navItems: NavItemDef[] = [
   },
 ]
 
-function NavParent({ item, defaultOpen }: { item: NavItemDef; defaultOpen: boolean }) {
+function NavParent({
+  item,
+  defaultOpen,
+  collapsed,
+}: {
+  item: NavItemDef
+  defaultOpen: boolean
+  collapsed: boolean
+}) {
   const [open, setOpen] = useState(defaultOpen)
   const location = useLocation()
   const hasActiveChild = item.children?.some((c) => location.pathname === c.to)
 
+  if (collapsed) {
+    return (
+      <div className="px-2">
+        <div
+          title={item.label}
+          className={cn(
+            'flex h-9 w-9 items-center justify-center rounded-md mx-auto transition-colors',
+            hasActiveChild ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          )}
+        >
+          {item.icon}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          'flex items-center w-full py-1.5 px-3 mx-3 rounded-md text-[13px] font-medium transition-colors',
-          'text-white/80 hover:text-white hover:bg-white/10',
-          hasActiveChild && 'text-white font-semibold bg-white/10',
+          'flex items-center w-full py-2 px-3 mx-2 rounded-md text-[13px] font-medium transition-colors',
+          hasActiveChild
+            ? 'text-foreground bg-muted'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
         )}
       >
-        <span className="w-6 flex justify-center opacity-70 shrink-0">{item.icon}</span>
-        <span className="ml-2">{item.label}</span>
-        <ChevronDown size={12} className={cn('ml-1.5 opacity-50 shrink-0 transition-transform duration-200', open && 'rotate-180')} />
+        <span className="w-5 flex justify-center shrink-0 opacity-80">{item.icon}</span>
+        <span className="ml-2.5 truncate">{item.label}</span>
+        <ChevronDown
+          size={12}
+          className={cn('ml-auto opacity-50 shrink-0 transition-transform duration-200', open && 'rotate-180')}
+        />
       </button>
       <div className={cn('overflow-hidden transition-all duration-200', open ? 'max-h-60' : 'max-h-0')}>
         {item.children?.map((child) => (
@@ -63,10 +96,10 @@ function NavParent({ item, defaultOpen }: { item: NavItemDef; defaultOpen: boole
             to={child.to}
             className={({ isActive }) =>
               cn(
-                'flex items-center py-1.5 pl-8 pr-3 mx-3 my-0.5 rounded-md text-[12.5px] font-medium transition-colors',
+                'flex items-center py-1.5 pl-9 pr-3 mx-2 my-0.5 rounded-md text-[13px] font-medium transition-colors',
                 isActive
-                  ? 'bg-white/15 text-white font-semibold border-l-[3px] border-white ml-1'
-                  : 'text-white/60 hover:text-white hover:bg-white/10',
+                  ? 'bg-primary/10 text-primary font-semibold'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
               )
             }
           >
@@ -80,34 +113,33 @@ function NavParent({ item, defaultOpen }: { item: NavItemDef; defaultOpen: boole
 
 export function Sidebar() {
   const location = useLocation()
-  const sidebarWidth = '224px'
+  const collapsed = useAppStore((s) => s.sidebarCollapsed)
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+  const sidebarWidth = collapsed ? '64px' : '240px'
 
   return (
     <>
       <style>{`:root { --sidebar-width: ${sidebarWidth}; }`}</style>
       <aside
-        className="fixed top-0 left-0 h-screen z-50 flex flex-col overflow-hidden"
-        style={{
-          width: 'var(--sidebar-width, 224px)',
-          background: 'linear-gradient(180deg, #059669 0%, #065f46 50%, #064e3b 100%)',
-        }}
+        className="fixed top-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-card transition-[width] duration-200"
+        style={{ width: 'var(--sidebar-width, 240px)' }}
       >
-        {/* Logo */}
-        <div className="px-5 h-[56px] flex items-center gap-3 border-b border-white/10 shrink-0">
-          <div className="w-7 h-7 rounded-md bg-white/20 flex items-center justify-center text-white">
-            <FileText size={14} />
+        <div className="flex h-14 items-center gap-2.5 border-b border-border px-3 shrink-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <FileText size={15} />
           </div>
-          <div>
-            <h1 className="font-bold text-white text-sm leading-tight">PTPN I</h1>
-            <p className="text-[10px] text-white/60 font-medium">Regional 8</p>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm font-semibold text-foreground leading-tight truncate">PTPN I</h1>
+              <p className="text-[11px] text-muted-foreground font-medium">Regional 8</p>
+            </div>
+          )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-4">
-          <p className="px-5 text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">
-            Main Menu
-          </p>
+        <nav className="flex-1 overflow-y-auto py-3">
+          {!collapsed && (
+            <p className="px-4 mb-2 text-[11px] font-medium text-muted-foreground">Menu</p>
+          )}
           <ul className="space-y-0.5">
             {navItems.map((item) => {
               if (item.children) {
@@ -116,6 +148,7 @@ export function Sidebar() {
                     <NavParent
                       item={item}
                       defaultOpen={item.children.some((c) => location.pathname === c.to)}
+                      collapsed={collapsed}
                     />
                   </li>
                 )
@@ -125,19 +158,21 @@ export function Sidebar() {
                   <NavLink
                     to={item.to!}
                     end={item.to === '/'}
+                    title={collapsed ? item.label : undefined}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-2 py-1.5 px-3 mx-3 rounded-md text-[13px] font-medium transition-colors',
+                        'flex items-center rounded-md text-[13px] font-medium transition-colors',
+                        collapsed ? 'mx-2 h-9 w-9 justify-center' : 'gap-2.5 py-2 px-3 mx-2',
                         isActive
-                          ? 'bg-white/15 text-white font-semibold border-l-[3px] border-white ml-1'
-                          : 'text-white/70 hover:text-white hover:bg-white/10',
+                          ? 'bg-primary/10 text-primary font-semibold'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                       )
                     }
                   >
-                    <span className={cn('w-6 flex justify-center', location.pathname === item.to ? 'text-white' : 'opacity-60')}>
+                    <span className={cn('flex justify-center shrink-0', collapsed ? '' : 'w-5')}>
                       {item.icon}
                     </span>
-                    <span>{item.label}</span>
+                    {!collapsed && <span className="truncate">{item.label}</span>}
                   </NavLink>
                 </li>
               )
@@ -145,17 +180,23 @@ export function Sidebar() {
           </ul>
         </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-white/10 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-semibold text-white">
-              A
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-white truncate">Administrator</p>
-              <p className="text-[11px] text-white/50 truncate">PTPN I Reg 8</p>
-            </div>
-          </div>
+        <div className="border-t border-border p-2 shrink-0">
+          <Button
+            variant="ghost"
+            size={collapsed ? 'icon' : 'sm'}
+            onClick={toggleSidebar}
+            className={cn('w-full text-muted-foreground hover:text-foreground', collapsed && 'h-9 w-9')}
+            title={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+          >
+            {collapsed ? (
+              <PanelLeft size={16} />
+            ) : (
+              <>
+                <PanelLeftClose size={16} />
+                <span className="ml-2">Ciutkan</span>
+              </>
+            )}
+          </Button>
         </div>
       </aside>
     </>

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Notification, NotificationType } from '@/types'
 import { client } from '@/lib/client'
+import { applyTheme, readTheme, type Theme } from '@/lib/theme'
 
 let nextId = 0
 
@@ -9,9 +10,23 @@ interface AppStore {
   availableUnits: string[]
   availableKomoditas: string[]
   availableYears: number[]
+  sidebarCollapsed: boolean
+  theme: Theme
   addNotification: (message: string, type: NotificationType) => void
   removeNotification: (id: string) => void
+  toggleSidebar: () => void
+  toggleTheme: () => void
   fetchDropdownData: () => Promise<void>
+}
+
+const SIDEBAR_KEY = 'sidebar-collapsed'
+
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === 'true'
+  } catch {
+    return false
+  }
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -19,6 +34,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   availableUnits: [],
   availableKomoditas: [],
   availableYears: [2025, 2026, 2027],
+  sidebarCollapsed: readSidebarCollapsed(),
+  theme: readTheme(),
 
   addNotification: (message: string, type: NotificationType = 'success') => {
     const id = String(++nextId)
@@ -34,6 +51,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => ({
       notifications: state.notifications.filter((n) => n.id !== id),
     }))
+  },
+
+  toggleSidebar: () => {
+    const next = !get().sidebarCollapsed
+    try {
+      localStorage.setItem(SIDEBAR_KEY, String(next))
+    } catch { /* ignore */ }
+    set({ sidebarCollapsed: next })
+  },
+
+  toggleTheme: () => {
+    const next: Theme = get().theme === 'dark' ? 'light' : 'dark'
+    applyTheme(next)
+    set({ theme: next })
   },
 
   fetchDropdownData: async () => {

@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit, FileDown, Trash2, Search, Eye, GitBranch } from 'lucide-react'
+import { Edit, FileDown, Trash2, Eye, GitBranch } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DocxPreview } from '@/components/common/DocxPreview'
+import { SearchInput } from '@/components/common/SearchInput'
+import { FilterBar, FilterSelect } from '@/components/common/FilterBar'
+import { DataTable } from '@/components/common/DataTable'
 import { formatCurrency, formatDate, safe } from '@/lib/utils'
 import type { Kontrak } from '@/types'
 
@@ -87,83 +91,97 @@ export default function RepoKontrak() {
     setPreviewOpen(true)
   }
 
-  const selCls = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-xs shadow-sm'
+  const sortOptions = [
+    { value: 'DESC', label: 'Terbaru ke Terlama' },
+    { value: 'ASC', label: 'Terlama ke Terbaru' },
+  ]
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input placeholder="Cari..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 pl-9 pr-3 rounded-md border border-input bg-white text-sm shadow-sm w-full" />
-        </div>
-        <select value={bulan} onChange={(e) => setBulan(e.target.value)} className={selCls}>
-          <option value="ALL">Semua Bulan</option>
-          {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
-        <select value={unit} onChange={(e) => setUnit(e.target.value)} className={selCls}>
-          <option value="ALL">Semua Unit</option>
-          {units.map((u) => u && <option key={u} value={u!}>{u}</option>)}
-        </select>
-        <select value={pembeli} onChange={(e) => setPembeli(e.target.value)} className={selCls}>
-          <option value="ALL">Semua Pembeli</option>
-          {pembelis.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select value={sort} onChange={(e) => setSort(e.target.value as 'DESC' | 'ASC')} className={selCls}>
-          <option value="DESC">Terbaru ke Terlama</option>
-          <option value="ASC">Terlama ke Terbaru</option>
-        </select>
-      </div>
+      <FilterBar>
+        <SearchInput value={search} onChange={setSearch} placeholder="Cari no kontrak, pembeli..." />
+        <FilterSelect
+          value={bulan}
+          onChange={setBulan}
+          options={[{ value: 'ALL', label: 'Semua Bulan' }, ...months]}
+        />
+        <FilterSelect
+          value={unit}
+          onChange={setUnit}
+          options={[{ value: 'ALL', label: 'Semua Unit' }, ...units.filter(Boolean).map((u) => ({ value: u!, label: u! }))]}
+        />
+        <FilterSelect
+          value={pembeli}
+          onChange={setPembeli}
+          options={[{ value: 'ALL', label: 'Semua Pembeli' }, ...pembelis.map((p) => ({ value: p, label: p }))]}
+        />
+        <FilterSelect value={sort} onChange={(v) => setSort(v as 'DESC' | 'ASC')} options={sortOptions} />
+      </FilterBar>
 
-      <Card>
+      <Card className="border-slate-200/80">
         <CardContent className="p-0">
           {store.isLoading ? <TableSkeleton rows={5} cols={6} /> : filtered.length === 0 ? (
-            <EmptyState title="Belum ada data kontrak" />
+            <EmptyState title="Belum ada data kontrak" description="Buat kontrak baru dari menu Buat Kontrak" />
           ) : (
-            <div className="overflow-auto max-h-[65vh]">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-gray-500 text-xs uppercase tracking-wide sticky top-0 z-10">
-                    <th className="text-left px-3 py-2">No Kontrak</th>
-                    <th className="text-left px-3 py-2">Tanggal</th>
-                    <th className="text-left px-3 py-2">Pembeli</th>
-                    <th className="text-center px-3 py-2">Komoditi</th>
-                    <th className="text-right px-3 py-2">Nilai</th>
-                    <th className="text-center px-3 py-2">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filtered.map((item) => (
-                    <tr key={item.no_kontrak} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-3 py-2.5 font-medium">{item.no_kontrak}</td>
-                      <td className="px-3 py-2.5 text-slate-600">{formatDate(item.tanggal_kontrak)}</td>
-                      <td className="px-3 py-2.5">{(item.pembeli || '-').split('\n')[0]}</td>
-                      <td className="px-3 py-2.5 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {safe(item.komoditi)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-bold">{formatCurrency(item.nilai_transaksi)}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex gap-1 justify-center">
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600" title="Edit kontrak" onClick={() => navigate(`/kontrak?edit=${item.no_kontrak}`)}>
-                            <Edit size={14} />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" title="Trace pembayaran & barang" onClick={() => navigate(`/kontrak-trace?id=${encodeURIComponent(item.no_kontrak)}`)}>
-                            <GitBranch size={14} />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" title="Preview dokumen" onClick={() => handlePreview(item)}>
-                            <Eye size={14} />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" title="Hapus kontrak" onClick={() => setDeleteTarget(item.no_kontrak)}>
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              data={filtered}
+              keyExtractor={(item) => item.no_kontrak}
+              columns={[
+                {
+                  key: 'no',
+                  header: 'No Kontrak',
+                  render: (item) => <span className="font-medium text-slate-900">{item.no_kontrak}</span>,
+                },
+                {
+                  key: 'tgl',
+                  header: 'Tanggal',
+                  render: (item) => <span className="text-slate-600">{formatDate(item.tanggal_kontrak)}</span>,
+                },
+                {
+                  key: 'pembeli',
+                  header: 'Pembeli',
+                  render: (item) => (item.pembeli || '-').split('\n')[0],
+                },
+                {
+                  key: 'komoditi',
+                  header: 'Komoditi',
+                  align: 'center',
+                  render: (item) => (
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
+                      {safe(item.komoditi)}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'nilai',
+                  header: 'Nilai',
+                  align: 'right',
+                  className: 'font-semibold tabular-nums',
+                  render: (item) => formatCurrency(item.nilai_transaksi),
+                },
+                {
+                  key: 'aksi',
+                  header: 'Aksi',
+                  align: 'center',
+                  render: (item) => (
+                    <div className="flex gap-0.5 justify-center opacity-80 group-hover:opacity-100">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" title="Edit" onClick={() => navigate(`/kontrak?edit=${item.no_kontrak}`)}>
+                        <Edit size={14} />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" title="Trace" onClick={() => navigate(`/kontrak-trace?id=${encodeURIComponent(item.no_kontrak)}`)}>
+                        <GitBranch size={14} />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" title="Preview" onClick={() => handlePreview(item)}>
+                        <Eye size={14} />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" title="Hapus" onClick={() => setDeleteTarget(item.no_kontrak)}>
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+            />
           )}
         </CardContent>
       </Card>
@@ -182,18 +200,17 @@ export default function RepoKontrak() {
         <DialogContent className="max-w-[780px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
-              <Eye size={16} className="text-blue-600" />
+              <Eye size={16} className="text-primary" />
               Preview Kontrak
             </DialogTitle>
           </DialogHeader>
-
           {previewData && (
             <>
               <div className="border rounded-lg bg-white overflow-hidden">
                 <DocxPreview url={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} />
               </div>
               <div className="flex justify-end">
-                <a href={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} target="_blank">
+                <a href={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} target="_blank" rel="noreferrer">
                   <Button variant="secondary" className="gap-2">
                     <FileDown size={14} />
                     Download Kontrak .docx

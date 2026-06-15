@@ -3,15 +3,16 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Save, FileDown, RotateCcw, Eye } from 'lucide-react'
+import { FileDown, RotateCcw, Save } from 'lucide-react'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
+import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
@@ -326,10 +327,8 @@ export default function InvoicePage() {
     }
   }, [editNo])
 
-  const ic = 'h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm w-full focus:outline-none focus:ring-1 focus:ring-ring'
-
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <Card>
@@ -352,7 +351,7 @@ export default function InvoicePage() {
               </div>
               <div>
                 <Label className="text-xs">No Invoice *</Label>
-                <input {...register('no_invoice')} className={ic} list="invoice-datalist" />
+                <Input {...register('no_invoice')} list="invoice-datalist" />
                 <datalist id="invoice-datalist">
                   {invoiceStore.data.map((i) => <option key={i.no_invoice} value={i.no_invoice} />)}
                 </datalist>
@@ -363,28 +362,27 @@ export default function InvoicePage() {
               </div>
               <div>
                 <Label className="text-xs">Tanggal Transaksi *</Label>
-                <input type="date" {...register('tanggal_transaksi')} className={ic} />
+                <Input type="date" {...register('tanggal_transaksi')} />
               </div>
               {showUnitSelector && (
                 <div className="col-span-2">
                   <Label className="text-xs">Unit yang Diinvoice</Label>
-                  <select {...register('nama_unit')} className={ic}>
+                  <NativeSelect {...register('nama_unit')}>
                     <option value="">-- Pilih Unit (opsional) --</option>
                     {unitOptions.map(u => (
                       <option key={u.nama_unit} value={u.nama_unit}>
                         {u.nama_unit}{u.volume > 0 ? ` — ${u.volume.toLocaleString('id-ID')} ${k?.satuan || 'Kg'}` : ''}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                   {!selectedUnit && <p className="text-xs text-slate-400 mt-1">Kosongkan jika invoice untuk keseluruhan kontrak</p>}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Kontrak Summary + Multi-Invoice */}
-          {k && pricing && (
-            <Card>
+          {k && pricing ? (
+          <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold">Data Kontrak & Pembayaran Bertahap</CardTitle>
               </CardHeader>
@@ -447,7 +445,7 @@ export default function InvoicePage() {
                     {(() => {
                       const reg = register('jumlah_pembayaran')
                       return (
-                        <input
+                        <Input
                           type="number"
                           step="1"
                           name={reg.name}
@@ -457,7 +455,6 @@ export default function InvoicePage() {
                             reg.onChange(e)
                             setLiveJumlah(Number(e.target.value) || 0)
                           }}
-                          className={ic}
                           placeholder={formatCurrency(sisaKontrak)}
                         />
                       )
@@ -474,9 +471,15 @@ export default function InvoicePage() {
                 </div>
               </CardContent>
             </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Pilih No Kontrak untuk melihat data pembayaran dan progress invoice.
+              </CardContent>
+            </Card>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={isSubmitting} className="gap-2">
               <Save size={14} />
               {isSubmitting ? 'Menyimpan...' : isExisting ? 'Simpan Perubahan' : 'Buat Invoice'}
@@ -498,33 +501,20 @@ export default function InvoicePage() {
         </form>
       </div>
 
-      {/* Preview Panel — exact format from forms.js buildInvoicePreview() */}
-      <div className="w-[600px] shrink-0">
-        <div className="sticky top-[76px] max-h-[calc(100vh-100px)] overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-800">Preview Proforma Invoice</span>
-            <Eye size={14} className="text-slate-400" />
-          </div>
-          <div className="p-2.5">
-            {!k ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Eye size={32} className="text-slate-300 mb-3" />
-                <p className="text-sm text-slate-500 font-medium">Belum ada data</p>
-                <p className="text-xs text-slate-400 mt-1">Pilih No Kontrak untuk melihat preview</p>
-              </div>
-            ) : (
-              <InvoicePreviewContent
-                noInv={watch('no_invoice') || '[No Invoice]'}
-                noK={selectedKontrak || '[No Kontrak]'}
-                tgl={watch('tanggal_transaksi') || ''}
-                k={k}
-                pricing={pricing}
-                jumlahPembayaran={Number(watch('jumlah_pembayaran')) || 0}
-              />
-            )}
-          </div>
-        </div>
-      </div>
+      <PreviewPanel
+        title="Preview Proforma Invoice"
+        isEmpty={!k}
+        emptyDescription="Pilih No Kontrak untuk melihat preview"
+      >
+        <InvoicePreviewContent
+          noInv={watch('no_invoice') || '[No Invoice]'}
+          noK={selectedKontrak || '[No Kontrak]'}
+          tgl={watch('tanggal_transaksi') || ''}
+          k={k!}
+          pricing={pricing}
+          jumlahPembayaran={Number(watch('jumlah_pembayaran')) || 0}
+        />
+      </PreviewPanel>
     </div>
   )
 }
