@@ -210,30 +210,27 @@ export default function LaporanPage() {
         </div>
       </div>
 
-      {/* Summary — padat, nominal penuh tanpa ellipsis */}
+      {/* Summary — nilai menyesuaikan lebar kartu */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <StatCard compact wrapValue label="Total Cash In" value={formatCurrency(summary.cashIn)} icon={Wallet} />
-        <StatCard compact wrapValue label="Total Pendapatan" value={formatCurrency(summary.pendapatan)} icon={TrendingUp} />
-        <StatCard compact wrapValue label="Kekurangan Bayar" value={formatCurrency(summary.sisaBayar)} icon={AlertTriangle} iconClassName="text-amber-500" />
+        <StatCard fitValue label="Total Cash In" value={formatCurrency(summary.cashIn)} icon={Wallet} />
+        <StatCard fitValue label="Total Pendapatan" value={formatCurrency(summary.pendapatan)} icon={TrendingUp} />
+        <StatCard fitValue label="Kekurangan Bayar" value={formatCurrency(summary.sisaBayar)} icon={AlertTriangle} iconClassName="text-amber-500" />
         <StatCard
-          compact
-          wrapValue
+          fitValue
           label="Sisa Barang (DO)"
           value={formatNumber(summary.sisaVolume)}
           subtitle={`Butir: ${formatNumber(summary.sisaVolumeButir)}`}
           icon={Package}
         />
         <StatCard
-          compact
-          wrapValue
+          fitValue
           label="Harga Rata-Rata"
           value={`${formatCurrency(summary.hargaRataKg)}/Kg`}
           subtitle={`${formatCurrency(summary.hargaRataButir)}/Butir`}
           icon={BarChart3}
         />
         <StatCard
-          compact
-          wrapValue
+          fitValue
           label="Barang Terkirim"
           value={formatNumber(summary.barangTerkirimKg)}
           subtitle={`Butir: ${formatNumber(summary.barangTerkirimButir)}`}

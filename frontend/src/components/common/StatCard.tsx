@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import { formatTrendPct, type TrendDelta } from '@/lib/trendUtils'
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { FitText } from '@/components/common/FitText'
 
 interface StatCardProps {
   label: string
@@ -16,9 +17,11 @@ interface StatCardProps {
   wrapValue?: boolean
   /** Ukuran ringkas untuk halaman data padat (mis. Laporan) */
   compact?: boolean
+  /** Skala font nilai agar selalu muat lebar kartu */
+  fitValue?: boolean
 }
 
-export function StatCard({ label, value, subtitle, icon: Icon, iconClassName, trend, onClick, wrapValue, compact }: StatCardProps) {
+export function StatCard({ label, value, subtitle, icon: Icon, iconClassName, trend, onClick, wrapValue, compact, fitValue }: StatCardProps) {
   const trendUp = trend && trend.pct > 0
   const trendDown = trend && trend.pct < 0
   const trendFlat = trend && trend.pct === 0
@@ -31,23 +34,27 @@ export function StatCard({ label, value, subtitle, icon: Icon, iconClassName, tr
       )}
       onClick={onClick}
     >
-      <CardContent className={cn('p-4', compact && 'p-3.5', wrapValue && !compact && 'p-5')}>
+      <CardContent className={cn('p-4', (compact || fitValue) && 'p-3.5', wrapValue && !compact && !fitValue && 'p-5')}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className={cn(
               'text-xs text-muted-foreground font-medium',
-              wrapValue ? 'leading-snug' : 'truncate',
+              (wrapValue || fitValue) ? 'leading-snug' : 'truncate',
             )}>
               {label}
             </p>
-            <p className={cn(
-              'font-bold text-foreground tabular-nums',
-              compact && 'mt-1 text-sm leading-snug break-words',
-              wrapValue && !compact && 'mt-1.5 text-base sm:text-lg leading-snug break-words',
-              !wrapValue && !compact && 'mt-1 text-2xl truncate',
-            )}>
-              {value}
-            </p>
+            {fitValue ? (
+              <FitText className="mt-1">{value}</FitText>
+            ) : (
+              <p className={cn(
+                'font-bold text-foreground tabular-nums',
+                compact && 'mt-1 text-sm leading-snug break-words',
+                wrapValue && !compact && 'mt-1.5 text-base sm:text-lg leading-snug break-words',
+                !wrapValue && !compact && 'mt-1 text-2xl truncate',
+              )}>
+                {value}
+              </p>
+            )}
             {trend && (
               <div className={cn(
                 'flex items-center gap-1 mt-1 text-xs font-medium',
