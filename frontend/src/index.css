@@ -21,6 +21,8 @@
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 160 84% 39%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
     --radius: 0.5rem;
 
     --chart-1: 160 84% 39%;
@@ -48,6 +50,8 @@
     --border: 217 33% 18%;
     --input: 217 33% 18%;
     --ring: 160 70% 42%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 96%;
   }
 }
 
@@ -109,6 +113,178 @@
 
   .date-input::-webkit-datetime-edit {
     padding: 0;
+  }
+
+  .date-input::-webkit-datetime-edit,
+  .date-input::-webkit-datetime-edit-fields-wrapper,
+  .date-input::-webkit-datetime-edit-text,
+  .date-input::-webkit-datetime-edit-month-field,
+  .date-input::-webkit-datetime-edit-day-field,
+  .date-input::-webkit-datetime-edit-year-field {
+    color: hsl(var(--foreground));
+  }
+}
+
+/* Dark mode: kontras teks & background hardcoded di halaman lama */
+@layer utilities {
+  .dark .text-slate-900,
+  .dark .text-slate-800,
+  .dark .text-slate-700,
+  .dark .text-gray-900,
+  .dark .text-gray-800,
+  .dark .text-gray-700 {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .text-slate-600,
+  .dark .text-slate-500,
+  .dark .text-gray-600,
+  .dark .text-gray-500 {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dark .text-slate-400,
+  .dark .text-slate-300,
+  .dark .text-gray-400,
+  .dark .text-gray-300 {
+    color: hsl(var(--muted-foreground) / 0.85);
+  }
+
+  .dark .text-green-600,
+  .dark .text-green-700,
+  .dark .text-green-800 {
+    color: hsl(142 71% 55%);
+  }
+
+  .dark .text-emerald-600,
+  .dark .text-emerald-700 {
+    color: hsl(160 70% 52%);
+  }
+
+  .dark .text-red-500,
+  .dark .text-red-600,
+  .dark .text-red-700,
+  .dark .text-rose-600 {
+    color: hsl(0 84% 68%);
+  }
+
+  .dark .text-amber-600,
+  .dark .text-amber-700 {
+    color: hsl(38 92% 60%);
+  }
+
+  .dark .text-blue-600,
+  .dark .text-blue-800 {
+    color: hsl(217 91% 68%);
+  }
+
+  .dark .text-indigo-500,
+  .dark .text-indigo-600 {
+    color: hsl(239 84% 74%);
+  }
+
+  .dark .bg-white {
+    background-color: hsl(var(--card));
+  }
+
+  .dark .bg-gray-50,
+  .dark .bg-slate-50 {
+    background-color: hsl(var(--muted) / 0.5);
+  }
+
+  .dark .bg-gray-100 {
+    background-color: hsl(var(--muted));
+  }
+
+  .dark .bg-amber-50\/30 {
+    background-color: hsl(38 92% 20% / 0.25);
+  }
+
+  .dark .bg-amber-100 {
+    background-color: hsl(38 92% 20% / 0.45);
+  }
+
+  .dark .bg-red-100 {
+    background-color: hsl(0 72% 20% / 0.45);
+  }
+
+  .dark .bg-green-100 {
+    background-color: hsl(142 71% 15% / 0.45);
+  }
+
+  .dark .bg-blue-50 {
+    background-color: hsl(217 91% 15% / 0.35);
+  }
+
+  .dark .bg-amber-50 {
+    background-color: hsl(38 92% 15% / 0.35);
+  }
+
+  .dark .text-blue-900 {
+    color: hsl(214 95% 90%);
+  }
+
+  .dark .text-amber-800 {
+    color: hsl(38 92% 75%);
+  }
+
+  .dark .border-amber-200 {
+    border-color: hsl(38 70% 30%);
+  }
+
+  .dark .border-blue-200 {
+    border-color: hsl(217 70% 30%);
+  }
+
+  .dark .hover\:bg-gray-50:hover,
+  .dark .hover\:bg-slate-50:hover,
+  .dark .hover\:bg-muted\/60:hover {
+    background-color: hsl(var(--muted) / 0.6);
+  }
+
+  .dark .hover\:bg-slate-100:hover,
+  .dark .hover\:bg-muted:hover {
+    background-color: hsl(var(--muted));
+  }
+
+  .dark .hover\:text-gray-800:hover {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .hover\:text-blue-800:hover {
+    color: hsl(217 91% 78%);
+  }
+
+  .dark .border-slate-200,
+  .dark .border-slate-200\/80 {
+    border-color: hsl(var(--border));
+  }
+
+  .dark .hover\:border-slate-300:hover {
+    border-color: hsl(var(--border));
+  }
+
+  .dark .bg-slate-200,
+  .dark .bg-slate-100 {
+    background-color: hsl(var(--muted));
+  }
+
+  .dark .recharts-cartesian-axis-tick-value {
+    fill: hsl(var(--muted-foreground));
+  }
+
+  .dark .recharts-legend-item-text {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .recharts-pie-label-text {
+    fill: hsl(var(--foreground));
+  }
+
+  .dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--foreground));
   }
 }
 

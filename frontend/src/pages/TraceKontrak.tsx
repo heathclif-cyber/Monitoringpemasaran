@@ -21,9 +21,9 @@ import type { KontrakTrace, TraceInvoice, PaymentStatus } from '@/types'
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function statusColor(s: PaymentStatus) {
-  if (s === 'LUNAS') return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-  if (s === 'SEBAGIAN') return 'bg-amber-100 text-amber-700 border-amber-200'
-  return 'bg-red-100 text-red-700 border-red-200'
+  if (s === 'LUNAS') return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+  if (s === 'SEBAGIAN') return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+  return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
 }
 
 function StatusBadge({ status }: { status: PaymentStatus }) {
@@ -315,7 +315,7 @@ function InvoiceExpandable({
       {/* header */}
       <button
         onClick={() => setOpen(!open)}
-        className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+        className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/60 transition-colors"
       >
         <span className={`transition-transform duration-200 text-gray-400 shrink-0 ${open ? 'rotate-90' : ''}`}>
           <ChevronRight size={15} />

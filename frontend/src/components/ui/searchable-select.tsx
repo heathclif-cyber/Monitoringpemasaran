@@ -59,20 +59,20 @@ export function SearchableSelect({ options, value, onChange, placeholder = '-- P
           onChange={e => { setQuery(e.target.value); if (!e.target.value) onChange('') }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder}
-          className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm w-full focus:outline-none focus:ring-1 focus:ring-ring pr-8"
+          className="h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm w-full focus:outline-none focus:ring-1 focus:ring-ring pr-8"
         />
         <button
           type="button"
           onClick={value ? handleClear : () => setOpen(o => !o)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
         >
           {value ? <X size={14} /> : <ChevronDown size={14} />}
         </button>
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-slate-400">Tidak ditemukan</div>
+            <div className="px-3 py-2 text-sm text-muted-foreground">Tidak ditemukan</div>
           ) : (
             filtered.map(o => (
               <button
@@ -80,8 +80,8 @@ export function SearchableSelect({ options, value, onChange, placeholder = '-- P
                 type="button"
                 onMouseDown={() => handleSelect(o)}
                 className={cn(
-                  'w-full text-left px-3 py-2 text-sm hover:bg-slate-100 transition-colors',
-                  o.value === value && 'bg-brand-50 text-brand-700 font-medium'
+                  'w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors',
+                  o.value === value && 'bg-accent text-accent-foreground font-medium',
                 )}
               >
                 {o.label}

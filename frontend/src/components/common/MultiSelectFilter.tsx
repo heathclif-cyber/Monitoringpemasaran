@@ -65,7 +65,7 @@ export function MultiSelectFilter({
         <button
           type="button"
           onClick={toggleAll}
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs font-medium hover:bg-slate-100 transition-colors"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
         >
           <span className={cn('flex h-4 w-4 items-center justify-center rounded border', allSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-slate-300')}>
             {allSelected && <Check size={10} />}
@@ -81,7 +81,7 @@ export function MultiSelectFilter({
                 key={opt}
                 type="button"
                 onClick={() => toggle(opt)}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-slate-100 transition-colors text-left"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-muted transition-colors text-left"
               >
                 <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', checked ? 'bg-primary border-primary text-primary-foreground' : 'border-slate-300')}>
                   {checked && <Check size={10} />}

@@ -238,7 +238,7 @@ export default function LaporanPage() {
             <div className="overflow-auto max-h-[70vh]">
               <table className="text-xs" style={{ minWidth: '3600px' }}>
                 <thead>
-                  <tr className="border-b bg-slate-50 text-xs font-medium text-muted-foreground sticky top-0 z-10">
+                  <tr className="border-b bg-muted/50 text-xs font-medium text-muted-foreground sticky top-0 z-10">
                     <th className="text-left px-3 py-2">No. DO</th>
                     <th className="text-left px-3 py-2">No Invoice</th>
                     <th className="text-left px-3 py-2">No Kontrak</th>
@@ -277,7 +277,7 @@ export default function LaporanPage() {
                   {sorted.map((row, idx) => {
                     const isBypass = row.No_DO.startsWith('BYPASS-')
                     return (
-                      <tr key={`${row.No_DO}-${idx}`} className={isBypass ? 'bg-amber-50/30' : 'hover:bg-gray-50 transition-colors'}>
+                      <tr key={`${row.No_DO}-${idx}`} className={isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'hover:bg-muted/60 transition-colors'}>
                         <td className="px-2 py-1.5 font-medium max-w-[180px] whitespace-normal break-words">{row.No_DO}</td>
                         <td className="px-2 py-1.5 max-w-[160px] whitespace-normal break-words">{row.No_Invoice}</td>
                         <td className="px-2 py-1.5 font-medium text-indigo-600 max-w-[200px] whitespace-normal break-words">{row.No_Kontrak}</td>
@@ -312,7 +312,7 @@ export default function LaporanPage() {
                         {(['Superman', 'Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const).map((field) => (
                           <td key={field} className="px-1 py-1">
                             <input
-                              className="w-full text-xs border border-transparent hover:border-slate-200 rounded px-1 py-0.5 bg-transparent focus:border-blue-300 focus:outline-none"
+                              className="w-full text-xs border border-transparent hover:border-border rounded px-1 py-0.5 bg-transparent text-foreground focus:border-ring focus:outline-none"
                               defaultValue={row[field] || ''}
                               onBlur={(e) => {
                                 if (e.target.value !== (row[field] || '')) {
@@ -336,7 +336,7 @@ export default function LaporanPage() {
                               </a>
                             )}
                             <input
-                              className="flex-1 min-w-[120px] text-xs border border-transparent hover:border-slate-200 rounded px-1 py-0.5 bg-transparent focus:border-blue-300 focus:outline-none"
+                              className="flex-1 min-w-[120px] text-xs border border-transparent hover:border-border rounded px-1 py-0.5 bg-transparent text-foreground focus:border-ring focus:outline-none"
                               defaultValue={row.Link_Deklarasi_Penerimaan || ''}
                               onBlur={(e) => {
                                 if (e.target.value !== (row.Link_Deklarasi_Penerimaan || '')) {
@@ -380,7 +380,7 @@ export default function LaporanPage() {
                             {!isBypass && (
                               <>
                                 <input
-                                  className="flex-1 min-w-[120px] text-xs border border-transparent hover:border-slate-200 rounded px-1 py-0.5 bg-transparent focus:border-blue-300 focus:outline-none"
+                                  className="flex-1 min-w-[120px] text-xs border border-transparent hover:border-border rounded px-1 py-0.5 bg-transparent text-foreground focus:border-ring focus:outline-none"
                                   defaultValue={row.Link_Berita_Acara_Serah_Terima || ''}
                                   onBlur={(e) => {
                                     if (e.target.value !== (row.Link_Berita_Acara_Serah_Terima || '')) {

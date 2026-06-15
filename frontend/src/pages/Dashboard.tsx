@@ -31,6 +31,16 @@ const CHART_PRIMARY = '#059669'
 const CHART_SECONDARY = '#10b981'
 const CHART_TERTIARY = '#f59e0b'
 
+function useChartTheme() {
+  const theme = useAppStore((s) => s.theme)
+  const isDark = theme === 'dark'
+  return {
+    gridStroke: isDark ? 'hsl(217 33% 22%)' : '#f0f0f0',
+    tick: { fontSize: 11, fill: isDark ? 'hsl(215 20% 65%)' : '#64748b' },
+    legendStyle: { fontSize: 11, color: isDark ? 'hsl(210 40% 90%)' : '#334155' },
+  }
+}
+
 function StatCards() {
   const data = useDashboardStore((s) => s.data)
   if (!data) return null
@@ -78,6 +88,7 @@ function StatCards() {
 
 function TrendChart() {
   const data = useDashboardStore((s) => s.data)
+  const chartTheme = useChartTheme()
   if (!data) return null
 
   const chartData = data.charts.bulanan.labels.map((label, i) => ({
@@ -95,11 +106,11 @@ function TrendChart() {
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="bulan" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatShortNumber(v)} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} />
+            <XAxis dataKey="bulan" tick={chartTheme.tick} />
+            <YAxis tick={chartTheme.tick} tickFormatter={(v) => formatShortNumber(v)} />
             <Tooltip formatter={(value: number) => formatCurrency(value)} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend wrapperStyle={chartTheme.legendStyle} />
             <Line type="monotone" dataKey="Pendapatan" stroke={CHART_PRIMARY} strokeWidth={2} dot={{ r: 3 }} />
             <Line type="monotone" dataKey="Invoice" stroke={CHART_SECONDARY} strokeWidth={2} dot={{ r: 3 }} />
             <Line type="monotone" dataKey="Cash In" stroke={CHART_TERTIARY} strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
@@ -112,6 +123,7 @@ function TrendChart() {
 
 function UnitChart() {
   const data = useDashboardStore((s) => s.data)
+  const chartTheme = useChartTheme()
   if (!data) return null
 
   const chartData = data.charts.unit.labels.map((label, i) => ({
@@ -127,9 +139,9 @@ function UnitChart() {
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 10, left: 60, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => formatShortNumber(v)} />
-            <YAxis type="category" dataKey="unit" tick={{ fontSize: 11 }} width={100} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} />
+            <XAxis type="number" tick={chartTheme.tick} tickFormatter={(v) => formatShortNumber(v)} />
+            <YAxis type="category" dataKey="unit" tick={chartTheme.tick} width={100} />
             <Tooltip formatter={(value: number) => formatCurrency(value)} />
             <Bar dataKey="pendapatan" radius={[0, 3, 3, 0]}>
               {chartData.map((_, i) => (
@@ -145,6 +157,7 @@ function UnitChart() {
 
 function VolumeChart() {
   const data = useDashboardStore((s) => s.data)
+  const chartTheme = useChartTheme()
   if (!data) return null
 
   const chartData = data.charts.bulanan.labels.map((label, i) => ({
@@ -161,11 +174,11 @@ function VolumeChart() {
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="bulan" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatShortNumber(v)} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} />
+            <XAxis dataKey="bulan" tick={chartTheme.tick} />
+            <YAxis tick={chartTheme.tick} tickFormatter={(v) => formatShortNumber(v)} />
             <Tooltip formatter={(value: number) => formatNumberDec(value)} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend wrapperStyle={chartTheme.legendStyle} />
             <Bar dataKey="Volume Kg" fill="#f97316" radius={[3, 3, 0, 0]} />
             <Bar dataKey="Volume Butir" fill="var(--chart-2)" radius={[3, 3, 0, 0]} />
           </BarChart>
@@ -252,7 +265,7 @@ function MonthlyBreakdown() {
       <CardContent className="p-0">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-slate-50 text-xs font-medium text-muted-foreground">
+            <tr className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
               <th className="text-left px-4 py-2.5">Bulan</th>
               <th className="text-right px-4 py-2.5">Pendapatan (Omset)</th>
               <th className="text-right px-4 py-2.5">Nilai Invoice</th>
@@ -262,7 +275,7 @@ function MonthlyBreakdown() {
           </thead>
           <tbody className="divide-y">
             {rows.map((row) => (
-              <tr key={row.bulan} className="hover:bg-gray-50 transition-colors">
+              <tr key={row.bulan} className="hover:bg-muted/60 transition-colors">
                 <td className="px-4 py-2 font-medium text-gray-700">{row.bulan}</td>
                 <td className="px-4 py-2 text-right">
                   {row.pendapatan > 0 ? formatCurrency(row.pendapatan) : <span className="text-gray-300">-</span>}
@@ -284,7 +297,7 @@ function MonthlyBreakdown() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 bg-gray-50 font-semibold">
+            <tr className="border-t-2 bg-muted/50 font-semibold">
               <td className="px-4 py-2">TOTAL</td>
               <td className="px-4 py-2 text-right">{formatCurrency(totals.pendapatan)}</td>
               <td className="px-4 py-2 text-right">{formatCurrency(totals.invoice)}</td>
@@ -360,7 +373,7 @@ function SapStatus() {
             <p className="text-xs text-muted-foreground mb-2">Per bulan · berdasarkan rencana pengambilan</p>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-slate-50 text-xs font-medium text-muted-foreground">
+                <tr className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
                   <th className="text-left px-3 py-2.5">Bulan</th>
                   <th className="text-center px-3 py-2.5">Kontrak SAP</th>
                   <th className="text-center px-3 py-2.5">SO SAP</th>
@@ -370,7 +383,7 @@ function SapStatus() {
               </thead>
               <tbody className="divide-y">
                 {rows.map((row) => (
-                  <tr key={row.bulan} className="hover:bg-gray-50 transition-colors">
+                  <tr key={row.bulan} className="hover:bg-muted/60 transition-colors">
                     <td className="px-3 py-2 font-medium text-gray-700">{row.bulan}</td>
                     <td className="px-3 py-2 text-center"><MissingBadge val={row.kontrak} /></td>
                     <td className="px-3 py-2 text-center"><MissingBadge val={row.so} /></td>
@@ -443,8 +456,8 @@ export default function Dashboard() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <AlertTriangle size={40} className="text-rose-400 mb-3" />
-            <p className="text-sm font-medium text-slate-700">{fetchError}</p>
-            <p className="text-xs text-slate-400 mt-1">Periksa koneksi database atau coba lagi</p>
+            <p className="text-sm font-medium text-foreground">{fetchError}</p>
+            <p className="text-xs text-muted-foreground mt-1">Periksa koneksi database atau coba lagi</p>
             <Button variant="outline" size="sm" onClick={doFetch} className="mt-4 gap-2">
               <RefreshCw size={14} /> Coba Lagi
             </Button>

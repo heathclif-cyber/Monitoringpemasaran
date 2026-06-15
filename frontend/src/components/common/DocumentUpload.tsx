@@ -115,7 +115,7 @@ export function DocumentUpload({
             href={latest.web_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
+            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
           >
             <ExternalLink size={10} /> Buka
           </a>

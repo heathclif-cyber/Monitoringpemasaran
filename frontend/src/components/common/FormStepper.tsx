@@ -32,7 +32,7 @@ export function FormStepper({ steps, activeStep, onStepClick, className }: FormS
                 className={cn(
                   'flex items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors',
                   isActive && 'bg-primary/10 text-primary',
-                  isComplete && !isActive && 'text-slate-600 hover:bg-slate-50',
+                  isComplete && !isActive && 'text-muted-foreground hover:bg-muted/50',
                   !isActive && !isComplete && 'text-muted-foreground',
                   isClickable && 'cursor-pointer',
                   !isClickable && 'cursor-default',
@@ -56,7 +56,7 @@ export function FormStepper({ steps, activeStep, onStepClick, className }: FormS
                 </span>
               </button>
               {index < steps.length - 1 && (
-                <div className={cn('mx-1 h-px w-4 sm:w-8', index < activeStep ? 'bg-primary/40' : 'bg-slate-200')} />
+                <div className={cn('mx-1 h-px w-4 sm:w-8', index < activeStep ? 'bg-primary/40' : 'bg-border')} />
               )}
             </li>
           )
