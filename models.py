@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from database import Base
 
 class Kontrak(Base):
@@ -122,6 +123,7 @@ class DeliveryOrder(Base):
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
     link_deklarasi_penerimaan = Column(String, nullable=True)
+    link_berita_acara_serah_terima = Column(String, nullable=True)
     
     rencana_pengambilan = Column(Date, nullable=True)
     
@@ -151,3 +153,16 @@ class LaporanBypass(Base):
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
     link_deklarasi_penerimaan = Column(String, nullable=True)
+
+
+class DocumentUpload(Base):
+    __tablename__ = "document_upload"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    entity_type = Column(String, nullable=False, index=True)
+    entity_id = Column(String, nullable=False, index=True)
+    doc_type = Column(String, nullable=False)
+    file_name = Column(String, nullable=False)
+    onedrive_item_id = Column(String, nullable=True)
+    web_url = Column(String, nullable=False)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())

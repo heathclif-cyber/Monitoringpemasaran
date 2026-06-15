@@ -160,6 +160,7 @@ def get_laporan(db: Session = Depends(get_db)):
             "DO_SAP": do.do_sap if do else "",
             "Billing": do.billing_sap if do else "",
             "Link_Deklarasi_Penerimaan": do.link_deklarasi_penerimaan if do else "",
+            "Link_Berita_Acara_Serah_Terima": do.link_berita_acara_serah_terima if do else "",
             "Satuan": k.satuan or "Kg"
         }
 
@@ -234,7 +235,8 @@ def get_laporan(db: Session = Depends(get_db)):
             "SO_SAP": b.so_sap or "",
             "DO_SAP": b.do_sap or "",
             "Billing": b.billing_sap or "",
-            "Link_Deklarasi_Penerimaan": b.link_deklarasi_penerimaan or ""
+            "Link_Deklarasi_Penerimaan": b.link_deklarasi_penerimaan or "",
+            "Link_Berita_Acara_Serah_Terima": "",
         })
 
     return rows
@@ -268,6 +270,7 @@ def update_sap_fields(data: dict, db: Session = Depends(get_db)):
         if "DO_SAP" in data: do.do_sap = data["DO_SAP"]
         if "Billing" in data: do.billing_sap = data["Billing"]
         if "Link_Deklarasi_Penerimaan" in data: do.link_deklarasi_penerimaan = data["Link_Deklarasi_Penerimaan"]
+        if "Link_Berita_Acara_Serah_Terima" in data: do.link_berita_acara_serah_terima = data["Link_Berita_Acara_Serah_Terima"]
     
     db.commit()
     return {"success": True}

@@ -15,6 +15,7 @@ const RepoKontrak = lazy(() => import('@/pages/RepoKontrak'))
 const RepoInvoice = lazy(() => import('@/pages/RepoInvoice'))
 const RepoDO = lazy(() => import('@/pages/RepoDO'))
 const TraceKontrak = lazy(() => import('@/pages/TraceKontrak'))
+const UploadPage = lazy(() => import('@/pages/UploadPage'))
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/delivery-order" element={<DOPage />} />
           <Route path="/laporan" element={<LaporanPage />} />
           <Route path="/bypass" element={<BypassPage />} />
+          <Route path="/upload" element={<UploadPage />} />
           <Route path="/repo/kontrak" element={<RepoKontrak />} />
           <Route path="/repo/invoice" element={<RepoInvoice />} />
           <Route path="/repo/do" element={<RepoDO />} />

@@ -15,6 +15,7 @@ import { FormStepper, FormStepActions, type FormStep } from '@/components/common
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { KontrakPreview } from '@/components/feature/KontrakPreview'
+import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
 import {
@@ -700,6 +701,10 @@ export default function KontrakPage() {
             </CardContent>
           </Card>
           </>
+          )}
+
+          {exportNo && activeStep === KONTRAK_STEPS.length - 1 && (
+            <DocumentUpload entityType="kontrak" entityId={exportNo} docType="kontrak" />
           )}
 
           <FormStepActions

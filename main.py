@@ -18,6 +18,7 @@ from api.r_invoice import router as invoice_router
 from api.r_do import router as do_router
 from api.r_dashboard import router as dashboard_router
 from api.r_laporan import router as laporan_router
+from api.r_documents import router as documents_router
 
 # --- App Initialization ---
 app = FastAPI(title="PTPN I - Sales Document Automation")
@@ -64,6 +65,7 @@ def startup_event():
             add_column_safely("laporan_bypass", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
             add_column_safely("kontrak_unit", "volume", "FLOAT DEFAULT 0.0")
             add_column_safely("invoice", "nama_unit", "VARCHAR DEFAULT NULL")
+            add_column_safely("delivery_order", "link_berita_acara_serah_terima", "VARCHAR DEFAULT NULL")
 
             # Normalize unit names (fix inconsistent spacing vs hyphens)
             try:
@@ -120,6 +122,7 @@ app.include_router(invoice_router)
 app.include_router(do_router)
 app.include_router(dashboard_router)
 app.include_router(laporan_router)
+app.include_router(documents_router)
 
 
 # --- Root Page: serve React SPA or fallback to Jinja2 ---

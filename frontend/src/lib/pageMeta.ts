@@ -35,6 +35,11 @@ const PAGE_META: Record<string, PageMeta> = {
     description: 'Entri manual transaksi tanpa kontrak',
     breadcrumb: 'Laporan / Bypass',
   },
+  '/upload': {
+    title: 'Upload Dokumen',
+    description: 'Unggah kontrak, invoice, DO, deklarasi, dan berita acara ke OneDrive',
+    breadcrumb: 'Dokumen / Upload',
+  },
   '/repo/kontrak': {
     title: 'Arsip Kontrak',
     description: 'Kelola dan unduh dokumen kontrak tersimpan',

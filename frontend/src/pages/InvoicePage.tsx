@@ -13,6 +13,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
 import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
@@ -477,6 +478,13 @@ export default function InvoicePage() {
                 Pilih No Kontrak untuk melihat data pembayaran dan progress invoice.
               </CardContent>
             </Card>
+          )}
+
+          {exportNo && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <DocumentUpload entityType="invoice" entityId={exportNo} docType="invoice" />
+              <DocumentUpload entityType="invoice" entityId={exportNo} docType="kuitansi" />
+            </div>
           )}
 
           <div className="flex flex-wrap gap-3">

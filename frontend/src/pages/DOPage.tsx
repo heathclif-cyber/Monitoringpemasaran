@@ -13,6 +13,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
 import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency } from '@/lib/utils'
 import { calculateProportionalVolume, calculateSelisih, getVolumePercentage } from '@/utils/doUtils'
@@ -365,6 +366,14 @@ export default function DOPage() {
                 Pilih No Invoice untuk melihat ringkasan kontrak dan invoice.
               </CardContent>
             </Card>
+          )}
+
+          {exportNo && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <DocumentUpload entityType="do" entityId={exportNo} docType="do" />
+              <DocumentUpload entityType="do" entityId={exportNo} docType="deklarasi" />
+              <DocumentUpload entityType="do" entityId={exportNo} docType="berita_acara" />
+            </div>
           )}
 
           <div className="flex flex-wrap gap-3">

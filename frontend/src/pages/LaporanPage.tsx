@@ -20,6 +20,7 @@ import {
 } from '@/utils/laporanUtils'
 import { formatCurrency, formatNumber, formatDate, safe } from '@/lib/utils'
 import type { LaporanRow } from '@/types'
+import { DocumentUpload } from '@/components/common/DocumentUpload'
 import * as XLSX from 'xlsx'
 
 const MONTHS_ID = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -268,6 +269,7 @@ export default function LaporanPage() {
                     <th className="text-left px-3 py-2">DO SAP</th>
                     <th className="text-left px-3 py-2">Billing</th>
                     <th className="text-left px-3 py-2">Link Deklarasi</th>
+                    <th className="text-left px-3 py-2">Berita Acara</th>
                     <th className="text-center px-3 py-2">Aksi</th>
                   </tr>
                 </thead>
@@ -322,7 +324,7 @@ export default function LaporanPage() {
                           </td>
                         ))}
                         <td className="px-1 py-1">
-                          <div className="flex flex-col gap-0.5">
+                          <div className="flex flex-col gap-0.5 min-w-[140px]">
                             {(row.Link_Deklarasi_Penerimaan || '').startsWith('http') && (
                               <a
                                 href={row.Link_Deklarasi_Penerimaan!}
@@ -343,6 +345,59 @@ export default function LaporanPage() {
                               }}
                               placeholder="-"
                             />
+                            {!isBypass && (
+                              <DocumentUpload
+                                compact
+                                entityType="do"
+                                entityId={row.No_DO}
+                                docType="deklarasi"
+                                onUploaded={() => fetch()}
+                              />
+                            )}
+                            {isBypass && (
+                              <DocumentUpload
+                                compact
+                                entityType="bypass"
+                                entityId={row.No_DO.replace('BYPASS-', '')}
+                                docType="deklarasi"
+                                onUploaded={() => fetch()}
+                              />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-1 py-1">
+                          <div className="flex flex-col gap-0.5 min-w-[140px]">
+                            {(row.Link_Berita_Acara_Serah_Terima || '').startsWith('http') && (
+                              <a
+                                href={row.Link_Berita_Acara_Serah_Terima!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                Buka Link
+                              </a>
+                            )}
+                            {!isBypass && (
+                              <>
+                                <input
+                                  className="flex-1 min-w-[120px] text-xs border border-transparent hover:border-slate-200 rounded px-1 py-0.5 bg-transparent focus:border-blue-300 focus:outline-none"
+                                  defaultValue={row.Link_Berita_Acara_Serah_Terima || ''}
+                                  onBlur={(e) => {
+                                    if (e.target.value !== (row.Link_Berita_Acara_Serah_Terima || '')) {
+                                      handleSapSave(row.No_DO, 'Link_Berita_Acara_Serah_Terima', e.target.value)
+                                    }
+                                  }}
+                                  placeholder="-"
+                                />
+                                <DocumentUpload
+                                  compact
+                                  entityType="do"
+                                  entityId={row.No_DO}
+                                  docType="berita_acara"
+                                  onUploaded={() => fetch()}
+                                />
+                              </>
+                            )}
                           </div>
                         </td>
                         <td className="px-3 py-2.5 text-center">

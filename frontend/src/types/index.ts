@@ -16,6 +16,10 @@ export type SapField =
   | 'do_sap'
   | 'billing_sap'
   | 'link_deklarasi_penerimaan'
+  | 'link_berita_acara_serah_terima'
+
+export type DocumentEntityType = 'kontrak' | 'invoice' | 'do' | 'bypass'
+export type DocumentDocType = 'kontrak' | 'invoice' | 'kuitansi' | 'do' | 'deklarasi' | 'berita_acara'
 
 // ============================================================
 // Entity Interfaces — matching backend models.py / schemas.py
@@ -120,6 +124,7 @@ export interface DeliveryOrder {
   do_sap: string | null
   billing_sap: string | null
   link_deklarasi_penerimaan: string | null
+  link_berita_acara_serah_terima: string | null
   // Computed
   selisih: number
   volume_do: number
@@ -183,6 +188,27 @@ export interface LaporanRow {
   DO_SAP: string
   Billing: string
   Link_Deklarasi_Penerimaan: string
+  Link_Berita_Acara_Serah_Terima: string
+}
+
+export interface DocumentUpload {
+  id: number
+  entity_type: DocumentEntityType
+  entity_id: string
+  doc_type: DocumentDocType
+  file_name: string
+  onedrive_item_id: string | null
+  web_url: string
+  uploaded_at: string | null
+}
+
+export interface DocumentStatusResponse {
+  configured: boolean
+  mode: 'personal' | 'organizational' | 'pending_auth' | null
+  auth_url: string | null
+  redirect_uri: string | null
+  doc_types: DocumentDocType[]
+  entity_types: DocumentEntityType[]
 }
 
 // ============================================================
@@ -348,6 +374,7 @@ export interface SapUpdateInput {
   DO_SAP?: string
   Billing?: string
   Link_Deklarasi_Penerimaan?: string
+  Link_Berita_Acara_Serah_Terima?: string
 }
 
 // ============================================================

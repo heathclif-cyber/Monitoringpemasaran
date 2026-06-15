@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import date
+from datetime import date, datetime
 
 class KontrakUnitInput(BaseModel):
     nama_unit: str
@@ -130,6 +130,20 @@ class DeliveryOrderCreate(DeliveryOrderBase):
 class DeliveryOrderOut(DeliveryOrderBase):
     selisih: float
     volume_do: Optional[float] = 0.0
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentUploadOut(BaseModel):
+    id: int
+    entity_type: str
+    entity_id: str
+    doc_type: str
+    file_name: str
+    onedrive_item_id: Optional[str] = None
+    web_url: str
+    uploaded_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

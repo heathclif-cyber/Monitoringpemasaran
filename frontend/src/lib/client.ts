@@ -40,4 +40,15 @@ export const client = {
   streamBlob(path: string): Promise<Blob> {
     return fetch(`${BASE_URL}${path}`).then((res) => res.blob())
   },
+
+  async uploadFormData<T>(path: string, formData: FormData): Promise<T> {
+    const url = `${BASE_URL}${path}`
+    const res = await fetch(url, { method: 'POST', body: formData })
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({ detail: res.statusText }))
+      console.error(`[client] POST ${path} failed:`, detail)
+      throw new Error(detail.detail || `Request failed: ${res.status}`)
+    }
+    return res.json()
+  },
 }
