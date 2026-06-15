@@ -16,7 +16,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { FIXED_UNITS } from '@/lib/constants'
 import { terbilangRupiah } from '@/utils/terbilang'
 import { calculateKontrakPricing, calculateJatuhTempo } from '@/utils/kontrakUtils'
 import type { Kontrak } from '@/types'
@@ -229,6 +228,7 @@ export default function InvoicePage() {
     : null
 
   // Units dari kontrak yang dipilih; jika tidak ada, pakai fixed list
+  const FIXED_UNITS = ['Minahasa-Halmahera','Beteleme','Awaya-Telpaputih','Takalar','Camming','Kabaru']
   const kontrakUnits = useMemo(() => k?.units && k.units.length > 0 ? k.units : [], [k])
   const unitOptions = useMemo(() =>
     kontrakUnits.length > 0

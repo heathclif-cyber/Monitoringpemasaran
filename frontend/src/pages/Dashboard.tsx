@@ -38,22 +38,7 @@ function useChartTheme() {
     gridStroke: isDark ? 'hsl(217 33% 22%)' : '#f0f0f0',
     tick: { fontSize: 11, fill: isDark ? 'hsl(215 20% 65%)' : '#64748b' },
     legendStyle: { fontSize: 11, color: isDark ? 'hsl(210 40% 90%)' : '#334155' },
-    tooltipStyle: {
-      fontSize: 12,
-      backgroundColor: isDark ? 'hsl(222 47% 9%)' : '#fff',
-      border: `1px solid ${isDark ? 'hsl(217 33% 18%)' : '#e2e8f0'}`,
-      borderRadius: 6,
-      color: isDark ? 'hsl(210 40% 96%)' : '#334155',
-    },
   }
-}
-
-function ChartEmpty({ message }: { message: string }) {
-  return (
-    <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-      {message}
-    </div>
-  )
 }
 
 function StatCards() {
@@ -62,15 +47,12 @@ function StatCards() {
   const { summary, charts } = data
   const { bulanan } = charts
 
-  const year = data.selected_year
-  const pendapatanTrend = calcMonthOverMonthTrend(bulanan.pendapatan, 'vs bln lalu', year)
-  const cashInTrend = calcMonthOverMonthTrend(bulanan.cashin, 'vs bln lalu', year)
+  const pendapatanTrend = calcMonthOverMonthTrend(bulanan.pendapatan)
+  const cashInTrend = calcMonthOverMonthTrend(bulanan.cashin)
   const volumeTrend = calcMonthOverMonthTrend(
     bulanan.labels.map((_, i) => (bulanan.volume_kg[i] || 0) + (bulanan.volume_butir[i] || 0)),
-    'vs bln lalu',
-    year,
   )
-  const invoiceTrend = calcMonthOverMonthTrend(bulanan.invoice, 'vs bln lalu', year)
+  const invoiceTrend = calcMonthOverMonthTrend(bulanan.invoice)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -115,7 +97,6 @@ function TrendChart() {
     Invoice: data.charts.bulanan.invoice[i] || 0,
     'Cash In': data.charts.bulanan.cashin[i] || 0,
   }))
-  const hasData = chartData.some((d) => d.Pendapatan > 0 || d.Invoice > 0 || d['Cash In'] > 0)
 
   return (
     <Card>
@@ -123,22 +104,18 @@ function TrendChart() {
         <CardTitle className="text-sm font-semibold">Tren Bulanan</CardTitle>
       </CardHeader>
       <CardContent>
-        {!hasData ? (
-          <ChartEmpty message="Belum ada data tren untuk filter ini" />
-        ) : (
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} />
             <XAxis dataKey="bulan" tick={chartTheme.tick} />
             <YAxis tick={chartTheme.tick} tickFormatter={(v) => formatShortNumber(v)} />
-            <Tooltip contentStyle={chartTheme.tooltipStyle} formatter={(value: number) => formatCurrency(value)} />
+            <Tooltip formatter={(value: number) => formatCurrency(value)} />
             <Legend wrapperStyle={chartTheme.legendStyle} />
             <Line type="monotone" dataKey="Pendapatan" stroke={CHART_PRIMARY} strokeWidth={2} dot={{ r: 3 }} />
             <Line type="monotone" dataKey="Invoice" stroke={CHART_SECONDARY} strokeWidth={2} dot={{ r: 3 }} />
             <Line type="monotone" dataKey="Cash In" stroke={CHART_TERTIARY} strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
-        )}
       </CardContent>
     </Card>
   )
@@ -149,13 +126,10 @@ function UnitChart() {
   const chartTheme = useChartTheme()
   if (!data) return null
 
-  const chartData = data.charts.unit.labels
-    .map((label, i) => ({
-      unit: label,
-      pendapatan: data.charts.unit.values[i] || 0,
-    }))
-    .filter((d) => d.pendapatan > 0)
-    .sort((a, b) => b.pendapatan - a.pendapatan)
+  const chartData = data.charts.unit.labels.map((label, i) => ({
+    unit: label,
+    pendapatan: data.charts.unit.values[i] || 0,
+  }))
 
   return (
     <Card>
@@ -163,15 +137,12 @@ function UnitChart() {
         <CardTitle className="text-sm font-semibold">Realisasi per Unit (DO)</CardTitle>
       </CardHeader>
       <CardContent>
-        {chartData.length === 0 ? (
-          <ChartEmpty message="Belum ada realisasi per unit" />
-        ) : (
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 10, left: 60, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} />
             <XAxis type="number" tick={chartTheme.tick} tickFormatter={(v) => formatShortNumber(v)} />
             <YAxis type="category" dataKey="unit" tick={chartTheme.tick} width={100} />
-            <Tooltip contentStyle={chartTheme.tooltipStyle} formatter={(value: number) => formatCurrency(value)} />
+            <Tooltip formatter={(value: number) => formatCurrency(value)} />
             <Bar dataKey="pendapatan" radius={[0, 3, 3, 0]}>
               {chartData.map((_, i) => (
                 <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -179,7 +150,6 @@ function UnitChart() {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-        )}
       </CardContent>
     </Card>
   )
@@ -195,7 +165,6 @@ function VolumeChart() {
     'Volume Kg': data.charts.bulanan.volume_kg[i] || 0,
     'Volume Butir': data.charts.bulanan.volume_butir[i] || 0,
   }))
-  const hasData = chartData.some((d) => d['Volume Kg'] > 0 || d['Volume Butir'] > 0)
 
   return (
     <Card>
@@ -203,21 +172,17 @@ function VolumeChart() {
         <CardTitle className="text-sm font-semibold">Tren Realisasi Volume (DO)</CardTitle>
       </CardHeader>
       <CardContent>
-        {!hasData ? (
-          <ChartEmpty message="Belum ada data volume" />
-        ) : (
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} />
             <XAxis dataKey="bulan" tick={chartTheme.tick} />
             <YAxis tick={chartTheme.tick} tickFormatter={(v) => formatShortNumber(v)} />
-            <Tooltip contentStyle={chartTheme.tooltipStyle} formatter={(value: number) => formatNumberDec(value)} />
+            <Tooltip formatter={(value: number) => formatNumberDec(value)} />
             <Legend wrapperStyle={chartTheme.legendStyle} />
             <Bar dataKey="Volume Kg" fill="#f97316" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="Volume Butir" fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="Volume Butir" fill="var(--chart-2)" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
-        )}
       </CardContent>
     </Card>
   )
@@ -225,7 +190,6 @@ function VolumeChart() {
 
 function CommodityChart() {
   const data = useDashboardStore((s) => s.data)
-  const chartTheme = useChartTheme()
   if (!data) return null
 
   const chartData = data.charts.komoditas.labels
@@ -234,7 +198,6 @@ function CommodityChart() {
       value: data.charts.komoditas.values[i] || 0,
     }))
     .filter((d) => d.value > 0)
-    .sort((a, b) => b.value - a.value)
 
   const total = chartData.reduce((s, d) => s + d.value, 0)
 
@@ -244,9 +207,6 @@ function CommodityChart() {
         <CardTitle className="text-sm font-semibold">Portofolio Komoditas</CardTitle>
       </CardHeader>
       <CardContent>
-        {chartData.length === 0 ? (
-          <ChartEmpty message="Belum ada data komoditas" />
-        ) : (
         <ResponsiveContainer width="100%" height={300}>
           <PieChart margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <Pie
@@ -257,23 +217,18 @@ function CommodityChart() {
               outerRadius={100}
               paddingAngle={2}
               dataKey="value"
-              label={({ name, value, x, y }) =>
-                total > 0 && value > 0 ? (
-                  <text x={x} y={y} fill={chartTheme.tick.fill} textAnchor="middle" dominantBaseline="central" fontSize={11}>
-                    {`${name} (${((value / total) * 100).toFixed(0)}%)`}
-                  </text>
-                ) : null
+              label={({ name, value }) =>
+                total > 0 && value > 0 ? `${name} (${((value / total) * 100).toFixed(0)}%)` : ''
               }
-              labelLine={{ stroke: chartTheme.gridStroke, strokeWidth: 1 }}
+              labelLine={{ strokeWidth: 1 }}
             >
               {chartData.map((_, i) => (
                 <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip contentStyle={chartTheme.tooltipStyle} formatter={(value: number) => formatCurrency(value)} />
+            <Tooltip formatter={(value: number) => formatCurrency(value)} />
           </PieChart>
         </ResponsiveContainer>
-        )}
       </CardContent>
     </Card>
   )
@@ -321,21 +276,21 @@ function MonthlyBreakdown() {
           <tbody className="divide-y">
             {rows.map((row) => (
               <tr key={row.bulan} className="hover:bg-muted/60 transition-colors">
-                <td className="px-4 py-2 font-medium text-foreground">{row.bulan}</td>
+                <td className="px-4 py-2 font-medium text-gray-700">{row.bulan}</td>
                 <td className="px-4 py-2 text-right">
-                  {row.pendapatan > 0 ? formatCurrency(row.pendapatan) : <span className="text-muted-foreground">-</span>}
+                  {row.pendapatan > 0 ? formatCurrency(row.pendapatan) : <span className="text-gray-300">-</span>}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  {row.invoice > 0 ? formatCurrency(row.invoice) : <span className="text-muted-foreground">-</span>}
+                  {row.invoice > 0 ? formatCurrency(row.invoice) : <span className="text-gray-300">-</span>}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  {row.cashin > 0 ? formatCurrency(row.cashin) : <span className="text-muted-foreground">-</span>}
+                  {row.cashin > 0 ? formatCurrency(row.cashin) : <span className="text-gray-300">-</span>}
                 </td>
-                <td className={`px-4 py-2 text-right font-medium ${row.selisih <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                <td className={`px-4 py-2 text-right font-medium ${row.selisih <= 0 ? 'text-green-600' : 'text-amber-600'}`}>
                   {row.pendapatan > 0 || row.cashin > 0 ? (
                     row.selisih <= 0 ? 'Lunas' : formatCurrency(row.selisih)
                   ) : (
-                    <span className="text-muted-foreground">-</span>
+                    <span className="text-gray-300">-</span>
                   )}
                 </td>
               </tr>
@@ -429,7 +384,7 @@ function SapStatus() {
               <tbody className="divide-y">
                 {rows.map((row) => (
                   <tr key={row.bulan} className="hover:bg-muted/60 transition-colors">
-                    <td className="px-3 py-2 font-medium text-foreground">{row.bulan}</td>
+                    <td className="px-3 py-2 font-medium text-gray-700">{row.bulan}</td>
                     <td className="px-3 py-2 text-center"><MissingBadge val={row.kontrak} /></td>
                     <td className="px-3 py-2 text-center"><MissingBadge val={row.so} /></td>
                     <td className="px-3 py-2 text-center"><MissingBadge val={row.do_} /></td>

@@ -1,45 +1,10 @@
 from fastapi import APIRouter, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func
 
 import models
 from database import SessionLocal
 from services.cache import api_cache
-from services.unit_utils import normalize_unit_name, unit_filter_variants
-
-
-def _sorted_chart(map_dict: dict) -> dict:
-    items = sorted(map_dict.items(), key=lambda x: x[1], reverse=True)
-    return {"labels": [k for k, _ in items], "values": [v for _, v in items]}
-
-
-def _resolve_do_unit(do, k) -> str:
-    unt = ""
-    if getattr(do, "kepada_unit", None):
-        unt = do.kepada_unit
-    if not unt and do.invoice and do.invoice.nama_unit:
-        unt = do.invoice.nama_unit
-    if not unt:
-        unt = k.kebun_produsen or ""
-    if not unt and hasattr(k, "units") and k.units:
-        unt = k.units[0].nama_unit or ""
-    normalized = normalize_unit_name(unt)
-    return normalized or "Lainnya"
-
-
-def _collect_available_units(db) -> list[str]:
-    units: set[str] = set()
-    for col in (
-        models.Kontrak.kebun_produsen,
-        models.LaporanBypass.unit,
-        models.Invoice.nama_unit,
-        models.DeliveryOrder.kepada_unit,
-    ):
-        for r in db.query(col).distinct().all():
-            n = normalize_unit_name(r[0])
-            if n:
-                units.add(n)
-    return sorted(units)
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
@@ -70,27 +35,13 @@ def get_dashboard_data(
         base_bypass = db.query(models.LaporanBypass).filter(func.extract('year', models.LaporanBypass.tanggal) == year)
         base_kontrak = db.query(models.Kontrak).filter(func.extract('year', models.Kontrak.tanggal_kontrak) == year)
 
-        # Filters (Unit & Komoditi) — unit selaras dengan agregasi chart (DO/invoice/kontrak)
+        # Filters (Unit & Komoditi)
         if unit != "ALL":
-            variants = unit_filter_variants(unit)
-            unit_do_filter = or_(
-                models.DeliveryOrder.kepada_unit.in_(variants),
-                models.DeliveryOrder.invoice.has(
-                    or_(
-                        models.Invoice.nama_unit.in_(variants),
-                        models.Invoice.kontrak.has(models.Kontrak.kebun_produsen.in_(variants)),
-                    )
-                ),
-            )
-            unit_inv_filter = or_(
-                models.Invoice.nama_unit.in_(variants),
-                models.Invoice.kontrak.has(models.Kontrak.kebun_produsen.in_(variants)),
-            )
-            base_do_cash = base_do_cash.filter(unit_do_filter)
-            base_do_pend = base_do_pend.filter(unit_do_filter)
-            base_invoice = base_invoice.filter(unit_inv_filter)
-            base_bypass = base_bypass.filter(models.LaporanBypass.unit.in_(variants))
-            base_kontrak = base_kontrak.filter(models.Kontrak.kebun_produsen.in_(variants))
+            base_do_cash = base_do_cash.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit)))
+            base_do_pend = base_do_pend.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit)))
+            base_invoice = base_invoice.filter(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit))
+            base_bypass = base_bypass.filter(models.LaporanBypass.unit == unit)
+            base_kontrak = base_kontrak.filter(models.Kontrak.kebun_produsen == unit)
 
         if komoditi != "ALL":
             base_do_cash = base_do_cash.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi)))
@@ -155,7 +106,18 @@ def get_dashboard_data(
                 vol_m_kg[f"{m:02d}"] += do_vol
             
             kom = k.komoditi or "Lainnya"
-            unt = _resolve_do_unit(do, k)
+            # Unit priority: DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen > Kontrak.units[0]
+            unt = ""
+            if getattr(do, 'kepada_unit', None):
+                unt = do.kepada_unit
+            if not unt and do.invoice and do.invoice.nama_unit:
+                unt = do.invoice.nama_unit
+            if not unt:
+                unt = k.kebun_produsen or ""
+            if not unt and hasattr(k, 'units') and k.units:
+                unt = k.units[0].nama_unit or ""
+            if not unt:
+                unt = "Lainnya"
             kom_map[kom] = kom_map.get(kom, 0) + pendapatan_do
             unit_map[unt] = unit_map.get(unt, 0) + pendapatan_do
 
@@ -208,7 +170,7 @@ def get_dashboard_data(
                 vol_m_kg[f"{m:02d}"] += vol
             
             kom = b.komoditi or "Lainnya"
-            unt = normalize_unit_name(b.unit) or "Lainnya"
+            unt = b.unit or "Lainnya"
             kom_map[kom] = kom_map.get(kom, 0) + nom
             unit_map[unt] = unit_map.get(unt, 0) + nom
             
@@ -226,7 +188,9 @@ def get_dashboard_data(
         if year not in avail_y: avail_y.insert(0, year)
         avail_y = sorted(list(set(avail_y)), reverse=True)
 
-        avail_u = _collect_available_units(db)
+        u_k = set(str(r[0]) for r in db.query(models.Kontrak.kebun_produsen).distinct().all() if r[0] and r[0] != "-")
+        u_b = set(str(r[0]) for r in db.query(models.LaporanBypass.unit).distinct().all() if r[0] and r[0] != "-")
+        avail_u = sorted(list(u_k | u_b))
 
         k_k = set(str(r[0]) for r in db.query(models.Kontrak.komoditi).distinct().all() if r[0] and r[0] != "-")
         k_b = set(str(r[0]) for r in db.query(models.LaporanBypass.komoditi).distinct().all() if r[0] and r[0] != "-")
@@ -263,8 +227,8 @@ def get_dashboard_data(
                 }
             },
             "charts": {
-                "komoditas": _sorted_chart(kom_map),
-                "unit": _sorted_chart(unit_map),
+                "komoditas": {"labels": list(kom_map.keys()), "values": list(kom_map.values())},
+                "unit": {"labels": list(unit_map.keys()), "values": list(unit_map.values())},
                 "bulanan": {
                     "labels": ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"],
                     "pendapatan": [pend_m[f"{i:02d}"] for i in range(1, 13)],
