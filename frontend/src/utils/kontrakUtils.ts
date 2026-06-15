@@ -1,6 +1,10 @@
 export const TAX_RATE_PPN_DEFAULT = 11.0
 export const TAX_RATE_PPH_DEFAULT = 0.25
 
+export function isPayungBA(tipeAlur?: string | null): boolean {
+  return String(tipeAlur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
+}
+
 export interface PricingResult {
   pokok: number
   nominalPpn: number

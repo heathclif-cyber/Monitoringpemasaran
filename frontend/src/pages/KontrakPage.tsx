@@ -23,6 +23,7 @@ import {
   calculateKontrakPricing,
   calculateJatuhTempo,
   generateSyaratSyarat,
+  isPayungBA,
   DEFAULT_SYARAT,
   DEFAULT_KETENTUAN,
 } from '@/utils/kontrakUtils'
@@ -150,10 +151,10 @@ export default function KontrakPage() {
 
   // Watch all fields for live preview
   const watchedFields = watch()
-  const isPayungBA = String(watchedFields.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
+  const payungMode = isPayungBA(watchedFields.tipe_alur)
 
   const pricing = calculateKontrakPricing(
-    Number(watchedFields.volume) || 0,
+    payungMode ? 0 : (Number(watchedFields.volume) || 0),
     Number(watchedFields.harga_satuan) || 0,
     Number(watchedFields.premi) || 0,
     watchedFields.is_ppn || 'true',
@@ -197,10 +198,14 @@ export default function KontrakPage() {
       const fbSatuan = data.satuan || 'Kg'
       const fbTahun = data.tahun_panen || ''
       const fbDeskripsi = data.deskripsi_produk || ''
+      const loadedPayung = isPayungBA(data.tipe_alur)
+      if (loadedPayung) {
+        setValue('volume', 0)
+      }
       if (data.units && data.units.length > 0) {
         setUnitList(data.units.map(u => ({
           nama_unit: u.nama_unit,
-          volume: u.volume || 0,
+          volume: loadedPayung ? 0 : (u.volume || 0),
           komoditi: u.komoditi || fbKomoditi,
           jenis_komoditi: u.jenis_komoditi || fbJenis,
           satuan: u.satuan || fbSatuan,
@@ -235,6 +240,13 @@ export default function KontrakPage() {
       loadKontrakByNo(no)
     }
   }, [selectedNoKontrak, store.data, loadKontrakByNo])
+
+  // Kontrak payung: volume hanya di Berita Acara, bukan di kontrak
+  useEffect(() => {
+    if (!payungMode) return
+    setValue('volume', 0)
+    setUnitList((prev) => prev.map((u) => ({ ...u, volume: 0 })))
+  }, [payungMode, setValue])
 
   // Reset everything
   const handleReset = () => {
@@ -274,8 +286,9 @@ export default function KontrakPage() {
         if (first.tahun_panen) payload.tahun_panen = first.tahun_panen
         if (first.deskripsi_produk) payload.deskripsi_produk = first.deskripsi_produk
       }
-      if (String(data.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA') {
+      if (isPayungBA(data.tipe_alur)) {
         payload.volume = 0
+        payload.premi = 0
         payload.units = validUnits.map((u) => ({ ...u, volume: 0 }))
       } else if (validUnits.length > 0 && validUnits.every(u => (u.volume || 0) > 0)) {
         payload.volume = validUnits.reduce((s, u) => s + (u.volume || 0), 0)
@@ -324,7 +337,15 @@ export default function KontrakPage() {
       return trigger(['no_kontrak', 'tanggal_kontrak', 'pembeli'])
     }
     if (step === 2) {
-      return isPayungBA ? trigger(['harga_satuan']) : trigger(['volume', 'harga_satuan'])
+      if (payungMode) {
+        const harga = Number(getValues('harga_satuan')) || 0
+        if (harga <= 0) {
+          form.setError('harga_satuan', { message: 'Harga satuan wajib diisi untuk kontrak payung' })
+          return false
+        }
+        return trigger(['harga_satuan'])
+      }
+      return trigger(['volume', 'harga_satuan'])
     }
     return true
   }
@@ -388,8 +409,8 @@ export default function KontrakPage() {
                   <option value="STANDAR">Standar (Invoice → DO)</option>
                   <option value="PAYUNG_BA">Payung + Berita Acara</option>
                 </NativeSelect>
-                {isPayungBA && (
-                  <p className="text-xs text-slate-500 mt-1">
+                {payungMode && (
+                  <p className="text-xs text-amber-700 mt-1">
                     Kontrak payung tidak memuat volume — volume dicatat per Berita Acara saat barang dikirim.
                   </p>
                 )}
@@ -551,7 +572,7 @@ export default function KontrakPage() {
                               placeholder="Nama unit..."
                             />
                           )}
-                          {!isPayungBA && (
+                          {!payungMode && (
                           <Input
                             type="number"
                             step="any"
@@ -643,10 +664,15 @@ export default function KontrakPage() {
           <>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">{isPayungBA ? 'Harga Satuan' : 'Harga & Volume'}</CardTitle>
+              <CardTitle className="text-sm font-semibold">{payungMode ? 'Harga Satuan (Payung)' : 'Harga & Volume'}</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
-              {!isPayungBA && (
+              {payungMode && (
+                <div className="col-span-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Volume dan nilai transaksi dihitung per Berita Acara. Kontrak payung hanya menyimpan harga satuan referensi.
+                </div>
+              )}
+              {!payungMode && (
               <div>
                 <Label className="text-xs">Volume *</Label>
                 {(() => {
@@ -667,37 +693,52 @@ export default function KontrakPage() {
                 <Label className="text-xs">Harga Satuan *</Label>
                 <Input type="number" step="any" {...register('harga_satuan')}  />
               </div>
+              {!payungMode && (
               <div>
                 <Label className="text-xs">Premi</Label>
                 <Input type="number" step="any" {...register('premi')}  />
               </div>
+              )}
             </CardContent>
             {/* Quick calculation */}
             <div className="px-5 pb-4 grid grid-cols-2 gap-2 text-sm">
-              <div className="text-slate-500">Nilai Pokok:</div>
-              <div className="text-right font-semibold">{formatCurrency(pricing.pokok)}</div>
-              {watchedFields.is_ppn !== 'false' && (
+              {payungMode ? (
                 <>
-                  <div className="text-slate-500">Nominal PPN ({watchedFields.ppn_persen || 11}%):</div>
-                  <div className="text-right">{formatCurrency(pricing.nominalPpn)}</div>
+                  <div className="text-slate-500">Volume Kontrak:</div>
+                  <div className="text-right text-slate-600">— (per Berita Acara)</div>
+                  <div className="text-slate-500">Harga Satuan:</div>
+                  <div className="text-right font-semibold">{formatCurrency(Number(watchedFields.harga_satuan) || 0)}</div>
+                  <div className="text-slate-500">Jatuh Tempo:</div>
+                  <div className="text-right">{formatDate(jatuhTempo)}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-slate-500">Nilai Pokok:</div>
+                  <div className="text-right font-semibold">{formatCurrency(pricing.pokok)}</div>
+                  {watchedFields.is_ppn !== 'false' && (
+                    <>
+                      <div className="text-slate-500">Nominal PPN ({watchedFields.ppn_persen || 11}%):</div>
+                      <div className="text-right">{formatCurrency(pricing.nominalPpn)}</div>
+                    </>
+                  )}
+                  {watchedFields.is_pph === 'true' && (
+                    <>
+                      <div className="text-slate-500">Potongan PPh ({watchedFields.pph_persen || 0}%):</div>
+                      <div className="text-right text-red-600">-{formatCurrency(pricing.nominalPph)}</div>
+                    </>
+                  )}
+                  <div className="text-slate-700 font-semibold border-t pt-1">Total Tagihan:</div>
+                  <div className="text-right font-bold text-brand-600 border-t pt-1">{formatCurrency(pricing.totalTagihan)}</div>
+                  {pricing.totalTagihan > 0 && (
+                    <>
+                      <div className="text-slate-400 text-xs">Terbilang:</div>
+                      <div className="text-right text-xs text-slate-500">{terbilangRupiah(pricing.totalTagihan)}</div>
+                    </>
+                  )}
+                  <div className="text-slate-500">Jatuh Tempo:</div>
+                  <div className="text-right">{formatDate(jatuhTempo)}</div>
                 </>
               )}
-              {watchedFields.is_pph === 'true' && (
-                <>
-                  <div className="text-slate-500">Potongan PPh ({watchedFields.pph_persen || 0}%):</div>
-                  <div className="text-right text-red-600">-{formatCurrency(pricing.nominalPph)}</div>
-                </>
-              )}
-              <div className="text-slate-700 font-semibold border-t pt-1">Total Tagihan:</div>
-              <div className="text-right font-bold text-brand-600 border-t pt-1">{formatCurrency(pricing.totalTagihan)}</div>
-              {pricing.totalTagihan > 0 && (
-                <>
-                  <div className="text-slate-400 text-xs">Terbilang:</div>
-                  <div className="text-right text-xs text-slate-500">{terbilangRupiah(pricing.totalTagihan)}</div>
-                </>
-              )}
-              <div className="text-slate-500">Jatuh Tempo:</div>
-              <div className="text-right">{formatDate(jatuhTempo)}</div>
             </div>
           </Card>
 
@@ -775,7 +816,7 @@ export default function KontrakPage() {
         emptyTitle="Preview akan muncul di sini"
         emptyDescription="Isi form kontrak untuk melihat preview"
       >
-        <KontrakPreview data={{ ...watchedFields, units: unitList.filter(u => u.nama_unit.trim()).map((u, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit: u.nama_unit, urutan: i, volume: u.volume || 0, komoditi: u.komoditi || null, jenis_komoditi: u.jenis_komoditi || null, satuan: u.satuan || null, tahun_panen: u.tahun_panen || null, deskripsi_produk: u.deskripsi_produk || null })) }} />
+        <KontrakPreview data={{ ...watchedFields, volume: payungMode ? 0 : watchedFields.volume, units: unitList.filter(u => u.nama_unit.trim()).map((u, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit: u.nama_unit, urutan: i, volume: payungMode ? 0 : (u.volume || 0), komoditi: u.komoditi || null, jenis_komoditi: u.jenis_komoditi || null, satuan: u.satuan || null, tahun_panen: u.tahun_panen || null, deskripsi_produk: u.deskripsi_produk || null })) }} />
       </PreviewPanel>
     </div>
   )

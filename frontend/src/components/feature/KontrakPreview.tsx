@@ -1,7 +1,7 @@
 import type { Kontrak } from '@/types'
 import { safe } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
-import { calculateKontrakPricing, calculateJatuhTempo, DEFAULT_PENJUAL, DEFAULT_PEMILIK_KOMODITAS } from '@/utils/kontrakUtils'
+import { calculateKontrakPricing, isPayungBA, DEFAULT_PENJUAL, DEFAULT_PEMILIK_KOMODITAS } from '@/utils/kontrakUtils'
 
 interface KontrakPreviewProps {
   data: Partial<Kontrak>
@@ -22,10 +22,14 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
     lama_pembayaran_hari, levering,
     pembayaran_metode, pembayaran_cara, pembayaran_bank,
     units,
+    tipe_alur,
   } = data
 
+  const payungMode = isPayungBA(tipe_alur)
+  const displayVolume = payungMode ? 0 : (volume || 0)
+
   const pricing = calculateKontrakPricing(
-    volume || 0, harga_satuan || 0, premi || 0,
+    displayVolume, harga_satuan || 0, payungMode ? 0 : (premi || 0),
     is_ppn || 'true', ppn_persen || 11,
     is_pph || 'false', pph_persen || 0,
   )
@@ -147,7 +151,7 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
                     <tbody>
                       {units.map((u, i) => {
                         const material = u.komoditi ? `${u.komoditi}${u.jenis_komoditi ? ` - ${u.jenis_komoditi}` : ''}` : ''
-                        const volStr = u.volume > 0 ? ` (${Math.round(u.volume).toLocaleString('id-ID')} ${u.satuan || satuan || 'Unit'})` : ''
+                        const volStr = !payungMode && u.volume > 0 ? ` (${Math.round(u.volume).toLocaleString('id-ID')} ${u.satuan || satuan || 'Unit'})` : ''
                         return (
                           <tr key={i}>
                             <td style={{ padding: '1px 4px 1px 0', verticalAlign: 'top' }}>
@@ -167,7 +171,7 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
             <RowS label="Produsen" value={safe(kebun_produsen)} />
           )}
           <RowS label="Pelabuhan Muat" value={safe(pelabuhan_muat)} />
-          <RowS label="Volume" value={fmtVol(volume || 0, satuan || 'Unit')} />
+          <RowS label="Volume" value={payungMode ? 'Sesuai Berita Acara' : fmtVol(displayVolume, satuan || 'Unit')} />
           <RowD l1="Harga Satuan" v1={fmtHarga(harga_satuan || 0, satuan || 'Unit')} l2="Premi" v2={premi && premi > 0 ? fmtRpLocal(premi) : '-'} />
           <RowS label="PPN" value={isPpn ? `Tarif Efektif ${ppn_persen || 11}%` : 'Non-PPN (Bebas PPN)'} />
           <RowS label="Kondisi Penyerahan" value={safe(kondisi_penyerahan)} />
@@ -208,9 +212,15 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
           </tr>
 
           <RowS label="Dasar Ketentuan" value={dasar} />
-          <RowS label="Jumlah (Pokok)" value={fmtRpFull(pricing.pokok)} />
-          {isPph && <RowS label="PPh" value={`Potongan PPh 22 (${pph_persen || 0}%) : -${fmtRpLocal(pricing.nominalPph)}`} />}
-          {isPph && <RowS label="Total Tagihan" value={fmtRpFull(pricing.totalTagihan)} bold />}
+          {payungMode ? (
+            <RowS label="Jumlah Pembayaran" value="Sesuai Berita Acara" />
+          ) : (
+            <>
+              <RowS label="Jumlah (Pokok)" value={fmtRpFull(pricing.pokok)} />
+              {isPph && <RowS label="PPh" value={`Potongan PPh 22 (${pph_persen || 0}%) : -${fmtRpLocal(pricing.nominalPph)}`} />}
+              {isPph && <RowS label="Total Tagihan" value={fmtRpFull(pricing.totalTagihan)} bold />}
+            </>
+          )}
           <RowS label="Catatan" value="-" />
         </tbody>
       </table>

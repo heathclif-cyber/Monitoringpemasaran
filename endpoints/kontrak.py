@@ -10,6 +10,7 @@ import schemas
 from database import get_db
 from services.utils import terbilang_rupiah
 from services.cache import api_cache
+from services.ba_utils import is_payung_ba
 
 router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 
@@ -21,22 +22,31 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     units_input = kontrak.units or []
     kontrak_data = kontrak.model_dump(exclude={'units'})
     kontrak_data['status'] = 'Active'
+    payung = is_payung_ba(kontrak)
 
-    # Jika semua unit memiliki volume > 0, derive volume kontrak dari sum unit
-    units_with_vol = [u for u in units_input if (u.volume or 0) > 0]
-    if units_with_vol and len(units_with_vol) == len(units_input) and units_input:
-        derived_volume = sum(u.volume or 0.0 for u in units_input)
-        kontrak_data['volume'] = derived_volume
-        volume_for_calc = derived_volume
+    if payung:
+        kontrak_data['volume'] = 0.0
+        kontrak_data['premi'] = 0.0
+        volume_for_calc = 0.0
+        pokok = 0.0
+        nominal_ppn = 0.0
+        nilai_transaksi = 0.0
     else:
-        volume_for_calc = kontrak.volume or 0.0
+        # Jika semua unit memiliki volume > 0, derive volume kontrak dari sum unit
+        units_with_vol = [u for u in units_input if (u.volume or 0) > 0]
+        if units_with_vol and len(units_with_vol) == len(units_input) and units_input:
+            derived_volume = sum(u.volume or 0.0 for u in units_input)
+            kontrak_data['volume'] = derived_volume
+            volume_for_calc = derived_volume
+        else:
+            volume_for_calc = kontrak.volume or 0.0
 
-    # Calculate fields
-    pokok = (volume_for_calc * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
-    nominal_ppn = 0.0
-    if str(kontrak.is_ppn).lower() == 'true':
-        nominal_ppn = pokok * ((kontrak.ppn_persen or 0.0) / 100)
-    nilai_transaksi = pokok + nominal_ppn
+        pokok = (volume_for_calc * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
+        nominal_ppn = 0.0
+        if str(kontrak.is_ppn).lower() == 'true':
+            nominal_ppn = pokok * ((kontrak.ppn_persen or 0.0) / 100)
+        nilai_transaksi = pokok + nominal_ppn
+
     jatuh_tempo_pembayaran = kontrak.tanggal_kontrak + timedelta(days=kontrak.lama_pembayaran_hari or 0)
     terbilang = terbilang_rupiah(math.floor(nilai_transaksi))
 
@@ -62,11 +72,12 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     # Replace units
     db.query(models.KontrakUnit).filter(models.KontrakUnit.no_kontrak == kontrak.no_kontrak).delete()
     for i, unit in enumerate(units_input):
+        unit_volume = 0.0 if payung else (unit.volume or 0.0)
         db.add(models.KontrakUnit(
             no_kontrak=kontrak.no_kontrak,
             nama_unit=unit.nama_unit,
             urutan=i,
-            volume=unit.volume or 0.0,
+            volume=unit_volume,
             komoditi=unit.komoditi,
             jenis_komoditi=unit.jenis_komoditi,
             satuan=unit.satuan,
@@ -131,9 +142,10 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
     def fmt_rp(v): return 'Rp{:,.0f}'.format(v or 0).replace(',', '.')
     def s(v, fb='-'): return str(v).strip() if v else fb
 
-    vol = k.volume or 0
+    payung = is_payung_ba(k)
+    vol = 0 if payung else (k.volume or 0)
     harga = k.harga_satuan or 0
-    premi = k.premi or 0
+    premi = 0 if payung else (k.premi or 0)
     ppn_pct = k.ppn_persen or 0
     satuan = s(k.satuan, 'Unit')
     pokok = (vol * harga) + premi
@@ -141,6 +153,8 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
     if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
         ppn_nom = pokok * (ppn_pct / 100)
     total_nilai = pokok + ppn_nom
+    vol_label = 'Sesuai Berita Acara' if payung else f'{vol:,.0f}'.replace(",",".") + " " + satuan
+    jml_label = 'Sesuai Berita Acara' if payung else fmt_rp(total_nilai)
     tgl = k.tanggal_kontrak
     months = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
     tgl_str = f"{tgl.day} {months[tgl.month]} {tgl.year}" if tgl else '-'
@@ -197,7 +211,7 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
         {row('Mutu', s(k.mutu))}
         {row('Produsen / Unit', produsen_html)}
         {row('Pelabuhan Muat', s(k.pelabuhan_muat))}
-        {row('Volume', f'{vol:,.0f}'.replace(",",".") + " " + satuan)}
+        {row('Volume', vol_label)}
         {rowD('Harga Satuan', fmt_rp(harga) + " per " + satuan, 'Premi', fmt_rp(premi) if premi else "-")}
         {row('PPN', f'Tarif Efektif {ppn_pct}%')}
         {row('Kondisi Penyerahan', s(k.kondisi_penyerahan))}
@@ -231,7 +245,7 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
           </td>
         </tr>
         {row('Dasar Ketentuan', s(k.dasar_ketentuan, "Mengacu kepada tata Cara dan Ketentuan Penjualan Komoditi Perkebunan PT Perkebunan Nusantara III (Persero)"))}
-        {row('Jumlah Pembayaran', fmt_rp(total_nilai))}
+        {row('Jumlah Pembayaran', jml_label)}
         {row('Catatan', '-')}
       </table>
       

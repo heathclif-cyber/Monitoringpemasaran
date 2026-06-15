@@ -85,22 +85,25 @@ def _date(d):
     except: return str(d)
 
 def generate_contract_docx(k) -> io.BytesIO:
+    from services.ba_utils import is_payung_ba
+
     doc = Document()
     sec = doc.sections[0]
     sec.left_margin = Cm(3); sec.right_margin = Cm(2.5)
     sec.top_margin = Cm(2.5); sec.bottom_margin = Cm(2)
 
-    vol = k.volume or 0
+    payung = is_payung_ba(k)
+    vol = 0 if payung else (k.volume or 0)
     harga = k.harga_satuan or 0
-    premi = k.premi or 0
+    premi = 0 if payung else (k.premi or 0)
     ppn = k.ppn_persen or 11
     sat = _s(k.satuan, 'Unit')
-    nilai = k.nilai_transaksi or 0
+    nilai = 0 if payung else (k.nilai_transaksi or 0)
 
-    vol_str = _id_fmt(vol) + ' ' + sat if vol else '-'
+    vol_str = 'Sesuai Berita Acara' if payung else (_id_fmt(vol) + ' ' + sat if vol else '-')
     harga_str = _rp_full(harga) + ' per ' + sat if harga else '-'
     premi_str = _rp(premi)
-    jml_str = _rp_full(nilai) + (f" ({_s(k.terbilang)} Rupiah)" if k.terbilang else "")
+    jml_str = 'Sesuai Berita Acara' if payung else (_rp_full(nilai) + (f" ({_s(k.terbilang)} Rupiah)" if k.terbilang else ""))
     lama = k.lama_pembayaran_hari or 15
 
     pjl_lines = _s(k.penjual).replace('\\n', '\n').split('\n')
