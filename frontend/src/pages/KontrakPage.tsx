@@ -25,20 +25,12 @@ import {
   DEFAULT_SYARAT,
   DEFAULT_KETENTUAN,
 } from '@/utils/kontrakUtils'
+import { FIXED_UNITS } from '@/lib/constants'
 
 const KONTRAK_STEPS: FormStep[] = [
   { id: 'identitas', label: 'Identitas', description: 'Data dasar & pihak' },
   { id: 'komoditas', label: 'Komoditas', description: 'Barang & produksi' },
   { id: 'finalisasi', label: 'Finalisasi', description: 'Nilai, bayar & syarat' },
-]
-
-const FIXED_UNITS = [
-  'Minahasa-Halmahera',
-  'Beteleme',
-  'Awaya-Telpaputih',
-  'Takalar',
-  'Camming',
-  'Kabaru',
 ]
 
 const kontrakSchema = z.object({
@@ -414,7 +406,7 @@ export default function KontrakPage() {
                 <Label className="text-xs">Unit / Kebun Produsen & Material</Label>
                 <div className="space-y-2 mt-1">
                   {unitList.map((unit, i) => {
-                    const isLainnya = unit.nama_unit !== '' && !FIXED_UNITS.includes(unit.nama_unit)
+                    const isLainnya = unit.nama_unit !== '' && !(FIXED_UNITS as readonly string[]).includes(unit.nama_unit)
                     const selectValue = isLainnya ? '__lainnya__' : unit.nama_unit
                     const sel = 'text-xs'
                     return (

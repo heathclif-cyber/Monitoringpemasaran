@@ -4,9 +4,17 @@ export interface TrendDelta {
 }
 
 /** Month-over-month trend from a 12-element monthly array (Jan=0). */
-export function calcMonthOverMonthTrend(monthlyValues: number[], label = 'vs bln lalu'): TrendDelta | undefined {
+export function calcMonthOverMonthTrend(
+  monthlyValues: number[],
+  label = 'vs bln lalu',
+  referenceYear?: number,
+): TrendDelta | undefined {
   const now = new Date()
-  const idx = now.getMonth()
+  const year = referenceYear ?? now.getFullYear()
+
+  if (year > now.getFullYear()) return undefined
+
+  const idx = year < now.getFullYear() ? 11 : now.getMonth()
   const current = monthlyValues[idx] ?? 0
   const previous = idx > 0 ? (monthlyValues[idx - 1] ?? 0) : 0
 
