@@ -609,13 +609,6 @@ async def upload_document(
     )
 
     if existing:
-        # Hapus file lama hanya jika path berbeda (nama file berubah).
-        # Jika path sama, file baru sudah meng-overwrite file lama — jangan hapus.
-        if existing.storage_path and existing.storage_path != result["storage_path"]:
-            try:
-                delete_file(existing.storage_path)
-            except StorageError:
-                pass  # file lama mungkin sudah tidak ada
         existing.file_name = result["file_name"]
         existing.storage_path = result["storage_path"]
         existing.web_url = ""  # diisi setelah commit (pakai ID)
