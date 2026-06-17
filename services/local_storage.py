@@ -127,15 +127,28 @@ def _resolve_storage_path(storage_path: str) -> str:
 
 
 def get_file_path(storage_path: str) -> str:
-    """Dapatkan path file yang tersimpan. Validasi path masih di dalam UPLOAD_DIR."""
-    full_path = _resolve_storage_path(storage_path)
+    """Dapatkan path file yang tersimpan.
+
+    Coba dua kandidat:
+    1. Path yang di-resolve terhadap UPLOAD_DIR saat ini (format baru / relative)
+    2. Original path absolut (format lama — upload di environment berbeda)
+    """
     real_upload = os.path.normcase(os.path.realpath(UPLOAD_DIR))
-    real_path = os.path.realpath(full_path)
-    if not os.path.normcase(real_path).startswith(real_upload + os.sep):
-        raise StorageError("Path file tidak valid")
-    if not os.path.isfile(real_path):
-        raise StorageError("File tidak ditemukan")
-    return real_path
+
+    # Kandidat 1: resolve ke UPLOAD_DIR sekarang
+    resolved = _resolve_storage_path(storage_path)
+    real_resolved = os.path.realpath(resolved)
+    if os.path.normcase(real_resolved).startswith(real_upload + os.sep):
+        if os.path.isfile(real_resolved):
+            return real_resolved
+
+    # Kandidat 2: path absolut asli (mis. /data/uploads/... dari environment lain)
+    if os.path.isabs(storage_path):
+        real_orig = os.path.realpath(storage_path)
+        if os.path.isfile(real_orig):
+            return real_orig
+
+    raise StorageError("File tidak ditemukan")
 
 
 def delete_file(storage_path: str) -> None:
