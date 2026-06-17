@@ -218,6 +218,7 @@ class DocumentSlotOut(BaseModel):
     doc_type: str
     label: str
     uploaded: bool
+    file_exists: bool = True
     file_name: Optional[str] = None
     web_url: Optional[str] = None
     uploaded_at: Optional[datetime] = None

@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, CircleAlert, CloudUpload, Download, Eye, FolderArchive, ListFilter, Loader2, Search } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CircleAlert, CloudUpload, Download, Eye, FolderArchive, ListFilter, Loader2, Search } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -96,7 +96,9 @@ function SlotRow({
   const ext = slot.file_name?.split('.').pop()?.toLowerCase() ?? ''
   const isDocx = ext === 'docx'
   const viewUrl = slot.document_id != null ? `/api/documents/view/${slot.document_id}` : null
-  const canView = slot.uploaded && !!viewUrl && (isDocx || BROWSER_VIEWABLE.has(ext))
+  const fileAvailable = slot.uploaded && slot.file_exists
+  const fileMissing = slot.uploaded && !slot.file_exists
+  const canView = fileAvailable && !!viewUrl && (isDocx || BROWSER_VIEWABLE.has(ext))
 
   const handleView = () => {
     if (!viewUrl) return
@@ -133,23 +135,31 @@ function SlotRow({
       <div
         className={cn(
           'flex flex-col gap-2 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between',
-          slot.uploaded
+          fileAvailable
             ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20'
-            : 'border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/20',
+            : fileMissing
+              ? 'border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20'
+              : 'border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/20',
         )}
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            {slot.uploaded ? (
+            {fileAvailable ? (
               <CheckCircle2 size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+            ) : fileMissing ? (
+              <AlertTriangle size={14} className="shrink-0 text-red-600 dark:text-red-400" />
             ) : (
               <CircleAlert size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
             )}
             <p className="text-sm font-medium">{slot.label}</p>
             <span className="text-xs text-muted-foreground">({DOC_TYPE_LABELS[slot.doc_type]})</span>
           </div>
-          {slot.uploaded ? (
+          {fileAvailable ? (
             <p className="mt-1 truncate text-xs text-muted-foreground">{slot.file_name}</p>
+          ) : fileMissing ? (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+              File hilang dari server — perlu upload ulang ({slot.file_name})
+            </p>
           ) : (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Belum di-upload</p>
           )}
@@ -168,7 +178,7 @@ function SlotRow({
               <Eye size={12} /> Lihat
             </Button>
           )}
-          {slot.web_url && (
+          {fileAvailable && slot.web_url && (
             <a
               href={slot.web_url}
               download
@@ -187,14 +197,14 @@ function SlotRow({
           />
           <Button
             type="button"
-            variant={slot.uploaded ? 'outline' : 'default'}
+            variant={fileAvailable ? 'outline' : fileMissing ? 'destructive' : 'default'}
             size="sm"
             className="h-8 gap-1 text-xs"
             disabled={!configured || uploading}
             onClick={() => inputRef.current?.click()}
           >
             {uploading ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />}
-            {slot.uploaded ? 'Ganti' : 'Upload'}
+            {fileAvailable ? 'Ganti' : fileMissing ? 'Upload Ulang' : 'Upload'}
           </Button>
         </div>
       </div>
@@ -532,7 +542,7 @@ export default function UploadPage() {
                             {row.sublabel || '—'}
                           </td>
                           <td className="py-2 px-2 hidden md:table-cell">
-                            <MissingBadge labels={row.slots.filter((s) => !s.uploaded).map((s) => s.label)} />
+                            <MissingBadge labels={row.slots.filter((s) => !s.uploaded || !s.file_exists).map((s) => s.label)} />
                           </td>
                           <td className="py-2 px-2 text-center">
                             <CompletenessBadge total={row.total} uploaded={row.uploaded} />

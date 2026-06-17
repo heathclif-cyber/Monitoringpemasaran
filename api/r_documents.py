@@ -64,6 +64,16 @@ def _validate_entity(db: Session, entity_type: str, entity_id: str) -> None:
             raise HTTPException(status_code=404, detail="Berita Acara tidak ditemukan")
 
 
+def _check_file_exists(upload: "models.DocumentUpload") -> bool:
+    if not upload or not upload.storage_path:
+        return False
+    try:
+        get_file_path(upload.storage_path)
+        return True
+    except StorageError:
+        return False
+
+
 def _build_slots(db: Session, entity_type: str, entity_id: str) -> list[schemas.DocumentSlotOut]:
     required = ENTITY_DOC_REQUIREMENTS.get(entity_type, [])
     uploads = (
@@ -80,11 +90,13 @@ def _build_slots(db: Session, entity_type: str, entity_id: str) -> list[schemas.
     slots: list[schemas.DocumentSlotOut] = []
     for doc_type in required:
         upload = by_type.get(doc_type)
+        file_exists = _check_file_exists(upload) if upload else False
         slots.append(
             schemas.DocumentSlotOut(
                 doc_type=doc_type,
                 label=DOC_TYPE_LABELS.get(doc_type, doc_type),
                 uploaded=upload is not None,
+                file_exists=file_exists,
                 file_name=upload.file_name if upload else None,
                 web_url=upload.web_url if upload else None,
                 uploaded_at=upload.uploaded_at if upload else None,
@@ -95,7 +107,8 @@ def _build_slots(db: Session, entity_type: str, entity_id: str) -> list[schemas.
 
 
 def _summarize_slots(slots: list[schemas.DocumentSlotOut]) -> schemas.DocumentCompletenessSummary:
-    uploaded = sum(1 for s in slots if s.uploaded)
+    # Hanya hitung sebagai "uploaded" jika file fisik benar-benar ada
+    uploaded = sum(1 for s in slots if s.uploaded and s.file_exists)
     total = len(slots)
     return schemas.DocumentCompletenessSummary(total=total, uploaded=uploaded, missing=total - uploaded)
 
@@ -386,11 +399,13 @@ def _build_slots_from_cache(
     slots: list[schemas.DocumentSlotOut] = []
     for doc_type in required:
         upload = by_type.get(doc_type)
+        file_exists = _check_file_exists(upload) if upload else False
         slots.append(
             schemas.DocumentSlotOut(
                 doc_type=doc_type,
                 label=DOC_TYPE_LABELS.get(doc_type, doc_type),
                 uploaded=upload is not None,
+                file_exists=file_exists,
                 file_name=upload.file_name if upload else None,
                 web_url=upload.web_url if upload else None,
                 uploaded_at=upload.uploaded_at if upload else None,
