@@ -243,7 +243,7 @@ export interface DocumentSlot {
   doc_type: DocumentDocType
   label: string
   uploaded: boolean
-  file_exists: boolean
+  file_exists?: boolean  // undefined = anggap ada (backend lama tidak kirim field ini)
   file_name: string | null
   web_url: string | null
   uploaded_at: string | null

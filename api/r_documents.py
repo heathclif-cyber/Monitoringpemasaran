@@ -72,6 +72,10 @@ def _check_file_exists(upload: "models.DocumentUpload") -> bool:
         get_file_path(upload.storage_path)
         return True
     except StorageError:
+        import logging
+        logging.getLogger(__name__).warning(
+            "file_exists=False id=%s storage_path=%r", upload.id, upload.storage_path
+        )
         return False
 
 

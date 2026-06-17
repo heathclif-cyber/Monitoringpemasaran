@@ -96,8 +96,10 @@ function SlotRow({
   const ext = slot.file_name?.split('.').pop()?.toLowerCase() ?? ''
   const isDocx = ext === 'docx'
   const viewUrl = slot.document_id != null ? `/api/documents/view/${slot.document_id}` : null
-  const fileAvailable = slot.uploaded && slot.file_exists
-  const fileMissing = slot.uploaded && !slot.file_exists
+  // file_exists===false hanya muncul kalau backend baru sudah jalan dan memastikan file tidak ada di disk.
+  // undefined = backend lama atau file belum dicek → anggap ada (tidak tampilkan warning palsu).
+  const fileMissing = slot.uploaded && slot.file_exists === false
+  const fileAvailable = slot.uploaded && !fileMissing
   const canView = fileAvailable && !!viewUrl && (isDocx || BROWSER_VIEWABLE.has(ext))
 
   const handleView = () => {
@@ -542,7 +544,7 @@ export default function UploadPage() {
                             {row.sublabel || '—'}
                           </td>
                           <td className="py-2 px-2 hidden md:table-cell">
-                            <MissingBadge labels={row.slots.filter((s) => !s.uploaded || !s.file_exists).map((s) => s.label)} />
+                            <MissingBadge labels={row.slots.filter((s) => !s.uploaded || s.file_exists === false).map((s) => s.label)} />
                           </td>
                           <td className="py-2 px-2 text-center">
                             <CompletenessBadge total={row.total} uploaded={row.uploaded} />
