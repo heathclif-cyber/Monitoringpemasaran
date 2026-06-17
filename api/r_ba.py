@@ -5,6 +5,7 @@ from typing import List, Optional
 import models
 import schemas
 from database import get_db
+from services.auth import require_write
 from services.cache import api_cache
 from services.ba_utils import validate_ba_volume_quota
 
@@ -24,7 +25,7 @@ def _sync_ba_status(db: Session, ba: models.BeritaAcara) -> None:
 
 
 @router.post("", response_model=schemas.BeritaAcaraOut)
-def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db)):
+def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == ba.no_kontrak).first()
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
@@ -119,7 +120,7 @@ def get_ba(no_ba: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/{no_ba:path}")
-def delete_ba(no_ba: str, db: Session = Depends(get_db)):
+def delete_ba(no_ba: str, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_ba = db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == no_ba).first()
     if not db_ba:
         raise HTTPException(status_code=404, detail="Berita Acara not found")

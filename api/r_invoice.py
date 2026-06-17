@@ -7,6 +7,7 @@ import math, io, mammoth
 import models
 import schemas
 from database import get_db
+from services.auth import require_write
 from services.cache import api_cache
 from services.utils import terbilang_rupiah
 from services.ba_utils import is_payung_ba, calculate_ba_invoice_amount, kontrak_nilai_maksimum
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/api/invoice", tags=["Invoice"])
 
 
 @router.post("", response_model=schemas.InvoiceOut)
-def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)):
+def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == invoice.no_kontrak).first()
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
@@ -219,7 +220,7 @@ def get_invoice(no_invoice: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Invoice not found")
     return db_invoice
 @router.delete("/{no_invoice:path}")
-def delete_invoice(no_invoice: str, db: Session = Depends(get_db)):
+def delete_invoice(no_invoice: str, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")

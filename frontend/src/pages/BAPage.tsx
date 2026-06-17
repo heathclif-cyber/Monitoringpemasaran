@@ -6,6 +6,7 @@ import { ClipboardList, RotateCcw, Save } from 'lucide-react'
 import { useBAStore } from '@/store/baStore'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -37,6 +38,7 @@ export default function BAPage() {
   const baStore = useBAStore()
   const kontrakStore = useKontrakStore()
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit)
   const [isExisting, setIsExisting] = useState(false)
   const [exportNo, setExportNo] = useState<string | null>(null)
 
@@ -260,9 +262,9 @@ export default function BAPage() {
         )}
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || !canEdit()}>
             <Save size={15} className="mr-1.5" />
-            {isSubmitting ? 'Menyimpan...' : 'Simpan BA'}
+            {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : 'Simpan BA'}
           </Button>
           <Button type="button" variant="outline" onClick={handleReset}>
             <RotateCcw size={15} className="mr-1.5" />

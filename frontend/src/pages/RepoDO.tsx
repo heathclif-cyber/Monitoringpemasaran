@@ -3,6 +3,7 @@ import { Edit, FileDown, Trash2, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useDOStore } from '@/store/doStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -26,6 +27,7 @@ export default function RepoDO() {
   const navigate = useNavigate()
   const store = useDOStore()
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit)
   const [search, setSearch] = useState('')
   const [bulan, setBulan] = useState('ALL')
   const [unit, setUnit] = useState('ALL')
@@ -115,15 +117,19 @@ export default function RepoDO() {
                   align: 'center',
                   render: (item) => (
                     <div className="flex gap-0.5 justify-center">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => navigate(`/delivery-order?edit=${item.no_do}`)}>
-                        <Edit size={14} />
-                      </Button>
+                      {canEdit() && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => navigate(`/delivery-order?edit=${item.no_do}`)}>
+                          <Edit size={14} />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => { setPreviewDO(item); setPreviewOpen(true) }}>
                         <Eye size={14} />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(item.no_do)}>
-                        <Trash2 size={14} />
-                      </Button>
+                      {canEdit() && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(item.no_do)}>
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
                     </div>
                   ),
                 },

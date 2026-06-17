@@ -9,6 +9,7 @@ from typing import List, Optional
 import models
 import schemas
 from database import get_db
+from services.auth import require_write
 from services.local_storage import (
     StorageError,
     build_folder,
@@ -584,6 +585,7 @@ async def upload_document(
     doc_type: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    _: models.User = Depends(require_write),
 ):
     entity_type = entity_type.strip().lower()
     entity_id = entity_id.strip()
@@ -743,7 +745,7 @@ def bundle_kontrak(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
 
 
 @router.delete("/{document_id}")
-def delete_document(document_id: int, db: Session = Depends(get_db)):
+def delete_document(document_id: int, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     record = db.query(models.DocumentUpload).filter(models.DocumentUpload.id == document_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Dokumen tidak ditemukan")

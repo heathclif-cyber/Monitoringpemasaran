@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Save, RotateCcw, Zap } from 'lucide-react'
 import { useLaporanStore } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -28,6 +29,7 @@ type BypassFormData = z.infer<typeof bypassSchema>
 export default function BypassPage() {
   const { createBypass } = useLaporanStore()
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit)
   const [editId, setEditId] = useState<number | null>(null)
 
   const form = useForm<BypassFormData>({
@@ -151,9 +153,9 @@ export default function BypassPage() {
         </div>
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={isSubmitting} className="gap-2">
+          <Button type="submit" disabled={isSubmitting || !canEdit()} className="gap-2">
             <Save size={14} />
-            {isSubmitting ? 'Menyimpan...' : editId ? 'Simpan Perubahan' : 'Simpan Data'}
+            {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : editId ? 'Simpan Perubahan' : 'Simpan Data'}
           </Button>
           <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
             <RotateCcw size={14} /> Reset

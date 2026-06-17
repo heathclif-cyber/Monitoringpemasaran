@@ -7,6 +7,7 @@ import mammoth
 import models
 import schemas
 from database import get_db
+from services.auth import require_write
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba, get_ba_for_entity
 
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/api/do", tags=["Delivery Order"])
 
 
 @router.post("", response_model=schemas.DeliveryOrderOut)
-def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db)):
+def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == do.no_invoice).first()
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -133,7 +134,7 @@ def get_do(no_do: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="DO not found")
     return db_do
 @router.delete("/{no_do:path}")
-def delete_do(no_do: str, db: Session = Depends(get_db)):
+def delete_do(no_do: str, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == no_do).first()
     if not db_do:
         raise HTTPException(status_code=404, detail="DO not found")

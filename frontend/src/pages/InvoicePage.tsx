@@ -8,6 +8,7 @@ import { useInvoiceStore } from '@/store/invoiceStore'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useBAStore } from '@/store/baStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -167,6 +168,7 @@ export default function InvoicePage() {
   const kontrakStore = useKontrakStore()
   const { currentKontrak, fetchKontrakForInvoice } = invoiceStore
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit)
   const [exportNo, setExportNo] = useState<string | null>(null)
   const [isExisting, setIsExisting] = useState(false)
   const [liveJumlah, setLiveJumlah] = useState(0)
@@ -532,9 +534,9 @@ export default function InvoicePage() {
           )}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={isSubmitting} className="gap-2">
+            <Button type="submit" disabled={isSubmitting || !canEdit()} className="gap-2">
               <Save size={14} />
-              {isSubmitting ? 'Menyimpan...' : isExisting ? 'Simpan Perubahan' : 'Buat Invoice'}
+              {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : isExisting ? 'Simpan Perubahan' : 'Buat Invoice'}
             </Button>
             {exportNo && (
               <>

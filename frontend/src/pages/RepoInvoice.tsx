@@ -3,6 +3,7 @@ import { Edit, FileDown, Trash2, Receipt, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -26,6 +27,7 @@ export default function RepoInvoice() {
   const navigate = useNavigate()
   const store = useInvoiceStore()
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit)
   const [search, setSearch] = useState('')
   const [bulan, setBulan] = useState('ALL')
   const [sort, setSort] = useState<'DESC' | 'ASC'>('DESC')
@@ -114,18 +116,22 @@ export default function RepoInvoice() {
                   align: 'center',
                   render: (item) => (
                     <div className="flex gap-0.5 justify-center">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => navigate(`/invoice?edit=${item.no_invoice}`)}>
-                        <Edit size={14} />
-                      </Button>
+                      {canEdit() && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => navigate(`/invoice?edit=${item.no_invoice}`)}>
+                          <Edit size={14} />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => { setInvPreviewItem(item); setInvPreviewOpen(true) }}>
                         <Eye size={14} />
                       </Button>
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => { setKwPreviewItem(item); setKwPreviewOpen(true) }}>
                         <Receipt size={14} />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(item.no_invoice)}>
-                        <Trash2 size={14} />
-                      </Button>
+                      {canEdit() && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(item.no_invoice)}>
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
                     </div>
                   ),
                 },

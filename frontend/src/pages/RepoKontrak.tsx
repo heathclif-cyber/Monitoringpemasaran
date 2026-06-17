@@ -3,6 +3,7 @@ import { Edit, FileDown, Trash2, Eye, GitBranch } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +34,7 @@ export default function RepoKontrak() {
   const navigate = useNavigate()
   const store = useKontrakStore()
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit)
   const [search, setSearch] = useState('')
   const [bulan, setBulan] = useState('ALL')
   const [unit, setUnit] = useState('ALL')
@@ -165,18 +167,22 @@ export default function RepoKontrak() {
                   align: 'center',
                   render: (item) => (
                     <div className="flex gap-0.5 justify-center opacity-80 group-hover:opacity-100">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" title="Edit" onClick={() => navigate(`/kontrak?edit=${item.no_kontrak}`)}>
-                        <Edit size={14} />
-                      </Button>
+                      {canEdit() && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" title="Edit" onClick={() => navigate(`/kontrak?edit=${item.no_kontrak}`)}>
+                          <Edit size={14} />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" title="Trace" onClick={() => navigate(`/kontrak-trace?id=${encodeURIComponent(item.no_kontrak)}`)}>
                         <GitBranch size={14} />
                       </Button>
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" title="Preview" onClick={() => handlePreview(item)}>
                         <Eye size={14} />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" title="Hapus" onClick={() => setDeleteTarget(item.no_kontrak)}>
-                        <Trash2 size={14} />
-                      </Button>
+                      {canEdit() && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" title="Hapus" onClick={() => setDeleteTarget(item.no_kontrak)}>
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
                     </div>
                   ),
                 },

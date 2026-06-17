@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { FileDown, RotateCcw, Plus, X } from 'lucide-react'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -93,6 +94,7 @@ type KontrakFormData = z.infer<typeof kontrakSchema>
 export default function KontrakPage() {
   const store = useKontrakStore()
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit)
   const [isExisting, setIsExisting] = useState(false)
   const [previewData, setPreviewData] = useState<Partial<KontrakFormData>>({})
   const [exportNo, setExportNo] = useState<string | null>(null)
@@ -776,8 +778,8 @@ export default function KontrakPage() {
             totalSteps={KONTRAK_STEPS.length}
             onBack={handleBackStep}
             onNext={handleNextStep}
-            isSubmitting={isSubmitting}
-            submitLabel={isExisting ? 'Simpan Perubahan' : 'Simpan & Preview'}
+            isSubmitting={isSubmitting || !canEdit()}
+            submitLabel={!canEdit() ? 'Read-Only (Tamu)' : isExisting ? 'Simpan Perubahan' : 'Simpan & Preview'}
             extraActions={
               <>
                 {exportNo && activeStep === KONTRAK_STEPS.length - 1 && (

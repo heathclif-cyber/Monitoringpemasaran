@@ -8,13 +8,14 @@ import math, mammoth
 import models
 import schemas
 from database import get_db
+from services.auth import require_write
 from services.utils import terbilang_rupiah
 
 router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 
 
 @router.post("", response_model=schemas.KontrakOut)
-def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)):
+def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == kontrak.no_kontrak).first()
 
     # Calculate fields

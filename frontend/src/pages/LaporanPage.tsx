@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useLaporanStore } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -553,6 +554,7 @@ function LaporanTableRow({
   onRefresh: () => void
   onDeleteBypass: (noDo: string, id: number) => void
 }) {
+  const canEdit = useAuthStore((s) => s.canEdit)
   return (
     <tr className={cn(
       'transition-colors',
@@ -612,8 +614,9 @@ function LaporanTableRow({
           <input
             className={TD_INPUT}
             defaultValue={row[field] || ''}
+            readOnly={!canEdit()}
             onBlur={(e) => {
-              if (e.target.value !== (row[field] || '')) {
+              if (canEdit() && e.target.value !== (row[field] || '')) {
                 onSapSave(row.No_DO, field, e.target.value)
               }
             }}
@@ -636,8 +639,9 @@ function LaporanTableRow({
           <input
             className={TD_INPUT}
             defaultValue={row.Link_Deklarasi_Penerimaan || ''}
+            readOnly={!canEdit()}
             onBlur={(e) => {
-              if (e.target.value !== (row.Link_Deklarasi_Penerimaan || '')) {
+              if (canEdit() && e.target.value !== (row.Link_Deklarasi_Penerimaan || '')) {
                 onSapSave(row.No_DO, 'Link_Deklarasi_Penerimaan', e.target.value)
               }
             }}
@@ -671,8 +675,9 @@ function LaporanTableRow({
               <input
                 className={TD_INPUT}
                 defaultValue={row.Link_Berita_Acara_Serah_Terima || ''}
+                readOnly={!canEdit()}
                 onBlur={(e) => {
-                  if (e.target.value !== (row.Link_Berita_Acara_Serah_Terima || '')) {
+                  if (canEdit() && e.target.value !== (row.Link_Berita_Acara_Serah_Terima || '')) {
                     onSapSave(row.No_DO, 'Link_Berita_Acara_Serah_Terima', e.target.value)
                   }
                 }}
@@ -690,7 +695,7 @@ function LaporanTableRow({
         </div>
       </td>
       <td className={cn(TD, 'text-center min-w-[6.5rem]')}>
-        {isBypass ? (
+        {isBypass && canEdit() ? (
           <div className="flex gap-1 justify-center">
             <Button size="sm" variant="ghost" className="h-8 px-2.5 text-[13px]" onClick={() => {
               const id = parseInt(row.No_DO.replace('BYPASS-', ''))

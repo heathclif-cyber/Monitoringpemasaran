@@ -8,6 +8,7 @@ import { useDOStore } from '@/store/doStore'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useBAStore } from '@/store/baStore'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -129,6 +130,7 @@ export default function DOPage() {
   const baStore = useBAStore()
   const { currentInvoice, currentKontrak, fetchInvoiceForDO } = doStore
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit)
   const [exportNo, setExportNo] = useState<string | null>(null)
   const [isExisting, setIsExisting] = useState(false)
 
@@ -411,9 +413,9 @@ export default function DOPage() {
           )}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={isSubmitting} className="gap-2">
+            <Button type="submit" disabled={isSubmitting || !canEdit()} className="gap-2">
               <Save size={14} />
-              {isSubmitting ? 'Menyimpan...' : isExisting ? 'Simpan Perubahan' : 'Terbitkan DO'}
+              {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : isExisting ? 'Simpan Perubahan' : 'Terbitkan DO'}
             </Button>
             {exportNo && (
               <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">

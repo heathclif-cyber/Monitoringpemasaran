@@ -7,6 +7,7 @@ from typing import List
 
 import models
 from database import get_db, SessionLocal
+from services.auth import require_write
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba
 
@@ -281,7 +282,7 @@ def get_laporan():
         db.close()
 
 @router.put("/update-sap")
-def update_sap_fields(data: dict, db: Session = Depends(get_db)):
+def update_sap_fields(data: dict, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     no_do = data.get("No_DO")
     if not no_do:
         return {"success": False, "message": "No. DO diperlukan"}
@@ -316,7 +317,7 @@ def update_sap_fields(data: dict, db: Session = Depends(get_db)):
     return {"success": True}
 
 @router.post("/create-bypass")
-def create_bypass_entry(data: dict, db: Session = Depends(get_db)):
+def create_bypass_entry(data: dict, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     try:
         from datetime import datetime
         tanggal_dt = datetime.strptime(data["Tanggal"], "%Y-%m-%d").date()
@@ -339,7 +340,7 @@ def create_bypass_entry(data: dict, db: Session = Depends(get_db)):
         return {"success": False, "message": str(e)}
 
 @router.put("/update-bypass")
-def update_bypass_entry(data: dict, db: Session = Depends(get_db)):
+def update_bypass_entry(data: dict, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     try:
         from datetime import datetime
         id_bypass = data.get("id")
@@ -364,7 +365,7 @@ def update_bypass_entry(data: dict, db: Session = Depends(get_db)):
         return {"success": False, "message": str(e)}
 
 @router.delete("/bypass/{bypass_id}")
-def delete_bypass_entry(bypass_id: int, db: Session = Depends(get_db)):
+def delete_bypass_entry(bypass_id: int, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     rec = db.query(models.LaporanBypass).filter(models.LaporanBypass.id == bypass_id).first()
     if not rec:
         return {"success": False, "message": "Data tidak ditemukan"}
