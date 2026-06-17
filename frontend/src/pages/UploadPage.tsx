@@ -415,7 +415,7 @@ export default function UploadPage() {
                     Download semua dokumen terkait kontrak ini (invoice, DO, berita acara, deklarasi) dalam 1 file ZIP.
                   </p>
                   <a
-                    href={`/api/documents/bundle/kontrak/${encodeURIComponent(entityId)}`}
+                    href={`/api/documents/bundle/kontrak?no_kontrak=${encodeURIComponent(entityId)}`}
                     download
                     className="inline-flex items-center gap-2 rounded-md bg-primary px-3 h-8 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                   >

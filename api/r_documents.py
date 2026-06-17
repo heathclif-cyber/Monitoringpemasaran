@@ -648,8 +648,8 @@ async def upload_document(
     return record
 
 
-@router.get("/bundle/kontrak/{no_kontrak}")
-def bundle_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
+@router.get("/bundle/kontrak")
+def bundle_kontrak(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
     """Download semua dokumen terkait 1 kontrak sebagai ZIP (kontrak→invoice→DO)."""
     kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == no_kontrak).first()
     if not kontrak:
