@@ -37,7 +37,7 @@ const PAGE_META: Record<string, PageMeta> = {
   },
   '/upload': {
     title: 'Upload Dokumen',
-    description: 'Unggah kontrak, invoice, DO, deklarasi, dan berita acara ke OneDrive',
+    description: 'Unggah kontrak, invoice, DO, deklarasi, dan berita acara',
     breadcrumb: 'Dokumen / Upload',
   },
   '/repo/kontrak': {

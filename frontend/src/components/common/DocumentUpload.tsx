@@ -89,7 +89,7 @@ export function DocumentUpload({
     try {
       const doc = await client.uploadFormData<DocumentUploadType>('/api/documents/upload', formData)
       setLatest(doc)
-      addNotification(`${title} berhasil di-upload ke OneDrive`, 'success')
+      addNotification(`${title} berhasil di-upload`, 'success')
       onUploaded?.(doc)
     } catch (err: unknown) {
       addNotification(err instanceof Error ? err.message : 'Upload gagal', 'error')
@@ -102,7 +102,7 @@ export function DocumentUpload({
   if (configured === false) {
     return compact ? null : (
       <p className="text-xs text-muted-foreground">
-        OneDrive belum terhubung. Setup di menu Upload Dokumen (akun Microsoft Family / personal).
+        Storage belum tersedia. Hubungi administrator.
       </p>
     )
   }
@@ -110,11 +110,11 @@ export function DocumentUpload({
   if (compact) {
     return (
       <div className={cn('flex flex-col gap-1', className)}>
-        {latest?.web_url?.startsWith('http') && (
+        {latest?.web_url && (
           <a
             href={latest.web_url}
-            target="_blank"
-            rel="noopener noreferrer"
+            target={latest.web_url.startsWith('http') ? '_blank' : undefined}
+            rel={latest.web_url.startsWith('http') ? 'noopener noreferrer' : undefined}
             className="text-xs text-primary hover:underline inline-flex items-center gap-1"
           >
             <ExternalLink size={10} /> Buka
@@ -153,7 +153,7 @@ export function DocumentUpload({
             rel="noopener noreferrer"
             className="text-xs text-primary hover:underline inline-flex items-center gap-1"
           >
-            <ExternalLink size={12} /> Buka di OneDrive
+            <ExternalLink size={12} /> Download
           </a>
         )}
       </div>
@@ -178,7 +178,7 @@ export function DocumentUpload({
         onClick={() => inputRef.current?.click()}
       >
         {uploading ? <Loader2 size={14} className="animate-spin" /> : <CloudUpload size={14} />}
-        {uploading ? 'Mengupload...' : latest ? 'Ganti File' : 'Upload ke OneDrive'}
+        {uploading ? 'Mengupload...' : latest ? 'Ganti File' : 'Upload Dokumen'}
       </Button>
       {!canUpload && (
         <p className="text-xs text-muted-foreground">Simpan dokumen terlebih dahulu untuk mengaktifkan upload.</p>

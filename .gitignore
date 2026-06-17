@@ -26,3 +26,4 @@ node_modules/
 *.log
 *.sql
 .env
+uploads/

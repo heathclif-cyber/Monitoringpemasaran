@@ -1,19 +1,19 @@
+import os
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
 import models
 import schemas
 from database import get_db
-from services.onedrive import (
-    MS_REDIRECT_URI,
-    OneDriveConfigError,
-    OneDriveUploadError,
-    build_authorize_url,
-    exchange_code_for_tokens,
-    get_onedrive_mode,
-    is_onedrive_configured,
+from services.local_storage import (
+    StorageError,
+    build_folder,
+    delete_file,
+    get_file_path,
+    get_mode,
+    is_configured,
     upload_bytes,
 )
 
@@ -211,75 +211,21 @@ def _sync_entity_link(
             ba.link_berita_acara = web_url
 
 
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+
 @router.get("/status")
 def documents_status():
-    mode = get_onedrive_mode()
     return {
-        "configured": is_onedrive_configured(),
-        "mode": mode,
-        "auth_url": "/api/documents/oauth/authorize" if mode == "pending_auth" else None,
-        "redirect_uri": MS_REDIRECT_URI if mode == "pending_auth" else None,
+        "configured": is_configured(),
+        "mode": get_mode(),
+        "auth_url": None,
+        "redirect_uri": None,
         "doc_types": sorted(VALID_DOC_TYPES),
         "entity_types": sorted(VALID_ENTITY_TYPES),
     }
-
-
-@router.get("/oauth/authorize")
-def oauth_authorize():
-    try:
-        return RedirectResponse(build_authorize_url())
-    except OneDriveConfigError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-
-@router.get("/oauth/callback", response_class=HTMLResponse)
-def oauth_callback(code: Optional[str] = None, error: Optional[str] = None, error_description: Optional[str] = None):
-    if error:
-        msg = error_description or error
-        return HTMLResponse(f"<h2>Login gagal</h2><p>{msg}</p>", status_code=400)
-    if not code:
-        raise HTTPException(status_code=400, detail="Authorization code tidak ditemukan")
-
-    try:
-        tokens = exchange_code_for_tokens(code)
-    except OneDriveUploadError as exc:
-        return HTMLResponse(f"<h2>OAuth gagal</h2><p>{exc}</p>", status_code=502)
-
-    refresh_token = tokens.get("refresh_token", "")
-    if not refresh_token:
-        return HTMLResponse(
-            "<h2>Refresh token tidak diterima</h2>"
-            "<p>Coba login ulang. Pastikan scope <code>offline_access</code> aktif di App Registration.</p>",
-            status_code=502,
-        )
-
-    safe_token = refresh_token.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    return HTMLResponse(
-        f"""<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <title>OneDrive Terhubung</title>
-  <style>
-    body {{ font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }}
-    code, pre {{ background: #f4f4f5; padding: 0.75rem; border-radius: 6px; word-break: break-all; display: block; }}
-    h2 {{ color: #166534; }}
-    ol {{ line-height: 1.7; }}
-  </style>
-</head>
-<body>
-  <h2>OneDrive akun personal berhasil terhubung</h2>
-  <p>Salin nilai berikut ke file <code>.env</code> (lokal) atau Railway Variables (production):</p>
-  <pre>MS_REFRESH_TOKEN={safe_token}</pre>
-  <ol>
-    <li>Tambahkan baris di atas ke environment variable.</li>
-    <li>Restart backend / redeploy Railway.</li>
-    <li>Buka halaman Upload — status harus <strong>configured: true</strong>.</li>
-  </ol>
-  <p>Redirect URI yang dipakai: <code>{MS_REDIRECT_URI}</code></p>
-</body>
-</html>"""
-    )
 
 
 @router.get("/references", response_model=List[schemas.DocumentReferenceOut])
@@ -427,6 +373,123 @@ def document_completeness(
     )
 
 
+@router.get("/summary", response_model=List[schemas.DocumentSummaryRow])
+def document_summary(
+    entity_type: str = Query(...),
+    status_filter: str = Query(default="incomplete"),
+    limit: int = Query(default=200, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """Ringkasan upload per entitas. Filter: all | complete | incomplete."""
+    entity_type = entity_type.strip().lower()
+    if entity_type not in VALID_ENTITY_TYPES:
+        raise HTTPException(status_code=400, detail="entity_type tidak valid")
+    if status_filter not in ("all", "complete", "incomplete"):
+        raise HTTPException(status_code=400, detail="status_filter tidak valid")
+
+    rows: list[schemas.DocumentSummaryRow] = []
+
+    # Kumpulkan semua entity_id + label
+    if entity_type == "kontrak":
+        q = db.query(models.Kontrak).order_by(models.Kontrak.tanggal_kontrak.desc()).limit(limit)
+        for row in q.all():
+            slots = _build_slots(db, entity_type, row.no_kontrak)
+            summary = _summarize_slots(slots)
+            if status_filter == "complete" and summary.missing > 0:
+                continue
+            if status_filter == "incomplete" and summary.missing == 0:
+                continue
+            rows.append(schemas.DocumentSummaryRow(
+                entity_type=entity_type,
+                entity_id=row.no_kontrak,
+                display_label=row.no_kontrak,
+                sublabel=row.pembeli,
+                total=summary.total,
+                uploaded=summary.uploaded,
+                missing=summary.missing,
+                slots=slots,
+            ))
+    elif entity_type == "invoice":
+        q = db.query(models.Invoice).order_by(models.Invoice.tanggal_transaksi.desc()).limit(limit)
+        for row in q.all():
+            slots = _build_slots(db, entity_type, row.no_invoice)
+            summary = _summarize_slots(slots)
+            if status_filter == "complete" and summary.missing > 0:
+                continue
+            if status_filter == "incomplete" and summary.missing == 0:
+                continue
+            rows.append(schemas.DocumentSummaryRow(
+                entity_type=entity_type,
+                entity_id=row.no_invoice,
+                display_label=row.no_invoice,
+                sublabel=row.no_kontrak,
+                total=summary.total,
+                uploaded=summary.uploaded,
+                missing=summary.missing,
+                slots=slots,
+            ))
+    elif entity_type == "do":
+        q = db.query(models.DeliveryOrder).order_by(models.DeliveryOrder.tanggal_do.desc()).limit(limit)
+        for row in q.all():
+            slots = _build_slots(db, entity_type, row.no_do)
+            summary = _summarize_slots(slots)
+            if status_filter == "complete" and summary.missing > 0:
+                continue
+            if status_filter == "incomplete" and summary.missing == 0:
+                continue
+            rows.append(schemas.DocumentSummaryRow(
+                entity_type=entity_type,
+                entity_id=row.no_do,
+                display_label=row.no_do,
+                sublabel=row.no_invoice,
+                total=summary.total,
+                uploaded=summary.uploaded,
+                missing=summary.missing,
+                slots=slots,
+            ))
+    elif entity_type == "ba":
+        q = db.query(models.BeritaAcara).order_by(models.BeritaAcara.tanggal_ba.desc()).limit(limit)
+        for row in q.all():
+            slots = _build_slots(db, entity_type, row.no_ba)
+            summary = _summarize_slots(slots)
+            if status_filter == "complete" and summary.missing > 0:
+                continue
+            if status_filter == "incomplete" and summary.missing == 0:
+                continue
+            rows.append(schemas.DocumentSummaryRow(
+                entity_type=entity_type,
+                entity_id=row.no_ba,
+                display_label=row.no_ba,
+                sublabel=row.no_kontrak,
+                total=summary.total,
+                uploaded=summary.uploaded,
+                missing=summary.missing,
+                slots=slots,
+            ))
+    elif entity_type == "bypass":
+        q = db.query(models.LaporanBypass).order_by(models.LaporanBypass.tanggal.desc()).limit(limit)
+        for row in q.all():
+            eid = str(row.id)
+            slots = _build_slots(db, entity_type, eid)
+            summary = _summarize_slots(slots)
+            if status_filter == "complete" and summary.missing > 0:
+                continue
+            if status_filter == "incomplete" and summary.missing == 0:
+                continue
+            rows.append(schemas.DocumentSummaryRow(
+                entity_type=entity_type,
+                entity_id=eid,
+                display_label=f"BYPASS-{eid}",
+                sublabel=f"{row.unit or '-'} · {row.komoditi or '-'}",
+                total=summary.total,
+                uploaded=summary.uploaded,
+                missing=summary.missing,
+                slots=slots,
+            ))
+
+    return rows
+
+
 @router.get("", response_model=List[schemas.DocumentUploadOut])
 def list_documents(
     entity_type: str,
@@ -447,6 +510,27 @@ def list_documents(
         q = q.filter(models.DocumentUpload.doc_type == doc_type)
 
     return q.order_by(models.DocumentUpload.uploaded_at.desc()).all()
+
+
+@router.get("/download/{document_id}")
+def download_document(document_id: int, db: Session = Depends(get_db)):
+    """Download file yang di-upload via local storage."""
+    record = db.query(models.DocumentUpload).filter(models.DocumentUpload.id == document_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Dokumen tidak ditemukan")
+    if not record.storage_path:
+        raise HTTPException(status_code=404, detail="File tidak tersedia")
+
+    try:
+        file_path = get_file_path(record.storage_path)
+    except StorageError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return FileResponse(
+        path=file_path,
+        filename=record.file_name,
+        media_type="application/octet-stream",
+    )
 
 
 @router.post("/upload", response_model=schemas.DocumentUploadOut)
@@ -482,10 +566,8 @@ async def upload_document(
             file_name=file.filename,
             content=content,
         )
-    except OneDriveConfigError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except OneDriveUploadError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except StorageError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     existing = (
         db.query(models.DocumentUpload)
@@ -498,9 +580,15 @@ async def upload_document(
     )
 
     if existing:
+        # Hapus file lama jika ada
+        if existing.storage_path:
+            try:
+                delete_file(existing.storage_path)
+            except StorageError:
+                pass  # file lama mungkin sudah tidak ada
         existing.file_name = result["file_name"]
-        existing.onedrive_item_id = result.get("item_id")
-        existing.web_url = result["web_url"]
+        existing.storage_path = result["storage_path"]
+        existing.web_url = ""  # diisi setelah commit (pakai ID)
         record = existing
     else:
         record = models.DocumentUpload(
@@ -508,14 +596,26 @@ async def upload_document(
             entity_id=entity_id,
             doc_type=doc_type,
             file_name=result["file_name"],
-            onedrive_item_id=result.get("item_id"),
-            web_url=result["web_url"],
+            storage_path=result["storage_path"],
+            web_url="",  # diisi setelah commit
         )
         db.add(record)
 
-    _sync_entity_link(db, entity_type=entity_type, entity_id=entity_id, doc_type=doc_type, web_url=result["web_url"])
+    # Commit dulu agar record dapat ID
+    db.flush()
+    # Set web_url dengan ID yang sudah ada
+    record.web_url = f"/api/documents/download/{record.id}"
     db.commit()
     db.refresh(record)
+
+    _sync_entity_link(
+        db,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        doc_type=doc_type,
+        web_url=record.web_url,
+    )
+
     return record
 
 
@@ -524,6 +624,13 @@ def delete_document(document_id: int, db: Session = Depends(get_db)):
     record = db.query(models.DocumentUpload).filter(models.DocumentUpload.id == document_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Dokumen tidak ditemukan")
+
+    # Hapus file fisik
+    if record.storage_path:
+        try:
+            delete_file(record.storage_path)
+        except StorageError:
+            pass  # file mungkin sudah tidak ada
 
     db.delete(record)
     db.commit()

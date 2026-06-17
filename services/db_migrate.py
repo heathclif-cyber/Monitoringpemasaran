@@ -90,6 +90,7 @@ def run_migrations() -> None:
         db.commit()
         add_column_safely(db, "invoice", "no_ba", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "delivery_order", "no_ba", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "document_upload", "storage_path", "VARCHAR DEFAULT NULL")
 
         fixes = [
             ("laporan_bypass", "unit", "Awaya Telpaputih", "Awaya-Telpaputih"),

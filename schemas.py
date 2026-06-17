@@ -203,7 +203,7 @@ class DocumentUploadOut(BaseModel):
     entity_id: str
     doc_type: str
     file_name: str
-    onedrive_item_id: Optional[str] = None
+    storage_path: Optional[str] = None
     web_url: str
     uploaded_at: Optional[datetime] = None
 
@@ -242,6 +242,17 @@ class DocumentReferenceOut(BaseModel):
     entity_id: str
     label: str
     sublabel: Optional[str] = None
+
+
+class DocumentSummaryRow(BaseModel):
+    entity_type: str
+    entity_id: str
+    display_label: str
+    sublabel: Optional[str] = None
+    total: int
+    uploaded: int
+    missing: int
+    slots: List[DocumentSlotOut]
 
 
 DocumentCompletenessOut.model_rebuild()

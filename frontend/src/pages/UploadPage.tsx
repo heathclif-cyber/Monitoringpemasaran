@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, CircleAlert, CloudUpload, ExternalLink, Loader2 } from 'lucide-react'
+import { CheckCircle2, CircleAlert, CloudUpload, ExternalLink, Eye, ListFilter, Loader2, Search } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,17 +16,21 @@ import type {
   DocumentReference,
   DocumentSlot,
   DocumentStatusResponse,
+  DocumentSummaryRow,
   DocumentUpload,
 } from '@/types'
 
 type UploadEntityType = Exclude<DocumentEntityType, 'bypass'>
+type SummaryEntityType = DocumentEntityType
 const UPLOAD_ENTITY_TYPES: UploadEntityType[] = ['kontrak', 'invoice', 'do', 'ba']
+const SUMMARY_ENTITY_TYPES: SummaryEntityType[] = ['kontrak', 'invoice', 'do', 'ba', 'bypass']
 
-const ENTITY_TYPE_LABELS: Record<UploadEntityType, string> = {
+const ENTITY_TYPE_LABELS: Record<SummaryEntityType, string> = {
   kontrak: 'Kontrak',
   invoice: 'Invoice',
   do: 'Delivery Order (DO)',
   ba: 'Berita Acara',
+  bypass: 'Bypass',
 }
 
 const ENTITY_REF_LABELS: Record<UploadEntityType, string> = {
@@ -36,19 +40,34 @@ const ENTITY_REF_LABELS: Record<UploadEntityType, string> = {
   ba: 'Pilih No. BA',
 }
 
-function CompletenessBadge({ summary }: { summary: DocumentCompleteness['summary'] }) {
-  const complete = summary.missing === 0
+type FilterMode = 'incomplete' | 'all' | 'complete'
+
+function CompletenessBadge({ total, uploaded }: { total: number; uploaded: number }) {
+  const complete = uploaded === total && total > 0
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap',
         complete
           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
           : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
       )}
     >
-      {summary.uploaded}/{summary.total} lengkap
+      {uploaded}/{total}
     </span>
+  )
+}
+
+function MissingBadge({ labels }: { labels: string[] }) {
+  if (labels.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-1">
+      {labels.map((l) => (
+        <span key={l} className="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
+          <CircleAlert size={10} className="mr-0.5" /> {l}
+        </span>
+      ))}
+    </div>
   )
 }
 
@@ -117,11 +136,11 @@ function SlotRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        {slot.web_url?.startsWith('http') && (
+        {slot.web_url && (
           <a
             href={slot.web_url}
-            target="_blank"
-            rel="noopener noreferrer"
+            target={slot.web_url.startsWith('http') ? '_blank' : undefined}
+            rel={slot.web_url.startsWith('http') ? 'noopener noreferrer' : undefined}
             className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
           >
             <ExternalLink size={12} /> Buka
@@ -165,7 +184,7 @@ function CompletenessGroup({
     <div className={cn('space-y-2', nested && 'ml-3 border-l border-border pl-3')}>
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-sm font-semibold">{item.display_label}</p>
-        <CompletenessBadge summary={item.summary} />
+        <CompletenessBadge total={item.summary.total} uploaded={item.summary.uploaded} />
         {item.sublabel && <span className="text-xs text-muted-foreground">{item.sublabel}</span>}
       </div>
       <div className="space-y-2">
@@ -196,6 +215,15 @@ function CompletenessGroup({
 export default function UploadPage() {
   const { addNotification } = useAppStore()
   const [status, setStatus] = useState<DocumentStatusResponse | null>(null)
+
+  // --- Summary state ---
+  const [summaryType, setSummaryType] = useState<SummaryEntityType>('kontrak')
+  const [summaryFilter, setSummaryFilter] = useState<FilterMode>('incomplete')
+  const [summaryRows, setSummaryRows] = useState<DocumentSummaryRow[]>([])
+  const [loadingSummary, setLoadingSummary] = useState(false)
+  const [summaryExpanded, setSummaryExpanded] = useState<string | null>(null)
+
+  // --- Upload state ---
   const [entityType, setEntityType] = useState<UploadEntityType>('kontrak')
   const [entityId, setEntityId] = useState('')
   const [references, setReferences] = useState<DocumentReference[]>([])
@@ -207,6 +235,26 @@ export default function UploadPage() {
     client.get<DocumentStatusResponse>('/api/documents/status').then(setStatus).catch(() => setStatus(null))
   }, [])
 
+  // --- Load summary ---
+  const loadSummary = useCallback(async () => {
+    setLoadingSummary(true)
+    try {
+      const data = await client.get<DocumentSummaryRow[]>(
+        `/api/documents/summary?entity_type=${encodeURIComponent(summaryType)}&status_filter=${summaryFilter}&limit=200`,
+      )
+      setSummaryRows(data)
+    } catch {
+      setSummaryRows([])
+    } finally {
+      setLoadingSummary(false)
+    }
+  }, [summaryType, summaryFilter])
+
+  useEffect(() => {
+    loadSummary()
+  }, [loadSummary])
+
+  // --- Load references ---
   const loadReferences = useCallback(async () => {
     setLoadingRefs(true)
     try {
@@ -262,33 +310,175 @@ export default function UploadPage() {
 
   const selectedRef = references.find((r) => r.entity_id === entityId)
 
+  // Jump from summary to upload detail
+  const jumpToUpload = (etype: UploadEntityType, eid: string) => {
+    setEntityType(etype)
+    setEntityId(eid)
+    // scroll to upload section
+    document.getElementById('upload-detail-card')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
+      {/* ======== SUMMARY TABLE ======== */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Upload Dokumen ke OneDrive</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ListFilter size={16} className="text-muted-foreground" />
+              <CardTitle className="text-sm font-semibold">Ringkasan Upload</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <NativeSelect
+                value={summaryType}
+                onChange={(e) => {
+                  setSummaryType(e.target.value as SummaryEntityType)
+                  setSummaryExpanded(null)
+                }}
+                className="h-8 w-auto text-xs"
+              >
+                {SUMMARY_ENTITY_TYPES.map((t) => (
+                  <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
+                ))}
+              </NativeSelect>
+              <NativeSelect
+                value={summaryFilter}
+                onChange={(e) => {
+                  setSummaryFilter(e.target.value as FilterMode)
+                  setSummaryExpanded(null)
+                }}
+                className="h-8 w-auto text-xs"
+              >
+                <option value="incomplete">Belum Lengkap</option>
+                <option value="all">Semua</option>
+                <option value="complete">Sudah Lengkap</option>
+              </NativeSelect>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingSummary ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+              <Loader2 size={16} className="animate-spin" /> Memuat ringkasan...
+            </div>
+          ) : summaryRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {summaryFilter === 'incomplete'
+                ? 'Semua dokumen sudah lengkap 🎉'
+                : 'Belum ada data dokumen.'}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2 pr-2 font-medium">No Dokumen</th>
+                    <th className="text-left py-2 px-2 font-medium hidden sm:table-cell">Keterangan</th>
+                    <th className="text-center py-2 px-2 font-medium w-20">Status</th>
+                    <th className="text-left py-2 px-2 font-medium hidden md:table-cell">Belum Upload</th>
+                    <th className="text-center py-2 pl-2 font-medium w-12"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaryRows.map((row) => (
+                    <tr
+                      key={`${row.entity_type}-${row.entity_id}`}
+                      className={cn(
+                        'border-b last:border-0 hover:bg-muted/50 cursor-pointer',
+                        summaryExpanded === `${row.entity_type}-${row.entity_id}` && 'bg-muted/30',
+                      )}
+                      onClick={() => {
+                        setSummaryExpanded(
+                          summaryExpanded === `${row.entity_type}-${row.entity_id}`
+                            ? null
+                            : `${row.entity_type}-${row.entity_id}`,
+                        )
+                      }}
+                    >
+                      <td className="py-2 pr-2">
+                        <span className="font-medium">{row.display_label}</span>
+                      </td>
+                      <td className="py-2 px-2 text-muted-foreground hidden sm:table-cell max-w-[140px] truncate">
+                        {row.sublabel || '-'}
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        <CompletenessBadge total={row.total} uploaded={row.uploaded} />
+                      </td>
+                      <td className="py-2 px-2 hidden md:table-cell">
+                        <MissingBadge labels={row.slots.filter((s) => !s.uploaded).map((s) => s.label)} />
+                      </td>
+                      <td className="py-2 pl-2 text-center">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          title="Lihat detail upload"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (row.entity_type === 'bypass') return
+                            jumpToUpload(row.entity_type as UploadEntityType, row.entity_id)
+                          }}
+                        >
+                          <Eye size={14} />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {/* Expanded: inline slot rows */}
+              {summaryExpanded && (() => {
+                const expandedRow = summaryRows.find(
+                  (r) => `${r.entity_type}-${r.entity_id}` === summaryExpanded,
+                )
+                if (!expandedRow) return null
+                return (
+                  <div className="mt-2 p-3 rounded-md border bg-muted/20 space-y-2">
+                    <p className="text-xs font-semibold">
+                      {expandedRow.display_label}
+                      {expandedRow.sublabel ? ` · ${expandedRow.sublabel}` : ''}
+                    </p>
+                    {expandedRow.slots.map((slot) => (
+                      <SlotRow
+                        key={`exp-${expandedRow.entity_type}-${expandedRow.entity_id}-${slot.doc_type}`}
+                        entityType={expandedRow.entity_type}
+                        entityId={expandedRow.entity_id}
+                        slot={slot}
+                        configured={Boolean(status?.configured)}
+                        onUploaded={() => {
+                          loadSummary()
+                          loadCompleteness()
+                        }}
+                      />
+                    ))}
+                    {expandedRow.entity_type !== 'bypass' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() =>
+                          jumpToUpload(expandedRow.entity_type as UploadEntityType, expandedRow.entity_id)
+                        }
+                      >
+                        <Search size={12} /> Buka detail lengkap
+                      </Button>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ======== UPLOAD DETAIL ======== */}
+      <Card id="upload-detail-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Upload Dokumen</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {status && !status.configured && status.mode === 'pending_auth' && (
-            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900 space-y-2 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100">
-              <p className="font-medium">Setup akun Microsoft Family / personal</p>
-              {status.auth_url && (
-                <Button type="button" variant="outline" size="sm" className="gap-1 h-8" asChild>
-                  <a href={status.auth_url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink size={12} /> Hubungkan Akun Microsoft
-                  </a>
-                </Button>
-              )}
-            </div>
-          )}
-
-          {status && !status.configured && status.mode === null && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-              OneDrive belum dikonfigurasi. Set <code className="bg-amber-100 px-1 rounded">MS_CLIENT_ID</code> dan{' '}
-              <code className="bg-amber-100 px-1 rounded">MS_CLIENT_SECRET</code> di .env.
-            </div>
-          )}
-
           <div>
             <Label className="text-xs">Jenis Referensi Dokumen</Label>
             <NativeSelect
@@ -330,7 +520,7 @@ export default function UploadPage() {
           <CardHeader className="pb-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle className="text-sm font-semibold">Status Kelengkapan Dokumen</CardTitle>
-              {completeness && <CompletenessBadge summary={completeness.summary} />}
+              {completeness && <CompletenessBadge total={completeness.summary.total} uploaded={completeness.summary.uploaded} />}
             </div>
           </CardHeader>
           <CardContent>
@@ -350,21 +540,6 @@ export default function UploadPage() {
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Dokumen per Jenis</CardTitle>
-        </CardHeader>
-        <CardContent className="text-xs text-muted-foreground space-y-1">
-          <p><strong>Kontrak:</strong> Dokumen Kontrak</p>
-          <p><strong>Invoice:</strong> Invoice, Kuitansi</p>
-          <p><strong>DO:</strong> Delivery Order, Deklarasi Penerimaan, Berita Acara Serah Terima</p>
-          <p><strong>BA:</strong> Berita Acara Serah Terima</p>
-          {entityType === 'kontrak' && (
-            <p className="pt-2 text-foreground">Pilih kontrak untuk melihat juga status invoice & DO terkait.</p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

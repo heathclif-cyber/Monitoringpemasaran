@@ -201,6 +201,6 @@ class DocumentUpload(Base):
     entity_id = Column(String, nullable=False, index=True)
     doc_type = Column(String, nullable=False)
     file_name = Column(String, nullable=False)
-    onedrive_item_id = Column(String, nullable=True)
+    storage_path = Column(String, nullable=True)
     web_url = Column(String, nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())

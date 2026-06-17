@@ -225,7 +225,7 @@ export interface DocumentUpload {
   entity_id: string
   doc_type: DocumentDocType
   file_name: string
-  onedrive_item_id: string | null
+  storage_path: string | null
   web_url: string
   uploaded_at: string | null
 }
@@ -263,6 +263,17 @@ export interface DocumentCompleteness {
   slots: DocumentSlot[]
   summary: DocumentCompletenessSummary
   related: DocumentCompleteness[]
+}
+
+export interface DocumentSummaryRow {
+  entity_type: DocumentEntityType
+  entity_id: string
+  display_label: string
+  sublabel: string | null
+  total: number
+  uploaded: number
+  missing: number
+  slots: DocumentSlot[]
 }
 
 export interface DocumentReference {
