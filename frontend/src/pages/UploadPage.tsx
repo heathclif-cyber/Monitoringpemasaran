@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, CircleAlert, CloudUpload, ExternalLink, Eye, ListFilter, Loader2, Search } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CheckCircle2, CircleAlert, CloudUpload, Download, Eye, ListFilter, Loader2, Search } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DocxPreview } from '@/components/common/DocxPreview'
 import { DOC_TYPE_LABELS } from '@/components/common/DocumentUpload'
 import { cn } from '@/lib/utils'
 import type {
@@ -71,6 +73,8 @@ function MissingBadge({ labels }: { labels: string[] }) {
   )
 }
 
+const BROWSER_VIEWABLE = new Set(['pdf', 'jpg', 'jpeg', 'png'])
+
 function SlotRow({
   entityType,
   entityId,
@@ -87,6 +91,21 @@ function SlotRow({
   const { addNotification } = useAppStore()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [docxOpen, setDocxOpen] = useState(false)
+
+  const ext = slot.file_name?.split('.').pop()?.toLowerCase() ?? ''
+  const isDocx = ext === 'docx'
+  const viewUrl = slot.document_id != null ? `/api/documents/view/${slot.document_id}` : null
+  const canView = slot.uploaded && !!viewUrl && (isDocx || BROWSER_VIEWABLE.has(ext))
+
+  const handleView = () => {
+    if (!viewUrl) return
+    if (isDocx) {
+      setDocxOpen(true)
+    } else {
+      window.open(viewUrl, '_blank', 'noopener,noreferrer')
+    }
+  }
 
   const handleFile = async (file: File | null) => {
     if (!file) return
@@ -110,62 +129,89 @@ function SlotRow({
   }
 
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-2 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between',
-        slot.uploaded
-          ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20'
-          : 'border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/20',
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          {slot.uploaded ? (
-            <CheckCircle2 size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
-          ) : (
-            <CircleAlert size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
-          )}
-          <p className="text-sm font-medium">{slot.label}</p>
-          <span className="text-xs text-muted-foreground">({DOC_TYPE_LABELS[slot.doc_type]})</span>
-        </div>
-        {slot.uploaded ? (
-          <p className="mt-1 truncate text-xs text-muted-foreground">{slot.file_name}</p>
-        ) : (
-          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Belum di-upload</p>
+    <>
+      <div
+        className={cn(
+          'flex flex-col gap-2 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between',
+          slot.uploaded
+            ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20'
+            : 'border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/20',
         )}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {slot.uploaded ? (
+              <CheckCircle2 size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <CircleAlert size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
+            )}
+            <p className="text-sm font-medium">{slot.label}</p>
+            <span className="text-xs text-muted-foreground">({DOC_TYPE_LABELS[slot.doc_type]})</span>
+          </div>
+          {slot.uploaded ? (
+            <p className="mt-1 truncate text-xs text-muted-foreground">{slot.file_name}</p>
+          ) : (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Belum di-upload</p>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          {canView && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1 text-xs"
+              onClick={handleView}
+              title="Lihat dokumen"
+            >
+              <Eye size={12} /> Lihat
+            </Button>
+          )}
+          {slot.web_url && (
+            <a
+              href={slot.web_url}
+              download
+              className="inline-flex items-center gap-1 rounded-md px-2 h-8 text-xs text-primary hover:bg-muted transition-colors"
+              title="Unduh dokumen"
+            >
+              <Download size={12} /> Unduh
+            </a>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
+            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+          />
+          <Button
+            type="button"
+            variant={slot.uploaded ? 'outline' : 'default'}
+            size="sm"
+            className="h-8 gap-1 text-xs"
+            disabled={!configured || uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {uploading ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />}
+            {slot.uploaded ? 'Ganti' : 'Upload'}
+          </Button>
+        </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
-        {slot.web_url && (
-          <a
-            href={slot.web_url}
-            target={slot.web_url.startsWith('http') ? '_blank' : undefined}
-            rel={slot.web_url.startsWith('http') ? 'noopener noreferrer' : undefined}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-          >
-            <ExternalLink size={12} /> Buka
-          </a>
-        )}
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
-          onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-        />
-        <Button
-          type="button"
-          variant={slot.uploaded ? 'outline' : 'default'}
-          size="sm"
-          className="h-8 gap-1 text-xs"
-          disabled={!configured || uploading}
-          onClick={() => inputRef.current?.click()}
-        >
-          {uploading ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />}
-          {slot.uploaded ? 'Ganti' : 'Upload'}
-        </Button>
-      </div>
-    </div>
+      {isDocx && viewUrl && (
+        <Dialog open={docxOpen} onOpenChange={setDocxOpen}>
+          <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
+            <DialogHeader className="px-6 pt-6 pb-3 shrink-0 border-b">
+              <DialogTitle className="text-sm font-medium">{slot.file_name}</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <DocxPreview url={viewUrl} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   )
 }
 
@@ -319,23 +365,96 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
-      {/* ======== SUMMARY TABLE ======== */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ListFilter size={16} className="text-muted-foreground" />
-              <CardTitle className="text-sm font-semibold">Ringkasan Upload</CardTitle>
+    <div>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,460px)_1fr] gap-6 items-start">
+
+        {/* ======== LEFT: UPLOAD FORM + COMPLETENESS ======== */}
+        <div className="space-y-6">
+          <Card id="upload-detail-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Upload Dokumen</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-xs">Jenis Referensi Dokumen</Label>
+                <NativeSelect
+                  value={entityType}
+                  onChange={(e) => setEntityType(e.target.value as UploadEntityType)}
+                  className="mt-1"
+                >
+                  {UPLOAD_ENTITY_TYPES.map((t) => (
+                    <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
+                  ))}
+                </NativeSelect>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pilih jenis dokumen bisnis, lalu pilih nomornya di bawah.
+                </p>
+              </div>
+
+              <div>
+                <Label className="text-xs">{ENTITY_REF_LABELS[entityType]}</Label>
+                <div className="mt-1">
+                  <SearchableSelect
+                    options={referenceOptions}
+                    value={entityId}
+                    onChange={setEntityId}
+                    placeholder={loadingRefs ? 'Memuat daftar...' : '-- Cari & pilih nomor --'}
+                  />
+                </div>
+                {selectedRef && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Terpilih: <span className="font-medium text-foreground">{selectedRef.label}</span>
+                    {selectedRef.sublabel ? ` · ${selectedRef.sublabel}` : ''}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {entityId && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-sm font-semibold">Status Kelengkapan Dokumen</CardTitle>
+                  {completeness && <CompletenessBadge total={completeness.summary.total} uploaded={completeness.summary.uploaded} />}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingCompleteness ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+                    <Loader2 size={16} className="animate-spin" /> Memuat status dokumen...
+                  </div>
+                ) : completeness ? (
+                  <CompletenessGroup
+                    item={completeness}
+                    configured={Boolean(status?.configured)}
+                    onUploaded={loadCompleteness}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Tidak ada data kelengkapan.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* ======== RIGHT: SUMMARY TABLE ======== */}
+        <Card className="sticky top-4">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ListFilter size={16} className="text-muted-foreground" />
+                <CardTitle className="text-sm font-semibold">Ringkasan Upload</CardTitle>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-2">
               <NativeSelect
                 value={summaryType}
                 onChange={(e) => {
                   setSummaryType(e.target.value as SummaryEntityType)
                   setSummaryExpanded(null)
                 }}
-                className="h-8 w-auto text-xs"
+                className="h-8 w-auto text-xs flex-1"
               >
                 {SUMMARY_ENTITY_TYPES.map((t) => (
                   <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
@@ -347,199 +466,122 @@ export default function UploadPage() {
                   setSummaryFilter(e.target.value as FilterMode)
                   setSummaryExpanded(null)
                 }}
-                className="h-8 w-auto text-xs"
+                className="h-8 w-auto text-xs flex-1"
               >
                 <option value="incomplete">Belum Lengkap</option>
                 <option value="all">Semua</option>
                 <option value="complete">Sudah Lengkap</option>
               </NativeSelect>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loadingSummary ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
-              <Loader2 size={16} className="animate-spin" /> Memuat ringkasan...
-            </div>
-          ) : summaryRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              {summaryFilter === 'incomplete'
-                ? 'Semua dokumen sudah lengkap 🎉'
-                : 'Belum ada data dokumen.'}
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="text-left py-2 pr-2 font-medium">No Dokumen</th>
-                    <th className="text-left py-2 px-2 font-medium hidden sm:table-cell">Keterangan</th>
-                    <th className="text-center py-2 px-2 font-medium w-20">Status</th>
-                    <th className="text-left py-2 px-2 font-medium hidden md:table-cell">Belum Upload</th>
-                    <th className="text-center py-2 pl-2 font-medium w-12"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summaryRows.map((row) => (
-                    <tr
-                      key={`${row.entity_type}-${row.entity_id}`}
-                      className={cn(
-                        'border-b last:border-0 hover:bg-muted/50 cursor-pointer',
-                        summaryExpanded === `${row.entity_type}-${row.entity_id}` && 'bg-muted/30',
-                      )}
-                      onClick={() => {
-                        setSummaryExpanded(
-                          summaryExpanded === `${row.entity_type}-${row.entity_id}`
-                            ? null
-                            : `${row.entity_type}-${row.entity_id}`,
-                        )
-                      }}
-                    >
-                      <td className="py-2 pr-2">
-                        <span className="font-medium">{row.display_label}</span>
-                      </td>
-                      <td className="py-2 px-2 text-muted-foreground hidden sm:table-cell max-w-[140px] truncate">
-                        {row.sublabel || '-'}
-                      </td>
-                      <td className="py-2 px-2 text-center">
-                        <CompletenessBadge total={row.total} uploaded={row.uploaded} />
-                      </td>
-                      <td className="py-2 px-2 hidden md:table-cell">
-                        <MissingBadge labels={row.slots.filter((s) => !s.uploaded).map((s) => s.label)} />
-                      </td>
-                      <td className="py-2 pl-2 text-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          title="Lihat detail upload"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (row.entity_type === 'bypass') return
-                            jumpToUpload(row.entity_type as UploadEntityType, row.entity_id)
+          </CardHeader>
+          <CardContent className="p-0">
+            {loadingSummary ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center px-4">
+                <Loader2 size={16} className="animate-spin" /> Memuat...
+              </div>
+            ) : summaryRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6 px-4">
+                {summaryFilter === 'incomplete' ? 'Semua dokumen sudah lengkap 🎉' : 'Belum ada data.'}
+              </p>
+            ) : (
+              <div className="max-h-[70vh] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr className="border-b text-muted-foreground">
+                      <th className="text-left py-2 px-3 font-medium">No Dokumen</th>
+                      <th className="text-left py-2 px-2 font-medium hidden sm:table-cell">Keterangan</th>
+                      <th className="text-left py-2 px-2 font-medium hidden md:table-cell">Belum Upload</th>
+                      <th className="text-center py-2 px-2 font-medium w-16">Status</th>
+                      <th className="text-center py-2 pr-3 font-medium w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summaryRows.map((row) => (
+                      <Fragment key={`${row.entity_type}-${row.entity_id}`}>
+                        <tr
+                          className={cn(
+                            'border-b last:border-0 hover:bg-muted/50 cursor-pointer',
+                            summaryExpanded === `${row.entity_type}-${row.entity_id}` && 'bg-muted/30',
+                          )}
+                          onClick={() => {
+                            setSummaryExpanded(
+                              summaryExpanded === `${row.entity_type}-${row.entity_id}`
+                                ? null
+                                : `${row.entity_type}-${row.entity_id}`,
+                            )
                           }}
                         >
-                          <Eye size={14} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {/* Expanded: inline slot rows */}
-              {summaryExpanded && (() => {
-                const expandedRow = summaryRows.find(
-                  (r) => `${r.entity_type}-${r.entity_id}` === summaryExpanded,
-                )
-                if (!expandedRow) return null
-                return (
-                  <div className="mt-2 p-3 rounded-md border bg-muted/20 space-y-2">
-                    <p className="text-xs font-semibold">
-                      {expandedRow.display_label}
-                      {expandedRow.sublabel ? ` · ${expandedRow.sublabel}` : ''}
-                    </p>
-                    {expandedRow.slots.map((slot) => (
-                      <SlotRow
-                        key={`exp-${expandedRow.entity_type}-${expandedRow.entity_id}-${slot.doc_type}`}
-                        entityType={expandedRow.entity_type}
-                        entityId={expandedRow.entity_id}
-                        slot={slot}
-                        configured={Boolean(status?.configured)}
-                        onUploaded={() => {
-                          loadSummary()
-                          loadCompleteness()
-                        }}
-                      />
+                          <td className="py-2 px-3 font-medium whitespace-nowrap">{row.display_label}</td>
+                          <td className="py-2 px-2 text-muted-foreground hidden sm:table-cell max-w-[180px] truncate">
+                            {row.sublabel || '—'}
+                          </td>
+                          <td className="py-2 px-2 hidden md:table-cell">
+                            <MissingBadge labels={row.slots.filter((s) => !s.uploaded).map((s) => s.label)} />
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <CompletenessBadge total={row.total} uploaded={row.uploaded} />
+                          </td>
+                          <td className="py-2 pr-3 text-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              title="Lihat detail upload"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (row.entity_type === 'bypass') return
+                                jumpToUpload(row.entity_type as UploadEntityType, row.entity_id)
+                              }}
+                            >
+                              <Eye size={14} />
+                            </Button>
+                          </td>
+                        </tr>
+                        {summaryExpanded === `${row.entity_type}-${row.entity_id}` && (
+                          <tr>
+                            <td colSpan={5} className="px-3 pb-3">
+                              <div className="pt-2 space-y-1.5">
+                                {row.slots.map((slot) => (
+                                  <SlotRow
+                                    key={`exp-${row.entity_type}-${row.entity_id}-${slot.doc_type}`}
+                                    entityType={row.entity_type}
+                                    entityId={row.entity_id}
+                                    slot={slot}
+                                    configured={Boolean(status?.configured)}
+                                    onUploaded={() => {
+                                      loadSummary()
+                                      loadCompleteness()
+                                    }}
+                                  />
+                                ))}
+                                {row.entity_type !== 'bypass' && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs gap-1 mt-1"
+                                    onClick={() =>
+                                      jumpToUpload(row.entity_type as UploadEntityType, row.entity_id)
+                                    }
+                                  >
+                                    <Search size={12} /> Buka detail
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
-                    {expandedRow.entity_type !== 'bypass' && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs gap-1"
-                        onClick={() =>
-                          jumpToUpload(expandedRow.entity_type as UploadEntityType, expandedRow.entity_id)
-                        }
-                      >
-                        <Search size={12} /> Buka detail lengkap
-                      </Button>
-                    )}
-                  </div>
-                )
-              })()}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ======== UPLOAD DETAIL ======== */}
-      <Card id="upload-detail-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Upload Dokumen</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label className="text-xs">Jenis Referensi Dokumen</Label>
-            <NativeSelect
-              value={entityType}
-              onChange={(e) => setEntityType(e.target.value as UploadEntityType)}
-              className="mt-1"
-            >
-              {UPLOAD_ENTITY_TYPES.map((t) => (
-                <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
-              ))}
-            </NativeSelect>
-            <p className="text-xs text-muted-foreground mt-1">
-              Pilih jenis dokumen bisnis, lalu pilih nomornya di bawah.
-            </p>
-          </div>
-
-          <div>
-            <Label className="text-xs">{ENTITY_REF_LABELS[entityType]}</Label>
-            <div className="mt-1">
-              <SearchableSelect
-                options={referenceOptions}
-                value={entityId}
-                onChange={setEntityId}
-                placeholder={loadingRefs ? 'Memuat daftar...' : '-- Cari & pilih nomor --'}
-              />
-            </div>
-            {selectedRef && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Terpilih: <span className="font-medium text-foreground">{selectedRef.label}</span>
-                {selectedRef.sublabel ? ` · ${selectedRef.sublabel}` : ''}
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {entityId && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold">Status Kelengkapan Dokumen</CardTitle>
-              {completeness && <CompletenessBadge total={completeness.summary.total} uploaded={completeness.summary.uploaded} />}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loadingCompleteness ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
-                <Loader2 size={16} className="animate-spin" /> Memuat status dokumen...
+                  </tbody>
+                </table>
               </div>
-            ) : completeness ? (
-              <CompletenessGroup
-                item={completeness}
-                configured={Boolean(status?.configured)}
-                onUploaded={loadCompleteness}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">Tidak ada data kelengkapan.</p>
             )}
           </CardContent>
         </Card>
-      )}
+
+      </div>
     </div>
   )
 }

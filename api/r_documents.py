@@ -373,6 +373,31 @@ def document_completeness(
     )
 
 
+def _build_slots_from_cache(
+    entity_type: str,
+    entity_id: str,
+    uploads_cache: dict[str, dict[str, "models.DocumentUpload"]],
+) -> list[schemas.DocumentSlotOut]:
+    """Build slots using a pre-fetched cache (avoids per-row DB queries)."""
+    required = ENTITY_DOC_REQUIREMENTS.get(entity_type, [])
+    by_type = uploads_cache.get(entity_id, {})
+    slots: list[schemas.DocumentSlotOut] = []
+    for doc_type in required:
+        upload = by_type.get(doc_type)
+        slots.append(
+            schemas.DocumentSlotOut(
+                doc_type=doc_type,
+                label=DOC_TYPE_LABELS.get(doc_type, doc_type),
+                uploaded=upload is not None,
+                file_name=upload.file_name if upload else None,
+                web_url=upload.web_url if upload else None,
+                uploaded_at=upload.uploaded_at if upload else None,
+                document_id=upload.id if upload else None,
+            )
+        )
+    return slots
+
+
 @router.get("/summary", response_model=List[schemas.DocumentSummaryRow])
 def document_summary(
     entity_type: str = Query(...),
@@ -387,105 +412,74 @@ def document_summary(
     if status_filter not in ("all", "complete", "incomplete"):
         raise HTTPException(status_code=400, detail="status_filter tidak valid")
 
-    rows: list[schemas.DocumentSummaryRow] = []
+    # --- 1. Fetch entity rows ---
+    entity_rows: list[tuple[str, str | None]] = []  # (entity_id, sublabel)
+    display_labels: dict[str, str] = {}
 
-    # Kumpulkan semua entity_id + label
     if entity_type == "kontrak":
-        q = db.query(models.Kontrak).order_by(models.Kontrak.tanggal_kontrak.desc()).limit(limit)
-        for row in q.all():
-            slots = _build_slots(db, entity_type, row.no_kontrak)
-            summary = _summarize_slots(slots)
-            if status_filter == "complete" and summary.missing > 0:
-                continue
-            if status_filter == "incomplete" and summary.missing == 0:
-                continue
-            rows.append(schemas.DocumentSummaryRow(
-                entity_type=entity_type,
-                entity_id=row.no_kontrak,
-                display_label=row.no_kontrak,
-                sublabel=row.pembeli,
-                total=summary.total,
-                uploaded=summary.uploaded,
-                missing=summary.missing,
-                slots=slots,
-            ))
+        for row in db.query(models.Kontrak).order_by(models.Kontrak.tanggal_kontrak.desc()).limit(limit):
+            entity_rows.append((row.no_kontrak, row.pembeli))
+            display_labels[row.no_kontrak] = row.no_kontrak
     elif entity_type == "invoice":
-        q = db.query(models.Invoice).order_by(models.Invoice.tanggal_transaksi.desc()).limit(limit)
-        for row in q.all():
-            slots = _build_slots(db, entity_type, row.no_invoice)
-            summary = _summarize_slots(slots)
-            if status_filter == "complete" and summary.missing > 0:
-                continue
-            if status_filter == "incomplete" and summary.missing == 0:
-                continue
-            rows.append(schemas.DocumentSummaryRow(
-                entity_type=entity_type,
-                entity_id=row.no_invoice,
-                display_label=row.no_invoice,
-                sublabel=row.no_kontrak,
-                total=summary.total,
-                uploaded=summary.uploaded,
-                missing=summary.missing,
-                slots=slots,
-            ))
+        for row in db.query(models.Invoice).order_by(models.Invoice.tanggal_transaksi.desc()).limit(limit):
+            entity_rows.append((row.no_invoice, row.no_kontrak))
+            display_labels[row.no_invoice] = row.no_invoice
     elif entity_type == "do":
-        q = db.query(models.DeliveryOrder).order_by(models.DeliveryOrder.tanggal_do.desc()).limit(limit)
-        for row in q.all():
-            slots = _build_slots(db, entity_type, row.no_do)
-            summary = _summarize_slots(slots)
-            if status_filter == "complete" and summary.missing > 0:
-                continue
-            if status_filter == "incomplete" and summary.missing == 0:
-                continue
-            rows.append(schemas.DocumentSummaryRow(
-                entity_type=entity_type,
-                entity_id=row.no_do,
-                display_label=row.no_do,
-                sublabel=row.no_invoice,
-                total=summary.total,
-                uploaded=summary.uploaded,
-                missing=summary.missing,
-                slots=slots,
-            ))
+        for row in db.query(models.DeliveryOrder).order_by(models.DeliveryOrder.tanggal_do.desc()).limit(limit):
+            entity_rows.append((row.no_do, row.no_invoice))
+            display_labels[row.no_do] = row.no_do
     elif entity_type == "ba":
-        q = db.query(models.BeritaAcara).order_by(models.BeritaAcara.tanggal_ba.desc()).limit(limit)
-        for row in q.all():
-            slots = _build_slots(db, entity_type, row.no_ba)
-            summary = _summarize_slots(slots)
-            if status_filter == "complete" and summary.missing > 0:
-                continue
-            if status_filter == "incomplete" and summary.missing == 0:
-                continue
-            rows.append(schemas.DocumentSummaryRow(
-                entity_type=entity_type,
-                entity_id=row.no_ba,
-                display_label=row.no_ba,
-                sublabel=row.no_kontrak,
-                total=summary.total,
-                uploaded=summary.uploaded,
-                missing=summary.missing,
-                slots=slots,
-            ))
+        for row in db.query(models.BeritaAcara).order_by(models.BeritaAcara.tanggal_ba.desc()).limit(limit):
+            entity_rows.append((row.no_ba, row.no_kontrak))
+            display_labels[row.no_ba] = row.no_ba
     elif entity_type == "bypass":
-        q = db.query(models.LaporanBypass).order_by(models.LaporanBypass.tanggal.desc()).limit(limit)
-        for row in q.all():
+        for row in db.query(models.LaporanBypass).order_by(models.LaporanBypass.tanggal.desc()).limit(limit):
             eid = str(row.id)
-            slots = _build_slots(db, entity_type, eid)
-            summary = _summarize_slots(slots)
-            if status_filter == "complete" and summary.missing > 0:
-                continue
-            if status_filter == "incomplete" and summary.missing == 0:
-                continue
-            rows.append(schemas.DocumentSummaryRow(
-                entity_type=entity_type,
-                entity_id=eid,
-                display_label=f"BYPASS-{eid}",
-                sublabel=f"{row.unit or '-'} · {row.komoditi or '-'}",
-                total=summary.total,
-                uploaded=summary.uploaded,
-                missing=summary.missing,
-                slots=slots,
-            ))
+            entity_rows.append((eid, f"{row.unit or '-'} · {row.komoditi or '-'}"))
+            display_labels[eid] = f"BYPASS-{eid}"
+
+    if not entity_rows:
+        return []
+
+    # --- 2. Batch-fetch all uploads in ONE query ---
+    all_ids = [eid for eid, _ in entity_rows]
+    all_uploads = (
+        db.query(models.DocumentUpload)
+        .filter(
+            models.DocumentUpload.entity_type == entity_type,
+            models.DocumentUpload.entity_id.in_(all_ids),
+        )
+        .order_by(models.DocumentUpload.uploaded_at.desc())
+        .all()
+    )
+
+    # Build cache: entity_id -> {doc_type -> most-recent upload}
+    cache: dict[str, dict[str, models.DocumentUpload]] = {}
+    for u in all_uploads:
+        if u.entity_id not in cache:
+            cache[u.entity_id] = {}
+        if u.doc_type not in cache[u.entity_id]:
+            cache[u.entity_id][u.doc_type] = u
+
+    # --- 3. Build result rows in memory (no further DB queries) ---
+    rows: list[schemas.DocumentSummaryRow] = []
+    for entity_id, sublabel in entity_rows:
+        slots = _build_slots_from_cache(entity_type, entity_id, cache)
+        summary = _summarize_slots(slots)
+        if status_filter == "complete" and summary.missing > 0:
+            continue
+        if status_filter == "incomplete" and summary.missing == 0:
+            continue
+        rows.append(schemas.DocumentSummaryRow(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            display_label=display_labels[entity_id],
+            sublabel=sublabel,
+            total=summary.total,
+            uploaded=summary.uploaded,
+            missing=summary.missing,
+            slots=slots,
+        ))
 
     return rows
 
@@ -510,6 +504,39 @@ def list_documents(
         q = q.filter(models.DocumentUpload.doc_type == doc_type)
 
     return q.order_by(models.DocumentUpload.uploaded_at.desc()).all()
+
+
+_EXT_MEDIA_TYPE: dict[str, str] = {
+    "pdf":  "application/pdf",
+    "jpg":  "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png":  "image/png",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "xls":  "application/vnd.ms-excel",
+}
+
+
+def _file_media_type(file_name: str) -> str:
+    ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
+    return _EXT_MEDIA_TYPE.get(ext, "application/octet-stream")
+
+
+@router.get("/view/{document_id}")
+def view_document(document_id: int, db: Session = Depends(get_db)):
+    """Serve file inline agar bisa ditampilkan langsung di browser."""
+    record = db.query(models.DocumentUpload).filter(models.DocumentUpload.id == document_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Dokumen tidak ditemukan")
+    if not record.storage_path:
+        raise HTTPException(status_code=404, detail="File tidak tersedia")
+
+    try:
+        file_path = get_file_path(record.storage_path)
+    except StorageError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return FileResponse(path=file_path, media_type=_file_media_type(record.file_name))
 
 
 @router.get("/download/{document_id}")
