@@ -87,18 +87,51 @@ def upload_bytes(
 
     logger.info("File disimpan: %s (%d bytes)", file_path, len(content))
 
+    # Simpan path relatif terhadap UPLOAD_DIR agar portabel lintas environment
+    rel_path = os.path.relpath(file_path, UPLOAD_DIR)
+
     return {
-        "storage_path": file_path,
+        "storage_path": rel_path,
         "web_url": "",  # diisi setelah record DB dibuat (butuh ID)
         "file_name": safe_name,
     }
 
 
+_KNOWN_SUBFOLDERS = tuple(
+    sf.split("/")[0] for sf in DOC_TYPE_SUBFOLDERS.values()
+) + ("Lainnya",)
+
+
+def _resolve_storage_path(storage_path: str) -> str:
+    """Konversi storage_path (absolut lama atau relatif baru) ke path absolut lokal.
+
+    Path lama disimpan absolut (mis. /data/uploads/Kontrak/...) yang tidak portabel.
+    Path baru disimpan relatif terhadap UPLOAD_DIR (mis. Kontrak/...).
+    Keduanya di-resolve ke file absolut berdasarkan UPLOAD_DIR saat ini.
+    """
+    norm = storage_path.replace("\\", "/")
+
+    # Cek apakah path ini relatif (format baru) — langsung join
+    if not os.path.isabs(storage_path) and "\\" not in storage_path:
+        return os.path.join(UPLOAD_DIR, storage_path)
+
+    # Path absolut lama: ekstrak bagian relatif dari subfolder yang dikenal
+    for sf in _KNOWN_SUBFOLDERS:
+        marker = f"/{sf}/"
+        if marker in norm:
+            rel = norm[norm.index(marker) + 1:]   # mis. "Kontrak/entity-id/file.pdf"
+            return os.path.join(UPLOAD_DIR, rel)
+
+    # Fallback: gunakan apa adanya
+    return storage_path
+
+
 def get_file_path(storage_path: str) -> str:
     """Dapatkan path file yang tersimpan. Validasi path masih di dalam UPLOAD_DIR."""
-    real_upload = os.path.realpath(UPLOAD_DIR)
-    real_path = os.path.realpath(storage_path)
-    if not real_path.startswith(real_upload + os.sep) and real_path != real_upload:
+    full_path = _resolve_storage_path(storage_path)
+    real_upload = os.path.normcase(os.path.realpath(UPLOAD_DIR))
+    real_path = os.path.realpath(full_path)
+    if not os.path.normcase(real_path).startswith(real_upload + os.sep):
         raise StorageError("Path file tidak valid")
     if not os.path.isfile(real_path):
         raise StorageError("File tidak ditemukan")
