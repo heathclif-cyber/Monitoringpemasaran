@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, CircleAlert, CloudUpload, Download, Eye, ListFilter, Loader2, Search } from 'lucide-react'
+import { CheckCircle2, CircleAlert, CloudUpload, Download, Eye, FolderArchive, ListFilter, Loader2, Search } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -408,6 +408,22 @@ export default function UploadPage() {
                   </p>
                 )}
               </div>
+
+              {entityType === 'kontrak' && entityId && (
+                <div className="pt-1 border-t">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Download semua dokumen terkait kontrak ini (invoice, DO, berita acara, deklarasi) dalam 1 file ZIP.
+                  </p>
+                  <a
+                    href={`/api/documents/bundle/kontrak/${encodeURIComponent(entityId)}`}
+                    download
+                    className="inline-flex items-center gap-2 rounded-md bg-primary px-3 h-8 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <FolderArchive size={13} />
+                    Download Bundle Dokumen
+                  </a>
+                </div>
+              )}
             </CardContent>
           </Card>
 

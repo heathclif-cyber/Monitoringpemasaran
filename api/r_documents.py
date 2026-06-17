@@ -1,6 +1,8 @@
+import io
 import os
+import zipfile
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -644,6 +646,91 @@ async def upload_document(
     )
 
     return record
+
+
+@router.get("/bundle/kontrak/{no_kontrak}")
+def bundle_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
+    """Download semua dokumen terkait 1 kontrak sebagai ZIP (kontrak→invoice→DO)."""
+    kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == no_kontrak).first()
+    if not kontrak:
+        raise HTTPException(status_code=404, detail="Kontrak tidak ditemukan")
+
+    # Kumpulkan semua entity yang terkait: kontrak + invoice + DO + BA
+    entities: list[tuple[str, str, str]] = []  # (entity_type, entity_id, folder_label)
+
+    entities.append(("kontrak", no_kontrak, "Kontrak"))
+
+    invoices = (
+        db.query(models.Invoice)
+        .filter(models.Invoice.no_kontrak == no_kontrak)
+        .order_by(models.Invoice.tanggal_transaksi)
+        .all()
+    )
+    for inv in invoices:
+        entities.append(("invoice", inv.no_invoice, f"Invoice/{inv.no_invoice}"))
+        dos = (
+            db.query(models.DeliveryOrder)
+            .filter(models.DeliveryOrder.no_invoice == inv.no_invoice)
+            .order_by(models.DeliveryOrder.tanggal_do)
+            .all()
+        )
+        for do in dos:
+            entities.append(("do", do.no_do, f"Invoice/{inv.no_invoice}/DO/{do.no_do}"))
+
+    bas = (
+        db.query(models.BeritaAcara)
+        .filter(models.BeritaAcara.no_kontrak == no_kontrak)
+        .order_by(models.BeritaAcara.tanggal_ba)
+        .all()
+    )
+    for ba in bas:
+        entities.append(("ba", ba.no_ba, f"BeritaAcara/{ba.no_ba}"))
+
+    # Batch-fetch semua uploads
+    all_entity_ids = [eid for _, eid, _ in entities]
+    all_types = list({et for et, _, _ in entities})
+    uploads = (
+        db.query(models.DocumentUpload)
+        .filter(
+            models.DocumentUpload.entity_type.in_(all_types),
+            models.DocumentUpload.entity_id.in_(all_entity_ids),
+        )
+        .all()
+    )
+    upload_map: dict[tuple[str, str], list[models.DocumentUpload]] = {}
+    for u in uploads:
+        key = (u.entity_type, u.entity_id)
+        upload_map.setdefault(key, []).append(u)
+
+    # Build ZIP in memory
+    zip_buffer = io.BytesIO()
+    total_files = 0
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for entity_type, entity_id, folder_label in entities:
+            recs = upload_map.get((entity_type, entity_id), [])
+            for rec in recs:
+                if not rec.storage_path:
+                    continue
+                try:
+                    file_path = get_file_path(rec.storage_path)
+                    arcname = f"{folder_label}/{rec.file_name}"
+                    zf.write(file_path, arcname)
+                    total_files += 1
+                except StorageError:
+                    pass  # skip file yang tidak ditemukan
+
+    if total_files == 0:
+        raise HTTPException(status_code=404, detail="Tidak ada dokumen yang tersedia untuk di-download")
+
+    zip_buffer.seek(0)
+    safe_no = no_kontrak.replace("/", "-").replace("\\", "-")
+    filename = f"Bundle_{safe_no}.zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/{document_id}")
