@@ -112,7 +112,9 @@ def _resolve_storage_path(storage_path: str) -> str:
     norm = storage_path.replace("\\", "/")
 
     # Cek apakah path ini relatif (format baru) — langsung join
-    if not os.path.isabs(storage_path) and "\\" not in storage_path:
+    # Catatan: di Windows os.path.relpath menghasilkan path dengan backslash,
+    # sehingga tidak bisa memakai "\\" not in sebagai indikator absolut.
+    if not os.path.isabs(storage_path):
         return os.path.join(UPLOAD_DIR, storage_path)
 
     # Path absolut lama: ekstrak bagian relatif dari subfolder yang dikenal
