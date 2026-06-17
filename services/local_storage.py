@@ -87,8 +87,9 @@ def upload_bytes(
 
     logger.info("File disimpan: %s (%d bytes)", file_path, len(content))
 
-    # Simpan path relatif terhadap UPLOAD_DIR agar portabel lintas environment
-    rel_path = os.path.relpath(file_path, UPLOAD_DIR)
+    # Simpan path relatif terhadap UPLOAD_DIR agar portabel lintas environment.
+    # Normalisasi ke forward-slash agar path konsisten di Windows maupun Linux.
+    rel_path = os.path.relpath(file_path, UPLOAD_DIR).replace("\\", "/")
 
     return {
         "storage_path": rel_path,
