@@ -28,6 +28,36 @@ def add_column_safely(db, table: str, col: str, type_def: str) -> None:
             db.rollback()
 
 
+def _seed_default_users(db) -> None:
+    from services.auth import hash_password
+    import os
+
+    existing_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+    if existing_count and existing_count > 0:
+        return
+
+    admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+    tamu_password = os.getenv("TAMU_PASSWORD", "tamu123")
+
+    import models as m
+    db.add(m.User(
+        username="admin",
+        hashed_password=hash_password(admin_password),
+        nama_lengkap="Administrator",
+        role="admin",
+        is_active=True,
+    ))
+    db.add(m.User(
+        username="tamu",
+        hashed_password=hash_password(tamu_password),
+        nama_lengkap="Tamu",
+        role="tamu",
+        is_active=True,
+    ))
+    db.commit()
+    logger.info("Seed default users: admin + tamu")
+
+
 def run_migrations() -> None:
     logger.info("Menghubungkan ke Railway PostgreSQL...")
     logger.info("(Dari PC lokal bisa 30-60 detik — jangan Ctrl+C, tunggu sampai selesai)")
@@ -39,6 +69,7 @@ def run_migrations() -> None:
 
     db = SessionLocal()
     try:
+        _seed_default_users(db)
         logger.info("Migrasi kolom yang belum ada...")
         add_column_safely(db, "laporan_bypass", "volume", "FLOAT DEFAULT 0.0")
         add_column_safely(db, "laporan_bypass", "satuan", "VARCHAR DEFAULT 'Kg'")

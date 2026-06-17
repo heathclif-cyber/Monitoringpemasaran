@@ -2,6 +2,43 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
 
+
+# --- Auth ---
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: "UserOut"
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    nama_lengkap: str
+    role: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    nama_lengkap: str
+    role: str = "staff"
+
+class UserUpdate(BaseModel):
+    nama_lengkap: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class PasswordReset(BaseModel):
+    new_password: str
+
+TokenResponse.model_rebuild()
+
 class KontrakUnitInput(BaseModel):
     nama_unit: str
     volume: Optional[float] = 0.0

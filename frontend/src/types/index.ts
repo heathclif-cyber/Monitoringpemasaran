@@ -516,6 +516,25 @@ export interface KontrakTrace {
 }
 
 // ============================================================
+// Auth
+// ============================================================
+
+export type UserRole = 'admin' | 'staff' | 'tamu'
+
+export interface User {
+  id: number
+  username: string
+  nama_lengkap: string
+  role: UserRole
+  is_active: boolean
+}
+
+export interface AuthState {
+  token: string | null
+  user: User | null
+}
+
+// ============================================================
 // Notification
 // ============================================================
 
