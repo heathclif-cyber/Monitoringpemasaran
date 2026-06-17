@@ -17,6 +17,7 @@ class UserOut(BaseModel):
     id: int
     username: str
     nama_lengkap: str
+    jabatan: Optional[str] = None
     role: str
     is_active: bool
 
@@ -27,10 +28,12 @@ class UserCreate(BaseModel):
     username: str
     password: str
     nama_lengkap: str
+    jabatan: Optional[str] = None
     role: str = "staff"
 
 class UserUpdate(BaseModel):
     nama_lengkap: Optional[str] = None
+    jabatan: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
 

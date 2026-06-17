@@ -39,7 +39,7 @@ export function Header() {
           <div className="flex items-center gap-2 ml-1 pl-3 border-l border-border">
             <div className="text-right hidden sm:block">
               <p className="text-[12px] font-medium text-foreground leading-tight">{user.nama_lengkap}</p>
-              <p className="text-[10px] text-muted-foreground">{ROLE_LABELS[user.role] ?? user.role}</p>
+              <p className="text-[10px] text-muted-foreground">{user.jabatan ?? ROLE_LABELS[user.role] ?? user.role}</p>
             </div>
             <Button
               variant="ghost"

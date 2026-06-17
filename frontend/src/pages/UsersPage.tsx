@@ -42,8 +42,8 @@ export default function UsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
 
   // Form state
-  const [form, setForm] = useState({ username: '', password: '', nama_lengkap: '', role: 'staff' as UserRole })
-  const [editForm, setEditForm] = useState({ nama_lengkap: '', role: 'staff' as UserRole, is_active: true })
+  const [form, setForm] = useState({ username: '', password: '', nama_lengkap: '', jabatan: '', role: 'staff' as UserRole })
+  const [editForm, setEditForm] = useState({ nama_lengkap: '', jabatan: '', role: 'staff' as UserRole, is_active: true })
   const [newPassword, setNewPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -69,7 +69,7 @@ export default function UsersPage() {
       await client.post('/api/users', form)
       addNotification('User berhasil dibuat', 'success')
       setCreateOpen(false)
-      setForm({ username: '', password: '', nama_lengkap: '', role: 'staff' })
+      setForm({ username: '', password: '', nama_lengkap: '', jabatan: '', role: 'staff' })
       fetchUsers()
     } catch (err: unknown) {
       addNotification(err instanceof Error ? err.message : 'Gagal membuat user', 'error')
@@ -134,6 +134,7 @@ export default function UsersPage() {
           <thead className="bg-muted/50 text-muted-foreground text-xs">
             <tr>
               <th className="text-left px-4 py-2.5 font-medium">Nama Lengkap</th>
+              <th className="text-left px-4 py-2.5 font-medium">Jabatan</th>
               <th className="text-left px-4 py-2.5 font-medium">Username</th>
               <th className="text-left px-4 py-2.5 font-medium">Role</th>
               <th className="text-left px-4 py-2.5 font-medium">Status</th>
@@ -142,12 +143,13 @@ export default function UsersPage() {
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Memuat...</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Memuat...</td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Belum ada user</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Belum ada user</td></tr>
             ) : users.map((u) => (
               <tr key={u.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3 font-medium">{u.nama_lengkap}</td>
+                <td className="px-4 py-3 text-muted-foreground">{u.jabatan ?? <span className="text-xs text-muted-foreground/50">—</span>}</td>
                 <td className="px-4 py-3 text-muted-foreground">{u.username}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role]}`}>
@@ -163,7 +165,7 @@ export default function UsersPage() {
                   <div className="flex items-center justify-end gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7"
                       title="Edit user"
-                      onClick={() => { setEditTarget(u); setEditForm({ nama_lengkap: u.nama_lengkap, role: u.role, is_active: u.is_active }) }}>
+                      onClick={() => { setEditTarget(u); setEditForm({ nama_lengkap: u.nama_lengkap, jabatan: u.jabatan ?? '', role: u.role, is_active: u.is_active }) }}>
                       <Pencil size={13} />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7"
@@ -194,6 +196,10 @@ export default function UsersPage() {
             <div className="space-y-1.5">
               <Label>Nama Lengkap</Label>
               <Input value={form.nama_lengkap} onChange={(e) => setForm({ ...form, nama_lengkap: e.target.value })} placeholder="Nama lengkap" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Jabatan</Label>
+              <Input value={form.jabatan} onChange={(e) => setForm({ ...form, jabatan: e.target.value })} placeholder="Jabatan (opsional)" />
             </div>
             <div className="space-y-1.5">
               <Label>Username</Label>
@@ -231,6 +237,10 @@ export default function UsersPage() {
             <div className="space-y-1.5">
               <Label>Nama Lengkap</Label>
               <Input value={editForm.nama_lengkap} onChange={(e) => setEditForm({ ...editForm, nama_lengkap: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Jabatan</Label>
+              <Input value={editForm.jabatan} onChange={(e) => setEditForm({ ...editForm, jabatan: e.target.value })} placeholder="Jabatan (opsional)" />
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>

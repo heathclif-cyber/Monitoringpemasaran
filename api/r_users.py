@@ -33,6 +33,7 @@ def create_user(
         username=body.username,
         hashed_password=hash_password(body.password),
         nama_lengkap=body.nama_lengkap,
+        jabatan=body.jabatan,
         role=body.role,
     )
     db.add(user)
@@ -55,6 +56,8 @@ def update_user(
         raise HTTPException(status_code=400, detail="Role tidak valid (admin/staff/tamu)")
     if body.nama_lengkap is not None:
         user.nama_lengkap = body.nama_lengkap
+    if body.jabatan is not None:
+        user.jabatan = body.jabatan
     if body.role is not None:
         user.role = body.role
     if body.is_active is not None:

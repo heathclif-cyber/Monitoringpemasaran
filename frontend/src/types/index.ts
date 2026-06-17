@@ -536,6 +536,7 @@ export interface User {
   id: number
   username: string
   nama_lengkap: string
+  jabatan?: string | null
   role: UserRole
   is_active: boolean
 }

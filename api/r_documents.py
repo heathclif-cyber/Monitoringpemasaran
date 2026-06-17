@@ -609,8 +609,9 @@ async def upload_document(
     )
 
     if existing:
-        # Hapus file lama jika ada
-        if existing.storage_path:
+        # Hapus file lama hanya jika path berbeda (nama file berubah).
+        # Jika path sama, file baru sudah meng-overwrite file lama — jangan hapus.
+        if existing.storage_path and existing.storage_path != result["storage_path"]:
             try:
                 delete_file(existing.storage_path)
             except StorageError:
