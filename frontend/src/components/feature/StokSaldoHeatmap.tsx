@@ -59,6 +59,16 @@ interface TreemapContentProps {
   fill?: string
 }
 
+const LABEL_STYLE = {
+  fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
+  fontWeight: 500 as const,
+  letterSpacing: '0.01em',
+  paintOrder: 'stroke' as const,
+  stroke: 'rgba(0,0,0,0.45)',
+  strokeWidth: 2.5,
+  strokeLinejoin: 'round' as const,
+}
+
 function TreemapCell({
   x = 0,
   y = 0,
@@ -70,58 +80,105 @@ function TreemapCell({
   satuan = 'Kg',
   fill = '#ccc',
 }: TreemapContentProps) {
-  const showLabel = width > 56 && height > 40
-  const showValue = width > 72 && height > 56
+  const rx = Math.round(x)
+  const ry = Math.round(y)
+  const rw = Math.round(width)
+  const rh = Math.round(height)
+  const showUnit = rw > 88 && rh > 48
+  const showMaterial = rw > 100 && rh > 62
+  const showValue = rw > 110 && rh > 78
+
+  const unitLabel = unit.length > 16 ? `${unit.slice(0, 15)}…` : unit
+  const materialLabel = name.length > 22 ? `${name.slice(0, 21)}…` : name
 
   return (
     <g>
       <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
+        x={rx}
+        y={ry}
+        width={rw}
+        height={rh}
         fill={fill}
         stroke="hsl(var(--background))"
         strokeWidth={2}
         rx={4}
         className="transition-opacity hover:opacity-90"
       />
-      {showLabel && (
-        <>
-          <text
-            x={x + 6}
-            y={y + 14}
-            fill="#fff"
-            fontSize={10}
-            fontWeight={600}
-            pointerEvents="none"
-          >
-            {unit.length > 14 ? `${unit.slice(0, 13)}…` : unit}
-          </text>
-          <text
-            x={x + 6}
-            y={y + 26}
-            fill="rgba(255,255,255,0.9)"
-            fontSize={9}
-            pointerEvents="none"
-          >
-            {name.length > 18 ? `${name.slice(0, 17)}…` : name}
-          </text>
-        </>
+      {showUnit && (
+        <text
+          x={rx + 8}
+          y={ry + 16}
+          fill="#ffffff"
+          fontSize={11}
+          pointerEvents="none"
+          style={LABEL_STYLE}
+        >
+          {unitLabel}
+        </text>
+      )}
+      {showMaterial && (
+        <text
+          x={rx + 8}
+          y={ry + 30}
+          fill="rgba(255,255,255,0.95)"
+          fontSize={10}
+          pointerEvents="none"
+          style={LABEL_STYLE}
+        >
+          {materialLabel}
+        </text>
       )}
       {showValue && (
         <text
-          x={x + 6}
-          y={y + height - 8}
-          fill="#fff"
-          fontSize={11}
-          fontWeight={700}
+          x={rx + 8}
+          y={ry + rh - 10}
+          fill="#ffffff"
+          fontSize={12}
           pointerEvents="none"
+          style={{ ...LABEL_STYLE, fontWeight: 600 }}
         >
           {formatNumber(saldo)} {satuan}
         </text>
       )}
     </g>
+  )
+}
+
+function SaldoRanking({ nodes, limit = 6 }: { nodes: TreemapNode[]; limit?: number }) {
+  const top = nodes.slice(0, limit)
+  const maxSize = top[0]?.size ?? 1
+
+  return (
+    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+      {top.map((n, i) => (
+        <li
+          key={`${n.unit}-${n.name}`}
+          className="flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 min-w-0"
+        >
+          <span className="text-[10px] font-medium text-muted-foreground w-4 shrink-0 tabular-nums">
+            {i + 1}.
+          </span>
+          <span
+            className="h-2.5 shrink-0 rounded-full"
+            style={{
+              width: `${Math.max(12, Math.round((n.size / maxSize) * 40))}px`,
+              background: n.fill,
+            }}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-foreground truncate leading-tight">
+              {n.unit} · {n.name}
+            </p>
+            <p className={cn(
+              'text-xs tabular-nums leading-tight',
+              n.saldo <= 0 ? 'text-red-600' : 'text-emerald-700',
+            )}>
+              {formatNumber(n.saldo)} {n.satuan}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -156,7 +213,7 @@ function SatuanHeatmap({ title, items }: { title: string; items: StokSaldo[] }) 
           </p>
         )}
       </div>
-      <div className="h-[220px] w-full rounded-lg border bg-muted/20 overflow-hidden">
+      <div className="h-[260px] w-full rounded-lg border bg-muted/20 overflow-hidden [&_svg]:overflow-visible">
         <ResponsiveContainer width="100%" height="100%">
           <Treemap
             data={nodes}
@@ -169,6 +226,10 @@ function SatuanHeatmap({ title, items }: { title: string; items: StokSaldo[] }) 
             <Tooltip content={<SaldoTooltip />} />
           </Treemap>
         </ResponsiveContainer>
+      </div>
+      <div>
+        <p className="text-[10px] font-medium text-muted-foreground mb-1.5">Peringkat stok (terbesar)</p>
+        <SaldoRanking nodes={nodes} />
       </div>
       <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
