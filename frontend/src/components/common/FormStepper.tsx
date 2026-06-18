@@ -95,7 +95,11 @@ export function FormStepActions({
       {!isLast ? (
         <button
           type="button"
-          onClick={onNext}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onNext()
+          }}
           className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           Lanjut

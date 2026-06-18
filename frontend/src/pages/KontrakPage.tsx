@@ -374,7 +374,7 @@ export default function KontrakPage() {
     lastFetchedNo.current = editNo
     unitsDirtyRef.current = false
     loadKontrakByNo(editNo, true)
-    setActiveStep(1)
+    setActiveStep(0)
   }, [editNo, setValue, loadKontrakByNo])
 
   // Regenerate syarat on lama/ambil change
@@ -410,8 +410,18 @@ export default function KontrakPage() {
 
   const handleNextStep = async () => {
     const ok = await validateStep(activeStep)
-    if (ok) setActiveStep((s) => Math.min(s + 1, KONTRAK_STEPS.length - 1))
+    if (!ok) return
+    // Tunda ganti step agar tombol Lanjut tidak langsung diganti Submit pada klik yang sama
+    // (klik bisa "menetes" ke tombol submit baru dan memicu simpan prematur).
+    window.setTimeout(() => {
+      setActiveStep((s) => Math.min(s + 1, KONTRAK_STEPS.length - 1))
+    }, 0)
   }
+
+  const handleFormSubmit = handleSubmit(async (data) => {
+    if (activeStep !== KONTRAK_STEPS.length - 1) return
+    await onSubmit(data)
+  })
 
   const handleBackStep = () => setActiveStep((s) => Math.max(s - 1, 0))
 
@@ -424,7 +434,19 @@ export default function KontrakPage() {
           activeStep={activeStep}
           onStepClick={(i) => { if (i <= activeStep) setActiveStep(i) }}
         />
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
+        <form
+          onSubmit={handleFormSubmit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && activeStep !== KONTRAK_STEPS.length - 1) {
+              const tag = (e.target as HTMLElement).tagName
+              if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+                e.preventDefault()
+              }
+            }
+          }}
+          className="space-y-6"
+          autoComplete="off"
+        >
           {activeStep === 0 && (
           <>
           {/* Data Dasar */}
