@@ -786,17 +786,59 @@ async def upload_document(
     return record
 
 
+def _safe_bundle_part(value: str) -> str:
+    return (
+        value.replace("/", "-")
+        .replace("\\", "-")
+        .replace(":", "-")
+        .strip()
+    )
+
+
+def _flat_bundle_arcname(
+    entity_type: str,
+    entity_id: str,
+    doc_type: str,
+    file_name: str,
+    used_names: set[str],
+) -> str:
+    """Nama file datar di root ZIP — unik per entity + doc_type."""
+    prefix = {
+        "kontrak": "Kontrak",
+        "invoice": "Invoice",
+        "do": "DO",
+        "ba": "BA",
+    }.get(entity_type, entity_type)
+    safe_id = _safe_bundle_part(entity_id)
+    stem, ext = os.path.splitext(file_name)
+    safe_stem = _safe_bundle_part(stem) or "dokumen"
+    ext = ext or ""
+
+    candidate = f"{prefix}_{safe_id}_{doc_type}_{safe_stem}{ext}"
+    if candidate not in used_names:
+        used_names.add(candidate)
+        return candidate
+
+    n = 2
+    while True:
+        alt = f"{prefix}_{safe_id}_{doc_type}_{safe_stem}_{n}{ext}"
+        if alt not in used_names:
+            used_names.add(alt)
+            return alt
+        n += 1
+
+
 @router.get("/bundle/kontrak")
 def bundle_kontrak(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
-    """Download semua dokumen terkait 1 kontrak sebagai ZIP (kontrak→invoice→DO)."""
+    """Download semua dokumen terkait 1 kontrak sebagai ZIP datar (tanpa subfolder)."""
     kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == no_kontrak).first()
     if not kontrak:
         raise HTTPException(status_code=404, detail="Kontrak tidak ditemukan")
 
     # Kumpulkan semua entity yang terkait: kontrak + invoice + DO + BA
-    entities: list[tuple[str, str, str]] = []  # (entity_type, entity_id, folder_label)
+    entities: list[tuple[str, str]] = []
 
-    entities.append(("kontrak", no_kontrak, "Kontrak"))
+    entities.append(("kontrak", no_kontrak))
 
     invoices = (
         db.query(models.Invoice)
@@ -805,7 +847,7 @@ def bundle_kontrak(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
         .all()
     )
     for inv in invoices:
-        entities.append(("invoice", inv.no_invoice, f"Invoice/{inv.no_invoice}"))
+        entities.append(("invoice", inv.no_invoice))
         dos = (
             db.query(models.DeliveryOrder)
             .filter(models.DeliveryOrder.no_invoice == inv.no_invoice)
@@ -813,7 +855,7 @@ def bundle_kontrak(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
             .all()
         )
         for do in dos:
-            entities.append(("do", do.no_do, f"Invoice/{inv.no_invoice}/DO/{do.no_do}"))
+            entities.append(("do", do.no_do))
 
     bas = (
         db.query(models.BeritaAcara)
@@ -822,11 +864,11 @@ def bundle_kontrak(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
         .all()
     )
     for ba in bas:
-        entities.append(("ba", ba.no_ba, f"BeritaAcara/{ba.no_ba}"))
+        entities.append(("ba", ba.no_ba))
 
     # Batch-fetch semua uploads
-    all_entity_ids = [eid for _, eid, _ in entities]
-    all_types = list({et for et, _, _ in entities})
+    all_entity_ids = [eid for _, eid in entities]
+    all_types = list({et for et, _ in entities})
     uploads = (
         db.query(models.DocumentUpload)
         .filter(
@@ -840,18 +882,21 @@ def bundle_kontrak(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
         key = (u.entity_type, u.entity_id)
         upload_map.setdefault(key, []).append(u)
 
-    # Build ZIP in memory
+    # Build ZIP in memory — semua file di root, tanpa subfolder
     zip_buffer = io.BytesIO()
     total_files = 0
+    used_arcnames: set[str] = set()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for entity_type, entity_id, folder_label in entities:
+        for entity_type, entity_id in entities:
             recs = upload_map.get((entity_type, entity_id), [])
             for rec in recs:
                 if not rec.storage_path:
                     continue
                 try:
                     file_path = get_file_path(rec.storage_path)
-                    arcname = f"{folder_label}/{rec.file_name}"
+                    arcname = _flat_bundle_arcname(
+                        entity_type, entity_id, rec.doc_type, rec.file_name, used_arcnames,
+                    )
                     zf.write(file_path, arcname)
                     total_files += 1
                 except StorageError:
