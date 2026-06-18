@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from services.auth import require_write
+from services.superman.auth import SupermanCaptchaError
 from services.superman.runner import (
     SupermanNotConfiguredError,
     get_status,
@@ -41,6 +42,8 @@ def superman_deklarasi(no_do: str = Query(..., min_length=1), _user=Depends(requ
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SupermanNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except SupermanCaptchaError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:

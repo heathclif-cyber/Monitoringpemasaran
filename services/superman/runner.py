@@ -8,7 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from services.superman.auth import ensure_session, open_authenticated_context
+from services.superman.auth import SupermanCaptchaError, ensure_session, is_session_valid, open_authenticated_context
 from services.superman.config import SupermanConfig
 from services.superman.documents import resolve_support_doc_from_do
 from services.superman.filler import fill_sppn_draft, submit_sppn_draft
@@ -41,12 +41,20 @@ def _api_config() -> SupermanConfig:
 def get_status() -> dict[str, Any]:
     cfg = SupermanConfig.from_env()
     state = Path(cfg.state_path)
+    session_valid = is_session_valid(cfg, state) if state.is_file() else False
     return {
         "configured": is_configured(),
         "session_exists": state.is_file(),
+        "session_valid": session_valid,
         "session_path": str(state),
         "base_url": cfg.base_url.rstrip("/"),
         "headless": cfg.headless,
+        "captcha_hint": (
+            None
+            if session_valid
+            else "Jika OCR gagal: jalankan `python scripts/superman_login.py --manual` lokal, "
+            "lalu salin file session ke Railway (SUPERMAN_STATE_PATH + volume)."
+        ),
     }
 
 
