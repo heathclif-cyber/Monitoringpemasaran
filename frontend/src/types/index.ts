@@ -599,6 +599,7 @@ export interface SupermanCaptchaVerifyResult {
   ok: boolean
   session_valid?: boolean
   error?: string
+  failure_kind?: 'captcha' | 'credentials' | 'lockout' | 'unknown'
   challenge_id?: string
   image_base64?: string
   mime_type?: string

@@ -115,7 +115,8 @@ export function SupermanCaptchaDialog({
         <DialogHeader>
           <DialogTitle>Login Superman</DialogTitle>
           <DialogDescription>
-            Selesaikan hitungan pada gambar captcha di bawah, lalu masukkan jawabannya.
+            Selesaikan hitungan pada gambar captcha di bawah. Masukkan <strong>hasil angka saja</strong>
+            {' '}(contoh: 3+5 → 8), tanpa tanda plus/minus.
           </DialogDescription>
         </DialogHeader>
 
@@ -138,8 +139,8 @@ export function SupermanCaptchaDialog({
             <Label htmlFor="superman-captcha-answer">Jawaban captcha</Label>
             <Input
               id="superman-captcha-answer"
-              inputMode="numeric"
-              placeholder="Contoh: 12"
+              inputMode="text"
+              placeholder="Hasil hitungan, contoh: 8"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               disabled={submitting || loading || !challenge}

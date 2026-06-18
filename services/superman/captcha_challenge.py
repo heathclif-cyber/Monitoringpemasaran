@@ -6,8 +6,9 @@ import base64
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, Literal
 
 from playwright.sync_api import Page, sync_playwright
 
@@ -15,6 +16,7 @@ from services.superman.auth import _is_login_page
 from services.superman.config import SupermanConfig
 
 TTL_SECONDS = 300
+LoginFailureKind = Literal["captcha", "credentials", "lockout", "unknown"]
 
 
 @dataclass
@@ -64,11 +66,16 @@ def _get_entry(challenge_id: str) -> PendingCaptcha:
     return entry
 
 
-def _captcha_image(page: Page, cfg: SupermanConfig) -> bytes:
-    img_src = page.locator('img[src*="captcha"]').first.get_attribute("src") or ""
-    if img_src.startswith("/"):
-        img_src = cfg.base_url.rstrip("/") + img_src
-    return page.request.get(img_src).body()
+def _fill_credentials(page: Page, cfg: SupermanConfig) -> None:
+    page.fill("#signin-username", cfg.username)
+    page.fill("#signin-password", cfg.password)
+
+
+def _captcha_image(page: Page) -> bytes:
+    """Screenshot elemen captcha di halaman — sama persis dengan yang divalidasi server."""
+    img = page.locator(".captcha img").first
+    img.wait_for(state="visible", timeout=10000)
+    return img.screenshot(type="png")
 
 
 def _image_payload(body: bytes, challenge_id: str) -> dict[str, Any]:
@@ -77,6 +84,68 @@ def _image_payload(body: bytes, challenge_id: str) -> dict[str, Any]:
         "image_base64": base64.b64encode(body).decode("ascii"),
         "mime_type": "image/png",
     }
+
+
+def _page_error_text(page: Page) -> str:
+    selectors = (
+        ".alert-danger",
+        ".text-danger strong",
+        "form .text-danger",
+        ".help-block",
+        "#countdown",
+    )
+    messages: list[str] = []
+    for selector in selectors:
+        locator = page.locator(selector)
+        for i in range(min(locator.count(), 3)):
+            try:
+                text = locator.nth(i).inner_text(timeout=500).strip()
+            except Exception:
+                continue
+            if text and text not in messages:
+                messages.append(text)
+    return " ".join(messages)
+
+
+def _classify_login_failure(page: Page) -> tuple[LoginFailureKind, str]:
+    if not _is_login_page(page):
+        return "unknown", ""
+
+    body_text = page.locator("body").inner_text(timeout=2000).lower()
+    page_error = _page_error_text(page)
+    combined = f"{body_text} {page_error.lower()}"
+
+    if "gagal login lebih dari" in combined or "coba lagi dalam" in combined:
+        return "lockout", (
+            page_error
+            or "Akun Superman terkunci sementara karena terlalu banyak percobaan gagal. Tunggu beberapa menit."
+        )
+
+    if any(word in combined for word in ("password", "username", "user", "kata sandi")):
+        return (
+            "credentials",
+            page_error
+            or "Username atau password Superman salah. Periksa SUPERMAN_USER dan SUPERMAN_PASSWORD di Railway.",
+        )
+
+    if "captcha" in combined:
+        return "captcha", page_error or "Captcha salah. Selesaikan hitungan pada gambar lalu coba lagi."
+
+    if page_error:
+        if "captcha" in page_error.lower():
+            return "captcha", page_error
+        return "unknown", page_error
+
+    return "captcha", "Login gagal. Pastikan jawaban captcha adalah hasil hitungan (angka saja)."
+
+
+def _submit_login(page: Page, cfg: SupermanConfig, answer: str) -> None:
+    _fill_credentials(page, cfg)
+    page.locator("#captcha").fill("")
+    page.fill("#captcha", answer.strip())
+    with page.expect_navigation(wait_until="networkidle", timeout=30000):
+        page.locator("form.form-auth-small button[type='submit']").click()
+    page.wait_for_timeout(1500)
 
 
 def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
@@ -88,9 +157,8 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
     browser = pw.chromium.launch(headless=True)
     page = browser.new_page()
     page.goto(cfg.base_url, wait_until="networkidle", timeout=60000)
-    page.fill("#signin-username", cfg.username)
-    page.fill("#signin-password", cfg.password)
-    body = _captcha_image(page, cfg)
+    _fill_credentials(page, cfg)
+    body = _captcha_image(page)
     challenge_id = str(uuid.uuid4())
     with _lock:
         _store[challenge_id] = PendingCaptcha(
@@ -105,9 +173,12 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
 
 def refresh_captcha_challenge(challenge_id: str) -> dict[str, Any]:
     entry = _get_entry(challenge_id)
-    entry.page.click("#reload")
-    entry.page.wait_for_timeout(600)
-    body = _captcha_image(entry.page, entry.cfg)
+    page = entry.page
+    page.click("#reload")
+    page.wait_for_timeout(900)
+    page.locator(".captcha img").first.wait_for(state="visible", timeout=10000)
+    _fill_credentials(page, entry.cfg)
+    body = _captcha_image(page)
     entry.created_at = time.time()
     return _image_payload(body, challenge_id)
 
@@ -116,24 +187,33 @@ def verify_captcha_challenge(challenge_id: str, answer: str) -> dict[str, Any]:
     entry = _get_entry(challenge_id)
     page = entry.page
     cfg = entry.cfg
-    page.fill("#captcha", answer.strip())
-    page.click('button[type="submit"]')
-    page.wait_for_load_state("networkidle", timeout=20000)
-    page.wait_for_timeout(1200)
 
-    if _is_login_page(page):
-        body = refresh_captcha_challenge(challenge_id)
+    try:
+        _submit_login(page, cfg, answer)
+    except Exception:
+        page.wait_for_timeout(1500)
+
+    if not _is_login_page(page):
+        path = Path(cfg.state_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        page.context.storage_state(path=str(path))
+        _dispose(challenge_id)
+        return {"ok": True, "session_valid": True}
+
+    kind, message = _classify_login_failure(page)
+    if kind in ("credentials", "lockout"):
         return {
             "ok": False,
-            "error": "Captcha salah. Periksa hitungan matematika lalu coba lagi.",
-            **body,
+            "error": message,
+            "failure_kind": kind,
+            "challenge_id": challenge_id,
+            **_image_payload(_captcha_image(page), challenge_id),
         }
 
-    state_path = cfg.state_path
-    from pathlib import Path
-
-    path = Path(state_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    page.context.storage_state(path=str(path))
-    _dispose(challenge_id)
-    return {"ok": True, "session_valid": True}
+    body = refresh_captcha_challenge(challenge_id)
+    return {
+        "ok": False,
+        "error": message,
+        "failure_kind": kind,
+        **body,
+    }
