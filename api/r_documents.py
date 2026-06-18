@@ -786,11 +786,11 @@ async def upload_document(
     return record
 
 
-def _safe_bundle_part(value: str) -> str:
+def _bundle_number_name(entity_id: str) -> str:
+    """Nomor dokumen untuk nama file — slash diganti agar tetap datar di ZIP."""
     return (
-        value.replace("/", "-")
+        entity_id.replace("/", "-")
         .replace("\\", "-")
-        .replace(":", "-")
         .strip()
     )
 
@@ -802,26 +802,27 @@ def _flat_bundle_arcname(
     file_name: str,
     used_names: set[str],
 ) -> str:
-    """Nama file datar di root ZIP — unik per entity + doc_type."""
-    prefix = {
-        "kontrak": "Kontrak",
-        "invoice": "Invoice",
-        "do": "DO",
-        "ba": "BA",
-    }.get(entity_type, entity_type)
-    safe_id = _safe_bundle_part(entity_id)
-    stem, ext = os.path.splitext(file_name)
-    safe_stem = _safe_bundle_part(stem) or "dokumen"
+    """Nama file = nomor dokumen (+ suffix jenis jika satu entitas punya >1 dokumen)."""
+    _, ext = os.path.splitext(file_name)
     ext = ext or ""
 
-    candidate = f"{prefix}_{safe_id}_{doc_type}_{safe_stem}{ext}"
+    base = _bundle_number_name(entity_id)
+    required = ENTITY_DOC_REQUIREMENTS.get(entity_type, [])
+    primary_doc = required[0] if required else doc_type
+
+    if len(required) <= 1 or doc_type == primary_doc:
+        stem = base
+    else:
+        stem = f"{base}-{doc_type.replace('_', '-')}"
+
+    candidate = f"{stem}{ext}"
     if candidate not in used_names:
         used_names.add(candidate)
         return candidate
 
     n = 2
     while True:
-        alt = f"{prefix}_{safe_id}_{doc_type}_{safe_stem}_{n}{ext}"
+        alt = f"{stem}-{n}{ext}"
         if alt not in used_names:
             used_names.add(alt)
             return alt
