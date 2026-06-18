@@ -101,12 +101,13 @@ def get_dashboard_data(
             
             total_pendapatan += pendapatan_do
             
-            ba_date = None
+            ba_buku_date = None
             if str(getattr(k, "tipe_alur", "STANDAR")).upper() == "PAYUNG_BA":
                 ba_ref = do.berita_acara or do.invoice.berita_acara
-                ba_date = ba_ref.tanggal_ba if ba_ref else None
-            if ba_date:
-                m = ba_date.month
+                if ba_ref:
+                    ba_buku_date = ba_ref.bulan_buku or ba_ref.tanggal_ba
+            if ba_buku_date:
+                m = ba_buku_date.month
             else:
                 m = do.rencana_pengambilan.month if do.rencana_pengambilan else do.tanggal_do.month if do.tanggal_do else 1
             pend_m[f"{m:02d}"] += pendapatan_do

@@ -141,6 +141,7 @@ export interface BeritaAcara {
   no_ba: string
   no_kontrak: string
   tanggal_ba: string
+  bulan_buku: string
   volume_ba: number
   nama_unit?: string | null
   komoditi?: string | null
@@ -152,6 +153,7 @@ export interface BeritaAcara {
 export interface BAAvailable {
   no_ba: string
   tanggal_ba: string | null
+  bulan_buku: string | null
   volume_ba: number
   nama_unit?: string | null
   komoditi?: string | null
@@ -424,6 +426,7 @@ export interface BeritaAcaraInput {
   no_ba: string
   no_kontrak: string
   tanggal_ba: string
+  bulan_buku: string
   volume_ba: number
   nama_unit?: string
   komoditi?: string

@@ -9,7 +9,26 @@ export function getCurrentMonthKey(): string {
   return String(new Date().getMonth() + 1).padStart(2, '0')
 }
 
+export function getPreviousMonthKey(): string {
+  const d = new Date()
+  d.setMonth(d.getMonth() - 1)
+  return String(d.getMonth() + 1).padStart(2, '0')
+}
+
+/** Default filter laporan: bulan berjalan + 1 bulan sebelumnya */
+export function getDefaultLaporanMonthKeys(): string[] {
+  const current = getCurrentMonthKey()
+  const previous = getPreviousMonthKey()
+  return previous === current ? [current] : [previous, current]
+}
+
 function extractMonthKey(row: LaporanRow, mode: 'TRANSFER' | 'RENCANA'): string {
+  // Kontrak payung: periode pembukuan dari Bulan_Buku (bukan tanggal BA / transfer)
+  if (row.No_BA) {
+    const bulanBuku = row.Bulan_Buku?.slice(0, 2)
+    if (bulanBuku) return bulanBuku
+  }
+
   if (mode === 'RENCANA') {
     const rencana = row.Rencana_Pengambilan || ''
     if (rencana.length >= 7) return rencana.slice(5, 7)
@@ -158,7 +177,7 @@ export function createDefaultLaporanFilters(): LaporanFilters {
     pembeli: [],
     komoditi: [],
     jenisKomoditi: [],
-    months: [getCurrentMonthKey()],
+    months: getDefaultLaporanMonthKeys(),
     modeTanggal: 'TRANSFER',
     sort: 'DESC',
     tipe: 'ALL',
@@ -168,5 +187,5 @@ export function createDefaultLaporanFilters(): LaporanFilters {
   }
 }
 
-/** @deprecated Use createDefaultLaporanFilters() agar bulan selalu bulan berjalan */
+/** @deprecated Use createDefaultLaporanFilters() agar bulan default selalu terbaru */
 export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = createDefaultLaporanFilters()

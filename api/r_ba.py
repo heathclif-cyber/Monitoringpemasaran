@@ -36,6 +36,9 @@ def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: m
             detail="Berita Acara hanya untuk kontrak dengan tipe alur PAYUNG_BA",
         )
 
+    if not ba.bulan_buku:
+        raise HTTPException(status_code=400, detail="Bulan buku wajib diisi")
+
     volume_ba = float(ba.volume_ba or 0)
     if volume_ba <= 0:
         raise HTTPException(status_code=400, detail="Volume BA harus > 0")
@@ -102,6 +105,7 @@ def get_available_ba(no_kontrak: str = Query(...), db: Session = Depends(get_db)
         {
             "no_ba": r.no_ba,
             "tanggal_ba": r.tanggal_ba.isoformat() if r.tanggal_ba else None,
+            "bulan_buku": r.bulan_buku.isoformat() if r.bulan_buku else None,
             "volume_ba": r.volume_ba,
             "nama_unit": r.nama_unit,
             "komoditi": r.komoditi,

@@ -18,10 +18,21 @@ import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { formatCurrency } from '@/lib/utils'
 import type { Kontrak } from '@/types'
 
+function previousMonthFrom(isoDate: string): string {
+  const d = new Date(isoDate)
+  d.setMonth(d.getMonth() - 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function toMonthInput(isoDate: string): string {
+  return isoDate?.slice(0, 7) || ''
+}
+
 const baSchema = z.object({
   no_ba: z.string().min(1, 'No BA wajib diisi'),
   no_kontrak: z.string().min(1, 'Kontrak wajib dipilih'),
   tanggal_ba: z.string().min(1, 'Tanggal BA wajib diisi'),
+  bulan_buku: z.string().min(1, 'Bulan buku wajib diisi'),
   volume_ba: z.coerce.number().min(0.01, 'Volume harus > 0'),
   nama_unit: z.string().optional(),
   komoditi: z.string().optional(),
@@ -48,6 +59,7 @@ export default function BAPage() {
       no_ba: '',
       no_kontrak: '',
       tanggal_ba: new Date().toISOString().split('T')[0],
+      bulan_buku: previousMonthFrom(new Date().toISOString().split('T')[0]),
       volume_ba: 0,
       nama_unit: '',
       komoditi: '',
@@ -59,6 +71,7 @@ export default function BAPage() {
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = form
   const selectedKontrak = watch('no_kontrak')
+  const tanggalBa = watch('tanggal_ba')
   const volumeBa = watch('volume_ba')
 
   useEffect(() => {
@@ -91,6 +104,11 @@ export default function BAPage() {
     }
   }, [currentKontrak])
 
+  useEffect(() => {
+    if (isExisting || !tanggalBa) return
+    setValue('bulan_buku', previousMonthFrom(tanggalBa))
+  }, [tanggalBa, isExisting, setValue])
+
   const autoLoadBA = async () => {
     const no = form.getValues('no_ba')
     if (!no) return
@@ -100,6 +118,7 @@ export default function BAPage() {
       setExportNo(no)
       setValue('no_kontrak', data.no_kontrak)
       setValue('tanggal_ba', data.tanggal_ba)
+      setValue('bulan_buku', toMonthInput(data.bulan_buku || data.tanggal_ba))
       setValue('volume_ba', data.volume_ba)
       setValue('nama_unit', data.nama_unit || '')
       setValue('komoditi', data.komoditi || '')
@@ -114,7 +133,10 @@ export default function BAPage() {
 
   const onSubmit = async (data: BAFormData) => {
     try {
-      const payload = { ...data }
+      const payload = {
+        ...data,
+        bulan_buku: `${data.bulan_buku}-01`,
+      }
       if (!payload.nama_unit) delete payload.nama_unit
       if (!payload.deskripsi) delete payload.deskripsi
       if (!payload.link_berita_acara) delete payload.link_berita_acara
@@ -180,7 +202,13 @@ export default function BAPage() {
             <div>
               <Label className="text-xs">Tanggal BA *</Label>
               <Input type="date" {...register('tanggal_ba')} />
-              <p className="text-xs text-slate-400 mt-1">Tanggal pengakuan pendapatan (bulan buku)</p>
+              <p className="text-xs text-slate-400 mt-1">Tanggal dokumen akumulasi (bisa beda bulan dengan pembukuan)</p>
+            </div>
+            <div>
+              <Label className="text-xs">Bulan Buku *</Label>
+              <Input type="month" {...register('bulan_buku')} />
+              <p className="text-xs text-slate-400 mt-1">Periode pembukuan transaksi — dipakai di Laporan Digital</p>
+              {errors.bulan_buku && <p className="text-xs text-red-500 mt-1">{errors.bulan_buku.message}</p>}
             </div>
             <div>
               <Label className="text-xs">Volume BA *</Label>

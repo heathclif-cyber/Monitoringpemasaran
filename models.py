@@ -160,6 +160,7 @@ class BeritaAcara(Base):
     no_ba = Column(String, primary_key=True, index=True)
     no_kontrak = Column(String, ForeignKey("kontrak.no_kontrak", ondelete="CASCADE"), nullable=False)
     tanggal_ba = Column(Date, nullable=False)
+    bulan_buku = Column(Date, nullable=True)  # periode pembukuan (biasanya ≠ bulan tanggal BA)
     volume_ba = Column(Float, default=0.0)
     nama_unit = Column(String, nullable=True)
     komoditi = Column(String, nullable=True)

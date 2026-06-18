@@ -90,6 +90,12 @@ def run_migrations() -> None:
         db.commit()
         add_column_safely(db, "invoice", "no_ba", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "delivery_order", "no_ba", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "berita_acara", "bulan_buku", "DATE DEFAULT NULL")
+        db.execute(text(
+            "UPDATE berita_acara SET bulan_buku = DATE_TRUNC('month', tanggal_ba)::date "
+            "WHERE bulan_buku IS NULL AND tanggal_ba IS NOT NULL"
+        ))
+        db.commit()
         add_column_safely(db, "document_upload", "storage_path", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "users", "jabatan", "VARCHAR DEFAULT NULL")
 

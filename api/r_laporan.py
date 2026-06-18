@@ -119,6 +119,7 @@ def _build_laporan_rows(db: Session):
             ba_ref = inv.berita_acara
 
         ba_date = ba_ref.tanggal_ba if ba_ref else None
+        ba_buku_date = ba_ref.bulan_buku if ba_ref else None
 
         # Unit: prioritas — BA.nama_unit > DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen
         unit_val = ""
@@ -170,7 +171,7 @@ def _build_laporan_rows(db: Session):
             "No_BA": ba_ref.no_ba if ba_ref else "",
             "Tanggal_BA": ba_date.strftime("%Y-%m-%d") if ba_date else "",
             "Bulan_Buku": get_bulan_buku(
-                ba_date if (is_payung_ba(k) and ba_date) else (
+                (ba_buku_date or ba_date) if (is_payung_ba(k) and (ba_buku_date or ba_date)) else (
                     do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)
                 )
             ),

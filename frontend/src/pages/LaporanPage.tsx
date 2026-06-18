@@ -31,7 +31,7 @@ import {
   filterLaporanRows,
   calculateLaporanSummary,
   createDefaultLaporanFilters,
-  getCurrentMonthKey,
+  getDefaultLaporanMonthKeys,
   MONTH_OPTIONS,
   MONTH_LABELS,
   type LaporanFilters,
@@ -87,6 +87,9 @@ export default function LaporanPage() {
   const periodLabel = useMemo(() => {
     if (filters.months.length === 0) return 'Semua bulan'
     if (filters.months.length === 1) return MONTH_LABELS[filters.months[0]] || filters.months[0]
+    if (filters.months.length === 2) {
+      return filters.months.map((m) => MONTH_LABELS[m] || m).join(' & ')
+    }
     return `${filters.months.length} bulan terpilih`
   }, [filters.months])
 
@@ -426,7 +429,9 @@ export default function LaporanPage() {
           )}
 
           <p className="text-xs text-muted-foreground">
-            Default: bulan berjalan ({MONTH_LABELS[getCurrentMonthKey()]}). Kosongkan filter bulan untuk melihat semua periode.
+            Default: bulan berjalan dan 1 bulan sebelumnya (
+            {getDefaultLaporanMonthKeys().map((m) => MONTH_LABELS[m]).join(', ')}
+            ). Kosongkan filter bulan untuk melihat semua periode.
           </p>
         </CardContent>
       </Card>
