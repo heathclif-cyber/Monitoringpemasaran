@@ -64,9 +64,88 @@ const LABEL_STYLE = {
   fontWeight: 500 as const,
   letterSpacing: '0.01em',
   paintOrder: 'stroke' as const,
-  stroke: 'rgba(0,0,0,0.45)',
-  strokeWidth: 2.5,
+  stroke: 'rgba(0,0,0,0.5)',
+  strokeWidth: 2,
   strokeLinejoin: 'round' as const,
+}
+
+function truncateText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  return maxChars <= 3 ? text.slice(0, maxChars) : `${text.slice(0, maxChars - 1)}…`
+}
+
+function shortUnit(unit: string): string {
+  const seg = unit.split('-')[0]?.trim() || unit
+  return seg.length > 10 ? `${seg.slice(0, 9)}…` : seg
+}
+
+function shortMaterial(name: string): string {
+  const words = name.split(/\s+/).filter(Boolean)
+  if (words.length >= 3) return `${words[0]} ${words[1]}…`
+  if (name.length > 14) return `${name.slice(0, 13)}…`
+  return name
+}
+
+function compactSaldo(saldo: number, satuan: string, compact: boolean): string {
+  const sign = saldo < 0 ? '−' : ''
+  const abs = Math.abs(saldo)
+  const suf = satuan === 'Butir' ? ' Btr' : ' Kg'
+  if (compact) {
+    if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)} jt`
+    if (abs >= 10_000) return `${sign}${Math.round(abs / 1000)} rb`
+    if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(1)} rb`
+    return `${sign}${Math.round(abs)}${satuan === 'Butir' ? ' B' : ''}`
+  }
+  return `${formatNumber(saldo)} ${satuan}`
+}
+
+type LabelTier = 'large' | 'medium' | 'small' | 'tiny'
+
+function getLabelTier(rw: number, rh: number): LabelTier | null {
+  if (rw < 14 || rh < 12) return null
+  if (rw >= 96 && rh >= 64) return 'large'
+  if (rw >= 64 && rh >= 40) return 'medium'
+  if (rw >= 40 && rh >= 26) return 'small'
+  return 'tiny'
+}
+
+function CellText({
+  x,
+  y,
+  lines,
+  fontSize,
+  anchor = 'start',
+  lineHeight = 1.25,
+}: {
+  x: number
+  y: number
+  lines: string[]
+  fontSize: number
+  anchor?: 'start' | 'middle'
+  lineHeight?: number
+}) {
+  const startY = anchor === 'middle'
+    ? y - ((lines.length - 1) * fontSize * lineHeight) / 2
+    : y
+
+  return (
+    <text
+      x={x}
+      y={startY}
+      fill="#ffffff"
+      fontSize={fontSize}
+      textAnchor={anchor}
+      dominantBaseline="hanging"
+      pointerEvents="none"
+      style={LABEL_STYLE}
+    >
+      {lines.map((line, i) => (
+        <tspan key={i} x={x} dy={i === 0 ? 0 : fontSize * lineHeight}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  )
 }
 
 function TreemapCell({
@@ -84,12 +163,50 @@ function TreemapCell({
   const ry = Math.round(y)
   const rw = Math.round(width)
   const rh = Math.round(height)
-  const showUnit = rw > 88 && rh > 48
-  const showMaterial = rw > 100 && rh > 62
-  const showValue = rw > 110 && rh > 78
+  const tier = getLabelTier(rw, rh)
+  const maxChars = Math.max(4, Math.floor(rw / (tier === 'tiny' ? 5.5 : 6.5)))
 
-  const unitLabel = unit.length > 16 ? `${unit.slice(0, 15)}…` : unit
-  const materialLabel = name.length > 22 ? `${name.slice(0, 21)}…` : name
+  let lines: string[] = []
+  let fontSize = 9
+  let anchor: 'start' | 'middle' = 'start'
+  let tx = rx + 6
+  let ty = ry + 12
+
+  if (tier === 'large') {
+    fontSize = 11
+    lines = [
+      truncateText(unit, maxChars),
+      truncateText(name, maxChars),
+      compactSaldo(saldo, satuan, false),
+    ]
+    ty = ry + 14
+  } else if (tier === 'medium') {
+    fontSize = 10
+    lines = [
+      truncateText(shortUnit(unit), maxChars),
+      truncateText(shortMaterial(name), maxChars),
+      compactSaldo(saldo, satuan, true),
+    ]
+    ty = ry + 12
+  } else if (tier === 'small') {
+    fontSize = 9
+    anchor = 'middle'
+    tx = rx + rw / 2
+    ty = ry + rh / 2
+    lines = [
+      truncateText(`${shortUnit(unit)} · ${shortMaterial(name)}`, maxChars),
+      compactSaldo(saldo, satuan, true),
+    ]
+  } else if (tier === 'tiny') {
+    fontSize = 8
+    anchor = 'middle'
+    tx = rx + rw / 2
+    ty = ry + rh / 2
+    const mat = shortMaterial(name).split(' ')[0] || name.slice(0, 4)
+    lines = rw >= 28
+      ? [truncateText(mat, maxChars), compactSaldo(saldo, satuan, true)]
+      : [compactSaldo(saldo, satuan, true)]
+  }
 
   return (
     <g>
@@ -104,41 +221,8 @@ function TreemapCell({
         rx={4}
         className="transition-opacity hover:opacity-90"
       />
-      {showUnit && (
-        <text
-          x={rx + 8}
-          y={ry + 16}
-          fill="#ffffff"
-          fontSize={11}
-          pointerEvents="none"
-          style={LABEL_STYLE}
-        >
-          {unitLabel}
-        </text>
-      )}
-      {showMaterial && (
-        <text
-          x={rx + 8}
-          y={ry + 30}
-          fill="rgba(255,255,255,0.95)"
-          fontSize={10}
-          pointerEvents="none"
-          style={LABEL_STYLE}
-        >
-          {materialLabel}
-        </text>
-      )}
-      {showValue && (
-        <text
-          x={rx + 8}
-          y={ry + rh - 10}
-          fill="#ffffff"
-          fontSize={12}
-          pointerEvents="none"
-          style={{ ...LABEL_STYLE, fontWeight: 600 }}
-        >
-          {formatNumber(saldo)} {satuan}
-        </text>
+      {tier && lines.length > 0 && (
+        <CellText x={tx} y={ty} lines={lines} fontSize={fontSize} anchor={anchor} />
       )}
     </g>
   )
@@ -228,8 +312,10 @@ function SatuanHeatmap({ title, items }: { title: string; items: StokSaldo[] }) 
         </ResponsiveContainer>
       </div>
       <div>
-        <p className="text-[10px] font-medium text-muted-foreground mb-1.5">Peringkat stok (terbesar)</p>
-        <SaldoRanking nodes={nodes} />
+        <p className="text-[10px] font-medium text-muted-foreground mb-1.5">
+          Semua stok (terbesar → terkecil) — kotak kecil di peta pakai label singkat
+        </p>
+        <SaldoRanking nodes={nodes} limit={nodes.length} />
       </div>
       <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
