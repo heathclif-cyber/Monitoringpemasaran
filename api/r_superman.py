@@ -77,7 +77,10 @@ def superman_preview(no_do: str = Query(..., min_length=1), _user=Depends(requir
 
 def _map_deklarasi_error(exc: Exception) -> HTTPException:
     if isinstance(exc, ValueError):
-        return HTTPException(status_code=404, detail=str(exc))
+        message = str(exc)
+        if "sudah pernah dibuatkan SPPn/SPPb" in message:
+            return HTTPException(status_code=409, detail=message)
+        return HTTPException(status_code=404, detail=message)
     if isinstance(exc, FileNotFoundError):
         return HTTPException(status_code=400, detail=str(exc))
     if isinstance(exc, SupermanNotConfiguredError):

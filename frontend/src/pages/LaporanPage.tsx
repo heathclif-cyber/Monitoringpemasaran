@@ -655,7 +655,12 @@ function LaporanTableRow({
           />
           {!isBypass && (
             <>
-              <SupermanDeklarasiButton noDo={row.No_DO} compact />
+              <SupermanDeklarasiButton
+                noDo={row.No_DO}
+                existingSuperman={row.Superman}
+                compact
+                onSuccess={onRefresh}
+              />
               <DocumentUpload
                 compact
                 entityType="do"

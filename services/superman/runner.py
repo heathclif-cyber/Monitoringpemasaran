@@ -25,6 +25,7 @@ from services.superman.config import SupermanConfig
 from services.superman.documents import resolve_support_doc_from_do
 from services.superman.filler import fill_sppn_draft, submit_sppn_draft
 from services.superman.payload import build_payload_from_do
+from services.superman.persist import assert_do_not_submitted, save_superman_to_do
 from services.superman.progress import (
     ProgressCallback,
     complete_job,
@@ -133,6 +134,9 @@ def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
 
 
 def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) -> dict[str, Any]:
+    no_do = no_do.strip()
+    assert_do_not_submitted(no_do)
+
     report = on_progress or (lambda _percent, _stage: None)
 
     report(5, "Memuat data DO dan dokumen")
@@ -179,17 +183,26 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
         "superman_url": f"{cfg.base_url.rstrip('/')}/sppd#tab-to-do-list-petugas",
         "message": "Draft SPPn/SPPb berhasil masuk To Do List Superman.",
     }
+    sppb_no = None
+    sppn_no = None
     if match:
+        sppb_no = match.get("sppb_no")
+        sppn_no = match.get("sppn_no")
         result.update(
             {
-                "sppb_no": match.get("sppb_no"),
-                "sppn_no": match.get("sppn_no"),
+                "sppb_no": sppb_no,
+                "sppn_no": sppn_no,
                 "sppb_total": match.get("sppb_total"),
                 "sppn_jumlah": match.get("sppn_jumlah"),
                 "tanggal": match.get("tanggal"),
                 "spp_id": match.get("spp_id"),
             }
         )
+
+    saved = save_superman_to_do(no_do, sppb_no, sppn_no)
+    if saved:
+        result["superman_saved"] = saved
+
     report(100, "Selesai")
     return result
 
@@ -204,6 +217,7 @@ def _run_deklarasi_job(job_id: str, no_do: str) -> None:
 
 def start_deklarasi_job(no_do: str) -> dict[str, Any]:
     no_do = no_do.strip()
+    assert_do_not_submitted(no_do)
     cfg = _api_config()
     ensure_session(cfg, auto_login=False)
     job_id = create_job(no_do)

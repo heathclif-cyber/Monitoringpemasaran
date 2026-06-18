@@ -136,6 +136,7 @@ export default function DOPage() {
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [exportNo, setExportNo] = useState<string | null>(null)
+  const [existingSuperman, setExistingSuperman] = useState<string | null>(null)
   const [isExisting, setIsExisting] = useState(false)
 
   const form = useForm<DOFormData>({
@@ -188,6 +189,7 @@ export default function DOPage() {
     if (data) {
       setIsExisting(true)
       setExportNo(no)
+      setExistingSuperman(data.superman || null)
       setValue('no_invoice', data.no_invoice)
       setValue('tanggal_do', data.tanggal_do)
       setValue('kepada_unit', data.kepada_unit || '')
@@ -198,6 +200,7 @@ export default function DOPage() {
     } else {
       setIsExisting(false)
       setExportNo(null)
+      setExistingSuperman(null)
     }
   }
 
@@ -474,7 +477,14 @@ export default function DOPage() {
                 <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">
                   <FileDown size={14} /> Export .docx
                 </Button>
-                <SupermanDeklarasiButton noDo={exportNo} />
+                <SupermanDeklarasiButton
+                  noDo={exportNo}
+                  existingSuperman={existingSuperman}
+                  onSuccess={async () => {
+                    const data = await doStore.fetchOne(exportNo)
+                    setExistingSuperman(data?.superman || null)
+                  }}
+                />
               </>
             )}
             <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">

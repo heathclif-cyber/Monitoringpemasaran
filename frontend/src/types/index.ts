@@ -644,6 +644,7 @@ export interface SupermanDeklarasiResult {
   sppn_jumlah?: number | null
   tanggal?: string | null
   spp_id?: number | null
+  superman_saved?: string
 }
 
 export interface AuthState {

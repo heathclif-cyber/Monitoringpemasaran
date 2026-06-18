@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ExternalLink, Loader2, Send } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Loader2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SupermanCaptchaDialog } from '@/components/common/SupermanCaptchaDialog'
@@ -17,9 +17,11 @@ import type {
 
 interface SupermanDeklarasiButtonProps {
   noDo: string
+  existingSuperman?: string | null
   compact?: boolean
   disabled?: boolean
   className?: string
+  onSuccess?: () => void
 }
 
 const POLL_INTERVAL_MS = 1000
@@ -30,9 +32,11 @@ function sleep(ms: number) {
 
 export function SupermanDeklarasiButton({
   noDo,
+  existingSuperman,
   compact = false,
   disabled = false,
   className,
+  onSuccess,
 }: SupermanDeklarasiButtonProps) {
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
@@ -43,6 +47,8 @@ export function SupermanDeklarasiButton({
   const [percent, setPercent] = useState(0)
   const [stage, setStage] = useState('Memulai...')
   const cancelledRef = useRef(false)
+
+  const savedLabel = (existingSuperman || '').trim()
 
   const showResult = (res: SupermanDeklarasiResult) => {
     const parts = [
@@ -59,6 +65,7 @@ export function SupermanDeklarasiButton({
       window.open(res.superman_url, '_blank', 'noopener,noreferrer')
     }
     setOpen(false)
+    onSuccess?.()
   }
 
   const pollJob = async (jobId: string): Promise<SupermanDeklarasiResult> => {
@@ -136,6 +143,26 @@ export function SupermanDeklarasiButton({
   }
 
   if (!canEdit()) return null
+
+  if (savedLabel) {
+    if (compact) {
+      return (
+        <span
+          className={cn('inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400', className)}
+          title={`Sudah dibuat: ${savedLabel}`}
+        >
+          <CheckCircle2 size={12} />
+          Sudah SPPn
+        </span>
+      )
+    }
+    return (
+      <div className={cn('inline-flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400', className)}>
+        <CheckCircle2 size={14} />
+        <span>Sudah dibuat: {savedLabel}</span>
+      </div>
+    )
+  }
 
   return (
     <>

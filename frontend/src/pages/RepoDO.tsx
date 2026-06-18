@@ -127,7 +127,12 @@ export default function RepoDO() {
                         <Eye size={14} />
                       </Button>
                       {canEdit() && (
-                        <SupermanDeklarasiButton noDo={item.no_do} compact className="h-8 px-2" />
+                        <SupermanDeklarasiButton
+                          noDo={item.no_do}
+                          existingSuperman={item.superman}
+                          compact
+                          className="h-8 px-2"
+                        />
                       )}
                       {canEdit() && (
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(item.no_do)}>
