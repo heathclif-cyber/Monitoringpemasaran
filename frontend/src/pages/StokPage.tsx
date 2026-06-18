@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Boxes, Pencil, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { Boxes, LayoutGrid, Map, Pencil, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { StokSaldoHeatmap } from '@/components/feature/StokSaldoHeatmap'
 import { useStokStore } from '@/store/stokStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -49,6 +50,7 @@ export default function StokPage() {
   const canEdit = useAuthStore((s) => s.canEdit)
   const [editId, setEditId] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<StokLedgerEntry | null>(null)
+  const [saldoView, setSaldoView] = useState<'grid' | 'heatmap'>('heatmap')
 
   const materialOptions = useMemo(() => {
     const merged = new Set([...MATERIAL_OPTIONS, ...materials])
@@ -210,6 +212,29 @@ export default function StokPage() {
                     Stok masuk per tanggal input. DO lama otomatis mengurangi stok per tanggal DO.
                   </p>
                 </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <div className="inline-flex rounded-md border p-0.5 bg-muted/40">
+                    <Button
+                      type="button"
+                      variant={saldoView === 'heatmap' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-7 text-xs gap-1 px-2"
+                      onClick={() => setSaldoView('heatmap')}
+                    >
+                      <Map size={12} />
+                      Peta
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={saldoView === 'grid' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-7 text-xs gap-1 px-2"
+                      onClick={() => setSaldoView('grid')}
+                    >
+                      <LayoutGrid size={12} />
+                      Kartu
+                    </Button>
+                  </div>
                 {canEdit() && (
                   <Button
                     type="button"
@@ -238,6 +263,7 @@ export default function StokPage() {
                     Sinkron DO
                   </Button>
                 )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -245,9 +271,13 @@ export default function StokPage() {
                 <p className="text-sm text-muted-foreground">Memuat...</p>
               ) : saldos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Belum ada saldo stok. Input stok masuk terlebih dahulu.</p>
+              ) : saldoView === 'heatmap' ? (
+                <StokSaldoHeatmap saldos={saldos} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {saldos.map((s) => (
+                  {[...saldos]
+                    .sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo))
+                    .map((s) => (
                     <div
                       key={`${s.unit}-${s.jenis_material}-${s.satuan}`}
                       className="rounded-md border px-3 py-2"
