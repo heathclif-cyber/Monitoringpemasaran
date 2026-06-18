@@ -51,3 +51,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   isAdmin: () => get().user?.role === 'admin',
 }))
+
+/** Subscribe ke perubahan role user — jangan pakai s.canEdit() di selector. */
+export const useCanEdit = () =>
+  useAuthStore((s) => s.user?.role === 'admin' || s.user?.role === 'staff')
+
+export const useIsTamu = () => useAuthStore((s) => s.user?.role === 'tamu')

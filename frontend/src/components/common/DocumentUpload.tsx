@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CloudUpload, ExternalLink, Loader2 } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
-import { useAuthStore } from '@/store/authStore'
+import { useAuthStore, useCanEdit } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { DocumentDocType, DocumentEntityType, DocumentUpload as DocumentUploadType } from '@/types'
@@ -38,7 +38,7 @@ export function DocumentUpload({
   className,
 }: DocumentUploadProps) {
   const { addNotification } = useAppStore()
-  const canEdit = useAuthStore((s) => s.canEdit())
+  const canEdit = useCanEdit()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [configured, setConfigured] = useState<boolean | null>(null)
@@ -80,7 +80,7 @@ export function DocumentUpload({
   }, [loadLatest])
 
   const handleFile = async (file: File | null) => {
-    if (!file || !canUpload) return
+    if (!file || !useAuthStore.getState().canEdit() || !canUpload) return
     const formData = new FormData()
     formData.append('entity_type', entityType)
     formData.append('entity_id', entityId.trim())
@@ -122,13 +122,15 @@ export function DocumentUpload({
             <ExternalLink size={10} /> Buka
           </a>
         )}
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
-          onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-        />
+        {canEdit && (
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
+            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+          />
+        )}
         {canEdit && (
           <Button
             type="button"
@@ -166,13 +168,15 @@ export function DocumentUpload({
       ) : (
         <p className="text-xs text-muted-foreground">Belum ada file di-upload.</p>
       )}
-      <input
-        ref={inputRef}
-        type="file"
-        className="hidden"
-        accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
-        onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-      />
+      {canEdit && (
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
+          onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+        />
+      )}
       {canEdit ? (
         <>
           <Button

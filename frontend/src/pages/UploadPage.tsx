@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { AlertTriangle, CheckCircle2, CircleAlert, CloudUpload, Download, Eye, FolderArchive, ListFilter, Loader2, Search } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
-import { useAuthStore } from '@/store/authStore'
+import { useAuthStore, useCanEdit } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -91,7 +91,7 @@ function SlotRow({
   onUploaded: () => void
 }) {
   const { addNotification } = useAppStore()
-  const canEdit = useAuthStore((s) => s.canEdit())
+  const canEdit = useCanEdit()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [docxOpen, setDocxOpen] = useState(false)
@@ -115,7 +115,7 @@ function SlotRow({
   }
 
   const handleFile = async (file: File | null) => {
-    if (!file) return
+    if (!file || !useAuthStore.getState().canEdit()) return
     const formData = new FormData()
     formData.append('entity_type', entityType)
     formData.append('entity_id', entityId)
