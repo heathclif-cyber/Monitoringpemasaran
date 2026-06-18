@@ -5,6 +5,13 @@ import { applyTheme, readTheme, type Theme } from '@/lib/theme'
 
 let nextId = 0
 
+const NOTIFICATION_DURATION_MS: Record<NotificationType, number> = {
+  error: 30_000,
+  warning: 30_000,
+  info: 12_000,
+  success: 8_000,
+}
+
 interface AppStore {
   notifications: Notification[]
   availableUnits: string[]
@@ -44,7 +51,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }))
     setTimeout(() => {
       get().removeNotification(id)
-    }, 3500)
+    }, NOTIFICATION_DURATION_MS[type])
   },
 
   removeNotification: (id: string) => {

@@ -163,7 +163,7 @@ def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
         entity_type="kontrak",
         entity_id=kontrak.no_kontrak,
         doc_type="kontrak",
-        label="Dokumen Kontrak",
+        label="Kontrak",
     )
 
 

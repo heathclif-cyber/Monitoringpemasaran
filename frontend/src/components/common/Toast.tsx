@@ -35,12 +35,12 @@ export function Toast() {
           <div
             key={n.id}
             className={cn(
-              'min-w-[280px] max-w-sm px-4 py-3 rounded-lg bg-card shadow-lg border border-border flex items-center gap-3 pointer-events-auto',
+              'min-w-[280px] max-w-md px-4 py-3 rounded-lg bg-card shadow-lg border border-border flex items-start gap-3 pointer-events-auto',
               COLOR_MAP[n.type],
             )}
           >
             <Icon size={15} className={cn('shrink-0', ICON_COLOR_MAP[n.type])} />
-            <span className="text-sm font-medium text-foreground flex-1">{n.message}</span>
+            <span className="text-sm font-medium text-foreground flex-1 break-words">{n.message}</span>
             <button
               type="button"
               onClick={() => removeNotification(n.id)}
