@@ -85,19 +85,22 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
             deskripsi_produk=unit.deskripsi_produk,
         ))
 
-    # Sync kontrak-level fields dari unit pertama sebagai fallback
+    # Sync kontrak-level fields dari unit pertama
     if units_input:
         first = units_input[0]
-        if first.komoditi:
+        if first.komoditi is not None:
             db_kontrak.komoditi = first.komoditi
-        if first.jenis_komoditi:
+        if first.jenis_komoditi is not None:
             db_kontrak.jenis_komoditi = first.jenis_komoditi
-        if first.satuan:
+            if not first.deskripsi_produk:
+                db_kontrak.deskripsi_produk = first.jenis_komoditi
+        if first.satuan is not None:
             db_kontrak.satuan = first.satuan
-        if first.tahun_panen:
+        if first.tahun_panen is not None:
             db_kontrak.tahun_panen = first.tahun_panen
-        if first.deskripsi_produk:
+        if first.deskripsi_produk is not None:
             db_kontrak.deskripsi_produk = first.deskripsi_produk
+        db_kontrak.kebun_produsen = ", ".join(u.nama_unit for u in units_input if u.nama_unit)
 
     db.commit()
     api_cache.invalidate_reporting()

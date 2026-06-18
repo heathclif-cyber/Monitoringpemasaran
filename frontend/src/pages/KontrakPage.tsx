@@ -95,7 +95,10 @@ const kontrakSchema = z.object({
 type KontrakFormData = z.infer<typeof kontrakSchema>
 
 export default function KontrakPage() {
-  const store = useKontrakStore()
+  const kontrakList = useKontrakStore((s) => s.data)
+  const fetchKontraks = useKontrakStore((s) => s.fetch)
+  const fetchOneKontrak = useKontrakStore((s) => s.fetchOne)
+  const saveKontrak = useKontrakStore((s) => s.save)
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [isExisting, setIsExisting] = useState(false)
@@ -107,6 +110,13 @@ export default function KontrakPage() {
   const [unitList, setUnitList] = useState<UnitRow[]>([emptyUnit()])
   const [activeStep, setActiveStep] = useState(0)
   const lastFetchedNo = useRef<string | null>(null)
+  const editLoadedRef = useRef<string | null>(null)
+  const unitsDirtyRef = useRef(false)
+
+  const patchUnitList = useCallback((updater: UnitRow[] | ((prev: UnitRow[]) => UnitRow[])) => {
+    unitsDirtyRef.current = true
+    setUnitList(updater)
+  }, [])
 
   const form = useForm<KontrakFormData>({
     resolver: zodResolver(kontrakSchema),
@@ -173,12 +183,14 @@ export default function KontrakPage() {
 
   const jatuhTempo = calculateJatuhTempo(watchedFields.tanggal_kontrak || '', Number(watchedFields.lama_pembayaran_hari) || 15)
 
-  const loadKontrakByNo = useCallback(async (no: string) => {
+  const loadKontrakByNo = useCallback(async (no: string, force = false) => {
     const trimmed = no?.trim()
     if (!trimmed) return
+    if (!force && unitsDirtyRef.current) return
 
-    const data = await store.fetchOne(trimmed)
+    const data = await fetchOneKontrak(trimmed)
     if (data) {
+      unitsDirtyRef.current = false
       setIsExisting(true)
       setExportNo(trimmed)
       const fields: (keyof KontrakFormData)[] = [
@@ -237,13 +249,13 @@ export default function KontrakPage() {
       setIsExisting(false)
       setExportNo(null)
     }
-  }, [store, setValue])
+  }, [fetchOneKontrak, setValue])
 
   const selectedNoKontrak = watch('no_kontrak')
 
   useEffect(() => {
-    store.fetch()
-  }, [])
+    fetchKontraks()
+  }, [fetchKontraks])
 
   useEffect(() => {
     const no = selectedNoKontrak?.trim()
@@ -254,8 +266,8 @@ export default function KontrakPage() {
       return
     }
     if (lastFetchedNo.current === no) return
-    if (store.data.length === 0) return
-    if (!store.data.some((k) => k.no_kontrak === no)) {
+    if (kontrakList.length === 0) return
+    if (!kontrakList.some((k) => k.no_kontrak === no)) {
       setIsExisting(false)
       setExportNo(null)
       lastFetchedNo.current = null
@@ -263,7 +275,7 @@ export default function KontrakPage() {
     }
     lastFetchedNo.current = no
     loadKontrakByNo(no)
-  }, [selectedNoKontrak, store.data.length, loadKontrakByNo])
+  }, [selectedNoKontrak, kontrakList.length, loadKontrakByNo])
 
   useEffect(() => {
     const patch = syncKontrakFieldsFromUnits(unitList, payungMode)
@@ -287,6 +299,8 @@ export default function KontrakPage() {
     setExportNo(null)
     setUnitList([emptyUnit()])
     lastFetchedNo.current = null
+    editLoadedRef.current = null
+    unitsDirtyRef.current = false
   }
 
   // Submit
@@ -309,14 +323,15 @@ export default function KontrakPage() {
         tahun_panen: u.tahun_panen || undefined,
         deskripsi_produk: u.deskripsi_produk || undefined,
       }))
-      // Sync kontrak-level material dari unit pertama
+      // Sync kontrak-level material dari unit pertama (selalu dari unit, bukan field form lama)
       if (validUnits.length > 0) {
         const first = validUnits[0]
-        if (first.komoditi) payload.komoditi = first.komoditi
-        if (first.jenis_komoditi) payload.jenis_komoditi = first.jenis_komoditi
-        if (first.satuan) payload.satuan = first.satuan
-        if (first.tahun_panen) payload.tahun_panen = first.tahun_panen
-        if (first.deskripsi_produk) payload.deskripsi_produk = first.deskripsi_produk
+        payload.komoditi = first.komoditi || payload.komoditi
+        payload.jenis_komoditi = first.jenis_komoditi || payload.jenis_komoditi
+        payload.satuan = first.satuan || payload.satuan
+        payload.tahun_panen = first.tahun_panen || payload.tahun_panen
+        payload.deskripsi_produk = first.deskripsi_produk || first.jenis_komoditi || payload.deskripsi_produk
+        payload.kebun_produsen = validUnits.map((u) => u.nama_unit).join(', ')
       }
       if (isPayungBA(data.tipe_alur)) {
         payload.volume = 0
@@ -326,9 +341,10 @@ export default function KontrakPage() {
         payload.volume = validUnits.reduce((s, u) => s + (u.volume || 0), 0)
       }
 
-      await store.save(payload)
+      await saveKontrak(payload)
+      unitsDirtyRef.current = false
       lastFetchedNo.current = null
-      await loadKontrakByNo(data.no_kontrak)
+      await loadKontrakByNo(data.no_kontrak, true)
       setExportNo(data.no_kontrak)
       setIsExisting(true)
       addNotification('Kontrak berhasil disimpan', 'success')
@@ -348,10 +364,16 @@ export default function KontrakPage() {
   const [searchParams] = useSearchParams()
   const editNo = searchParams.get('edit')
   useEffect(() => {
-    if (!editNo) return
+    if (!editNo) {
+      editLoadedRef.current = null
+      return
+    }
+    if (editLoadedRef.current === editNo) return
+    editLoadedRef.current = editNo
     setValue('no_kontrak', editNo)
     lastFetchedNo.current = editNo
-    loadKontrakByNo(editNo)
+    unitsDirtyRef.current = false
+    loadKontrakByNo(editNo, true)
     setActiveStep(1)
   }, [editNo, setValue, loadKontrakByNo])
 
@@ -414,7 +436,7 @@ export default function KontrakPage() {
               <div className="col-span-2">
                 <Label className="text-xs">No Kontrak *</Label>
                 <SearchableSelect
-                  options={store.data.map((k) => ({
+                  options={kontrakList.map((k) => ({
                     value: k.no_kontrak,
                     label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''}`,
                   }))}
@@ -422,9 +444,11 @@ export default function KontrakPage() {
                   allowCustom
                   onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
                   onValueCommit={(v) => {
-                    if (v && store.data.some((k) => k.no_kontrak === v)) {
+                    if (v && kontrakList.some((k) => k.no_kontrak === v)) {
+                      unitsDirtyRef.current = false
                       lastFetchedNo.current = v
-                      loadKontrakByNo(v)
+                      editLoadedRef.current = null
+                      loadKontrakByNo(v, true)
                     }
                   }}
                   placeholder="Ketik baru atau pilih dari daftar"
@@ -515,7 +539,7 @@ export default function KontrakPage() {
                             onChange={e => {
                               const next = [...unitList]
                               next[i] = { ...next[i], komoditi: e.target.value }
-                              setUnitList(next)
+                              patchUnitList(next)
                             }}
                             className={`${sel} w-28 shrink-0`}
                             placeholder="Komoditi"
@@ -525,9 +549,9 @@ export default function KontrakPage() {
                             onChange={e => {
                               const next = [...unitList]
                               next[i] = { ...next[i], jenis_komoditi: e.target.value }
-                              setUnitList(next)
+                              patchUnitList(next)
                             }}
-                            className={`${sel} w-36 shrink-0`}
+                            className={`${sel} min-w-[12rem] flex-1 shrink-0`}
                           >
                             <option value="">-- Jenis Material --</option>
                             {materialOptionsForUnit(unit.jenis_komoditi).map((m) => (
@@ -539,7 +563,7 @@ export default function KontrakPage() {
                             onChange={e => {
                               const next = [...unitList]
                               next[i] = { ...next[i], satuan: e.target.value }
-                              setUnitList(next)
+                              patchUnitList(next)
                             }}
                             className={`${sel} w-20 shrink-0`}
                           >
@@ -551,7 +575,7 @@ export default function KontrakPage() {
                             onChange={e => {
                               const next = [...unitList]
                               next[i] = { ...next[i], tahun_panen: e.target.value }
-                              setUnitList(next)
+                              patchUnitList(next)
                             }}
                             className={`${sel} w-24 shrink-0`}
                             placeholder="Thn Panen"
@@ -561,7 +585,7 @@ export default function KontrakPage() {
                             onChange={e => {
                               const next = [...unitList]
                               next[i] = { ...next[i], deskripsi_produk: e.target.value }
-                              setUnitList(next)
+                              patchUnitList(next)
                             }}
                             className={`${sel} flex-1 min-w-0`}
                             placeholder="Deskripsi"
@@ -578,7 +602,7 @@ export default function KontrakPage() {
                               } else {
                                 next[i] = { ...next[i], nama_unit: e.target.value }
                               }
-                              setUnitList(next)
+                              patchUnitList(next)
                             }}
                             className={`${sel} flex-1 min-w-0`}
                           >
@@ -592,7 +616,7 @@ export default function KontrakPage() {
                               onChange={e => {
                                 const next = [...unitList]
                                 next[i] = { ...next[i], nama_unit: e.target.value }
-                                setUnitList(next)
+                                patchUnitList(next)
                               }}
                               className={`${sel} flex-1 min-w-0`}
                               placeholder="Nama unit..."
@@ -606,7 +630,7 @@ export default function KontrakPage() {
                             onChange={e => {
                               const next = [...unitList]
                               next[i] = { ...next[i], volume: parseFloat(e.target.value) || 0 }
-                              setUnitList(next)
+                              patchUnitList(next)
                             }}
                             className={`${sel} w-32 shrink-0`}
                             placeholder="Volume"
@@ -618,7 +642,7 @@ export default function KontrakPage() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 shrink-0 text-slate-400 hover:text-red-500"
-                              onClick={() => setUnitList(unitList.filter((_, j) => j !== i))}
+                              onClick={() => patchUnitList(unitList.filter((_, j) => j !== i))}
                             >
                               <X size={14} />
                             </Button>
@@ -633,7 +657,7 @@ export default function KontrakPage() {
                       variant="outline"
                       size="sm"
                       className="gap-1 text-xs"
-                      onClick={() => setUnitList([...unitList, emptyUnit()])}
+                      onClick={() => patchUnitList([...unitList, emptyUnit()])}
                     >
                       <Plus size={12} />
                       Tambah Unit
