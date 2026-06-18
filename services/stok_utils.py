@@ -1,6 +1,7 @@
 """Stok ledger helpers — saldo, validasi, integrasi DO."""
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 
 from fastapi import HTTPException
@@ -97,19 +98,24 @@ def get_saldo(
     jenis_material: str,
     satuan: str,
     *,
+    as_of: Optional[date] = None,
     exclude_referensi_id: Optional[str] = None,
 ) -> float:
+    """Saldo per tanggal: stok masuk s/d as_of dikurangi DO/keluar s/d as_of."""
+    cutoff = as_of or date.today()
     masuk_q = db.query(models.StokLedger).filter(
         models.StokLedger.unit == unit,
         models.StokLedger.jenis_material == jenis_material,
         models.StokLedger.satuan == satuan,
         models.StokLedger.arah == "MASUK",
+        models.StokLedger.tanggal <= cutoff,
     )
     keluar_q = db.query(models.StokLedger).filter(
         models.StokLedger.unit == unit,
         models.StokLedger.jenis_material == jenis_material,
         models.StokLedger.satuan == satuan,
         models.StokLedger.arah == "KELUAR",
+        models.StokLedger.tanggal <= cutoff,
     )
     if exclude_referensi_id:
         keluar_q = keluar_q.filter(
@@ -125,23 +131,27 @@ def validate_stok_cukup(
     db: Session,
     ctx: dict,
     *,
+    as_of: Optional[date] = None,
     exclude_referensi_id: Optional[str] = None,
 ) -> None:
     if ctx["volume"] <= 0:
         return
+    cutoff = as_of or date.today()
     saldo = get_saldo(
         db,
         ctx["unit"],
         ctx["jenis_material"],
         ctx["satuan"],
+        as_of=cutoff,
         exclude_referensi_id=exclude_referensi_id,
     )
     needed = ctx["volume"]
     if saldo < needed:
+        tgl = cutoff.strftime("%d/%m/%Y")
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Stok tidak cukup: {ctx['unit']} / {ctx['jenis_material']} "
+                f"Stok tidak cukup per tanggal {tgl}: {ctx['unit']} / {ctx['jenis_material']} "
                 f"tersedia {saldo:,.0f} {ctx['satuan']}, dibutuhkan {needed:,.0f} {ctx['satuan']}"
             ),
         )

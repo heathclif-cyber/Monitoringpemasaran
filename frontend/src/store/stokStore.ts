@@ -25,9 +25,10 @@ export const useStokStore = create<StokStore>((set, get) => ({
   fetchAll: async () => {
     set({ isLoading: true })
     try {
+      const today = new Date().toISOString().split('T')[0]
       const [entries, saldos, materials, units] = await Promise.all([
         client.get<StokLedgerEntry[]>('/api/stok?limit=200'),
-        client.get<StokSaldo[]>('/api/stok/saldo'),
+        client.get<StokSaldo[]>(`/api/stok/saldo?tanggal=${today}`),
         client.get<string[]>('/api/stok/materials'),
         client.get<string[]>('/api/stok/units'),
       ])

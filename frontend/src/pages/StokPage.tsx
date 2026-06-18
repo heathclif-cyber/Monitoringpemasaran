@@ -203,6 +203,9 @@ export default function StokPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Saldo Saat Ini</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Stok masuk hanya dihitung dari tanggal inputnya. DO mengurangi stok per tanggal DO terbit.
+              </p>
             </CardHeader>
             <CardContent>
               {isLoading ? (

@@ -155,6 +155,7 @@ export default function DOPage() {
   const nominalTransfer = watch('nominal_transfer')
   const kepadaUnit = watch('kepada_unit')
   const noDo = watch('no_do')
+  const tanggalDo = watch('tanggal_do')
   const [stokSaldo, setStokSaldo] = useState<StokSaldo | null>(null)
 
   useEffect(() => {
@@ -252,12 +253,13 @@ export default function DOPage() {
       jenis_material: stokMaterial,
       satuan: stokSatuan,
     })
+    if (tanggalDo) params.set('tanggal', tanggalDo)
     if (isExisting && noDo) params.set('exclude_referensi_id', noDo)
     client
       .get<StokSaldo>(`/api/stok/saldo/detail?${params.toString()}`)
       .then(setStokSaldo)
       .catch(() => setStokSaldo(null))
-  }, [stokUnit, stokMaterial, stokSatuan, isExisting, noDo, volumeDo])
+  }, [stokUnit, stokMaterial, stokSatuan, tanggalDo, isExisting, noDo, volumeDo])
 
   const onSubmit = async (data: DOFormData) => {
     try {
@@ -400,7 +402,8 @@ export default function DOPage() {
                 <p className="text-xs text-slate-500 mt-1">Selisih: {formatCurrency(selisih)}</p>
                 {stokUnit && stokMaterial && (
                   <p className={cn('text-xs mt-2', stokKurang ? 'text-red-600 font-medium' : 'text-slate-600')}>
-                    Stok tersedia: {stokSaldo != null ? `${formatNumber(stokSaldo.saldo)} ${stokSatuan}` : '—'}
+                    Stok tersedia{tanggalDo ? ` per ${tanggalDo.split('-').reverse().join('/')}` : ''}:{' '}
+                    {stokSaldo != null ? `${formatNumber(stokSaldo.saldo)} ${stokSatuan}` : '—'}
                     {stokKurang && ' — tidak cukup untuk DO ini'}
                   </p>
                 )}

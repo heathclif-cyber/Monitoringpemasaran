@@ -55,8 +55,10 @@ def list_stok(
 def list_saldo(
     unit: Optional[str] = Query(default=None),
     jenis_material: Optional[str] = Query(default=None),
+    tanggal: Optional[date] = Query(default=None, description="Saldo per tanggal (default: hari ini)"),
     db: Session = Depends(get_db),
 ):
+    as_of = tanggal or date.today()
     q = (
         db.query(
             models.StokLedger.unit,
@@ -65,6 +67,7 @@ def list_saldo(
             models.StokLedger.arah,
             func.sum(models.StokLedger.volume).label("total"),
         )
+        .filter(models.StokLedger.tanggal <= as_of)
         .group_by(
             models.StokLedger.unit,
             models.StokLedger.jenis_material,
@@ -100,6 +103,7 @@ def saldo_detail(
     unit: str = Query(...),
     jenis_material: str = Query(...),
     satuan: str = Query(default="Kg"),
+    tanggal: Optional[date] = Query(default=None, description="Saldo per tanggal DO (default: hari ini)"),
     exclude_referensi_id: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
@@ -108,6 +112,7 @@ def saldo_detail(
         unit.strip(),
         jenis_material.strip(),
         satuan.strip(),
+        as_of=tanggal or date.today(),
         exclude_referensi_id=exclude_referensi_id,
     )
     return schemas.StokSaldoOut(
