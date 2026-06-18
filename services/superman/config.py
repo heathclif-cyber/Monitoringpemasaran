@@ -1,7 +1,21 @@
 from __future__ import annotations
 
+import base64
 import os
 from dataclasses import dataclass
+
+
+def _env_credential(name: str, *, b64_name: str | None = None) -> str:
+    raw_b64 = os.getenv(b64_name or "", "").strip() if b64_name else ""
+    if raw_b64:
+        try:
+            return base64.b64decode(raw_b64).decode("utf-8")
+        except Exception as exc:
+            raise RuntimeError(f"{b64_name} tidak valid (harus base64 UTF-8).") from exc
+    value = os.getenv(name, "")
+    if not value:
+        return ""
+    return value.strip().strip('"').strip("'")
 
 
 @dataclass(frozen=True)
@@ -25,8 +39,8 @@ class SupermanConfig:
         base = os.getenv("SUPERMAN_URL", "https://superman.ptpn1.co.id/").rstrip("/") + "/"
         return cls(
             base_url=base,
-            username=os.getenv("SUPERMAN_USER", ""),
-            password=os.getenv("SUPERMAN_PASSWORD", ""),
+            username=_env_credential("SUPERMAN_USER"),
+            password=_env_credential("SUPERMAN_PASSWORD", b64_name="SUPERMAN_PASSWORD_B64"),
             flow_id=os.getenv("SUPERMAN_FLOW_ID", "32"),
             bagian=os.getenv("SUPERMAN_BAGIAN", "223"),
             gl_pendapatan=os.getenv("SUPERMAN_GL_PENDAPATAN", "11000998"),

@@ -67,8 +67,21 @@ def _get_entry(challenge_id: str) -> PendingCaptcha:
 
 
 def _fill_credentials(page: Page, cfg: SupermanConfig) -> None:
-    page.fill("#signin-username", cfg.username)
-    page.fill("#signin-password", cfg.password)
+    page.evaluate(
+        """([user, password]) => {
+            const userEl = document.querySelector('#signin-username');
+            const passEl = document.querySelector('#signin-password');
+            if (userEl) {
+                userEl.value = user;
+                userEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (passEl) {
+                passEl.value = password;
+                passEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }""",
+        [cfg.username, cfg.password],
+    )
 
 
 def _captcha_image(page: Page) -> bytes:
@@ -207,6 +220,10 @@ def verify_captcha_challenge(challenge_id: str, answer: str) -> dict[str, Any]:
             "error": message,
             "failure_kind": kind,
             "challenge_id": challenge_id,
+            "credential_hint": {
+                "username": cfg.username,
+                "password_length": len(cfg.password),
+            },
             **_image_payload(_captcha_image(page), challenge_id),
         }
 

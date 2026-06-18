@@ -85,7 +85,12 @@ export function SupermanCaptchaDialog({
         answer: answer.trim(),
       })
       if (!res.ok) {
-        setError(res.error || 'Captcha salah')
+        let message = res.error || 'Captcha salah'
+        if (res.failure_kind === 'credentials' && res.credential_hint) {
+          const { username, password_length } = res.credential_hint
+          message += ` Server membaca username "${username}" dan password ${password_length} karakter. Periksa SUPERMAN_USER / SUPERMAN_PASSWORD di Railway (jika password ada simbol @, pakai SUPERMAN_PASSWORD_B64).`
+        }
+        setError(message)
         if (res.challenge_id && res.image_base64) {
           setChallenge({
             challenge_id: res.challenge_id,

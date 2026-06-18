@@ -579,6 +579,12 @@ export interface User {
   is_active: boolean
 }
 
+export interface SupermanCredentialHint {
+  username: string
+  password_length: number
+  password_from_b64?: boolean
+}
+
 export interface SupermanStatus {
   configured: boolean
   session_exists: boolean
@@ -586,6 +592,7 @@ export interface SupermanStatus {
   session_path: string
   base_url: string
   headless: boolean
+  credential_hint?: SupermanCredentialHint
   captcha_hint?: string | null
 }
 
@@ -600,6 +607,7 @@ export interface SupermanCaptchaVerifyResult {
   session_valid?: boolean
   error?: string
   failure_kind?: 'captcha' | 'credentials' | 'lockout' | 'unknown'
+  credential_hint?: SupermanCredentialHint
   challenge_id?: string
   image_base64?: string
   mime_type?: string

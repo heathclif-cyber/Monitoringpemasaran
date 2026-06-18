@@ -45,7 +45,11 @@ class SupermanSessionError(RuntimeError):
 
 
 def is_configured() -> bool:
-    return bool(os.getenv("SUPERMAN_USER", "").strip() and os.getenv("SUPERMAN_PASSWORD", "").strip())
+    has_user = bool(os.getenv("SUPERMAN_USER", "").strip())
+    has_password = bool(
+        os.getenv("SUPERMAN_PASSWORD", "").strip() or os.getenv("SUPERMAN_PASSWORD_B64", "").strip()
+    )
+    return has_user and has_password
 
 
 def _api_config() -> SupermanConfig:
@@ -63,6 +67,7 @@ def get_status() -> dict[str, Any]:
     cfg = SupermanConfig.from_env()
     state = Path(cfg.state_path)
     session_valid = is_session_valid(cfg, state) if state.is_file() else False
+    using_b64 = bool(os.getenv("SUPERMAN_PASSWORD_B64", "").strip())
     return {
         "configured": is_configured(),
         "session_exists": state.is_file(),
@@ -70,6 +75,11 @@ def get_status() -> dict[str, Any]:
         "session_path": str(state),
         "base_url": cfg.base_url.rstrip("/"),
         "headless": cfg.headless,
+        "credential_hint": {
+            "username": cfg.username,
+            "password_length": len(cfg.password),
+            "password_from_b64": using_b64,
+        },
         "captcha_hint": (
             None
             if session_valid
