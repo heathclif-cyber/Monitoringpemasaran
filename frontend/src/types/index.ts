@@ -182,6 +182,16 @@ export interface LaporanBypass {
 // Laporan Row (from GET /api/laporan)
 // ============================================================
 
+export interface SupermanDocRequirement {
+  label: string
+  entity_type: string
+  entity_id: string
+  doc_type: string
+  uploaded: boolean
+  file_name?: string | null
+  upload_hint?: string | null
+}
+
 export interface LaporanRow {
   No_DO: string
   No_Invoice: string
@@ -219,6 +229,8 @@ export interface LaporanRow {
   Billing: string
   Link_Deklarasi_Penerimaan: string
   Link_Berita_Acara_Serah_Terima: string
+  Dokumen_Superman?: SupermanDocRequirement[]
+  Dokumen_Superman_Siap?: boolean
 }
 
 export interface DocumentUpload {

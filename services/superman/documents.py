@@ -167,6 +167,100 @@ def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
     )
 
 
+def _upload_status(
+    db: Session,
+    *,
+    entity_type: str,
+    entity_id: str,
+    doc_type: str,
+) -> tuple[bool, str | None]:
+    upload = _latest_upload(db, entity_type, entity_id, doc_type)
+    if upload:
+        try:
+            path = _path_from_upload(upload)
+            if path.is_file():
+                return True, upload.file_name
+        except StorageError:
+            pass
+
+    scanned = _scan_folder(entity_type, entity_id, doc_type)
+    if scanned and scanned.is_file():
+        return True, scanned.name
+    return False, None
+
+
+def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict[str, str | bool | None]], bool]:
+    """Daftar dokumen wajib sebelum deklarasi Superman + apakah semua sudah ada."""
+    do = (
+        db.query(models.DeliveryOrder)
+        .options(
+            joinedload(models.DeliveryOrder.invoice).joinedload(models.Invoice.kontrak),
+            joinedload(models.DeliveryOrder.berita_acara),
+        )
+        .filter(models.DeliveryOrder.no_do == no_do)
+        .first()
+    )
+    if not do or not do.invoice or not do.invoice.kontrak:
+        return [], False
+
+    kontrak = do.invoice.kontrak
+    requirements: list[dict[str, str | bool | None]] = []
+
+    if is_payung_ba(kontrak):
+        no_ba = do.no_ba or do.invoice.no_ba
+        if not no_ba and do.berita_acara:
+            no_ba = do.berita_acara.no_ba
+        if not no_ba:
+            requirements.append(
+                {
+                    "label": "Berita Acara",
+                    "entity_type": "ba",
+                    "entity_id": "-",
+                    "doc_type": "berita_acara",
+                    "uploaded": False,
+                    "file_name": None,
+                    "upload_hint": "Hubungkan DO ke Berita Acara terlebih dahulu",
+                }
+            )
+            return requirements, False
+
+        ba_ok, ba_name = _upload_status(db, entity_type="ba", entity_id=no_ba, doc_type="berita_acara")
+        do_ok, do_name = _upload_status(db, entity_type="do", entity_id=no_do, doc_type="berita_acara")
+        uploaded = ba_ok or do_ok
+        requirements.append(
+            {
+                "label": "Berita Acara",
+                "entity_type": "ba" if ba_ok else "do",
+                "entity_id": no_ba if ba_ok else no_do,
+                "doc_type": "berita_acara",
+                "uploaded": uploaded,
+                "file_name": ba_name or do_name,
+                "upload_hint": f"Upload di menu Upload Dokumen → BA → {no_ba}",
+            }
+        )
+        return requirements, uploaded
+
+    kontrak_id = kontrak.no_kontrak
+    uploaded, file_name = _upload_status(
+        db,
+        entity_type="kontrak",
+        entity_id=kontrak_id,
+        doc_type="kontrak",
+    )
+    requirements.append(
+        {
+            "label": "Dokumen Kontrak",
+            "entity_type": "kontrak",
+            "entity_id": kontrak_id,
+            "doc_type": "kontrak",
+            "uploaded": uploaded,
+            "file_name": file_name,
+            "upload_hint": f"Upload di menu Upload Dokumen → Kontrak → {kontrak_id}",
+        }
+    )
+    return requirements, uploaded
+
+
 def resolve_support_doc_from_do(no_do: str) -> ResolvedSupportDoc:
     from database import SessionLocal
 

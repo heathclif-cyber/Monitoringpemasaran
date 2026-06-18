@@ -39,7 +39,7 @@ import {
 import { formatCurrency, formatNumber, formatDate, safe, cn } from '@/lib/utils'
 import type { LaporanRow } from '@/types'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
-import { SupermanDeklarasiButton } from '@/components/common/SupermanDeklarasiButton'
+import { SupermanDeklarasiStatus } from '@/components/common/SupermanDeklarasiStatus'
 import * as XLSX from 'xlsx'
 
 /** Kepadatan seimbang — antara padat & lega, nominal penuh tanpa ellipsis */
@@ -496,7 +496,7 @@ export default function LaporanPage() {
                     <th className={cn(TH, 'text-left min-w-[7rem]')}>SO SAP</th>
                     <th className={cn(TH, 'text-left min-w-[7rem]')}>DO SAP</th>
                     <th className={cn(TH, 'text-left min-w-[7.5rem]')}>Billing</th>
-                    <th className={cn(TH, 'text-left min-w-[10rem]')}>Link Deklarasi</th>
+                    <th className={cn(TH, 'text-left min-w-[12rem]')}>Status Deklarasi Superman</th>
                     <th className={cn(TH, 'text-left min-w-[10rem]')}>Berita Acara</th>
                     <th className={cn(TH, 'text-center min-w-[6.5rem]')}>Aksi</th>
                   </tr>
@@ -630,47 +630,18 @@ function LaporanTableRow({
           />
         </td>
       ))}
-      <td className={cn(TD, 'min-w-[10rem]')}>
-        <div className="flex flex-col gap-1.5 min-w-[9rem]">
-          {(row.Link_Deklarasi_Penerimaan || '').startsWith('http') && (
-            <a
-              href={row.Link_Deklarasi_Penerimaan!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[13px] text-primary hover:underline"
-            >
-              Buka Link
-            </a>
-          )}
-          <input
-            className={TD_INPUT}
-            defaultValue={row.Link_Deklarasi_Penerimaan || ''}
-            readOnly={!canEdit()}
-            onBlur={(e) => {
-              if (canEdit() && e.target.value !== (row.Link_Deklarasi_Penerimaan || '')) {
-                onSapSave(row.No_DO, 'Link_Deklarasi_Penerimaan', e.target.value)
-              }
-            }}
-            placeholder="-"
+      <td className={cn(TD, 'min-w-[12rem]')}>
+        {!isBypass && row.No_DO ? (
+          <SupermanDeklarasiStatus
+            noDo={row.No_DO}
+            existingSuperman={row.Superman}
+            requirements={row.Dokumen_Superman}
+            docsReady={row.Dokumen_Superman_Siap}
+            onSuccess={onRefresh}
           />
-          {!isBypass && (
-            <>
-              <SupermanDeklarasiButton
-                noDo={row.No_DO}
-                existingSuperman={row.Superman}
-                compact
-                onSuccess={onRefresh}
-              />
-              <DocumentUpload
-                compact
-                entityType="do"
-                entityId={row.No_DO}
-                docType="deklarasi"
-                onUploaded={onRefresh}
-              />
-            </>
-          )}
-        </div>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )}
       </td>
       <td className={cn(TD, 'min-w-[10rem]')}>
         <div className="flex flex-col gap-1.5 min-w-[9rem]">

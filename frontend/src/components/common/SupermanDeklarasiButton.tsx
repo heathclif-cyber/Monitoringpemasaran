@@ -18,6 +18,7 @@ import type {
 interface SupermanDeklarasiButtonProps {
   noDo: string
   existingSuperman?: string | null
+  docsReady?: boolean
   compact?: boolean
   disabled?: boolean
   className?: string
@@ -33,6 +34,7 @@ function sleep(ms: number) {
 export function SupermanDeklarasiButton({
   noDo,
   existingSuperman,
+  docsReady = true,
   compact = false,
   disabled = false,
   className,
@@ -118,6 +120,10 @@ export function SupermanDeklarasiButton({
   }
 
   const handleConfirm = async () => {
+    if (!docsReady) {
+      addNotification('Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.', 'warning')
+      return
+    }
     setLoading(true)
     try {
       const status = await client.get<SupermanStatus>('/api/superman/status')
@@ -171,7 +177,8 @@ export function SupermanDeklarasiButton({
         variant={compact ? 'outline' : 'secondary'}
         size={compact ? 'sm' : 'default'}
         className={cn(compact ? 'h-8 text-xs gap-1.5' : 'gap-2', className)}
-        disabled={disabled || loading || !noDo}
+        disabled={disabled || loading || !noDo || !docsReady}
+        title={!docsReady ? 'Upload dokumen wajib terlebih dahulu' : undefined}
         onClick={() => setOpen(true)}
       >
         {loading ? <Loader2 size={compact ? 12 : 14} className="animate-spin" /> : <Send size={compact ? 12 : 14} />}

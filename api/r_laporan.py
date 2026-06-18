@@ -10,6 +10,7 @@ from database import get_db, SessionLocal
 from services.auth import require_write
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba
+from services.superman.documents import superman_doc_requirements_for_do
 
 router = APIRouter(prefix="/api/laporan", tags=["Laporan"])
 
@@ -143,6 +144,11 @@ def _build_laporan_rows(db: Session):
         if not jenis_komoditi_val:
             jenis_komoditi_val = k.jenis_komoditi or k.deskripsi_produk or k.komoditi or ""
 
+        dokumen_superman: list = []
+        dokumen_superman_siap = False
+        if do:
+            dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_do(db, do.no_do)
+
         return {
             "No_DO": do.no_do if do else "",
             "No_Invoice": inv.no_invoice if inv else "",
@@ -187,6 +193,8 @@ def _build_laporan_rows(db: Session):
             "Billing": do.billing_sap if do else "",
             "Link_Deklarasi_Penerimaan": do.link_deklarasi_penerimaan if do else "",
             "Link_Berita_Acara_Serah_Terima": do.link_berita_acara_serah_terima if do else "",
+            "Dokumen_Superman": dokumen_superman,
+            "Dokumen_Superman_Siap": dokumen_superman_siap,
             "Satuan": k.satuan or "Kg"
         }
 
