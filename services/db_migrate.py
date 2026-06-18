@@ -111,6 +111,16 @@ def run_migrations() -> None:
             if result.rowcount > 0:
                 logger.info("Normalized %s rows: %s.%s '%s' -> '%s'", result.rowcount, tbl, col, old, new)
         db.commit()
+
+        from services.stok_utils import backfill_stok_from_dos
+        bf = backfill_stok_from_dos(db)
+        if bf["created"]:
+            logger.info(
+                "Backfill stok dari DO: %d entri keluar dibuat (%d dilewati)",
+                bf["created"],
+                bf["skipped"],
+            )
+
         logger.info("Migrasi selesai (total %.1f detik).", time.perf_counter() - t0)
     except Exception as err:
         db.rollback()

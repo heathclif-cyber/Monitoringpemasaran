@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Boxes, Pencil, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { Boxes, Pencil, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { useStokStore } from '@/store/stokStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -43,7 +43,8 @@ const MATERIAL_OPTIONS = [
 ]
 
 export default function StokPage() {
-  const { entries, saldos, materials, units, isLoading, fetchAll, createMasuk, updateEntry, deleteEntry } = useStokStore()
+  const { entries, saldos, materials, units, isLoading, fetchAll, createMasuk, updateEntry, deleteEntry, backfillDO } = useStokStore()
+  const [syncing, setSyncing] = useState(false)
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [editId, setEditId] = useState<number | null>(null)
@@ -202,10 +203,42 @@ export default function StokPage() {
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Saldo Saat Ini</CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                Stok masuk hanya dihitung dari tanggal inputnya. DO mengurangi stok per tanggal DO terbit.
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold">Saldo Saat Ini</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Stok masuk per tanggal input. DO lama otomatis mengurangi stok per tanggal DO.
+                  </p>
+                </div>
+                {canEdit() && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1 shrink-0"
+                    disabled={syncing}
+                    onClick={async () => {
+                      setSyncing(true)
+                      try {
+                        const r = await backfillDO()
+                        addNotification(
+                          r.created > 0
+                            ? `Sinkron DO: ${r.created} pengurangan stok ditambahkan`
+                            : 'Semua DO sudah tersinkron',
+                          'success',
+                        )
+                      } catch (err: unknown) {
+                        addNotification(err instanceof Error ? err.message : 'Sinkron gagal', 'error')
+                      } finally {
+                        setSyncing(false)
+                      }
+                    }}
+                  >
+                    <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
+                    Sinkron DO
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (

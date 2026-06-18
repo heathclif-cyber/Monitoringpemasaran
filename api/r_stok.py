@@ -9,7 +9,12 @@ import models
 import schemas
 from database import get_db
 from services.auth import require_write
-from services.stok_utils import FIXED_UNITS, get_saldo, list_distinct_materials
+from services.stok_utils import (
+    FIXED_UNITS,
+    backfill_stok_from_dos,
+    get_saldo,
+    list_distinct_materials,
+)
 
 router = APIRouter(prefix="/api/stok", tags=["Stok"])
 
@@ -121,6 +126,16 @@ def saldo_detail(
         satuan=satuan.strip(),
         saldo=round(saldo, 2),
     )
+
+
+@router.post("/backfill-do")
+def backfill_do_stok(
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_write),
+):
+    """Sinkronkan DO lama yang belum punya entri pengurangan stok."""
+    result = backfill_stok_from_dos(db)
+    return {"success": True, **result}
 
 
 @router.post("", response_model=schemas.StokLedgerOut)

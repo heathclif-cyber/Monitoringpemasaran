@@ -187,6 +187,55 @@ def record_stok_keluar_do(
     )
 
 
+def backfill_stok_from_dos(db: Session) -> dict:
+    """Buat entri KELUAR untuk DO yang sudah ada sebelum fitur stok diaktifkan."""
+    from sqlalchemy.orm import joinedload
+
+    existing_refs = {
+        r[0]
+        for r in db.query(models.StokLedger.referensi_id)
+        .filter(
+            models.StokLedger.sumber == "do",
+            models.StokLedger.referensi_id.isnot(None),
+        )
+        .all()
+        if r[0]
+    }
+
+    dos = (
+        db.query(models.DeliveryOrder)
+        .options(
+            joinedload(models.DeliveryOrder.invoice)
+            .joinedload(models.Invoice.kontrak)
+            .joinedload(models.Kontrak.units),
+        )
+        .all()
+    )
+
+    created = 0
+    skipped = 0
+    for do in dos:
+        if do.no_do in existing_refs:
+            skipped += 1
+            continue
+        invoice = do.invoice
+        kontrak = invoice.kontrak if invoice else None
+        if not kontrak:
+            skipped += 1
+            continue
+        ctx = resolve_do_stock_context(do, invoice, kontrak)
+        if not ctx["unit"] or not ctx["jenis_material"] or ctx["volume"] <= 0:
+            skipped += 1
+            continue
+        record_stok_keluar_do(db, do, ctx)
+        created += 1
+
+    if created:
+        db.commit()
+
+    return {"created": created, "skipped": skipped, "total_dos": len(dos)}
+
+
 def list_distinct_materials(db: Session) -> list[str]:
     values: set[str] = set(FIXED_MATERIALS)
     for (val,) in db.query(models.StokLedger.jenis_material).distinct().all():

@@ -13,6 +13,7 @@ interface StokStore {
   createMasuk: (input: StokInput) => Promise<void>
   updateEntry: (id: number, input: Partial<StokInput>) => Promise<void>
   deleteEntry: (id: number) => Promise<void>
+  backfillDO: () => Promise<{ created: number; skipped: number }>
 }
 
 export const useStokStore = create<StokStore>((set, get) => ({
@@ -62,5 +63,11 @@ export const useStokStore = create<StokStore>((set, get) => ({
   deleteEntry: async (id: number) => {
     await client.delete(`/api/stok/${id}`)
     await get().fetchAll()
+  },
+
+  backfillDO: async () => {
+    const result = await client.post<{ created: number; skipped: number }>('/api/stok/backfill-do')
+    await get().fetchAll()
+    return result
   },
 }))
