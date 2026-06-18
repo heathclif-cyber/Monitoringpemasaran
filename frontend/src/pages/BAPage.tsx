@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { formatCurrency } from '@/lib/utils'
 import type { Kontrak } from '@/types'
 
@@ -163,7 +164,7 @@ export default function BAPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <ClipboardList size={15} className="text-brand-600" />
-              Berita Acara — Kontrak Payung
+              Pilih Berita Acara
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
@@ -191,7 +192,7 @@ export default function BAPage() {
                   label: `${b.no_ba} — ${b.no_kontrak}`,
                 }))}
                 value={watch('no_ba')}
-                allowCustom
+                allowCustom={canEdit()}
                 onChange={(v) => setValue('no_ba', v, { shouldValidate: true })}
                 onValueCommit={() => autoLoadBA()}
                 placeholder="Ketik baru atau pilih dari daftar"
@@ -199,6 +200,15 @@ export default function BAPage() {
               <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih BA lama → data terisi otomatis.</p>
               {errors.no_ba && <p className="text-xs text-red-500 mt-1">{errors.no_ba.message}</p>}
             </div>
+          </CardContent>
+        </Card>
+
+        <ReadOnlyFieldset className="space-y-6 block">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold">Data Berita Acara</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-xs">Tanggal BA *</Label>
               <Input type="date" {...register('tanggal_ba')} />
@@ -288,13 +298,14 @@ export default function BAPage() {
             </CardContent>
           </Card>
         )}
+        </ReadOnlyFieldset>
 
         <div className="flex gap-3">
           <Button type="submit" disabled={isSubmitting || !canEdit()}>
             <Save size={15} className="mr-1.5" />
             {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : 'Simpan BA'}
           </Button>
-          <Button type="button" variant="outline" onClick={handleReset}>
+          <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()}>
             <RotateCcw size={15} className="mr-1.5" />
             Reset
           </Button>

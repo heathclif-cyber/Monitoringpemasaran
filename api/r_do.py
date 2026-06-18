@@ -102,7 +102,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     if not ctx["jenis_material"]:
         raise HTTPException(
             status_code=400,
-            detail="Material tidak ditemukan di kontrak — tidak bisa mengurangi stok",
+            detail="Material tidak ditemukan di kontrak — tidak bisa mengurangi persediaan",
         )
     if not ctx["unit"]:
         raise HTTPException(

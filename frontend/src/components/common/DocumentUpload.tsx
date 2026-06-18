@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CloudUpload, ExternalLink, Loader2 } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { DocumentDocType, DocumentEntityType, DocumentUpload as DocumentUploadType } from '@/types'
@@ -37,13 +38,14 @@ export function DocumentUpload({
   className,
 }: DocumentUploadProps) {
   const { addNotification } = useAppStore()
+  const canEdit = useAuthStore((s) => s.canEdit())
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [latest, setLatest] = useState<DocumentUploadType | null>(null)
 
   const title = label || DOC_TYPE_LABELS[docType]
-  const canUpload = Boolean(entityId?.trim()) && !disabled
+  const canUpload = canEdit && Boolean(entityId?.trim()) && !disabled
 
   const loadStatus = useCallback(async () => {
     try {
@@ -127,17 +129,19 @@ export function DocumentUpload({
           accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs gap-1"
-          disabled={!canUpload || uploading}
-          onClick={() => inputRef.current?.click()}
-        >
-          {uploading ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />}
-          Upload
-        </Button>
+        {canEdit && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            disabled={!canUpload || uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {uploading ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />}
+            Upload
+          </Button>
+        )}
       </div>
     )
   }
@@ -169,19 +173,25 @@ export function DocumentUpload({
         accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
         onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
       />
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="gap-2"
-        disabled={!canUpload || uploading}
-        onClick={() => inputRef.current?.click()}
-      >
-        {uploading ? <Loader2 size={14} className="animate-spin" /> : <CloudUpload size={14} />}
-        {uploading ? 'Mengupload...' : latest ? 'Ganti File' : 'Upload Dokumen'}
-      </Button>
-      {!canUpload && (
-        <p className="text-xs text-muted-foreground">Simpan dokumen terlebih dahulu untuk mengaktifkan upload.</p>
+      {canEdit ? (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="gap-2"
+            disabled={!canUpload || uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {uploading ? <Loader2 size={14} className="animate-spin" /> : <CloudUpload size={14} />}
+            {uploading ? 'Mengupload...' : latest ? 'Ganti File' : 'Upload Dokumen'}
+          </Button>
+          {!canUpload && (
+            <p className="text-xs text-muted-foreground">Simpan dokumen terlebih dahulu untuk mengaktifkan upload.</p>
+          )}
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground">Mode tamu — hanya unduh dokumen yang sudah ada.</p>
       )}
     </div>
   )

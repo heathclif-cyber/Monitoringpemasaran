@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { cn, formatNumber } from '@/lib/utils'
 import type { StokLedgerEntry } from '@/types'
 
@@ -87,14 +88,14 @@ export default function StokPage() {
       }
       if (editId) {
         await updateEntry(editId, payload)
-        addNotification('Stok berhasil diperbarui', 'success')
+        addNotification('Persediaan berhasil diperbarui', 'success')
       } else {
         await createMasuk(payload)
-        addNotification('Stok masuk berhasil dicatat', 'success')
+        addNotification('Persediaan masuk berhasil dicatat', 'success')
       }
       handleReset()
     } catch (err: unknown) {
-      addNotification(err instanceof Error ? err.message : 'Gagal menyimpan stok', 'error')
+      addNotification(err instanceof Error ? err.message : 'Gagal menyimpan persediaan', 'error')
     }
   }
 
@@ -125,7 +126,7 @@ export default function StokPage() {
     if (!deleteTarget) return
     try {
       await deleteEntry(deleteTarget.id)
-      addNotification('Entri stok dihapus', 'success')
+      addNotification('Entri persediaan dihapus', 'success')
       if (editId === deleteTarget.id) handleReset()
     } catch (err: unknown) {
       addNotification(err instanceof Error ? err.message : 'Gagal menghapus', 'error')
@@ -141,11 +142,12 @@ export default function StokPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Boxes size={15} className="text-primary" />
-              {editId ? 'Edit Stok Masuk' : 'Input Stok Masuk'}
+              {editId ? 'Edit Persediaan Masuk' : 'Input Persediaan Masuk'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" autoComplete="off">
+              <ReadOnlyFieldset className="space-y-4 block">
               <div>
                 <Label className="text-xs">Tanggal *</Label>
                 <Input type="date" {...register('tanggal')} />
@@ -189,12 +191,13 @@ export default function StokPage() {
                 <Label className="text-xs">Catatan</Label>
                 <Textarea {...register('catatan')} rows={2} placeholder="Opsional" />
               </div>
+              </ReadOnlyFieldset>
               <div className="flex gap-2">
                 <Button type="submit" disabled={isSubmitting || !canEdit()} className="gap-2">
                   <Save size={14} />
-                  {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : editId ? 'Simpan Perubahan' : 'Simpan Stok'}
+                  {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : editId ? 'Simpan Perubahan' : 'Simpan Persediaan'}
                 </Button>
-                <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
+                <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
                   <RotateCcw size={14} /> Reset
                 </Button>
               </div>
@@ -209,7 +212,7 @@ export default function StokPage() {
                 <div>
                   <CardTitle className="text-sm font-semibold">Saldo Saat Ini</CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Stok masuk per tanggal input. DO lama otomatis mengurangi stok per tanggal DO.
+                    Persediaan masuk per tanggal input. DO lama otomatis mengurangi persediaan per tanggal DO.
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -248,7 +251,7 @@ export default function StokPage() {
                         const r = await backfillDO()
                         addNotification(
                           r.created > 0
-                            ? `Sinkron DO: ${r.created} pengurangan stok ditambahkan`
+                            ? `Sinkron DO: ${r.created} pengurangan persediaan ditambahkan`
                             : 'Semua DO sudah tersinkron',
                           'success',
                         )
@@ -270,7 +273,7 @@ export default function StokPage() {
               {isLoading ? (
                 <p className="text-sm text-muted-foreground">Memuat...</p>
               ) : saldos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Belum ada saldo stok. Input stok masuk terlebih dahulu.</p>
+                <p className="text-sm text-muted-foreground">Belum ada saldo persediaan. Input persediaan masuk terlebih dahulu.</p>
               ) : saldoView === 'heatmap' ? (
                 <StokSaldoHeatmap saldos={saldos} />
               ) : (
@@ -296,7 +299,7 @@ export default function StokPage() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Riwayat Stok</CardTitle>
+              <CardTitle className="text-sm font-semibold">Riwayat Persediaan</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {entries.length === 0 ? (
@@ -365,8 +368,8 @@ export default function StokPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Hapus entri stok?"
-        description={`Hapus stok masuk ${deleteTarget?.unit} / ${deleteTarget?.jenis_material} pada ${deleteTarget?.tanggal}?`}
+        title="Hapus entri persediaan?"
+        description={`Hapus persediaan masuk ${deleteTarget?.unit} / ${deleteTarget?.jenis_material} pada ${deleteTarget?.tanggal}?`}
         onConfirm={handleDelete}
       />
     </div>

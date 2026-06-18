@@ -35,7 +35,7 @@ const navItems: NavItemDef[] = [
   { label: 'Delivery Order', to: '/delivery-order', icon: <Truck size={16} /> },
   { label: 'Berita Acara', to: '/berita-acara', icon: <ClipboardList size={16} /> },
   { label: 'Upload Dokumen', to: '/upload', icon: <CloudUpload size={16} /> },
-  { label: 'Input Stok', to: '/stok', icon: <Boxes size={16} /> },
+  { label: 'Persediaan', to: '/stok', icon: <Boxes size={16} /> },
   { label: 'Laporan Digital', to: '/laporan', icon: <Table size={16} /> },
   { label: 'Input Bypass', to: '/bypass', icon: <Zap size={16} /> },
   {
@@ -221,7 +221,7 @@ export function Sidebar() {
         {!collapsed && user?.role === 'tamu' && (
           <div className="px-4 pb-2">
             <div className="rounded-md bg-muted px-3 py-2 text-[11px] text-muted-foreground text-center">
-              Mode <strong>Tamu</strong> — hanya bisa lihat
+              Mode <strong>Tamu</strong> — hanya lihat & unduh
             </div>
           </div>
         )}

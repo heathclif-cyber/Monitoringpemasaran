@@ -8,6 +8,7 @@ import math
 import models
 import schemas
 from database import get_db
+from services.auth import require_write
 from services.utils import terbilang_rupiah
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 
 
 @router.post("", response_model=schemas.KontrakOut)
-def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)):
+def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == kontrak.no_kontrak).first()
 
     units_input = kontrak.units or []
@@ -374,7 +375,7 @@ def get_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Kontrak not found")
     return db_kontrak
 @router.delete("/{no_kontrak:path}")
-def delete_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
+def delete_kontrak(no_kontrak: str, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == no_kontrak).first()
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")

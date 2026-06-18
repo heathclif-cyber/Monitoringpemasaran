@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
@@ -353,7 +354,7 @@ export default function InvoicePage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Data Dokumen</CardTitle>
+              <CardTitle className="text-sm font-semibold">Pilih Dokumen</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
@@ -377,7 +378,7 @@ export default function InvoicePage() {
                     label: i.no_invoice,
                   }))}
                   value={watch('no_invoice')}
-                  allowCustom
+                  allowCustom={canEdit()}
                   onChange={(v) => setValue('no_invoice', v, { shouldValidate: true })}
                   onValueCommit={() => autoLoadInvoice()}
                   placeholder="Ketik baru atau pilih dari daftar"
@@ -385,6 +386,15 @@ export default function InvoicePage() {
                 <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih invoice lama → data terisi otomatis.</p>
                 {errors.no_invoice && <p className="text-xs text-red-500 mt-1">{errors.no_invoice.message}</p>}
               </div>
+            </CardContent>
+          </Card>
+
+          <ReadOnlyFieldset className="space-y-6 block">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Data Dokumen</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Tanggal Transaksi *</Label>
                 <Input type="date" {...register('tanggal_transaksi')} />
@@ -532,6 +542,7 @@ export default function InvoicePage() {
               <DocumentUpload entityType="invoice" entityId={exportNo} docType="kuitansi" />
             </div>
           )}
+          </ReadOnlyFieldset>
 
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={isSubmitting || !canEdit()} className="gap-2">
@@ -548,7 +559,7 @@ export default function InvoicePage() {
                 </Button>
               </>
             )}
-            <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
+            <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
               <RotateCcw size={14} /> Reset
             </Button>
           </div>

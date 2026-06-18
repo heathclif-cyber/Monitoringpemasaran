@@ -151,7 +151,7 @@ def validate_stok_cukup(
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Stok tidak cukup per tanggal {tgl}: {ctx['unit']} / {ctx['jenis_material']} "
+                f"Persediaan tidak cukup per tanggal {tgl}: {ctx['unit']} / {ctx['jenis_material']} "
                 f"tersedia {saldo:,.0f} {ctx['satuan']}, dibutuhkan {needed:,.0f} {ctx['satuan']}"
             ),
         )

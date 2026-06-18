@@ -12,6 +12,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 
 const bypassSchema = z.object({
   unit: z.string().min(1, 'Unit wajib diisi'),
@@ -81,6 +82,7 @@ export default function BypassPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
+        <ReadOnlyFieldset className="block">
         <div className="grid grid-cols-2 gap-6">
           {/* Left: Informasi Dasar */}
           <Card>
@@ -151,13 +153,14 @@ export default function BypassPage() {
             </CardContent>
           </Card>
         </div>
+        </ReadOnlyFieldset>
 
         <div className="flex gap-3">
           <Button type="submit" disabled={isSubmitting || !canEdit()} className="gap-2">
             <Save size={14} />
             {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : editId ? 'Simpan Perubahan' : 'Simpan Data'}
           </Button>
-          <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
+          <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
             <RotateCcw size={14} /> Reset
           </Button>
         </div>

@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { KontrakPreview } from '@/components/feature/KontrakPreview'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -448,6 +449,40 @@ export default function KontrakPage() {
           autoComplete="off"
         >
           {activeStep === 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Pilih Kontrak</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Label className="text-xs">No Kontrak *</Label>
+              <SearchableSelect
+                options={kontrakList.map((k) => ({
+                  value: k.no_kontrak,
+                  label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''}`,
+                }))}
+                value={selectedNoKontrak || ''}
+                allowCustom={canEdit()}
+                onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
+                onValueCommit={(v) => {
+                  if (v && kontrakList.some((k) => k.no_kontrak === v)) {
+                    unitsDirtyRef.current = false
+                    lastFetchedNo.current = v
+                    editLoadedRef.current = null
+                    loadKontrakByNo(v, true)
+                  }
+                }}
+                placeholder="Ketik baru atau pilih dari daftar"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Daftar dari database. Pilih → data terisi otomatis. Nomor baru → buat kontrak baru.
+              </p>
+              {errors.no_kontrak && <p className="text-xs text-red-500 mt-1">{errors.no_kontrak.message}</p>}
+            </CardContent>
+          </Card>
+          )}
+
+          <ReadOnlyFieldset className="space-y-6 block">
+          {activeStep === 0 && (
           <>
           {/* Data Dasar */}
           <Card>
@@ -455,31 +490,6 @@ export default function KontrakPage() {
               <CardTitle className="text-sm font-semibold">Data Dasar</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <Label className="text-xs">No Kontrak *</Label>
-                <SearchableSelect
-                  options={kontrakList.map((k) => ({
-                    value: k.no_kontrak,
-                    label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''}`,
-                  }))}
-                  value={selectedNoKontrak || ''}
-                  allowCustom
-                  onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
-                  onValueCommit={(v) => {
-                    if (v && kontrakList.some((k) => k.no_kontrak === v)) {
-                      unitsDirtyRef.current = false
-                      lastFetchedNo.current = v
-                      editLoadedRef.current = null
-                      loadKontrakByNo(v, true)
-                    }
-                  }}
-                  placeholder="Ketik baru atau pilih dari daftar"
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  Daftar dari database. Pilih → data terisi otomatis. Nomor baru → buat kontrak baru.
-                </p>
-                {errors.no_kontrak && <p className="text-xs text-red-500 mt-1">{errors.no_kontrak.message}</p>}
-              </div>
               <div>
                 <Label className="text-xs">Tanggal *</Label>
                 <Input type="date" {...register('tanggal_kontrak')} />
@@ -846,6 +856,7 @@ export default function KontrakPage() {
           {exportNo && activeStep === KONTRAK_STEPS.length - 1 && (
             <DocumentUpload entityType="kontrak" entityId={exportNo} docType="kontrak" />
           )}
+          </ReadOnlyFieldset>
 
           <FormStepActions
             activeStep={activeStep}
@@ -862,7 +873,7 @@ export default function KontrakPage() {
                     Export .docx
                   </Button>
                 )}
-                <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
+                <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
                   <RotateCcw size={14} />
                   Reset
                 </Button>

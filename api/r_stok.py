@@ -16,7 +16,7 @@ from services.stok_utils import (
     list_distinct_materials,
 )
 
-router = APIRouter(prefix="/api/stok", tags=["Stok"])
+router = APIRouter(prefix="/api/stok", tags=["Persediaan"])
 
 
 @router.get("/materials", response_model=List[str])
@@ -171,7 +171,7 @@ def update_stok(
 ):
     record = db.query(models.StokLedger).filter(models.StokLedger.id == entry_id).first()
     if not record:
-        raise HTTPException(status_code=404, detail="Entri stok tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Entri persediaan tidak ditemukan")
     if record.sumber != "manual":
         raise HTTPException(status_code=400, detail="Hanya entri manual yang bisa diedit")
 
@@ -195,9 +195,9 @@ def delete_stok(
 ):
     record = db.query(models.StokLedger).filter(models.StokLedger.id == entry_id).first()
     if not record:
-        raise HTTPException(status_code=404, detail="Entri stok tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Entri persediaan tidak ditemukan")
     if record.sumber != "manual":
         raise HTTPException(status_code=400, detail="Hanya entri manual yang bisa dihapus")
     db.delete(record)
     db.commit()
-    return {"success": True, "message": "Entri stok dihapus"}
+    return {"success": True, "message": "Entri persediaan dihapus"}

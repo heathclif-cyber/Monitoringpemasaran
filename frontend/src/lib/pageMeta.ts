@@ -41,9 +41,9 @@ const PAGE_META: Record<string, PageMeta> = {
     breadcrumb: 'Dokumen / Upload',
   },
   '/stok': {
-    title: 'Input Stok',
-    description: 'Catat stok masuk per tanggal; penjualan DO mengurangi saldo otomatis',
-    breadcrumb: 'Operasional / Stok',
+    title: 'Persediaan',
+    description: 'Catat persediaan masuk per tanggal; penjualan DO mengurangi saldo otomatis',
+    breadcrumb: 'Operasional / Persediaan',
   },
   '/repo/kontrak': {
     title: 'Arsip Kontrak',

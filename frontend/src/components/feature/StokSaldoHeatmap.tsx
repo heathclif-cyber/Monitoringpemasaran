@@ -313,20 +313,20 @@ function SatuanHeatmap({ title, items }: { title: string; items: StokSaldo[] }) 
       </div>
       <div>
         <p className="text-[10px] font-medium text-muted-foreground mb-1.5">
-          Semua stok (terbesar → terkecil) — kotak kecil di peta pakai label singkat
+          Semua persediaan (terbesar → terkecil) — kotak kecil di peta pakai label singkat
         </p>
         <SaldoRanking nodes={nodes} limit={nodes.length} />
       </div>
       <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: heatFill(1, 1) }} />
-          Stok positif (semakin gelap = semakin besar)
+          Persediaan positif (semakin gelap = semakin besar)
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: heatFill(-1, 1) }} />
-          Stok negatif / minus
+          Persediaan negatif / minus
         </span>
-        <span>Luas kotak ∝ jumlah stok</span>
+        <span>Luas kotak ∝ jumlah persediaan</span>
       </div>
     </div>
   )

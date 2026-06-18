@@ -15,6 +15,7 @@ interface SearchableSelectProps {
   className?: string
   /** Izinkan nilai bebas (mis. nomor dokumen baru) selain opsi dari database */
   allowCustom?: boolean
+  disabled?: boolean
   /** Dipanggil saat nilai dipilih dari daftar atau dikonfirmasi (blur) */
   onValueCommit?: (value: string) => void
 }
@@ -26,6 +27,7 @@ export function SearchableSelect({
   placeholder = '-- Pilih --',
   className,
   allowCustom = false,
+  disabled = false,
   onValueCommit,
 }: SearchableSelectProps) {
   const [query, setQuery] = useState('')
@@ -84,6 +86,7 @@ export function SearchableSelect({
       <div className="relative">
         <input
           type="text"
+          disabled={disabled}
           value={displayValue}
           onChange={(e) => {
             const v = e.target.value
@@ -95,6 +98,7 @@ export function SearchableSelect({
             }
           }}
           onFocus={() => {
+            if (disabled) return
             setOpen(true)
             if (allowCustom) setQuery(value)
           }}
@@ -124,8 +128,9 @@ export function SearchableSelect({
         />
         <button
           type="button"
+          disabled={disabled}
           onClick={value ? handleClear : () => setOpen((o) => !o)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-40"
         >
           {value ? <X size={14} /> : <ChevronDown size={14} />}
         </button>

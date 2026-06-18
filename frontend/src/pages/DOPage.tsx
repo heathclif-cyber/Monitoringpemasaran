@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { client } from '@/lib/client'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
@@ -299,7 +300,7 @@ export default function DOPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Data Dokumen</CardTitle>
+              <CardTitle className="text-sm font-semibold">Pilih Dokumen</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
@@ -323,13 +324,22 @@ export default function DOPage() {
                     label: d.no_do,
                   }))}
                   value={watch('no_do')}
-                  allowCustom
+                  allowCustom={canEdit()}
                   onChange={(v) => setValue('no_do', v, { shouldValidate: true })}
                   onValueCommit={() => autoLoadDO()}
                   placeholder="Ketik baru atau pilih dari daftar"
                 />
                 <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih DO lama → data terisi otomatis.</p>
               </div>
+            </CardContent>
+          </Card>
+
+          <ReadOnlyFieldset className="space-y-6 block">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Data Dokumen</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Tanggal DO *</Label>
                 <Input type="date" {...register('tanggal_do')} />
@@ -402,7 +412,7 @@ export default function DOPage() {
                 <p className="text-xs text-slate-500 mt-1">Selisih: {formatCurrency(selisih)}</p>
                 {stokUnit && stokMaterial && (
                   <p className={cn('text-xs mt-2', stokKurang ? 'text-red-600 font-medium' : 'text-slate-600')}>
-                    Stok tersedia{tanggalDo ? ` per ${tanggalDo.split('-').reverse().join('/')}` : ''}:{' '}
+                    Persediaan tersedia{tanggalDo ? ` per ${tanggalDo.split('-').reverse().join('/')}` : ''}:{' '}
                     {stokSaldo != null ? `${formatNumber(stokSaldo.saldo)} ${stokSatuan}` : '—'}
                     {stokKurang && ' — tidak cukup untuk DO ini'}
                   </p>
@@ -451,6 +461,7 @@ export default function DOPage() {
               <DocumentUpload entityType="do" entityId={exportNo} docType="berita_acara" />
             </div>
           )}
+          </ReadOnlyFieldset>
 
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={isSubmitting || !canEdit()} className="gap-2">
@@ -462,7 +473,7 @@ export default function DOPage() {
                 <FileDown size={14} /> Export .docx
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={handleReset} className="gap-2">
+            <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
               <RotateCcw size={14} /> Reset
             </Button>
           </div>

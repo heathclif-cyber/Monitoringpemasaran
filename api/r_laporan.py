@@ -377,7 +377,7 @@ def delete_bypass_entry(bypass_id: int, db: Session = Depends(get_db), _: models
     return {"success": True}
 
 @router.post("/seed-beteleme")
-def seed_beteleme(db: Session = Depends(get_db)):
+def seed_beteleme(db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     from datetime import date
     data_entries = [
         # Februari 2026
