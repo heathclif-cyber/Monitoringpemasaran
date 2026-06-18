@@ -13,6 +13,10 @@ class SupermanCaptchaError(RuntimeError):
     """Login gagal karena captcha OCR tidak berhasil."""
 
 
+class SupermanCaptchaRequired(RuntimeError):
+    """Session Superman belum ada — user harus isi captcha lewat UI."""
+
+
 def _is_login_page(page: Page) -> bool:
     return page.locator("#signin-username").count() > 0
 
@@ -103,15 +107,25 @@ def _save_session(cfg: SupermanConfig, *, manual: bool = False) -> str:
     return str(state_path)
 
 
-def ensure_session(cfg: SupermanConfig) -> str:
+def _auto_login_enabled() -> bool:
+    return os.getenv("SUPERMAN_AUTO_LOGIN", "").lower() in ("1", "true", "yes")
+
+
+def ensure_session(cfg: SupermanConfig, *, auto_login: bool | None = None) -> str:
     state_path = Path(cfg.state_path)
     state_path.parent.mkdir(parents=True, exist_ok=True)
     force = os.getenv("SUPERMAN_FORCE_LOGIN", "").lower() in ("1", "true", "yes")
+    use_auto = _auto_login_enabled() if auto_login is None else auto_login
 
     if state_path.exists() and not force:
         if is_session_valid(cfg, state_path):
             return str(state_path)
         state_path.unlink(missing_ok=True)
+
+    if not use_auto:
+        raise SupermanCaptchaRequired(
+            "Session Superman belum aktif. Isi captcha login Superman terlebih dahulu."
+        )
 
     return _save_session(cfg, manual=False)
 

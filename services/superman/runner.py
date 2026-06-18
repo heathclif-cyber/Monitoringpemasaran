@@ -8,7 +8,18 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from services.superman.auth import SupermanCaptchaError, ensure_session, is_session_valid, open_authenticated_context
+from services.superman.auth import (
+    SupermanCaptchaError,
+    SupermanCaptchaRequired,
+    ensure_session,
+    is_session_valid,
+    open_authenticated_context,
+)
+from services.superman.captcha_challenge import (
+    refresh_captcha_challenge,
+    start_captcha_challenge,
+    verify_captcha_challenge,
+)
 from services.superman.config import SupermanConfig
 from services.superman.documents import resolve_support_doc_from_do
 from services.superman.filler import fill_sppn_draft, submit_sppn_draft
@@ -89,9 +100,21 @@ def _find_todo_match(
     return candidates[0] if candidates else None
 
 
+def request_captcha() -> dict[str, Any]:
+    return start_captcha_challenge(_api_config())
+
+
+def refresh_captcha(challenge_id: str) -> dict[str, Any]:
+    return refresh_captcha_challenge(challenge_id.strip())
+
+
+def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
+    return verify_captcha_challenge(challenge_id.strip(), answer.strip())
+
+
 def submit_deklarasi(no_do: str) -> dict[str, Any]:
     cfg = _api_config()
-    ensure_session(cfg)
+    ensure_session(cfg, auto_login=False)
 
     payload = build_payload_from_do(no_do)
     support = resolve_support_doc_from_do(no_do)

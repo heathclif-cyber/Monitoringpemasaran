@@ -582,9 +582,26 @@ export interface User {
 export interface SupermanStatus {
   configured: boolean
   session_exists: boolean
+  session_valid: boolean
   session_path: string
   base_url: string
   headless: boolean
+  captcha_hint?: string | null
+}
+
+export interface SupermanCaptchaChallenge {
+  challenge_id: string
+  image_base64: string
+  mime_type: string
+}
+
+export interface SupermanCaptchaVerifyResult {
+  ok: boolean
+  session_valid?: boolean
+  error?: string
+  challenge_id?: string
+  image_base64?: string
+  mime_type?: string
 }
 
 export interface SupermanDeklarasiResult {
