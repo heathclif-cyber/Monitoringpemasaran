@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,15 @@ from services.superman.config import SupermanConfig
 from services.superman.documents import resolve_support_doc_from_do
 from services.superman.filler import fill_sppn_draft, submit_sppn_draft
 from services.superman.payload import build_payload_from_do
+from services.superman.progress import (
+    ProgressCallback,
+    complete_job,
+    create_job,
+    fail_job,
+    get_job,
+    make_progress_callback,
+    update_job,
+)
 
 
 class SupermanNotConfiguredError(RuntimeError):
@@ -112,18 +122,31 @@ def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
     return verify_captcha_challenge(challenge_id.strip(), answer.strip())
 
 
-def submit_deklarasi(no_do: str) -> dict[str, Any]:
+def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) -> dict[str, Any]:
+    report = on_progress or (lambda _percent, _stage: None)
+
+    report(5, "Memuat data DO dan dokumen")
     cfg = _api_config()
+
+    report(10, "Memvalidasi session Superman")
     ensure_session(cfg, auto_login=False)
 
     payload = build_payload_from_do(no_do)
     support = resolve_support_doc_from_do(no_do)
 
+    report(20, "Membuka browser Superman")
     pw, browser, context = open_authenticated_context(cfg)
     try:
         page = context.new_page()
-        fill_sppn_draft(page, cfg, payload, support_doc=support.path)
-        submit_sppn_draft(page)
+        fill_sppn_draft(
+            page,
+            cfg,
+            payload,
+            support_doc=support.path,
+            on_progress=on_progress,
+        )
+        submit_sppn_draft(page, on_progress=on_progress)
+        report(95, "Memverifikasi To Do List")
         match = _find_todo_match(
             page,
             cfg.base_url,
@@ -157,4 +180,42 @@ def submit_deklarasi(no_do: str) -> dict[str, Any]:
                 "spp_id": match.get("spp_id"),
             }
         )
+    report(100, "Selesai")
     return result
+
+
+def _run_deklarasi_job(job_id: str, no_do: str) -> None:
+    try:
+        result = submit_deklarasi(no_do, on_progress=make_progress_callback(job_id))
+        complete_job(job_id, result)
+    except Exception as exc:
+        fail_job(job_id, str(exc))
+
+
+def start_deklarasi_job(no_do: str) -> dict[str, Any]:
+    no_do = no_do.strip()
+    cfg = _api_config()
+    ensure_session(cfg, auto_login=False)
+    job_id = create_job(no_do)
+    update_job(job_id, 0, "Memulai proses...")
+    thread = threading.Thread(target=_run_deklarasi_job, args=(job_id, no_do), daemon=True)
+    thread.start()
+    return {"job_id": job_id, "no_do": no_do}
+
+
+def get_deklarasi_progress(job_id: str) -> dict[str, Any]:
+    job = get_job(job_id.strip())
+    if not job:
+        raise ValueError("Job deklarasi tidak ditemukan atau sudah kedaluwarsa.")
+    payload: dict[str, Any] = {
+        "job_id": job.job_id,
+        "no_do": job.no_do,
+        "status": job.status,
+        "percent": job.percent,
+        "stage": job.stage,
+    }
+    if job.status == "completed" and job.result:
+        payload["result"] = job.result
+    if job.status == "failed" and job.error:
+        payload["error"] = job.error
+    return payload

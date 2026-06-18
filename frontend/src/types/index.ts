@@ -605,6 +605,21 @@ export interface SupermanCaptchaVerifyResult {
   mime_type?: string
 }
 
+export interface SupermanDeklarasiJobStart {
+  job_id: string
+  no_do: string
+}
+
+export interface SupermanDeklarasiProgress {
+  job_id: string
+  no_do: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  percent: number
+  stage: string
+  result?: SupermanDeklarasiResult
+  error?: string
+}
+
 export interface SupermanDeklarasiResult {
   ok: boolean
   no_do: string

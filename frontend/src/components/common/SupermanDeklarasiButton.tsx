@@ -1,19 +1,31 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ExternalLink, Loader2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SupermanCaptchaDialog } from '@/components/common/SupermanCaptchaDialog'
+import { SupermanProgressDialog } from '@/components/common/SupermanProgressDialog'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
-import type { SupermanDeklarasiResult, SupermanStatus } from '@/types'
+import type {
+  SupermanDeklarasiJobStart,
+  SupermanDeklarasiProgress,
+  SupermanDeklarasiResult,
+  SupermanStatus,
+} from '@/types'
 
 interface SupermanDeklarasiButtonProps {
   noDo: string
   compact?: boolean
   disabled?: boolean
   className?: string
+}
+
+const POLL_INTERVAL_MS = 1000
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export function SupermanDeklarasiButton({
@@ -26,37 +38,75 @@ export function SupermanDeklarasiButton({
   const canEdit = useAuthStore((s) => s.canEdit)
   const [open, setOpen] = useState(false)
   const [captchaOpen, setCaptchaOpen] = useState(false)
+  const [progressOpen, setProgressOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [percent, setPercent] = useState(0)
+  const [stage, setStage] = useState('Memulai...')
+  const cancelledRef = useRef(false)
+
+  const showResult = (res: SupermanDeklarasiResult) => {
+    const parts = [
+      res.sppn_no ? `SPPn ${res.sppn_no}` : null,
+      res.sppb_no ? `SPPb ${res.sppb_no}` : null,
+    ].filter(Boolean)
+    addNotification(
+      parts.length
+        ? `Superman: ${parts.join(' + ')} masuk To Do List`
+        : res.message,
+      'success',
+    )
+    if (res.superman_url) {
+      window.open(res.superman_url, '_blank', 'noopener,noreferrer')
+    }
+    setOpen(false)
+  }
+
+  const pollJob = async (jobId: string): Promise<SupermanDeklarasiResult> => {
+    while (!cancelledRef.current) {
+      const progress = await client.get<SupermanDeklarasiProgress>(
+        `/api/superman/deklarasi/progress?job_id=${encodeURIComponent(jobId)}`,
+      )
+      setPercent(progress.percent)
+      setStage(progress.stage)
+
+      if (progress.status === 'completed' && progress.result) {
+        setPercent(100)
+        setStage('Selesai')
+        return progress.result
+      }
+      if (progress.status === 'failed') {
+        throw new Error(progress.error || 'Gagal membuat SPPn di Superman')
+      }
+      await sleep(POLL_INTERVAL_MS)
+    }
+    throw new Error('Proses dibatalkan')
+  }
 
   const runDeklarasi = async () => {
+    cancelledRef.current = false
     setLoading(true)
+    setPercent(0)
+    setStage('Memulai...')
+    setProgressOpen(true)
+    setOpen(false)
+
     try {
-      const res = await client.post<SupermanDeklarasiResult>(
-        `/api/superman/deklarasi?no_do=${encodeURIComponent(noDo)}`,
+      const start = await client.post<SupermanDeklarasiJobStart>(
+        `/api/superman/deklarasi/start?no_do=${encodeURIComponent(noDo)}`,
       )
-      const parts = [
-        res.sppn_no ? `SPPn ${res.sppn_no}` : null,
-        res.sppb_no ? `SPPb ${res.sppb_no}` : null,
-      ].filter(Boolean)
-      addNotification(
-        parts.length
-          ? `Superman: ${parts.join(' + ')} masuk To Do List`
-          : res.message,
-        'success',
-      )
-      if (res.superman_url) {
-        window.open(res.superman_url, '_blank', 'noopener,noreferrer')
-      }
-      setOpen(false)
+      const result = await pollJob(start.job_id)
+      showResult(result)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Gagal membuat SPPn di Superman'
       if (message.includes('captcha') || message.includes('Session Superman')) {
+        setProgressOpen(false)
         setCaptchaOpen(true)
         return
       }
       addNotification(message, 'error')
     } finally {
       setLoading(false)
+      setProgressOpen(false)
     }
   }
 
@@ -116,6 +166,13 @@ export function SupermanDeklarasiButton({
         open={captchaOpen}
         onOpenChange={setCaptchaOpen}
         onVerified={handleCaptchaVerified}
+      />
+
+      <SupermanProgressDialog
+        open={progressOpen}
+        noDo={noDo}
+        percent={percent}
+        stage={stage}
       />
     </>
   )

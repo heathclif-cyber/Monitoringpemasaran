@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from playwright.sync_api import Page
 
 from services.superman.config import SupermanConfig
+
+ProgressCallback = Callable[[int, str], None]
 from services.superman.payload import DeklarasiPayload, LineItem, SppbLineItem
 from services.superman.select2_helpers import (
     pick_cash_flow,
@@ -178,17 +181,27 @@ def fill_sppn_draft(
     payload: DeklarasiPayload,
     *,
     support_doc: Path | None = None,
+    on_progress: ProgressCallback | None = None,
 ) -> None:
+    def report(percent: int, stage: str) -> None:
+        if on_progress:
+            on_progress(percent, stage)
+
+    report(25, "Membuka form SPPn di Superman")
     page.goto(cfg.base_url.rstrip("/") + TAMBAH_URL, wait_until="networkidle", timeout=90000)
     _wait_loaded(page)
     combined = payload.jenis_form == "sppb_sppn"
+
+    report(35, "Mengisi informasi umum")
     _select_form(page, cfg, payload.jenis_form)
     _fill_shared_informasi(page, payload, cfg)
 
     if support_doc and support_doc.exists():
+        report(45, "Mengunggah dokumen pendukung")
         _upload_support_docs(page, support_doc, combined=combined)
 
     if combined and payload.sppb_item:
+        report(55, "Mengisi baris SPPb (PPh)")
         page.locator('a[href="#tab-isi-sppb"]').click(force=True)
         page.wait_for_timeout(1000)
         _fill_isi_sppb_block(page, 1, payload.sppb_item)
@@ -196,12 +209,16 @@ def fill_sppn_draft(
     page.locator('a[href="#tab-isi-sppn"]').click(force=True)
     page.wait_for_timeout(1000)
 
+    total_lines = max(len(payload.line_items), 1)
     for idx, item in enumerate(payload.line_items, start=1):
+        line_pct = 60 + int((idx / total_lines) * 20)
+        report(line_pct, f"Mengisi baris SPPn ({idx}/{total_lines})")
         if idx > 1:
             page.locator('button[onclick="tambah_isi_sppn()"]').click()
             page.wait_for_timeout(1200)
         _fill_isi_sppn_block(page, idx, item)
 
+    report(82, "Memvalidasi isian form")
     page.evaluate("() => { if (typeof bandingkan_dpp_sisa === 'function') bandingkan_dpp_sisa(); }")
     page.wait_for_timeout(500)
 
@@ -245,7 +262,14 @@ def _dismiss_swal_dialogs(page: Page, *, print_after: bool = False) -> None:
         page.wait_for_timeout(1000)
 
 
-def submit_sppn_draft(page: Page, *, print_after: bool = False) -> None:
+def submit_sppn_draft(
+    page: Page,
+    *,
+    print_after: bool = False,
+    on_progress: ProgressCallback | None = None,
+) -> None:
+    if on_progress:
+        on_progress(88, "Menyimpan draft ke Superman")
     simpan = page.locator("#simpan, button:has-text('Simpan')").first
     simpan.wait_for(state="visible", timeout=10000)
     page.wait_for_function(
