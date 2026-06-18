@@ -39,6 +39,7 @@ import {
 import { formatCurrency, formatNumber, formatDate, safe, cn } from '@/lib/utils'
 import type { LaporanRow } from '@/types'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { SupermanDocChecklist } from '@/components/common/SupermanDocChecklist'
 import { SupermanDeklarasiStatus } from '@/components/common/SupermanDeklarasiStatus'
 import * as XLSX from 'xlsx'
 
@@ -496,7 +497,8 @@ export default function LaporanPage() {
                     <th className={cn(TH, 'text-left min-w-[7rem]')}>SO SAP</th>
                     <th className={cn(TH, 'text-left min-w-[7rem]')}>DO SAP</th>
                     <th className={cn(TH, 'text-left min-w-[7.5rem]')}>Billing</th>
-                    <th className={cn(TH, 'text-left min-w-[12rem]')}>Status Deklarasi Superman</th>
+                    <th className={cn(TH, 'text-left min-w-[7rem]')}>Dok. Wajib</th>
+                    <th className={cn(TH, 'text-left min-w-[9rem]')}>Status Deklarasi Superman</th>
                     <th className={cn(TH, 'text-left min-w-[10rem]')}>Berita Acara</th>
                     <th className={cn(TH, 'text-center min-w-[6.5rem]')}>Aksi</th>
                   </tr>
@@ -630,12 +632,21 @@ function LaporanTableRow({
           />
         </td>
       ))}
-      <td className={cn(TD, 'min-w-[12rem]')}>
+      <td className={cn(TD, 'min-w-[7rem]')}>
+        {!isBypass && row.No_DO ? (
+          <SupermanDocChecklist
+            requirements={row.Dokumen_Superman}
+            docsReady={row.Dokumen_Superman_Siap}
+          />
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )}
+      </td>
+      <td className={cn(TD, 'min-w-[9rem]')}>
         {!isBypass && row.No_DO ? (
           <SupermanDeklarasiStatus
             noDo={row.No_DO}
             existingSuperman={row.Superman}
-            requirements={row.Dokumen_Superman}
             docsReady={row.Dokumen_Superman_Siap}
             onSuccess={onRefresh}
           />
