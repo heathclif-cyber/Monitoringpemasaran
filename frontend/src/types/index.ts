@@ -579,6 +579,32 @@ export interface User {
   is_active: boolean
 }
 
+export interface SupermanStatus {
+  configured: boolean
+  session_exists: boolean
+  session_path: string
+  base_url: string
+  headless: boolean
+}
+
+export interface SupermanDeklarasiResult {
+  ok: boolean
+  no_do: string
+  no_kontrak: string
+  jenis_form: string
+  pph_nominal: number
+  total_sppn: number
+  support_doc: string
+  superman_url: string
+  message: string
+  sppb_no?: string | null
+  sppn_no?: string | null
+  sppb_total?: number | null
+  sppn_jumlah?: number | null
+  tanggal?: string | null
+  spp_id?: number | null
+}
+
 export interface AuthState {
   token: string | null
   user: User | null

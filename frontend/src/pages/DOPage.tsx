@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { SupermanDeklarasiButton } from '@/components/common/SupermanDeklarasiButton'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { client } from '@/lib/client'
@@ -469,9 +470,12 @@ export default function DOPage() {
               {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : isExisting ? 'Simpan Perubahan' : 'Terbitkan DO'}
             </Button>
             {exportNo && (
-              <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">
-                <FileDown size={14} /> Export .docx
-              </Button>
+              <>
+                <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">
+                  <FileDown size={14} /> Export .docx
+                </Button>
+                <SupermanDeklarasiButton noDo={exportNo} />
+              </>
             )}
             <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
               <RotateCcw size={14} /> Reset

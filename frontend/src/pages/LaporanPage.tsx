@@ -39,6 +39,7 @@ import {
 import { formatCurrency, formatNumber, formatDate, safe, cn } from '@/lib/utils'
 import type { LaporanRow } from '@/types'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { SupermanDeklarasiButton } from '@/components/common/SupermanDeklarasiButton'
 import * as XLSX from 'xlsx'
 
 /** Kepadatan seimbang — antara padat & lega, nominal penuh tanpa ellipsis */
@@ -653,13 +654,16 @@ function LaporanTableRow({
             placeholder="-"
           />
           {!isBypass && (
-            <DocumentUpload
-              compact
-              entityType="do"
-              entityId={row.No_DO}
-              docType="deklarasi"
-              onUploaded={onRefresh}
-            />
+            <>
+              <SupermanDeklarasiButton noDo={row.No_DO} compact />
+              <DocumentUpload
+                compact
+                entityType="do"
+                entityId={row.No_DO}
+                docType="deklarasi"
+                onUploaded={onRefresh}
+              />
+            </>
           )}
         </div>
       </td>

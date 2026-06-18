@@ -27,3 +27,5 @@ node_modules/
 *.sql
 .env
 uploads/
+scripts/.superman_state.json
+scripts/_superman_probe/
