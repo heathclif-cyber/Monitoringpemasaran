@@ -3,7 +3,7 @@ import os
 import zipfile
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 
 import models
@@ -41,6 +41,72 @@ ENTITY_DOC_REQUIREMENTS: dict[str, list[str]] = {
     "bypass": ["deklarasi"],
     "ba": ["berita_acara"],
 }
+
+FIXED_MATERIALS = [
+    "TBS (TANDAN BUAH SEGAR)",
+    "Lump",
+    "TH BR CR 3X",
+    "TH BR CR 3X HITAM",
+    "GULA GAPOKTAN",
+    "Gula Kemasan 50 KG Milik PG",
+    "KELAPA KUPAS",
+    "KELAPA BUTIR",
+    "Kopra",
+    "SAPI PEJANTAN AFKIR",
+    "CPO",
+]
+
+
+def _collect_kontrak_materials(
+    kontrak: Optional["models.Kontrak"],
+    unit_name: Optional[str] = None,
+) -> set[str]:
+    if not kontrak:
+        return set()
+    if unit_name and kontrak.units:
+        matched = next((u for u in kontrak.units if u.nama_unit == unit_name), None)
+        if matched and matched.jenis_komoditi:
+            return {matched.jenis_komoditi}
+    values: set[str] = set()
+    if kontrak.jenis_komoditi:
+        values.add(kontrak.jenis_komoditi)
+    if kontrak.deskripsi_produk:
+        values.add(kontrak.deskripsi_produk)
+    for unit in kontrak.units or []:
+        if unit.jenis_komoditi:
+            values.add(unit.jenis_komoditi)
+    return values
+
+
+def _entity_matches_material_filter(
+    entity_type: str,
+    row,
+    materials: list[str],
+) -> bool:
+    if not materials:
+        return True
+    if entity_type == "bypass":
+        return False
+
+    filter_set = set(materials)
+    if entity_type == "kontrak":
+        return bool(_collect_kontrak_materials(row) & filter_set)
+
+    kontrak = None
+    unit_name = None
+    if entity_type == "invoice":
+        kontrak = row.kontrak
+        unit_name = row.nama_unit
+    elif entity_type == "do":
+        kontrak = row.invoice.kontrak if row.invoice else None
+        unit_name = row.kepada_unit or (row.invoice.nama_unit if row.invoice else None)
+    elif entity_type == "ba":
+        kontrak = row.kontrak
+        unit_name = row.nama_unit
+
+    if not kontrak:
+        return False
+    return bool(_collect_kontrak_materials(kontrak, unit_name) & filter_set)
 
 
 def _validate_entity(db: Session, entity_type: str, entity_id: str) -> None:
@@ -420,45 +486,100 @@ def _build_slots_from_cache(
     return slots
 
 
+@router.get("/materials", response_model=List[str])
+def list_materials(db: Session = Depends(get_db)):
+    """Daftar jenis material untuk filter upload dokumen."""
+    values: set[str] = set(FIXED_MATERIALS)
+    for (val,) in db.query(models.Kontrak.jenis_komoditi).distinct().all():
+        if val and val.strip():
+            values.add(val.strip())
+    for (val,) in db.query(models.KontrakUnit.jenis_komoditi).distinct().all():
+        if val and val.strip():
+            values.add(val.strip())
+    for (val,) in db.query(models.Kontrak.deskripsi_produk).distinct().all():
+        if val and val.strip():
+            values.add(val.strip())
+    return sorted(values)
+
+
 @router.get("/summary", response_model=List[schemas.DocumentSummaryRow])
 def document_summary(
     entity_type: str = Query(...),
     status_filter: str = Query(default="incomplete"),
+    material: List[str] = Query(default=[]),
     limit: int = Query(default=200, ge=1, le=1000),
     db: Session = Depends(get_db),
 ):
-    """Ringkasan upload per entitas. Filter: all | complete | incomplete."""
+    """Ringkasan upload per entitas. Filter: all | complete | incomplete, material (multi)."""
     entity_type = entity_type.strip().lower()
     if entity_type not in VALID_ENTITY_TYPES:
         raise HTTPException(status_code=400, detail="entity_type tidak valid")
     if status_filter not in ("all", "complete", "incomplete"):
         raise HTTPException(status_code=400, detail="status_filter tidak valid")
 
+    materials = [m.strip() for m in material if m and m.strip()]
+
+    # Ambil lebih banyak baris bila ada filter agar hasil akhir tetap mendekati limit
+    fetch_limit = min(limit * 10, 1000) if materials or status_filter != "all" else limit
+
     # --- 1. Fetch entity rows ---
     entity_rows: list[tuple[str, str | None]] = []  # (entity_id, sublabel)
     display_labels: dict[str, str] = {}
 
     if entity_type == "kontrak":
-        for row in db.query(models.Kontrak).order_by(models.Kontrak.tanggal_kontrak.desc()).limit(limit):
+        query = (
+            db.query(models.Kontrak)
+            .options(joinedload(models.Kontrak.units))
+            .order_by(models.Kontrak.tanggal_kontrak.desc())
+        )
+        for row in query.limit(fetch_limit).all():
+            if not _entity_matches_material_filter("kontrak", row, materials):
+                continue
             entity_rows.append((row.no_kontrak, row.pembeli))
             display_labels[row.no_kontrak] = row.no_kontrak
     elif entity_type == "invoice":
-        for row in db.query(models.Invoice).order_by(models.Invoice.tanggal_transaksi.desc()).limit(limit):
+        query = (
+            db.query(models.Invoice)
+            .options(joinedload(models.Invoice.kontrak).joinedload(models.Kontrak.units))
+            .order_by(models.Invoice.tanggal_transaksi.desc())
+        )
+        for row in query.limit(fetch_limit).all():
+            if not _entity_matches_material_filter("invoice", row, materials):
+                continue
             entity_rows.append((row.no_invoice, row.no_kontrak))
             display_labels[row.no_invoice] = row.no_invoice
     elif entity_type == "do":
-        for row in db.query(models.DeliveryOrder).order_by(models.DeliveryOrder.tanggal_do.desc()).limit(limit):
+        query = (
+            db.query(models.DeliveryOrder)
+            .options(
+                joinedload(models.DeliveryOrder.invoice)
+                .joinedload(models.Invoice.kontrak)
+                .joinedload(models.Kontrak.units),
+            )
+            .order_by(models.DeliveryOrder.tanggal_do.desc())
+        )
+        for row in query.limit(fetch_limit).all():
+            if not _entity_matches_material_filter("do", row, materials):
+                continue
             entity_rows.append((row.no_do, row.no_invoice))
             display_labels[row.no_do] = row.no_do
     elif entity_type == "ba":
-        for row in db.query(models.BeritaAcara).order_by(models.BeritaAcara.tanggal_ba.desc()).limit(limit):
+        query = (
+            db.query(models.BeritaAcara)
+            .options(joinedload(models.BeritaAcara.kontrak).joinedload(models.Kontrak.units))
+            .order_by(models.BeritaAcara.tanggal_ba.desc())
+        )
+        for row in query.limit(fetch_limit).all():
+            if not _entity_matches_material_filter("ba", row, materials):
+                continue
             entity_rows.append((row.no_ba, row.no_kontrak))
             display_labels[row.no_ba] = row.no_ba
     elif entity_type == "bypass":
-        for row in db.query(models.LaporanBypass).order_by(models.LaporanBypass.tanggal.desc()).limit(limit):
-            eid = str(row.id)
-            entity_rows.append((eid, f"{row.unit or '-'} · {row.komoditi or '-'}"))
-            display_labels[eid] = f"BYPASS-{eid}"
+        if not materials:
+            for row in db.query(models.LaporanBypass).order_by(models.LaporanBypass.tanggal.desc()).limit(fetch_limit):
+                eid = str(row.id)
+                entity_rows.append((eid, f"{row.unit or '-'} · {row.komoditi or '-'}"))
+                display_labels[eid] = f"BYPASS-{eid}"
 
     if not entity_rows:
         return []
@@ -502,6 +623,8 @@ def document_summary(
             missing=summary.missing,
             slots=slots,
         ))
+        if len(rows) >= limit:
+            break
 
     return rows
 

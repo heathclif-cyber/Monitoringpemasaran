@@ -10,6 +10,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DocxPreview } from '@/components/common/DocxPreview'
 import { DOC_TYPE_LABELS } from '@/components/common/DocumentUpload'
+import { MultiSelectFilter } from '@/components/common/MultiSelectFilter'
 import { cn } from '@/lib/utils'
 import type {
   DocumentCompleteness,
@@ -277,6 +278,8 @@ export default function UploadPage() {
   // --- Summary state ---
   const [summaryType, setSummaryType] = useState<SummaryEntityType>('kontrak')
   const [summaryFilter, setSummaryFilter] = useState<FilterMode>('incomplete')
+  const [summaryMaterials, setSummaryMaterials] = useState<string[]>([])
+  const [materialOptions, setMaterialOptions] = useState<string[]>([])
   const [summaryRows, setSummaryRows] = useState<DocumentSummaryRow[]>([])
   const [loadingSummary, setLoadingSummary] = useState(false)
   const [summaryExpanded, setSummaryExpanded] = useState<string | null>(null)
@@ -293,20 +296,30 @@ export default function UploadPage() {
     client.get<DocumentStatusResponse>('/api/documents/status').then(setStatus).catch(() => setStatus(null))
   }, [])
 
+  useEffect(() => {
+    client.get<string[]>('/api/documents/materials')
+      .then(setMaterialOptions)
+      .catch(() => setMaterialOptions([]))
+  }, [])
+
   // --- Load summary ---
   const loadSummary = useCallback(async () => {
     setLoadingSummary(true)
     try {
-      const data = await client.get<DocumentSummaryRow[]>(
-        `/api/documents/summary?entity_type=${encodeURIComponent(summaryType)}&status_filter=${summaryFilter}&limit=200`,
-      )
+      const params = new URLSearchParams({
+        entity_type: summaryType,
+        status_filter: summaryFilter,
+        limit: '200',
+      })
+      summaryMaterials.forEach((m) => params.append('material', m))
+      const data = await client.get<DocumentSummaryRow[]>(`/api/documents/summary?${params.toString()}`)
       setSummaryRows(data)
     } catch {
       setSummaryRows([])
     } finally {
       setLoadingSummary(false)
     }
-  }, [summaryType, summaryFilter])
+  }, [summaryType, summaryFilter, summaryMaterials])
 
   useEffect(() => {
     loadSummary()
@@ -475,31 +488,48 @@ export default function UploadPage() {
                 <CardTitle className="text-sm font-semibold">Ringkasan Upload</CardTitle>
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <NativeSelect
-                value={summaryType}
-                onChange={(e) => {
-                  setSummaryType(e.target.value as SummaryEntityType)
-                  setSummaryExpanded(null)
-                }}
-                className="h-8 w-auto text-xs flex-1"
-              >
-                {SUMMARY_ENTITY_TYPES.map((t) => (
-                  <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
-                ))}
-              </NativeSelect>
-              <NativeSelect
-                value={summaryFilter}
-                onChange={(e) => {
-                  setSummaryFilter(e.target.value as FilterMode)
-                  setSummaryExpanded(null)
-                }}
-                className="h-8 w-auto text-xs flex-1"
-              >
-                <option value="incomplete">Belum Lengkap</option>
-                <option value="all">Semua</option>
-                <option value="complete">Sudah Lengkap</option>
-              </NativeSelect>
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="flex items-center gap-2">
+                <NativeSelect
+                  value={summaryType}
+                  onChange={(e) => {
+                    setSummaryType(e.target.value as SummaryEntityType)
+                    setSummaryExpanded(null)
+                  }}
+                  className="h-8 w-auto text-xs flex-1"
+                >
+                  {SUMMARY_ENTITY_TYPES.map((t) => (
+                    <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
+                  ))}
+                </NativeSelect>
+                <NativeSelect
+                  value={summaryFilter}
+                  onChange={(e) => {
+                    setSummaryFilter(e.target.value as FilterMode)
+                    setSummaryExpanded(null)
+                  }}
+                  className="h-8 w-auto text-xs flex-1"
+                >
+                  <option value="incomplete">Belum Lengkap</option>
+                  <option value="all">Semua</option>
+                  <option value="complete">Sudah Lengkap</option>
+                </NativeSelect>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Material</Label>
+                <MultiSelectFilter
+                  label="Material"
+                  allLabel="Semua Material"
+                  options={materialOptions}
+                  selected={summaryMaterials}
+                  onChange={(materials) => {
+                    setSummaryMaterials(materials)
+                    setSummaryExpanded(null)
+                  }}
+                  className="h-8 w-full text-xs"
+                  contentWidth="w-72"
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -509,7 +539,9 @@ export default function UploadPage() {
               </div>
             ) : summaryRows.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6 px-4">
-                {summaryFilter === 'incomplete' ? 'Semua dokumen sudah lengkap 🎉' : 'Belum ada data.'}
+                {summaryFilter === 'incomplete' && summaryMaterials.length === 0
+                  ? 'Semua dokumen sudah lengkap 🎉'
+                  : 'Belum ada data untuk filter ini.'}
               </p>
             ) : (
               <div className="max-h-[70vh] overflow-y-auto">
