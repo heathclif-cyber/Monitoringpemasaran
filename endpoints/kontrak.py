@@ -361,7 +361,12 @@ def get_kontrak_trace(no_kontrak: str, db: Session = Depends(get_db)):
 
 @router.get("/{no_kontrak:path}", response_model=schemas.KontrakOut)
 def get_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
-    db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == no_kontrak).first()
+    db_kontrak = (
+        db.query(models.Kontrak)
+        .options(joinedload(models.Kontrak.units))
+        .filter(models.Kontrak.no_kontrak == no_kontrak)
+        .first()
+    )
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
     return db_kontrak

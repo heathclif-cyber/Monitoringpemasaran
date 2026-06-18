@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -28,6 +28,9 @@ import {
   isPayungBA,
   DEFAULT_SYARAT,
   DEFAULT_KETENTUAN,
+  materialOptionsForUnit,
+  syncKontrakFieldsFromUnits,
+  type UnitRow,
 } from '@/utils/kontrakUtils'
 
 const KONTRAK_STEPS: FormStep[] = [
@@ -98,10 +101,12 @@ export default function KontrakPage() {
   const [isExisting, setIsExisting] = useState(false)
   const [previewData, setPreviewData] = useState<Partial<KontrakFormData>>({})
   const [exportNo, setExportNo] = useState<string | null>(null)
-  const [unitList, setUnitList] = useState<{ nama_unit: string; volume: number; komoditi: string; jenis_komoditi: string; satuan: string; tahun_panen: string; deskripsi_produk: string }[]>([
-    { nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }
-  ])
+  const emptyUnit = (): UnitRow => ({
+    nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '',
+  })
+  const [unitList, setUnitList] = useState<UnitRow[]>([emptyUnit()])
   const [activeStep, setActiveStep] = useState(0)
+  const lastFetchedNo = useRef<string | null>(null)
 
   const form = useForm<KontrakFormData>({
     resolver: zodResolver(kontrakSchema),
@@ -215,10 +220,18 @@ export default function KontrakPage() {
           tahun_panen: u.tahun_panen || fbTahun,
           deskripsi_produk: u.deskripsi_produk || fbDeskripsi,
         })))
-      } else if (data.kebun_produsen) {
-        setUnitList([{ nama_unit: data.kebun_produsen, volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])
+      } else if (data.kebun_produsen || fbKomoditi || fbJenis) {
+        setUnitList([{
+          nama_unit: data.kebun_produsen || '',
+          volume: loadedPayung ? 0 : (data.volume || 0),
+          komoditi: fbKomoditi,
+          jenis_komoditi: fbJenis,
+          satuan: fbSatuan,
+          tahun_panen: fbTahun,
+          deskripsi_produk: fbDeskripsi,
+        }])
       } else {
-        setUnitList([{ nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])
+        setUnitList([emptyUnit()])
       }
     } else {
       setIsExisting(false)
@@ -237,12 +250,27 @@ export default function KontrakPage() {
     if (!no) {
       setIsExisting(false)
       setExportNo(null)
+      lastFetchedNo.current = null
       return
     }
-    if (store.data.some((k) => k.no_kontrak === no)) {
-      loadKontrakByNo(no)
+    if (lastFetchedNo.current === no) return
+    if (store.data.length === 0) return
+    if (!store.data.some((k) => k.no_kontrak === no)) {
+      setIsExisting(false)
+      setExportNo(null)
+      lastFetchedNo.current = null
+      return
     }
-  }, [selectedNoKontrak, store.data, loadKontrakByNo])
+    lastFetchedNo.current = no
+    loadKontrakByNo(no)
+  }, [selectedNoKontrak, store.data.length, loadKontrakByNo])
+
+  useEffect(() => {
+    const patch = syncKontrakFieldsFromUnits(unitList, payungMode)
+    for (const [key, val] of Object.entries(patch)) {
+      if (val !== undefined) setValue(key as keyof KontrakFormData, val as never)
+    }
+  }, [unitList, payungMode, setValue])
 
   // Kontrak payung: volume hanya di Berita Acara, bukan di kontrak
   useEffect(() => {
@@ -257,7 +285,8 @@ export default function KontrakPage() {
     setActiveStep(0)
     setIsExisting(false)
     setExportNo(null)
-    setUnitList([{ nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])
+    setUnitList([emptyUnit()])
+    lastFetchedNo.current = null
   }
 
   // Submit
@@ -298,6 +327,8 @@ export default function KontrakPage() {
       }
 
       await store.save(payload)
+      lastFetchedNo.current = null
+      await loadKontrakByNo(data.no_kontrak)
       setExportNo(data.no_kontrak)
       setIsExisting(true)
       addNotification('Kontrak berhasil disimpan', 'success')
@@ -317,10 +348,12 @@ export default function KontrakPage() {
   const [searchParams] = useSearchParams()
   const editNo = searchParams.get('edit')
   useEffect(() => {
-    if (editNo) {
-      setValue('no_kontrak', editNo)
-    }
-  }, [editNo, setValue])
+    if (!editNo) return
+    setValue('no_kontrak', editNo)
+    lastFetchedNo.current = editNo
+    loadKontrakByNo(editNo)
+    setActiveStep(1)
+  }, [editNo, setValue, loadKontrakByNo])
 
   // Regenerate syarat on lama/ambil change
   useEffect(() => {
@@ -389,7 +422,10 @@ export default function KontrakPage() {
                   allowCustom
                   onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
                   onValueCommit={(v) => {
-                    if (v && store.data.some((k) => k.no_kontrak === v)) loadKontrakByNo(v)
+                    if (v && store.data.some((k) => k.no_kontrak === v)) {
+                      lastFetchedNo.current = v
+                      loadKontrakByNo(v)
+                    }
                   }}
                   placeholder="Ketik baru atau pilih dari daftar"
                 />
@@ -494,17 +530,9 @@ export default function KontrakPage() {
                             className={`${sel} w-36 shrink-0`}
                           >
                             <option value="">-- Jenis Material --</option>
-                            <option>TBS (TANDAN BUAH SEGAR)</option>
-                            <option>Lump</option>
-                            <option>TH BR CR 3X</option>
-                            <option>TH BR CR 3X HITAM</option>
-                            <option>GULA GAPOKTAN</option>
-                            <option>Gula Kemasan 50 KG Milik PG</option>
-                            <option>KELAPA KUPAS</option>
-                            <option>KELAPA BUTIR</option>
-                            <option>Kopra</option>
-                            <option>SAPI PEJANTAN AFKIR</option>
-                            <option>CPO</option>
+                            {materialOptionsForUnit(unit.jenis_komoditi).map((m) => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
                           </NativeSelect>
                           <NativeSelect
                             value={unit.satuan}
@@ -605,7 +633,7 @@ export default function KontrakPage() {
                       variant="outline"
                       size="sm"
                       className="gap-1 text-xs"
-                      onClick={() => setUnitList([...unitList, { nama_unit: '', volume: 0, komoditi: '', jenis_komoditi: '', satuan: 'Kg', tahun_panen: '', deskripsi_produk: '' }])}
+                      onClick={() => setUnitList([...unitList, emptyUnit()])}
                     >
                       <Plus size={12} />
                       Tambah Unit

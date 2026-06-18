@@ -113,7 +113,7 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
             <td style={tdVal} colSpan={4}><strong>{pblNama}</strong>{alamatPbl ? <><br />{alamatPbl}</> : null}</td>
           </tr>
           <RowS label="No. Referensi" value={safe(no_reff)} />
-          {units && units.length > 0 && units.some(u => u.komoditi) ? (
+          {units && units.length > 0 && units.some(u => u.komoditi || u.jenis_komoditi) ? (
             <>
               <tr>
                 <td style={tdLbl}>Komoditi</td><td style={tdCol}>:</td>

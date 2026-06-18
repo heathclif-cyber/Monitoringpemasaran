@@ -59,3 +59,68 @@ export const DEFAULT_PEMILIK_KOMODITAS = 'PT Perkebunan Nusantara I Regional 8'
 
 export const DEFAULT_PENJUAL =
   'PT Perkebunan Nusantara I Regional 8\nJalan Urip Sumoharjo No. 72-76, Kota Makassar'
+
+export const MATERIAL_OPTIONS = [
+  'TBS (TANDAN BUAH SEGAR)',
+  'Lump',
+  'TH BR CR 3X',
+  'TH BR CR 3X HITAM',
+  'GULA GAPOKTAN',
+  'Gula Kemasan 50 KG Milik PG',
+  'KELAPA KUPAS',
+  'KELAPA BUTIR',
+  'Kopra',
+  'SAPI PEJANTAN AFKIR',
+  'CPO',
+] as const
+
+export type UnitRow = {
+  nama_unit: string
+  volume: number
+  komoditi: string
+  jenis_komoditi: string
+  satuan: string
+  tahun_panen: string
+  deskripsi_produk: string
+}
+
+export function materialOptionsForUnit(jenisKomoditi: string, extra: string[] = []): string[] {
+  const merged = new Set<string>([...MATERIAL_OPTIONS, ...extra])
+  if (jenisKomoditi?.trim()) merged.add(jenisKomoditi.trim())
+  return [...merged].sort((a, b) => a.localeCompare(b, 'id'))
+}
+
+export function syncKontrakFieldsFromUnits(
+  units: UnitRow[],
+  payungMode: boolean,
+): Partial<{
+  komoditi: string
+  jenis_komoditi: string
+  satuan: string
+  tahun_panen: string
+  deskripsi_produk: string
+  volume: number
+  kebun_produsen: string
+}> {
+  const valid = units.filter((u) => u.nama_unit.trim())
+  if (valid.length === 0) return {}
+
+  const first = valid[0]
+  const patch: ReturnType<typeof syncKontrakFieldsFromUnits> = {}
+
+  if (first.komoditi) patch.komoditi = first.komoditi
+  if (first.jenis_komoditi) patch.jenis_komoditi = first.jenis_komoditi
+  if (first.satuan) patch.satuan = first.satuan
+  if (first.tahun_panen) patch.tahun_panen = first.tahun_panen
+  if (first.deskripsi_produk) patch.deskripsi_produk = first.deskripsi_produk
+  patch.kebun_produsen = valid.map((u) => u.nama_unit).join(', ')
+
+  if (!payungMode) {
+    const withVol = valid.filter((u) => (u.volume || 0) > 0)
+    if (withVol.length > 0 && withVol.length === valid.length) {
+      patch.volume = withVol.reduce((s, u) => s + (u.volume || 0), 0)
+    }
+  }
+
+  return patch
+}
