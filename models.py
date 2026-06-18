@@ -205,3 +205,19 @@ class DocumentUpload(Base):
     storage_path = Column(String, nullable=True)
     web_url = Column(String, nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class StokLedger(Base):
+    __tablename__ = "stok_ledger"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    tanggal = Column(Date, nullable=False, index=True)
+    unit = Column(String, nullable=False, index=True)
+    jenis_material = Column(String, nullable=False, index=True)
+    volume = Column(Float, nullable=False, default=0.0)
+    satuan = Column(String, nullable=False, default="Kg")
+    arah = Column(String, nullable=False)  # MASUK | KELUAR
+    sumber = Column(String, nullable=False, default="manual")  # manual | do
+    referensi_id = Column(String, nullable=True, index=True)
+    catatan = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

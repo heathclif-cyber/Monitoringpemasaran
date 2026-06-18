@@ -40,6 +40,11 @@ const PAGE_META: Record<string, PageMeta> = {
     description: 'Unggah kontrak, invoice, DO, deklarasi, dan berita acara',
     breadcrumb: 'Dokumen / Upload',
   },
+  '/stok': {
+    title: 'Input Stok',
+    description: 'Catat stok masuk per tanggal; penjualan DO mengurangi saldo otomatis',
+    breadcrumb: 'Operasional / Stok',
+  },
   '/repo/kontrak': {
     title: 'Arsip Kontrak',
     description: 'Kelola dan unduh dokumen kontrak tersimpan',

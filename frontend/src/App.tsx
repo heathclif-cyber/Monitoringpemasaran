@@ -19,6 +19,7 @@ const RepoInvoice = lazy(() => import('@/pages/RepoInvoice'))
 const RepoDO = lazy(() => import('@/pages/RepoDO'))
 const TraceKontrak = lazy(() => import('@/pages/TraceKontrak'))
 const UploadPage = lazy(() => import('@/pages/UploadPage'))
+const StokPage = lazy(() => import('@/pages/StokPage'))
 const UsersPage = lazy(() => import('@/pages/UsersPage'))
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/bypass" element={<BypassPage />} />
             <Route path="/berita-acara" element={<BAPage />} />
             <Route path="/upload" element={<UploadPage />} />
+            <Route path="/stok" element={<StokPage />} />
             <Route path="/repo/kontrak" element={<RepoKontrak />} />
             <Route path="/repo/invoice" element={<RepoInvoice />} />
             <Route path="/repo/do" element={<RepoDO />} />

@@ -260,3 +260,46 @@ class DocumentSummaryRow(BaseModel):
 
 
 DocumentCompletenessOut.model_rebuild()
+
+
+# --- Stok ---
+class StokLedgerCreate(BaseModel):
+    tanggal: date
+    unit: str
+    jenis_material: str
+    volume: float
+    satuan: str = "Kg"
+    catatan: Optional[str] = None
+
+
+class StokLedgerUpdate(BaseModel):
+    tanggal: Optional[date] = None
+    unit: Optional[str] = None
+    jenis_material: Optional[str] = None
+    volume: Optional[float] = None
+    satuan: Optional[str] = None
+    catatan: Optional[str] = None
+
+
+class StokLedgerOut(BaseModel):
+    id: int
+    tanggal: date
+    unit: str
+    jenis_material: str
+    volume: float
+    satuan: str
+    arah: str
+    sumber: str
+    referensi_id: Optional[str] = None
+    catatan: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class StokSaldoOut(BaseModel):
+    unit: str
+    jenis_material: str
+    satuan: str
+    saldo: float

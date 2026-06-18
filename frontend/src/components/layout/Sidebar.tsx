@@ -13,6 +13,7 @@ import {
   PanelLeft,
   CloudUpload,
   ClipboardList,
+  Boxes,
   Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,7 @@ const navItems: NavItemDef[] = [
   { label: 'Delivery Order', to: '/delivery-order', icon: <Truck size={16} /> },
   { label: 'Berita Acara', to: '/berita-acara', icon: <ClipboardList size={16} /> },
   { label: 'Upload Dokumen', to: '/upload', icon: <CloudUpload size={16} /> },
+  { label: 'Input Stok', to: '/stok', icon: <Boxes size={16} /> },
   { label: 'Laporan Digital', to: '/laporan', icon: <Table size={16} /> },
   { label: 'Input Bypass', to: '/bypass', icon: <Zap size={16} /> },
   {

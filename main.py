@@ -21,6 +21,7 @@ from api.r_dashboard import router as dashboard_router
 from api.r_laporan import router as laporan_router
 from api.r_documents import router as documents_router
 from api.r_ba import router as ba_router
+from api.r_stok import router as stok_router
 from api.r_auth import router as auth_router
 from api.r_users import router as users_router
 
@@ -84,6 +85,7 @@ app.include_router(dashboard_router)
 app.include_router(laporan_router)
 app.include_router(documents_router)
 app.include_router(ba_router)
+app.include_router(stok_router)
 
 
 # --- Root Page: serve React SPA or fallback to Jinja2 ---

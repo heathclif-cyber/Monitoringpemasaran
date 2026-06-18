@@ -17,7 +17,9 @@ import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import { formatCurrency } from '@/lib/utils'
+import { client } from '@/lib/client'
+import { cn, formatCurrency } from '@/lib/utils'
+import type { StokSaldo } from '@/types'
 import { calculateProportionalVolume, calculateSelisih, getVolumePercentage } from '@/utils/doUtils'
 import type { Kontrak } from '@/types'
 
@@ -151,6 +153,9 @@ export default function DOPage() {
   const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors, isSubmitting } } = form
   const selectedInvoice = watch('no_invoice')
   const nominalTransfer = watch('nominal_transfer')
+  const kepadaUnit = watch('kepada_unit')
+  const noDo = watch('no_do')
+  const [stokSaldo, setStokSaldo] = useState<StokSaldo | null>(null)
 
   useEffect(() => {
     invoiceStore.fetch()
@@ -227,6 +232,32 @@ export default function DOPage() {
     : calculateProportionalVolume(Number(nominalTransfer) || 0, nilaiUnitPenuh, kontrakVolume)
   const selisih = calculateSelisih(invoiceTotal, Number(nominalTransfer) || 0)
   const volumePct = getVolumePercentage(volumeDo, kontrakVolume)
+
+  const stokUnit = kepadaUnit || currentInvoice?.nama_unit || ''
+  const stokMaterial =
+    unitForDO?.jenis_komoditi ||
+    currentKontrak?.jenis_komoditi ||
+    currentKontrak?.deskripsi_produk ||
+    ''
+  const stokSatuan = unitForDO?.satuan || currentKontrak?.satuan || 'Kg'
+  const stokKurang = stokSaldo != null && volumeDo > 0 && stokSaldo.saldo < volumeDo
+
+  useEffect(() => {
+    if (!stokUnit || !stokMaterial) {
+      setStokSaldo(null)
+      return
+    }
+    const params = new URLSearchParams({
+      unit: stokUnit,
+      jenis_material: stokMaterial,
+      satuan: stokSatuan,
+    })
+    if (isExisting && noDo) params.set('exclude_referensi_id', noDo)
+    client
+      .get<StokSaldo>(`/api/stok/saldo/detail?${params.toString()}`)
+      .then(setStokSaldo)
+      .catch(() => setStokSaldo(null))
+  }, [stokUnit, stokMaterial, stokSatuan, isExisting, noDo, volumeDo])
 
   const onSubmit = async (data: DOFormData) => {
     try {
@@ -367,6 +398,12 @@ export default function DOPage() {
                   {volumePct > 0 && ` (${Math.round(volumePct)}%)`}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">Selisih: {formatCurrency(selisih)}</p>
+                {stokUnit && stokMaterial && (
+                  <p className={cn('text-xs mt-2', stokKurang ? 'text-red-600 font-medium' : 'text-slate-600')}>
+                    Stok tersedia: {stokSaldo != null ? `${formatCurrency(stokSaldo.saldo)} ${stokSatuan}` : '—'}
+                    {stokKurang && ' — tidak cukup untuk DO ini'}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

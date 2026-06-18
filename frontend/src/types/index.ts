@@ -528,6 +528,40 @@ export interface KontrakTrace {
 }
 
 // ============================================================
+// Stok
+// ============================================================
+
+export interface StokLedgerEntry {
+  id: number
+  tanggal: string
+  unit: string
+  jenis_material: string
+  volume: number
+  satuan: string
+  arah: 'MASUK' | 'KELUAR'
+  sumber: 'manual' | 'do'
+  referensi_id: string | null
+  catatan: string | null
+  created_at: string | null
+}
+
+export interface StokSaldo {
+  unit: string
+  jenis_material: string
+  satuan: string
+  saldo: number
+}
+
+export interface StokInput {
+  tanggal: string
+  unit: string
+  jenis_material: string
+  volume: number
+  satuan: string
+  catatan?: string
+}
+
+// ============================================================
 // Auth
 // ============================================================
 

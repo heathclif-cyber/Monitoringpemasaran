@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse, HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 import mammoth
 
@@ -10,6 +10,12 @@ from database import get_db
 from services.auth import require_write
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba, get_ba_for_entity
+from services.stok_utils import (
+    record_stok_keluar_do,
+    resolve_do_stock_context,
+    reverse_stok_do,
+    validate_stok_cukup,
+)
 
 router = APIRouter(prefix="/api/do", tags=["Delivery Order"])
 
@@ -20,8 +26,13 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Get kontrak for volume calculation
-    db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == db_invoice.no_kontrak).first()
+    # Get kontrak for volume calculation (eager-load units for stok material)
+    db_kontrak = (
+        db.query(models.Kontrak)
+        .options(joinedload(models.Kontrak.units))
+        .filter(models.Kontrak.no_kontrak == db_invoice.no_kontrak)
+        .first()
+    )
     kontrak_volume = float(db_kontrak.volume or 0) if db_kontrak else 0
     invoice_total = float(db_invoice.jumlah_pembayaran or 0)
     nominal = float(do.nominal_transfer or 0)
@@ -78,21 +89,35 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
             setattr(db_do, key, value)
         db_do.selisih = selisih
         db_do.volume_do = round(volume_do)
-        db.commit()
-        api_cache.invalidate_reporting()
-        db.refresh(db_do)
-        return db_do
+        saved_do = db_do
     else:
-        new_do = models.DeliveryOrder(
+        saved_do = models.DeliveryOrder(
             **do_payload,
             selisih=selisih,
-            volume_do=round(volume_do)
+            volume_do=round(volume_do),
         )
-        db.add(new_do)
-        db.commit()
-        api_cache.invalidate_reporting()
-        db.refresh(new_do)
-        return new_do
+        db.add(saved_do)
+
+    ctx = resolve_do_stock_context(saved_do, db_invoice, db_kontrak)
+    if not ctx["jenis_material"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Material tidak ditemukan di kontrak — tidak bisa mengurangi stok",
+        )
+    if not ctx["unit"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Unit tidak ditemukan — isi Kepada Unit atau nama unit di invoice",
+        )
+
+    reverse_stok_do(db, do.no_do)
+    validate_stok_cukup(db, ctx)
+    record_stok_keluar_do(db, saved_do, ctx)
+
+    db.commit()
+    api_cache.invalidate_reporting()
+    db.refresh(saved_do)
+    return saved_do
 
 
 @router.get("", response_model=List[schemas.DeliveryOrderOut])
@@ -139,6 +164,7 @@ def delete_do(no_do: str, db: Session = Depends(get_db), _: models.User = Depend
     if not db_do:
         raise HTTPException(status_code=404, detail="DO not found")
     
+    reverse_stok_do(db, no_do)
     db.delete(db_do)
     db.commit()
     api_cache.invalidate_reporting()
