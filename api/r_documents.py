@@ -795,25 +795,30 @@ def _bundle_number_name(entity_id: str) -> str:
     )
 
 
+# Prefix nama file di bundle — None = nomor dokumen saja
+BUNDLE_FILE_PREFIX: dict[str, str | None] = {
+    "kontrak": None,
+    "invoice": None,
+    "kuitansi": "Kuitansi",
+    "do": None,
+    "deklarasi": "Deklarasi",
+    "berita_acara": "Berita-Acara",
+}
+
+
 def _flat_bundle_arcname(
-    entity_type: str,
     entity_id: str,
     doc_type: str,
     file_name: str,
     used_names: set[str],
 ) -> str:
-    """Nama file = nomor dokumen (+ suffix jenis jika satu entitas punya >1 dokumen)."""
+    """Nama file bundle: nomor dokumen, atau Prefix-Nomor untuk jenis selain utama."""
     _, ext = os.path.splitext(file_name)
     ext = ext or ""
 
     base = _bundle_number_name(entity_id)
-    required = ENTITY_DOC_REQUIREMENTS.get(entity_type, [])
-    primary_doc = required[0] if required else doc_type
-
-    if len(required) <= 1 or doc_type == primary_doc:
-        stem = base
-    else:
-        stem = f"{base}-{doc_type.replace('_', '-')}"
+    prefix = BUNDLE_FILE_PREFIX.get(doc_type)
+    stem = f"{prefix}-{base}" if prefix else base
 
     candidate = f"{stem}{ext}"
     if candidate not in used_names:
@@ -896,7 +901,7 @@ def bundle_kontrak(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
                 try:
                     file_path = get_file_path(rec.storage_path)
                     arcname = _flat_bundle_arcname(
-                        entity_type, entity_id, rec.doc_type, rec.file_name, used_arcnames,
+                        entity_id, rec.doc_type, rec.file_name, used_arcnames,
                     )
                     zf.write(file_path, arcname)
                     total_files += 1
