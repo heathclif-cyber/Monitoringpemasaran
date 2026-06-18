@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { client } from '@/lib/client'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import type { StokSaldo } from '@/types'
 import { calculateProportionalVolume, calculateSelisih, getVolumePercentage } from '@/utils/doUtils'
 import type { Kontrak } from '@/types'
@@ -394,13 +394,13 @@ export default function DOPage() {
                 <p className={`text-lg font-bold mt-1 ${
                   volumePct > 100 ? 'text-red-600' : volumePct > 0 ? 'text-green-600' : 'text-blue-600'
                 }`}>
-                  {formatCurrency(volumeDo)} {currentKontrak?.satuan || ''}
+                  {formatNumber(volumeDo)} {currentKontrak?.satuan || ''}
                   {volumePct > 0 && ` (${Math.round(volumePct)}%)`}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">Selisih: {formatCurrency(selisih)}</p>
                 {stokUnit && stokMaterial && (
                   <p className={cn('text-xs mt-2', stokKurang ? 'text-red-600 font-medium' : 'text-slate-600')}>
-                    Stok tersedia: {stokSaldo != null ? `${formatCurrency(stokSaldo.saldo)} ${stokSatuan}` : '—'}
+                    Stok tersedia: {stokSaldo != null ? `${formatNumber(stokSaldo.saldo)} ${stokSatuan}` : '—'}
                     {stokKurang && ' — tidak cukup untuk DO ini'}
                   </p>
                 )}

@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatNumber } from '@/lib/utils'
 import type { StokLedgerEntry } from '@/types'
 
 const stokSchema = z.object({
@@ -219,7 +219,7 @@ export default function StokPage() {
                       <p className="text-xs text-muted-foreground truncate">{s.unit}</p>
                       <p className="text-sm font-medium truncate">{s.jenis_material}</p>
                       <p className={cn('text-lg font-bold mt-0.5', s.saldo <= 0 ? 'text-red-600' : 'text-emerald-700')}>
-                        {formatCurrency(s.saldo)} <span className="text-xs font-normal text-muted-foreground">{s.satuan}</span>
+                        {formatNumber(s.saldo)} <span className="text-xs font-normal text-muted-foreground">{s.satuan}</span>
                       </p>
                     </div>
                   ))}
@@ -255,7 +255,7 @@ export default function StokPage() {
                           <td className="py-2 px-2">{e.unit}</td>
                           <td className="py-2 px-2 hidden md:table-cell max-w-[140px] truncate">{e.jenis_material}</td>
                           <td className="py-2 px-2 text-right font-medium">
-                            {formatCurrency(e.volume)} {e.satuan}
+                            {formatNumber(e.volume)} {e.satuan}
                           </td>
                           <td className="py-2 px-2 text-center">
                             <Badge
