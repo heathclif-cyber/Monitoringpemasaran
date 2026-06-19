@@ -31,7 +31,8 @@ import {
   filterLaporanRows,
   calculateLaporanSummary,
   createDefaultLaporanFilters,
-  getDefaultLaporanMonthKeys,
+  createInitialLaporanFilters,
+  getInitialLaporanMonthKeys,
   MONTH_OPTIONS,
   MONTH_LABELS,
   type LaporanFilters,
@@ -73,7 +74,7 @@ function FilterField({ label, children, className }: { label: string; children: 
 export default function LaporanPage() {
   const { rows, isLoading, fetch, updateSapField, deleteBypass } = useLaporanStore()
   const { addNotification } = useAppStore()
-  const [filters, setFilters] = useState<LaporanFilters>(createDefaultLaporanFilters)
+  const [filters, setFilters] = useState<LaporanFilters>(createInitialLaporanFilters)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -443,9 +444,9 @@ export default function LaporanPage() {
           )}
 
           <p className="text-xs text-muted-foreground">
-            Default: bulan berjalan dan 1 bulan sebelumnya (
-            {getDefaultLaporanMonthKeys().map((m) => MONTH_LABELS[m]).join(', ')}
-            ). Kosongkan filter bulan untuk melihat semua periode.
+            Saat buka halaman: filter bulan berjalan (
+            {getInitialLaporanMonthKeys().map((m) => MONTH_LABELS[m]).join(', ')}
+            ). Reset filter menampilkan semua bulan tanpa batas.
           </p>
         </CardContent>
       </Card>

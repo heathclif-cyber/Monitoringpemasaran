@@ -15,11 +15,14 @@ export function getPreviousMonthKey(): string {
   return String(d.getMonth() + 1).padStart(2, '0')
 }
 
-/** Default filter laporan: bulan berjalan + 1 bulan sebelumnya */
+/** Filter bulan saat halaman pertama dibuka: bulan berjalan saja */
+export function getInitialLaporanMonthKeys(): string[] {
+  return [getCurrentMonthKey()]
+}
+
+/** @deprecated Gunakan getInitialLaporanMonthKeys() */
 export function getDefaultLaporanMonthKeys(): string[] {
-  const current = getCurrentMonthKey()
-  const previous = getPreviousMonthKey()
-  return previous === current ? [current] : [previous, current]
+  return getInitialLaporanMonthKeys()
 }
 
 function extractMonthKey(row: LaporanRow, mode: 'TRANSFER' | 'RENCANA'): string {
@@ -171,13 +174,14 @@ export interface LaporanFilters {
   search: string
 }
 
+/** State reset filter — semua bulan (tanpa filter bulan) */
 export function createDefaultLaporanFilters(): LaporanFilters {
   return {
     unit: [],
     pembeli: [],
     komoditi: [],
     jenisKomoditi: [],
-    months: getDefaultLaporanMonthKeys(),
+    months: [],
     modeTanggal: 'TRANSFER',
     sort: 'DESC',
     tipe: 'ALL',
@@ -187,5 +191,13 @@ export function createDefaultLaporanFilters(): LaporanFilters {
   }
 }
 
-/** @deprecated Use createDefaultLaporanFilters() agar bulan default selalu terbaru */
-export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = createDefaultLaporanFilters()
+/** State awal halaman — bulan berjalan + filter lain default */
+export function createInitialLaporanFilters(): LaporanFilters {
+  return {
+    ...createDefaultLaporanFilters(),
+    months: getInitialLaporanMonthKeys(),
+  }
+}
+
+/** @deprecated Use createInitialLaporanFilters() atau createDefaultLaporanFilters() */
+export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = createInitialLaporanFilters()
