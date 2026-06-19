@@ -112,11 +112,10 @@ def _resolve_upload(
 
 
 def _standar_support_sources(kontrak_id: str, no_do: str) -> list[tuple[str, str, str, str]]:
-    """Sumber dokumen pendukung kontrak standar — dicoba berurutan."""
+    """Sumber dokumen pendukung kontrak standar — cukup salah satu (bukan deklarasi SPPn)."""
     return [
         ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
         ("do", no_do, "berita_acara", "Berita Acara (DO)"),
-        ("do", no_do, "deklarasi", "Deklarasi Penerimaan (DO)"),
     ]
 
 
@@ -269,43 +268,45 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
     do_ba_ok, do_ba_name = _upload_status(
         db, entity_type="do", entity_id=no_do, doc_type="berita_acara"
     )
-    do_dek_ok, do_dek_name = _upload_status(
-        db, entity_type="do", entity_id=no_do, doc_type="deklarasi"
-    )
-    any_uploaded = kontrak_ok or do_ba_ok or do_dek_ok
+    any_uploaded = kontrak_ok or do_ba_ok
 
-    requirements.append(
-        {
-            "label": "Dokumen Kontrak",
-            "entity_type": "kontrak",
-            "entity_id": kontrak_id,
-            "doc_type": "kontrak",
-            "uploaded": kontrak_ok,
-            "file_name": kontrak_name,
-            "upload_hint": f"Upload di menu Upload Dokumen → Kontrak → {kontrak_id}",
-        }
-    )
-    requirements.append(
-        {
-            "label": "BA DO (alternatif)",
-            "entity_type": "do",
-            "entity_id": no_do,
-            "doc_type": "berita_acara",
-            "uploaded": do_ba_ok,
-            "file_name": do_ba_name,
-            "upload_hint": f"Upload di menu Upload Dokumen → DO → {no_do} (Berita Acara)",
-        }
-    )
-    if not kontrak_ok and not do_ba_ok:
+    if kontrak_ok:
         requirements.append(
             {
-                "label": "Deklarasi DO (alternatif)",
+                "label": "Dokumen Kontrak",
+                "entity_type": "kontrak",
+                "entity_id": kontrak_id,
+                "doc_type": "kontrak",
+                "uploaded": True,
+                "file_name": kontrak_name,
+                "upload_hint": f"Kontrak {kontrak_id}",
+            }
+        )
+    elif do_ba_ok:
+        requirements.append(
+            {
+                "label": "Berita Acara (DO)",
                 "entity_type": "do",
                 "entity_id": no_do,
-                "doc_type": "deklarasi",
-                "uploaded": do_dek_ok,
-                "file_name": do_dek_name,
-                "upload_hint": f"Upload di menu Upload Dokumen → DO → {no_do} (Deklarasi)",
+                "doc_type": "berita_acara",
+                "uploaded": True,
+                "file_name": do_ba_name,
+                "upload_hint": f"BA serah terima DO {no_do}",
+            }
+        )
+    else:
+        requirements.append(
+            {
+                "label": "Dokumen Pendukung",
+                "entity_type": "kontrak",
+                "entity_id": kontrak_id,
+                "doc_type": "kontrak",
+                "uploaded": False,
+                "file_name": None,
+                "upload_hint": (
+                    f"Upload salah satu: Kontrak ({kontrak_id}) atau Berita Acara DO ({no_do}). "
+                    "Deklarasi SPPn/SPPb dibuat otomatis oleh Superman — tidak perlu di-upload dulu."
+                ),
             }
         )
     return requirements, any_uploaded

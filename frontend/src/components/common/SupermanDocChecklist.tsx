@@ -13,8 +13,6 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
     return <span className="text-muted-foreground">-</span>
   }
 
-  const uploaded = requirements.filter((r) => r.uploaded).length
-
   return (
     <div className="min-w-[7rem] space-y-1">
       <span
@@ -25,7 +23,7 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
             : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
         )}
       >
-        {uploaded}/{requirements.length}
+        {docsReady ? 'Siap' : 'Belum'}
       </span>
       <ul className="space-y-0.5">
         {requirements.map((req) => (
@@ -42,10 +40,10 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
             <span className={cn(!req.uploaded && 'text-amber-800 dark:text-amber-300')}>
               {req.label === 'Dokumen Kontrak'
                 ? 'Kontrak'
-                : req.label === 'BA DO (alternatif)'
+                : req.label === 'Berita Acara (DO)'
                   ? 'BA DO'
-                  : req.label === 'Deklarasi DO (alternatif)'
-                    ? 'Deklarasi'
+                  : req.label === 'Dokumen Pendukung'
+                    ? 'Kontrak/BA'
                     : req.label}
             </span>
           </li>
