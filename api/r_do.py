@@ -91,23 +91,24 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     # Calculate selisih — sisa dari invoice yang belum ditransfer
     selisih = invoice_total - nominal
 
-    do_payload = do.model_dump()
+    do_payload = do.model_dump(exclude={"volume_do"})
     if payung_ba and db_ba:
         do_payload["no_ba"] = db_ba.no_ba
         do_payload["rencana_pengambilan"] = db_ba.tanggal_ba
 
+    rounded_volume = round(volume_do)
     db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == do.no_do).first()
     if db_do:
         for key, value in do_payload.items():
             setattr(db_do, key, value)
         db_do.selisih = selisih
-        db_do.volume_do = round(volume_do)
+        db_do.volume_do = rounded_volume
         saved_do = db_do
     else:
         saved_do = models.DeliveryOrder(
             **do_payload,
             selisih=selisih,
-            volume_do=round(volume_do),
+            volume_do=rounded_volume,
         )
         db.add(saved_do)
 
