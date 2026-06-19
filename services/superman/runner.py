@@ -171,8 +171,14 @@ def _score_todo_row(
     return score
 
 
-_SPPN_NO_RE = re.compile(r"(R\d+/R\d+D/SPPn/[^\s\"'<>]+)", re.I)
-_SPPB_NO_RE = re.compile(r"(R\d+/R\d+D/SPPb/[^\s\"'<>]+)", re.I)
+_SPPN_NO_RE = re.compile(
+    r"((?:R\d+/R\d+D/SPPn/|\d+(?:\.\d+)?/SPPn/)[^\s\"'<>]+)",
+    re.I,
+)
+_SPPB_NO_RE = re.compile(
+    r"((?:R\d+/R\d+D/SPPb/|\d+(?:\.\d+)?/SPP[BG]/)[^\s\"'<>]+)",
+    re.I,
+)
 
 
 def _extract_numbers_from_blob(text: str) -> tuple[str | None, str | None]:
@@ -239,8 +245,8 @@ def _extract_numbers_from_store(body: Any) -> tuple[str | None, str | None]:
                         continue
                     if key_l in {"sppb_no", "no_sppb", "nomor_sppb"}:
                         sppb_no = text
-                    elif key_l in {"sppn_no", "no_sppn", "nomor_sppn", "nomor"}:
-                        if "sppn" in text.lower() or key_l != "nomor":
+                    elif key_l in {"sppn_no", "no_sppn", "nomor_sppn", "nomor", "no_spp"}:
+                        if "sppn" in text.lower() or key_l != "nomor" or "/sppn/" in text.lower():
                             sppn_no = text
                 child_sppb, child_sppn = walk(value)
                 sppb_no = sppb_no or child_sppb
@@ -261,8 +267,8 @@ def _extract_numbers_from_store(body: Any) -> tuple[str | None, str | None]:
         except json.JSONDecodeError:
             import re
 
-            sppn_m = re.search(r"(R\d+/R\d+D/SPPn/[^\s\"']+)", text, re.I)
-            sppb_m = re.search(r"(R\d+/R\d+D/SPPb/[^\s\"']+)", text, re.I)
+            sppn_m = _SPPN_NO_RE.search(text)
+            sppb_m = _SPPB_NO_RE.search(text)
             return (
                 sppb_m.group(1) if sppb_m else None,
                 sppn_m.group(1) if sppn_m else None,

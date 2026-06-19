@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { SupermanDeklarasiButton } from '@/components/common/SupermanDeklarasiButton'
 import { supermanLabelFromResult } from '@/store/laporanStore'
@@ -17,15 +17,32 @@ export function SupermanDeklarasiStatus({
   docsReady = false,
   onSuccess,
 }: SupermanDeklarasiStatusProps) {
+  const pendingLabelRef = useRef<string | null>(null)
   const [savedLabel, setSavedLabel] = useState(() => (existingSuperman || '').trim())
 
   useEffect(() => {
+    pendingLabelRef.current = null
     setSavedLabel((existingSuperman || '').trim())
-  }, [existingSuperman, noDo])
+  }, [noDo])
+
+  useEffect(() => {
+    const fromProp = (existingSuperman || '').trim()
+    if (fromProp) {
+      pendingLabelRef.current = null
+      setSavedLabel(fromProp)
+      return
+    }
+    if (!pendingLabelRef.current) {
+      setSavedLabel('')
+    }
+  }, [existingSuperman])
 
   const handleSuccess = async (result: SupermanDeklarasiResult) => {
     const label = supermanLabelFromResult(result)
-    if (label) setSavedLabel(label)
+    if (label) {
+      pendingLabelRef.current = label
+      setSavedLabel(label)
+    }
     await onSuccess?.(result)
   }
 

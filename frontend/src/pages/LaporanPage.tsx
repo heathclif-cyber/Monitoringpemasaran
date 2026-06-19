@@ -210,10 +210,13 @@ export default function LaporanPage() {
       try {
         await updateSapField(noDo, 'Superman', label)
       } catch {
-        // Backend mungkin sudah menyimpan; refresh tetap dijalankan
+        // Backend mungkin sudah menyimpan; patch lokal tetap dipertahankan
       }
     }
     await fetch({ fresh: true, silent: true })
+    if (label) {
+      patchRow(noDo, { Superman: label })
+    }
   }, [fetch, patchRow, updateSapField])
 
   const handleSapSave = async (noDo: string, field: string, value: string) => {
@@ -748,6 +751,7 @@ function LaporanTableRow({
       <td className={cn(TD, 'min-w-[9rem]')}>
         {!isBypass && row.No_DO ? (
           <SupermanDeklarasiStatus
+            key={`${row.No_DO}-superman-status-${row.Superman || ''}`}
             noDo={row.No_DO}
             existingSuperman={row.Superman}
             docsReady={row.Dokumen_Superman_Siap}
