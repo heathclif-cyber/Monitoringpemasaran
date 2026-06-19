@@ -49,6 +49,14 @@ const TD = 'px-3 py-2 text-[13px] align-middle leading-normal'
 const TD_MONEY = 'px-3 py-2 text-[13px] text-right whitespace-nowrap tabular-nums min-w-[10.5rem] align-middle'
 const TD_INPUT = 'w-full min-w-[6.5rem] h-8 text-[13px] border border-border/60 hover:border-border rounded-md px-2.5 py-1.5 bg-background text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring/30'
 
+/** Kolom identitas dibekukan saat scroll horizontal (DO + Invoice + Kontrak) */
+const STICKY_LEFT_DO = 'left-0'
+const STICKY_LEFT_INV = 'left-[12rem]'
+const STICKY_LEFT_KONTRAK = 'left-[23rem]'
+const STICKY_SHADOW = 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]'
+const STICKY_TH = 'sticky z-30 bg-muted/90 backdrop-blur-sm'
+const STICKY_TD = 'sticky z-10 bg-card'
+
 function FilterField({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn('space-y-1.5 min-w-0', className)}>
@@ -466,11 +474,11 @@ export default function LaporanPage() {
           ) : (
             <div className="overflow-auto max-h-[76vh]">
               <table className="text-[13px] border-separate border-spacing-0 w-full" style={{ minWidth: '4300px' }}>
-                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-muted/90 [&_th]:backdrop-blur-sm [&_th]:border-b [&_th]:border-border [&_th:first-child]:left-0 [&_th:first-child]:z-30 [&_th]:text-muted-foreground">
+                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-muted/90 [&_th]:backdrop-blur-sm [&_th]:border-b [&_th]:border-border [&_th]:text-muted-foreground">
                   <tr>
-                    <th className={cn(TH, 'text-left min-w-[12rem] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]')}>No. DO</th>
-                    <th className={cn(TH, 'text-left min-w-[11rem]')}>No Invoice</th>
-                    <th className={cn(TH, 'text-left min-w-[13rem]')}>No Kontrak</th>
+                    <th className={cn(TH, STICKY_TH, STICKY_LEFT_DO, 'text-left min-w-[12rem]')}>No. DO</th>
+                    <th className={cn(TH, STICKY_TH, STICKY_LEFT_INV, 'text-left min-w-[11rem]')}>No Invoice</th>
+                    <th className={cn(TH, STICKY_TH, STICKY_LEFT_KONTRAK, STICKY_SHADOW, 'text-left min-w-[13rem]')}>No Kontrak</th>
                     <th className={cn(TH, 'text-left min-w-[8rem]')}>Unit</th>
                     <th className={cn(TH, 'text-left min-w-[7.5rem]')}>Komoditi</th>
                     <th className={cn(TH, 'text-center min-w-[4.5rem]')}>Satuan</th>
@@ -565,18 +573,37 @@ function LaporanTableRow({
   const canEdit = useAuthStore((s) => s.canEdit)
   return (
     <tr className={cn(
-      'transition-colors',
+      'group transition-colors',
       isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'hover:bg-muted/50',
     )}>
       <td className={cn(
         TD,
-        'font-medium min-w-[12rem] whitespace-normal break-words sticky left-0 z-10 bg-card shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]',
-        isBypass && 'bg-amber-500/10 dark:bg-amber-500/15',
+        STICKY_TD,
+        STICKY_LEFT_DO,
+        'font-medium min-w-[12rem] whitespace-normal break-words',
+        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'group-hover:bg-muted/50',
       )}>
         {row.No_DO}
       </td>
-      <td className={cn(TD, 'min-w-[11rem] whitespace-normal break-words')}>{row.No_Invoice}</td>
-      <td className={cn(TD, 'font-medium text-primary min-w-[13rem] whitespace-normal break-words')}>{row.No_Kontrak}</td>
+      <td className={cn(
+        TD,
+        STICKY_TD,
+        STICKY_LEFT_INV,
+        'min-w-[11rem] whitespace-normal break-words',
+        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'group-hover:bg-muted/50',
+      )}>
+        {row.No_Invoice}
+      </td>
+      <td className={cn(
+        TD,
+        STICKY_TD,
+        STICKY_LEFT_KONTRAK,
+        STICKY_SHADOW,
+        'font-medium text-primary min-w-[13rem] whitespace-normal break-words',
+        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'group-hover:bg-muted/50',
+      )}>
+        {row.No_Kontrak}
+      </td>
       <td className={cn(TD, 'min-w-[8rem] whitespace-normal break-words')}>{row.Unit}</td>
       <td className={cn(TD, 'min-w-[7.5rem] whitespace-normal break-words')}>{row.Komoditi}</td>
       <td className={cn(TD, 'text-center min-w-[4.5rem]')}>{row.Satuan}</td>
