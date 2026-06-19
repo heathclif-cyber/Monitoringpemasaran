@@ -57,12 +57,19 @@ export function SupermanDeklarasiButton({
       res.sppn_no ? `SPPn ${res.sppn_no}` : null,
       res.sppb_no ? `SPPb ${res.sppb_no}` : null,
     ].filter(Boolean)
-    addNotification(
-      parts.length
-        ? `Superman: ${parts.join(' + ')} masuk To Do List`
-        : res.message,
-      'success',
-    )
+    if (parts.length && !res.superman_saved) {
+      addNotification(
+        `Superman: ${parts.join(' + ')} dibuat, tetapi nomor belum tersimpan ke kolom Superman. Salin manual.`,
+        'warning',
+      )
+    } else {
+      addNotification(
+        parts.length
+          ? `Superman: ${parts.join(' + ')} masuk To Do List`
+          : res.message,
+        'success',
+      )
+    }
     if (res.superman_url) {
       window.open(res.superman_url, '_blank', 'noopener,noreferrer')
     }

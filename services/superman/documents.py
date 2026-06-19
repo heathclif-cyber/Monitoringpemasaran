@@ -111,6 +111,15 @@ def _resolve_upload(
     )
 
 
+def _standar_support_sources(kontrak_id: str, no_do: str) -> list[tuple[str, str, str, str]]:
+    """Sumber dokumen pendukung kontrak standar — dicoba berurutan."""
+    return [
+        ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
+        ("do", no_do, "berita_acara", "Berita Acara (DO)"),
+        ("do", no_do, "deklarasi", "Deklarasi Penerimaan (DO)"),
+    ]
+
+
 def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
     do = (
         db.query(models.DeliveryOrder)
@@ -158,13 +167,23 @@ def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
                 label="Berita Acara (DO)",
             )
 
-    return _resolve_upload(
-        db,
-        entity_type="kontrak",
-        entity_id=kontrak.no_kontrak,
-        doc_type="kontrak",
-        label="Kontrak",
-    )
+    last_error: FileNotFoundError | None = None
+    for entity_type, entity_id, doc_type, label in _standar_support_sources(
+        kontrak.no_kontrak, no_do
+    ):
+        try:
+            return _resolve_upload(
+                db,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                doc_type=doc_type,
+                label=label,
+            )
+        except FileNotFoundError as exc:
+            last_error = exc
+    if last_error:
+        raise last_error
+    raise FileNotFoundError(f"Dokumen pendukung tidak ditemukan untuk DO: {no_do}")
 
 
 def _upload_status(
@@ -241,24 +260,55 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
         return requirements, uploaded
 
     kontrak_id = kontrak.no_kontrak
-    uploaded, file_name = _upload_status(
+    kontrak_ok, kontrak_name = _upload_status(
         db,
         entity_type="kontrak",
         entity_id=kontrak_id,
         doc_type="kontrak",
     )
+    do_ba_ok, do_ba_name = _upload_status(
+        db, entity_type="do", entity_id=no_do, doc_type="berita_acara"
+    )
+    do_dek_ok, do_dek_name = _upload_status(
+        db, entity_type="do", entity_id=no_do, doc_type="deklarasi"
+    )
+    any_uploaded = kontrak_ok or do_ba_ok or do_dek_ok
+
     requirements.append(
         {
             "label": "Dokumen Kontrak",
             "entity_type": "kontrak",
             "entity_id": kontrak_id,
             "doc_type": "kontrak",
-            "uploaded": uploaded,
-            "file_name": file_name,
+            "uploaded": kontrak_ok,
+            "file_name": kontrak_name,
             "upload_hint": f"Upload di menu Upload Dokumen → Kontrak → {kontrak_id}",
         }
     )
-    return requirements, uploaded
+    requirements.append(
+        {
+            "label": "BA DO (alternatif)",
+            "entity_type": "do",
+            "entity_id": no_do,
+            "doc_type": "berita_acara",
+            "uploaded": do_ba_ok,
+            "file_name": do_ba_name,
+            "upload_hint": f"Upload di menu Upload Dokumen → DO → {no_do} (Berita Acara)",
+        }
+    )
+    if not kontrak_ok and not do_ba_ok:
+        requirements.append(
+            {
+                "label": "Deklarasi DO (alternatif)",
+                "entity_type": "do",
+                "entity_id": no_do,
+                "doc_type": "deklarasi",
+                "uploaded": do_dek_ok,
+                "file_name": do_dek_name,
+                "upload_hint": f"Upload di menu Upload Dokumen → DO → {no_do} (Deklarasi)",
+            }
+        )
+    return requirements, any_uploaded
 
 
 def resolve_support_doc_from_do(no_do: str) -> ResolvedSupportDoc:

@@ -267,7 +267,7 @@ def submit_sppn_draft(
     *,
     print_after: bool = False,
     on_progress: ProgressCallback | None = None,
-) -> None:
+) -> dict | list | str | None:
     if on_progress:
         on_progress(88, "Menyimpan draft ke Superman")
     simpan = page.locator("#simpan, button:has-text('Simpan')").first
@@ -277,14 +277,23 @@ def submit_sppn_draft(
         timeout=30000,
     )
 
+    store_body: dict | list | str | None = None
     with page.expect_response(
         lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
         timeout=120000,
-    ):
+    ) as resp_info:
         simpan.click()
         _dismiss_swal_dialogs(page, print_after=print_after)
+        try:
+            store_body = resp_info.value.json()
+        except Exception:
+            try:
+                store_body = resp_info.value.text()
+            except Exception:
+                store_body = None
 
     page.wait_for_load_state("networkidle", timeout=120000)
+    return store_body
 
 
 def pause_for_review(page: Page, message: str) -> None:

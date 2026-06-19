@@ -40,7 +40,13 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
               <CircleAlert size={11} className="shrink-0 text-amber-600" />
             )}
             <span className={cn(!req.uploaded && 'text-amber-800 dark:text-amber-300')}>
-              {req.label === 'Dokumen Kontrak' ? 'Kontrak' : req.label}
+              {req.label === 'Dokumen Kontrak'
+                ? 'Kontrak'
+                : req.label === 'BA DO (alternatif)'
+                  ? 'BA DO'
+                  : req.label === 'Deklarasi DO (alternatif)'
+                    ? 'Deklarasi'
+                    : req.label}
             </span>
           </li>
         ))}
