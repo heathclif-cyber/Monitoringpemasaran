@@ -42,9 +42,13 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
                 ? 'Kontrak'
                 : req.label === 'Berita Acara (DO)'
                   ? 'BA DO'
-                  : req.label === 'Dokumen Pendukung'
-                    ? 'Kontrak/BA'
-                    : req.label}
+                  : req.label === 'Deklarasi Penerimaan (DO)'
+                    ? 'Deklarasi'
+                    : req.label === 'Dokumen DO/SPPB'
+                      ? 'DO/SPPB'
+                      : req.label === 'Dokumen Pendukung'
+                        ? 'Kontrak/BA/Deklarasi'
+                        : req.label}
             </span>
           </li>
         ))}

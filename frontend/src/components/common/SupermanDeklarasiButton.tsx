@@ -197,7 +197,7 @@ export function SupermanDeklarasiButton({
         open={open}
         onOpenChange={setOpen}
         title="Buat SPPn di Superman"
-        description={`Draft masuk To Do List Superman untuk DO ${noDo}. Pastikan dokumen kontrak/BA sudah di-upload. Jika ada PPh, sistem otomatis membuat SPPb + SPPn.`}
+        description={`Draft masuk To Do List Superman untuk DO ${noDo}. Pastikan dokumen pendukung (kontrak, BA, deklarasi, atau DO/SPPB) sudah di-upload. Jika ada PPh, sistem otomatis membuat SPPb + SPPn.`}
         confirmLabel={loading ? 'Memproses...' : 'Buat di Superman'}
         isLoading={loading}
         onConfirm={handleConfirm}

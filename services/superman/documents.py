@@ -112,10 +112,12 @@ def _resolve_upload(
 
 
 def _standar_support_sources(kontrak_id: str, no_do: str) -> list[tuple[str, str, str, str]]:
-    """Sumber dokumen pendukung kontrak standar — cukup salah satu (bukan deklarasi SPPn)."""
+    """Sumber dokumen pendukung kontrak standar — cukup salah satu."""
     return [
         ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
         ("do", no_do, "berita_acara", "Berita Acara (DO)"),
+        ("do", no_do, "deklarasi", "Deklarasi Penerimaan (DO)"),
+        ("do", no_do, "do", "Dokumen DO/SPPB"),
     ]
 
 
@@ -259,41 +261,32 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
         return requirements, uploaded
 
     kontrak_id = kontrak.no_kontrak
-    kontrak_ok, kontrak_name = _upload_status(
-        db,
-        entity_type="kontrak",
-        entity_id=kontrak_id,
-        doc_type="kontrak",
-    )
-    do_ba_ok, do_ba_name = _upload_status(
-        db, entity_type="do", entity_id=no_do, doc_type="berita_acara"
-    )
-    any_uploaded = kontrak_ok or do_ba_ok
+    sources = _standar_support_sources(kontrak_id, no_do)
+    any_uploaded = False
+    matched: dict[str, str | bool | None] | None = None
 
-    if kontrak_ok:
-        requirements.append(
-            {
-                "label": "Dokumen Kontrak",
-                "entity_type": "kontrak",
-                "entity_id": kontrak_id,
-                "doc_type": "kontrak",
-                "uploaded": True,
-                "file_name": kontrak_name,
-                "upload_hint": f"Kontrak {kontrak_id}",
-            }
+    for entity_type, entity_id, doc_type, label in sources:
+        ok, name = _upload_status(
+            db,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            doc_type=doc_type,
         )
-    elif do_ba_ok:
-        requirements.append(
-            {
-                "label": "Berita Acara (DO)",
-                "entity_type": "do",
-                "entity_id": no_do,
-                "doc_type": "berita_acara",
+        if ok:
+            any_uploaded = True
+            matched = {
+                "label": label,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "doc_type": doc_type,
                 "uploaded": True,
-                "file_name": do_ba_name,
-                "upload_hint": f"BA serah terima DO {no_do}",
+                "file_name": name,
+                "upload_hint": f"{label} ({entity_type}/{entity_id})",
             }
-        )
+            break
+
+    if matched:
+        requirements.append(matched)
     else:
         requirements.append(
             {
@@ -304,8 +297,8 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
                 "uploaded": False,
                 "file_name": None,
                 "upload_hint": (
-                    f"Upload salah satu: Kontrak ({kontrak_id}) atau Berita Acara DO ({no_do}). "
-                    "Deklarasi SPPn/SPPb dibuat otomatis oleh Superman — tidak perlu di-upload dulu."
+                    f"Upload salah satu: Kontrak ({kontrak_id}), Berita Acara, Deklarasi Penerimaan, "
+                    f"atau Dokumen DO/SPPB untuk {no_do}."
                 ),
             }
         )

@@ -87,8 +87,8 @@ def _build_uraian_pokok(
     no_kontrak: str,
 ) -> str:
     vol = _fmt_volume(volume)
-    key = (komoditi or produk or "").lower()
-    if "gula" in key:
+    key = f"{komoditi} {produk}".lower()
+    if "gula" in key or "tebu" in key:
         base = (
             f"Penerimaan Pembayaran Penjualan Gula sebanyak {vol} {satuan} "
             f"oleh {pembeli}"
