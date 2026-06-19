@@ -50,12 +50,16 @@ const TD_MONEY = 'px-3 py-2 text-[13px] text-right whitespace-nowrap tabular-num
 const TD_INPUT = 'w-full min-w-[6.5rem] h-8 text-[13px] border border-border/60 hover:border-border rounded-md px-2.5 py-1.5 bg-background text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring/30'
 
 /** Kolom identitas dibekukan saat scroll horizontal (DO + Invoice + Kontrak) */
+const FROZEN_W_DO = 'w-[12rem] min-w-[12rem] max-w-[12rem]'
+const FROZEN_W_INV = 'w-[11rem] min-w-[11rem] max-w-[11rem]'
+const FROZEN_W_KONTRAK = 'w-[13rem] min-w-[13rem] max-w-[13rem]'
 const STICKY_LEFT_DO = 'left-0'
 const STICKY_LEFT_INV = 'left-[12rem]'
 const STICKY_LEFT_KONTRAK = 'left-[23rem]'
-const STICKY_SHADOW = 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]'
-const STICKY_TH = 'sticky z-30 bg-muted/90 backdrop-blur-sm'
-const STICKY_TD = 'sticky z-10 bg-card'
+const STICKY_SHADOW = 'shadow-[4px_0_6px_-2px_rgba(0,0,0,0.12)]'
+const STICKY_TH = 'sticky top-0 z-30 bg-muted border-b border-border'
+const STICKY_TH_FROZEN = 'sticky top-0 z-40 bg-muted border-b border-border'
+const STICKY_TD = 'sticky z-20 bg-card'
 
 function FilterField({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
@@ -474,41 +478,41 @@ export default function LaporanPage() {
           ) : (
             <div className="overflow-auto max-h-[76vh]">
               <table className="text-[13px] border-separate border-spacing-0 w-full" style={{ minWidth: '4300px' }}>
-                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-muted/90 [&_th]:backdrop-blur-sm [&_th]:border-b [&_th]:border-border [&_th]:text-muted-foreground">
-                  <tr>
-                    <th className={cn(TH, STICKY_TH, STICKY_LEFT_DO, 'text-left min-w-[12rem]')}>No. DO</th>
-                    <th className={cn(TH, STICKY_TH, STICKY_LEFT_INV, 'text-left min-w-[11rem]')}>No Invoice</th>
-                    <th className={cn(TH, STICKY_TH, STICKY_LEFT_KONTRAK, STICKY_SHADOW, 'text-left min-w-[13rem]')}>No Kontrak</th>
-                    <th className={cn(TH, 'text-left min-w-[8rem]')}>Unit</th>
-                    <th className={cn(TH, 'text-left min-w-[7.5rem]')}>Komoditi</th>
-                    <th className={cn(TH, 'text-center min-w-[4.5rem]')}>Satuan</th>
-                    <th className={cn(TH, 'text-left min-w-[8rem]')}>Billing Date</th>
-                    <th className={cn(TH, 'text-left min-w-[8rem]')}>Tgl Transfer</th>
-                    <th className={cn(TH, 'text-right min-w-[10.5rem]')}>Jumlah Transfer</th>
-                    <th className={cn(TH, 'text-right min-w-[10.5rem]')}>Pelunasan (Inc. PPh)</th>
-                    <th className={cn(TH, 'text-left min-w-[11rem]')}>Mitra Pembeli</th>
-                    <th className={cn(TH, 'text-left min-w-[12rem]')}>Jenis Material</th>
-                    <th className={cn(TH, 'text-right min-w-[10.5rem]')}>Jml Invoice</th>
-                    <th className={cn(TH, 'text-right min-w-[9.5rem]')}>Harga Satuan</th>
-                    <th className={cn(TH, 'text-right min-w-[7.5rem]')}>Jumlah DO</th>
-                    <th className={cn(TH, 'text-right min-w-[10.5rem]')}>Pendapatan Pokok</th>
-                    <th className={cn(TH, 'text-right min-w-[10.5rem]')}>Setelah PPN</th>
-                    <th className={cn(TH, 'text-right min-w-[9.5rem]')}>Pajak PPN</th>
-                    <th className={cn(TH, 'text-right min-w-[8.5rem]')}>PPh</th>
-                    <th className={cn(TH, 'text-center min-w-[5.5rem]')}>PPh Setor?</th>
-                    <th className={cn(TH, 'text-right min-w-[10.5rem]')}>Kewajiban (Gross)</th>
-                    <th className={cn(TH, 'text-right min-w-[9.5rem]')}>Sisa Bayar</th>
-                    <th className={cn(TH, 'text-right min-w-[8rem]')}>Sisa Volume</th>
-                    <th className={cn(TH, 'text-left min-w-[8rem]')}>Bulan Buku</th>
-                    <th className={cn(TH, 'text-left min-w-[7.5rem]')}>Superman</th>
-                    <th className={cn(TH, 'text-left min-w-[8rem]')}>Kontrak SAP</th>
-                    <th className={cn(TH, 'text-left min-w-[7rem]')}>SO SAP</th>
-                    <th className={cn(TH, 'text-left min-w-[7rem]')}>DO SAP</th>
-                    <th className={cn(TH, 'text-left min-w-[7.5rem]')}>Billing</th>
-                    <th className={cn(TH, 'text-left min-w-[7rem]')}>Dok. Wajib</th>
-                    <th className={cn(TH, 'text-left min-w-[9rem]')}>Status Deklarasi Superman</th>
-                    <th className={cn(TH, 'text-left min-w-[10rem]')}>Berita Acara</th>
-                    <th className={cn(TH, 'text-center min-w-[6.5rem]')}>Aksi</th>
+                <thead>
+                  <tr className="text-muted-foreground">
+                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_DO, FROZEN_W_DO, 'text-left')}>No. DO</th>
+                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_INV, FROZEN_W_INV, 'text-left')}>No Invoice</th>
+                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_KONTRAK, STICKY_SHADOW, FROZEN_W_KONTRAK, 'text-left')}>No Kontrak</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Unit</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[7.5rem]')}>Komoditi</th>
+                    <th className={cn(TH, STICKY_TH, 'text-center min-w-[4.5rem]')}>Satuan</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Billing Date</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Tgl Transfer</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jumlah Transfer</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Pelunasan (Inc. PPh)</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[11rem]')}>Mitra Pembeli</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[12rem]')}>Jenis Material</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jml Invoice</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Harga Satuan</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[7.5rem]')}>Jumlah DO</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Pendapatan Pokok</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Setelah PPN</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Pajak PPN</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[8.5rem]')}>PPh</th>
+                    <th className={cn(TH, STICKY_TH, 'text-center min-w-[5.5rem]')}>PPh Setor?</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Kewajiban (Gross)</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Sisa Bayar</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[8rem]')}>Sisa Volume</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Bulan Buku</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[7.5rem]')}>Superman</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Kontrak SAP</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[7rem]')}>SO SAP</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[7rem]')}>DO SAP</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[7.5rem]')}>Billing</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[7rem]')}>Dok. Wajib</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[9rem]')}>Status Deklarasi Superman</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[10rem]')}>Berita Acara</th>
+                    <th className={cn(TH, STICKY_TH, 'text-center min-w-[6.5rem]')}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/80">
@@ -580,8 +584,9 @@ function LaporanTableRow({
         TD,
         STICKY_TD,
         STICKY_LEFT_DO,
-        'font-medium min-w-[12rem] whitespace-normal break-words',
-        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'group-hover:bg-muted/50',
+        FROZEN_W_DO,
+        'font-medium whitespace-normal break-words',
+        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'bg-card group-hover:bg-muted/50',
       )}>
         {row.No_DO}
       </td>
@@ -589,8 +594,9 @@ function LaporanTableRow({
         TD,
         STICKY_TD,
         STICKY_LEFT_INV,
-        'min-w-[11rem] whitespace-normal break-words',
-        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'group-hover:bg-muted/50',
+        FROZEN_W_INV,
+        'whitespace-normal break-words',
+        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'bg-card group-hover:bg-muted/50',
       )}>
         {row.No_Invoice}
       </td>
@@ -599,8 +605,9 @@ function LaporanTableRow({
         STICKY_TD,
         STICKY_LEFT_KONTRAK,
         STICKY_SHADOW,
-        'font-medium text-primary min-w-[13rem] whitespace-normal break-words',
-        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'group-hover:bg-muted/50',
+        FROZEN_W_KONTRAK,
+        'font-medium text-primary whitespace-normal break-words',
+        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'bg-card group-hover:bg-muted/50',
       )}>
         {row.No_Kontrak}
       </td>
