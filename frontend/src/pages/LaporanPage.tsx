@@ -32,7 +32,9 @@ import {
   calculateLaporanSummary,
   createDefaultLaporanFilters,
   createInitialLaporanFilters,
+  extractPeriodKeys,
   getInitialLaporanMonthKeys,
+  getInitialLaporanYearKey,
   MONTH_OPTIONS,
   MONTH_LABELS,
   type LaporanFilters,
@@ -85,6 +87,14 @@ export default function LaporanPage() {
   const pembelis = useMemo(() => [...new Set(rows.map((r) => r.Mitra_Pembeli).filter(Boolean))].sort(), [rows])
   const komoditas = useMemo(() => [...new Set(rows.map((r) => r.Komoditi).filter(Boolean))].sort(), [rows])
   const jenisKomoditas = useMemo(() => [...new Set(rows.map((r) => r.Deskripsi_Produk).filter(Boolean))].sort(), [rows])
+  const years = useMemo(() => {
+    const set = new Set<string>([getInitialLaporanYearKey()])
+    for (const row of rows) {
+      const { year } = extractPeriodKeys(row, filters.modeTanggal)
+      if (year) set.add(year)
+    }
+    return [...set].sort((a, b) => b.localeCompare(a))
+  }, [rows, filters.modeTanggal])
 
   const filtered = useMemo(() => filterLaporanRows(rows, filters), [rows, filters])
   const summary = useMemo(() => calculateLaporanSummary(filtered), [filtered])
@@ -100,13 +110,19 @@ export default function LaporanPage() {
   }, [filtered, filters.sort])
 
   const periodLabel = useMemo(() => {
-    if (filters.months.length === 0) return 'Semua bulan'
-    if (filters.months.length === 1) return MONTH_LABELS[filters.months[0]] || filters.months[0]
-    if (filters.months.length === 2) {
-      return filters.months.map((m) => MONTH_LABELS[m] || m).join(' & ')
+    if (!filters.year && filters.months.length === 0) return 'Semua periode'
+
+    let monthPart = 'semua bulan'
+    if (filters.months.length === 1) monthPart = MONTH_LABELS[filters.months[0]] || filters.months[0]
+    else if (filters.months.length === 2) {
+      monthPart = filters.months.map((m) => MONTH_LABELS[m] || m).join(' & ')
+    } else if (filters.months.length > 2) {
+      monthPart = `${filters.months.length} bulan terpilih`
     }
-    return `${filters.months.length} bulan terpilih`
-  }, [filters.months])
+
+    if (filters.year) return `${monthPart} ${filters.year}`
+    return monthPart
+  }, [filters.year, filters.months])
 
   const activeChips = useMemo(() => {
     const chips: { id: string; label: string; onRemove: () => void }[] = []
@@ -141,6 +157,22 @@ export default function LaporanPage() {
         id: 'material',
         label: filters.jenisKomoditi.length === 1 ? '1 material' : `${filters.jenisKomoditi.length} material`,
         onRemove: () => patch({ jenisKomoditi: [] }),
+      })
+    }
+    if (filters.year) {
+      chips.push({
+        id: 'year',
+        label: `Tahun ${filters.year}`,
+        onRemove: () => patch({ year: '' }),
+      })
+    }
+    if (filters.months.length > 0) {
+      chips.push({
+        id: 'months',
+        label: filters.months.length === 1
+          ? MONTH_LABELS[filters.months[0]] || filters.months[0]
+          : `${filters.months.length} bulan`,
+        onRemove: () => patch({ months: [] }),
       })
     }
     if (filters.tipe !== 'ALL') {
@@ -279,7 +311,18 @@ export default function LaporanPage() {
           />
 
           {/* Filter utama — grid proporsional */}
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 items-end">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 items-end">
+            <FilterField label="Tahun">
+              <FilterSelect
+                value={filters.year}
+                onChange={(year) => setFilters((f) => ({ ...f, year }))}
+                options={[
+                  { value: '', label: 'Semua Tahun' },
+                  ...years.map((y) => ({ value: y, label: y })),
+                ]}
+                className="w-full"
+              />
+            </FilterField>
             <FilterField label="Bulan">
               <MultiSelectFilter
                 label="Bulan"
@@ -444,9 +487,9 @@ export default function LaporanPage() {
           )}
 
           <p className="text-xs text-muted-foreground">
-            Saat buka halaman: filter bulan berjalan (
-            {getInitialLaporanMonthKeys().map((m) => MONTH_LABELS[m]).join(', ')}
-            ). Reset filter menampilkan semua bulan tanpa batas.
+            Saat buka halaman: filter bulan & tahun berjalan (
+            {MONTH_LABELS[getInitialLaporanMonthKeys()[0]]} {getInitialLaporanYearKey()}
+            ). Reset filter menampilkan semua periode tanpa batas.
           </p>
         </CardContent>
       </Card>
@@ -468,7 +511,7 @@ export default function LaporanPage() {
             <div className="py-8">
               <EmptyState
                 title="Tidak ada data laporan"
-                description={`Tidak ada baris untuk ${periodLabel}. Coba ubah filter bulan atau reset ke default.`}
+                description={`Tidak ada baris untuk ${periodLabel}. Coba ubah filter periode atau reset ke default.`}
               />
               <div className="flex justify-center mt-4">
                 <Button variant="outline" size="sm" onClick={handleResetFilters}>
@@ -579,7 +622,9 @@ function LaporanTableRow({
   return (
     <tr className={cn(
       'group transition-colors',
-      isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'hover:bg-muted/50',
+      isBypass
+        ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950 dark:hover:bg-amber-900'
+        : 'hover:bg-muted/50',
     )}>
       <td className={cn(
         TD,
@@ -587,7 +632,9 @@ function LaporanTableRow({
         STICKY_LEFT_DO,
         FROZEN_W_DO,
         'font-medium whitespace-normal break-words',
-        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'bg-card group-hover:bg-muted/50',
+        isBypass
+          ? 'bg-amber-50 group-hover:bg-amber-100 dark:bg-amber-950 dark:group-hover:bg-amber-900'
+          : 'bg-card group-hover:bg-muted',
       )}>
         {row.No_DO}
       </td>
@@ -597,7 +644,9 @@ function LaporanTableRow({
         STICKY_LEFT_INV,
         FROZEN_W_INV,
         'whitespace-normal break-words',
-        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'bg-card group-hover:bg-muted/50',
+        isBypass
+          ? 'bg-amber-50 group-hover:bg-amber-100 dark:bg-amber-950 dark:group-hover:bg-amber-900'
+          : 'bg-card group-hover:bg-muted',
       )}>
         {row.No_Invoice}
       </td>
@@ -608,7 +657,9 @@ function LaporanTableRow({
         STICKY_SHADOW,
         FROZEN_W_KONTRAK,
         'font-medium text-primary whitespace-normal break-words',
-        isBypass ? 'bg-amber-500/10 dark:bg-amber-500/15' : 'bg-card group-hover:bg-muted/50',
+        isBypass
+          ? 'bg-amber-50 group-hover:bg-amber-100 dark:bg-amber-950 dark:group-hover:bg-amber-900'
+          : 'bg-card group-hover:bg-muted',
       )}>
         {row.No_Kontrak}
       </td>

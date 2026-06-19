@@ -9,15 +9,23 @@ export function getCurrentMonthKey(): string {
   return String(new Date().getMonth() + 1).padStart(2, '0')
 }
 
+export function getCurrentYearKey(): string {
+  return String(new Date().getFullYear())
+}
+
 export function getPreviousMonthKey(): string {
   const d = new Date()
   d.setMonth(d.getMonth() - 1)
   return String(d.getMonth() + 1).padStart(2, '0')
 }
 
-/** Filter bulan saat halaman pertama dibuka: bulan berjalan saja */
+/** Filter periode saat halaman pertama dibuka: bulan & tahun berjalan */
 export function getInitialLaporanMonthKeys(): string[] {
   return [getCurrentMonthKey()]
+}
+
+export function getInitialLaporanYearKey(): string {
+  return getCurrentYearKey()
 }
 
 /** @deprecated Gunakan getInitialLaporanMonthKeys() */
@@ -25,29 +33,69 @@ export function getDefaultLaporanMonthKeys(): string[] {
   return getInitialLaporanMonthKeys()
 }
 
-function extractMonthKey(row: LaporanRow, mode: 'TRANSFER' | 'RENCANA'): string {
-  // Kontrak payung: periode pembukuan dari Bulan_Buku (bukan tanggal BA / transfer)
+export interface LaporanPeriodKeys {
+  year: string
+  month: string
+}
+
+function extractYearFromDateString(dateStr: string): string {
+  if (!dateStr) return ''
+  if (dateStr.length >= 7 && dateStr[4] === '-') return dateStr.slice(0, 4)
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/')
+    if (parts.length === 3) return parts[2]
+  }
+  return ''
+}
+
+function extractMonthFromDateString(dateStr: string): string {
+  if (!dateStr) return ''
+  if (dateStr.length >= 7 && dateStr[4] === '-') return dateStr.slice(5, 7)
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/')
+    if (parts.length === 3) return parts[1].padStart(2, '0')
+  }
+  return ''
+}
+
+export function extractPeriodKeys(row: LaporanRow, mode: 'TRANSFER' | 'RENCANA'): LaporanPeriodKeys {
+  // Kontrak payung: bulan dari Bulan_Buku, tahun dari tanggal terkait
   if (row.No_BA) {
-    const bulanBuku = row.Bulan_Buku?.slice(0, 2)
-    if (bulanBuku) return bulanBuku
+    const month = row.Bulan_Buku?.slice(0, 2) || ''
+    const year = extractYearFromDateString(row.Rencana_Pengambilan || '')
+      || extractYearFromDateString(row.Tanggal_BA || '')
+      || extractYearFromDateString(row.Raw_Date || '')
+    return { year, month }
   }
 
   if (mode === 'RENCANA') {
     const rencana = row.Rencana_Pengambilan || ''
-    if (rencana.length >= 7) return rencana.slice(5, 7)
-    return row.Bulan_Buku?.slice(0, 2) || ''
+    const month = rencana.length >= 7
+      ? rencana.slice(5, 7)
+      : (row.Bulan_Buku?.slice(0, 2) || '')
+    const year = extractYearFromDateString(rencana)
+      || extractYearFromDateString(row.Raw_Date || '')
+      || extractYearFromDateString(row.Billing_Date || '')
+    return { year, month }
   }
 
   const raw = row.Raw_Date || ''
-  if (raw.length >= 7) return raw.slice(5, 7)
+  if (raw.length >= 7) {
+    return { year: raw.slice(0, 4), month: raw.slice(5, 7) }
+  }
 
   const transfer = row.Tanggal_Transfer || ''
   if (transfer.includes('/')) {
     const parts = transfer.split('/')
-    if (parts.length === 3) return parts[1].padStart(2, '0')
+    if (parts.length === 3) {
+      return { year: parts[2], month: parts[1].padStart(2, '0') }
+    }
   }
 
-  return row.Bulan_Buku?.slice(0, 2) || ''
+  const month = row.Bulan_Buku?.slice(0, 2) || ''
+  const year = extractYearFromDateString(row.Raw_Date || '')
+    || extractYearFromDateString(row.Billing_Date || '')
+  return { year, month }
 }
 
 export interface LaporanSummary {
@@ -122,9 +170,10 @@ export function filterLaporanRows(rows: LaporanRow[], filters: LaporanFilters): 
     if (filters.tipe === 'NO_BYPASS' && row.No_DO.startsWith('BYPASS-')) return false
     if (filters.tipe === 'ONLY_BYPASS' && !row.No_DO.startsWith('BYPASS-')) return false
 
-    if (filters.months.length > 0) {
-      const monthKey = extractMonthKey(row, filters.modeTanggal)
-      if (!monthKey || !filters.months.includes(monthKey)) return false
+    if (filters.year || filters.months.length > 0) {
+      const { year, month } = extractPeriodKeys(row, filters.modeTanggal)
+      if (filters.year && (!year || year !== filters.year)) return false
+      if (filters.months.length > 0 && (!month || !filters.months.includes(month))) return false
     }
 
     if (filters.sap !== 'ALL') {
@@ -165,6 +214,7 @@ export interface LaporanFilters {
   pembeli: string[]
   komoditi: string[]
   jenisKomoditi: string[]
+  year: string
   months: string[]
   modeTanggal: 'TRANSFER' | 'RENCANA'
   sort: 'DESC' | 'ASC'
@@ -174,13 +224,14 @@ export interface LaporanFilters {
   search: string
 }
 
-/** State reset filter — semua bulan (tanpa filter bulan) */
+/** State reset filter — semua periode (tanpa filter tahun/bulan) */
 export function createDefaultLaporanFilters(): LaporanFilters {
   return {
     unit: [],
     pembeli: [],
     komoditi: [],
     jenisKomoditi: [],
+    year: '',
     months: [],
     modeTanggal: 'TRANSFER',
     sort: 'DESC',
@@ -191,10 +242,11 @@ export function createDefaultLaporanFilters(): LaporanFilters {
   }
 }
 
-/** State awal halaman — bulan berjalan + filter lain default */
+/** State awal halaman — bulan & tahun berjalan + filter lain default */
 export function createInitialLaporanFilters(): LaporanFilters {
   return {
     ...createDefaultLaporanFilters(),
+    year: getInitialLaporanYearKey(),
     months: getInitialLaporanMonthKeys(),
   }
 }
