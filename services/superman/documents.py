@@ -111,14 +111,81 @@ def _resolve_upload(
     )
 
 
-def _standar_support_sources(kontrak_id: str, no_do: str) -> list[tuple[str, str, str, str]]:
-    """Sumber dokumen pendukung kontrak standar — cukup salah satu."""
+SupportSource = tuple[str, str, str, str]
+
+_PENDING_SUPPORT_HINT = (
+    "Upload salah satu: Kontrak, Berita Acara, Deklarasi Penerimaan, atau Dokumen DO/SPPB."
+)
+
+
+def _do_support_sources(no_do: str) -> list[SupportSource]:
+    """Dokumen pendukung pada entity DO — berlaku semua komoditi."""
     return [
-        ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
         ("do", no_do, "berita_acara", "Berita Acara (DO)"),
         ("do", no_do, "deklarasi", "Deklarasi Penerimaan (DO)"),
         ("do", no_do, "do", "Dokumen DO/SPPB"),
     ]
+
+
+def _standar_support_sources(kontrak_id: str, no_do: str) -> list[SupportSource]:
+    """Kontrak standar — cukup salah satu sumber (semua komoditi)."""
+    return [
+        ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
+        *_do_support_sources(no_do),
+    ]
+
+
+def _payung_ba_support_sources(no_ba: str, no_do: str) -> list[SupportSource]:
+    """Kontrak payung BA — BA atau dokumen DO (semua komoditi)."""
+    return [
+        ("ba", no_ba, "berita_acara", "Berita Acara"),
+        *_do_support_sources(no_do),
+    ]
+
+
+def _resolve_first_available(
+    db: Session,
+    sources: list[SupportSource],
+) -> ResolvedSupportDoc:
+    last_error: FileNotFoundError | None = None
+    for entity_type, entity_id, doc_type, label in sources:
+        try:
+            return _resolve_upload(
+                db,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                doc_type=doc_type,
+                label=label,
+            )
+        except FileNotFoundError as exc:
+            last_error = exc
+    if last_error:
+        raise last_error
+    raise FileNotFoundError("Dokumen pendukung tidak ditemukan.")
+
+
+def _find_first_uploaded(
+    db: Session,
+    sources: list[SupportSource],
+) -> dict[str, str | bool | None] | None:
+    for entity_type, entity_id, doc_type, label in sources:
+        ok, name = _upload_status(
+            db,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            doc_type=doc_type,
+        )
+        if ok:
+            return {
+                "label": label,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "doc_type": doc_type,
+                "uploaded": True,
+                "file_name": name,
+                "upload_hint": f"{label} ({entity_type}/{entity_id})",
+            }
+    return None
 
 
 def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
@@ -151,40 +218,15 @@ def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
                 f"DO {no_do} kontrak payung tanpa nomor BA. "
                 "Pastikan invoice/DO terhubung ke Berita Acara."
             )
-        try:
-            return _resolve_upload(
-                db,
-                entity_type="ba",
-                entity_id=no_ba,
-                doc_type="berita_acara",
-                label="Berita Acara",
-            )
-        except FileNotFoundError:
-            return _resolve_upload(
-                db,
-                entity_type="do",
-                entity_id=no_do,
-                doc_type="berita_acara",
-                label="Berita Acara (DO)",
-            )
+        return _resolve_first_available(
+            db,
+            _payung_ba_support_sources(no_ba, no_do),
+        )
 
-    last_error: FileNotFoundError | None = None
-    for entity_type, entity_id, doc_type, label in _standar_support_sources(
-        kontrak.no_kontrak, no_do
-    ):
-        try:
-            return _resolve_upload(
-                db,
-                entity_type=entity_type,
-                entity_id=entity_id,
-                doc_type=doc_type,
-                label=label,
-            )
-        except FileNotFoundError as exc:
-            last_error = exc
-    if last_error:
-        raise last_error
-    raise FileNotFoundError(f"Dokumen pendukung tidak ditemukan untuk DO: {no_do}")
+    return _resolve_first_available(
+        db,
+        _standar_support_sources(kontrak.no_kontrak, no_do),
+    )
 
 
 def _upload_status(
@@ -244,65 +286,44 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
             )
             return requirements, False
 
-        ba_ok, ba_name = _upload_status(db, entity_type="ba", entity_id=no_ba, doc_type="berita_acara")
-        do_ok, do_name = _upload_status(db, entity_type="do", entity_id=no_do, doc_type="berita_acara")
-        uploaded = ba_ok or do_ok
-        requirements.append(
-            {
-                "label": "Berita Acara",
-                "entity_type": "ba" if ba_ok else "do",
-                "entity_id": no_ba if ba_ok else no_do,
-                "doc_type": "berita_acara",
-                "uploaded": uploaded,
-                "file_name": ba_name or do_name,
-                "upload_hint": f"Upload di menu Upload Dokumen → BA → {no_ba}",
-            }
-        )
-        return requirements, uploaded
-
-    kontrak_id = kontrak.no_kontrak
-    sources = _standar_support_sources(kontrak_id, no_do)
-    any_uploaded = False
-    matched: dict[str, str | bool | None] | None = None
-
-    for entity_type, entity_id, doc_type, label in sources:
-        ok, name = _upload_status(
-            db,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            doc_type=doc_type,
-        )
-        if ok:
-            any_uploaded = True
-            matched = {
-                "label": label,
-                "entity_type": entity_type,
-                "entity_id": entity_id,
-                "doc_type": doc_type,
-                "uploaded": True,
-                "file_name": name,
-                "upload_hint": f"{label} ({entity_type}/{entity_id})",
-            }
-            break
-
-    if matched:
-        requirements.append(matched)
-    else:
+        sources = _payung_ba_support_sources(no_ba, no_do)
+        matched = _find_first_uploaded(db, sources)
+        if matched:
+            requirements.append(matched)
+            return requirements, True
         requirements.append(
             {
                 "label": "Dokumen Pendukung",
-                "entity_type": "kontrak",
-                "entity_id": kontrak_id,
-                "doc_type": "kontrak",
+                "entity_type": "ba",
+                "entity_id": no_ba,
+                "doc_type": "berita_acara",
                 "uploaded": False,
                 "file_name": None,
-                "upload_hint": (
-                    f"Upload salah satu: Kontrak ({kontrak_id}), Berita Acara, Deklarasi Penerimaan, "
-                    f"atau Dokumen DO/SPPB untuk {no_do}."
-                ),
+                "upload_hint": f"{_PENDING_SUPPORT_HINT} BA: {no_ba}, DO: {no_do}.",
             }
         )
-    return requirements, any_uploaded
+        return requirements, False
+
+    kontrak_id = kontrak.no_kontrak
+    sources = _standar_support_sources(kontrak_id, no_do)
+    matched = _find_first_uploaded(db, sources)
+
+    if matched:
+        requirements.append(matched)
+        return requirements, True
+
+    requirements.append(
+        {
+            "label": "Dokumen Pendukung",
+            "entity_type": "kontrak",
+            "entity_id": kontrak_id,
+            "doc_type": "kontrak",
+            "uploaded": False,
+            "file_name": None,
+            "upload_hint": f"{_PENDING_SUPPORT_HINT} Kontrak: {kontrak_id}, DO: {no_do}.",
+        }
+    )
+    return requirements, False
 
 
 def resolve_support_doc_from_do(no_do: str) -> ResolvedSupportDoc:

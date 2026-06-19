@@ -63,12 +63,9 @@ def _month_name(bulan_buku: str, raw_date: str) -> str:
     return bulan_buku or ""
 
 
-def _format_periode(komoditi: str, bulan_buku: str, raw_date: str) -> str:
+def _format_periode(_komoditi: str, bulan_buku: str, raw_date: str) -> str:
     month = _month_name(bulan_buku, raw_date)
     year = raw_date[:4] if raw_date and len(raw_date) >= 4 else ""
-    key = (komoditi or "").lower()
-    if "kelapa" in key and month:
-        return f"bulan {month}"
     if month and year:
         return f"{month} {year}"
     if month:
@@ -87,21 +84,15 @@ def _build_uraian_pokok(
     no_kontrak: str,
 ) -> str:
     vol = _fmt_volume(volume)
-    key = f"{komoditi} {produk}".lower()
-    if "gula" in key or "tebu" in key:
-        base = (
-            f"Penerimaan Pembayaran Penjualan Gula sebanyak {vol} {satuan} "
-            f"oleh {pembeli}"
-        )
-        if no_kontrak:
-            return f"{base} {no_kontrak}".strip()
-        return base
+    label = (produk or komoditi or "Komoditi").strip()
     base = (
-        f"Penerimaan Pembayaran Penjualan {produk} sebanyak {vol} {satuan} "
+        f"Penerimaan Pembayaran Penjualan {label} sebanyak {vol} {satuan} "
         f"oleh {pembeli}"
     )
     if periode:
         return f"{base} {periode}".strip()
+    if no_kontrak:
+        return f"{base} {no_kontrak}".strip()
     return base
 
 

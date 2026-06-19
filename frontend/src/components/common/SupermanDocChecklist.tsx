@@ -47,8 +47,10 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
                     : req.label === 'Dokumen DO/SPPB'
                       ? 'DO/SPPB'
                       : req.label === 'Dokumen Pendukung'
-                        ? 'Kontrak/BA/Deklarasi'
-                        : req.label}
+                        ? 'Belum upload'
+                        : req.label === 'Berita Acara'
+                          ? 'BA'
+                          : req.label}
             </span>
           </li>
         ))}
