@@ -1,11 +1,12 @@
 import { CheckCircle2 } from 'lucide-react'
 import { SupermanDeklarasiButton } from '@/components/common/SupermanDeklarasiButton'
+import type { SupermanDeklarasiResult } from '@/types'
 
 interface SupermanDeklarasiStatusProps {
   noDo: string
   existingSuperman?: string | null
   docsReady?: boolean
-  onSuccess?: () => void
+  onSuccess?: (result: SupermanDeklarasiResult) => void | Promise<void>
 }
 
 export function SupermanDeklarasiStatus({

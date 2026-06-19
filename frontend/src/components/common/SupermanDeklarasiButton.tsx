@@ -22,7 +22,7 @@ interface SupermanDeklarasiButtonProps {
   compact?: boolean
   disabled?: boolean
   className?: string
-  onSuccess?: () => void
+  onSuccess?: (result: SupermanDeklarasiResult) => void | Promise<void>
 }
 
 const POLL_INTERVAL_MS = 1000
@@ -52,7 +52,7 @@ export function SupermanDeklarasiButton({
 
   const savedLabel = (existingSuperman || '').trim()
 
-  const showResult = (res: SupermanDeklarasiResult) => {
+  const showResult = async (res: SupermanDeklarasiResult) => {
     const parts = [
       res.sppn_no ? `SPPn ${res.sppn_no}` : null,
       res.sppb_no ? `SPPb ${res.sppb_no}` : null,
@@ -74,7 +74,11 @@ export function SupermanDeklarasiButton({
       window.open(res.superman_url, '_blank', 'noopener,noreferrer')
     }
     setOpen(false)
-    onSuccess?.()
+    try {
+      await onSuccess?.(res)
+    } catch (err) {
+      console.error('[SupermanDeklarasiButton.onSuccess]', err)
+    }
   }
 
   const pollJob = async (jobId: string): Promise<SupermanDeklarasiResult> => {
@@ -111,7 +115,7 @@ export function SupermanDeklarasiButton({
         `/api/superman/deklarasi/start?no_do=${encodeURIComponent(noDo)}`,
       )
       const result = await pollJob(start.job_id)
-      showResult(result)
+      await showResult(result)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Gagal membuat SPPn di Superman'
       if (message.includes('captcha') || message.includes('Session Superman')) {

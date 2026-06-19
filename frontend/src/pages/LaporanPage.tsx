@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   RefreshCw,
   Download,
@@ -13,7 +13,7 @@ import {
   X,
   SlidersHorizontal,
 } from 'lucide-react'
-import { useLaporanStore } from '@/store/laporanStore'
+import { supermanLabelFromResult, useLaporanStore } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,7 +40,7 @@ import {
   type LaporanFilters,
 } from '@/utils/laporanUtils'
 import { formatCurrency, formatNumber, formatDate, safe, cn } from '@/lib/utils'
-import type { LaporanRow } from '@/types'
+import type { LaporanRow, SupermanDeklarasiResult } from '@/types'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { SupermanDocChecklist } from '@/components/common/SupermanDocChecklist'
 import { SupermanDeklarasiStatus } from '@/components/common/SupermanDeklarasiStatus'
@@ -74,7 +74,7 @@ function FilterField({ label, children, className }: { label: string; children: 
 }
 
 export default function LaporanPage() {
-  const { rows, isLoading, fetch, updateSapField, deleteBypass } = useLaporanStore()
+  const { rows, isLoading, fetch, patchRow, updateSapField, deleteBypass } = useLaporanStore()
   const { addNotification } = useAppStore()
   const [filters, setFilters] = useState<LaporanFilters>(createInitialLaporanFilters)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -203,6 +203,14 @@ export default function LaporanPage() {
     return n
   }, [filters])
 
+  const handleSupermanSuccess = useCallback(async (noDo: string, result: SupermanDeklarasiResult) => {
+    const label = supermanLabelFromResult(result)
+    if (label) {
+      patchRow(noDo, { Superman: label })
+    }
+    await fetch({ fresh: true })
+  }, [fetch, patchRow])
+
   const handleSapSave = async (noDo: string, field: string, value: string) => {
     if (!value.trim()) return
     try {
@@ -252,7 +260,7 @@ export default function LaporanPage() {
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" onClick={fetch} disabled={isLoading} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => void fetch()} disabled={isLoading} className="gap-1.5">
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
           </Button>
           <Button variant="default" size="sm" onClick={handleExportExcel} disabled={sorted.length === 0} className="gap-1.5">
@@ -569,6 +577,7 @@ export default function LaporanPage() {
                         isBypass={isBypass}
                         onSapSave={handleSapSave}
                         onRefresh={fetch}
+                        onSupermanSuccess={handleSupermanSuccess}
                         onDeleteBypass={(noDo, id) => {
                           setDeleteTarget(noDo)
                           setDeleteId(id)
@@ -610,12 +619,14 @@ function LaporanTableRow({
   isBypass,
   onSapSave,
   onRefresh,
+  onSupermanSuccess,
   onDeleteBypass,
 }: {
   row: LaporanRow
   isBypass: boolean
   onSapSave: (noDo: string, field: string, value: string) => Promise<void>
   onRefresh: () => void
+  onSupermanSuccess: (noDo: string, result: SupermanDeklarasiResult) => void | Promise<void>
   onDeleteBypass: (noDo: string, id: number) => void
 }) {
   const canEdit = useAuthStore((s) => s.canEdit)
@@ -706,6 +717,7 @@ function LaporanTableRow({
       {(['Superman', 'Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const).map((field) => (
         <td key={field} className={cn(TD, 'min-w-[7.5rem]')}>
           <input
+            key={field === 'Superman' ? `${row.No_DO}-superman-${row.Superman || ''}` : field}
             className={TD_INPUT}
             defaultValue={row[field] || ''}
             readOnly={!canEdit()}
@@ -734,7 +746,7 @@ function LaporanTableRow({
             noDo={row.No_DO}
             existingSuperman={row.Superman}
             docsReady={row.Dokumen_Superman_Siap}
-            onSuccess={onRefresh}
+            onSuccess={(result) => onSupermanSuccess(row.No_DO, result)}
           />
         ) : (
           <span className="text-muted-foreground">-</span>

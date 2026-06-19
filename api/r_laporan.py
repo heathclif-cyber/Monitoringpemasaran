@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 import locale
@@ -277,10 +277,11 @@ def _build_laporan_rows(db: Session):
 
 
 @router.get("")
-def get_laporan():
-    cached = api_cache.get("laporan:all")
-    if cached is not None:
-        return cached
+def get_laporan(fresh: bool = Query(False, description="Lewati cache — dipakai setelah mutasi data")):
+    if not fresh:
+        cached = api_cache.get("laporan:all")
+        if cached is not None:
+            return cached
 
     db = SessionLocal()
     try:

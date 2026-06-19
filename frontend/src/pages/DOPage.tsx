@@ -480,9 +480,15 @@ export default function DOPage() {
                 <SupermanDeklarasiButton
                   noDo={exportNo}
                   existingSuperman={existingSuperman}
-                  onSuccess={async () => {
+                  onSuccess={async (result) => {
+                    const label = [result.sppb_no, result.sppn_no]
+                      .map((p) => (p == null ? '' : String(p).trim()))
+                      .filter(Boolean)
+                      .join(' + ')
+                    const saved = (result.superman_saved || label || '').trim()
+                    if (saved) setExistingSuperman(saved)
                     const data = await doStore.fetchOne(exportNo)
-                    setExistingSuperman(data?.superman || null)
+                    setExistingSuperman(data?.superman || saved || null)
                   }}
                 />
               </>

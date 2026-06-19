@@ -1,11 +1,21 @@
 import { create } from 'zustand'
 import { client } from '@/lib/client'
-import type { LaporanRow, BypassInput, SapUpdateInput } from '@/types'
+import type { LaporanRow, BypassInput, SupermanDeklarasiResult } from '@/types'
+
+export function supermanLabelFromResult(result: SupermanDeklarasiResult): string | null {
+  const saved = (result.superman_saved || '').trim()
+  if (saved) return saved
+  const parts = [result.sppb_no, result.sppn_no]
+    .map((p) => (p == null ? '' : String(p).trim()))
+    .filter(Boolean)
+  return parts.length > 0 ? parts.join(' + ') : null
+}
 
 interface LaporanStore {
   rows: LaporanRow[]
   isLoading: boolean
-  fetch: () => Promise<void>
+  fetch: (opts?: { fresh?: boolean }) => Promise<void>
+  patchRow: (noDo: string, patch: Partial<LaporanRow>) => void
   updateSapField: (noDo: string, field: string, value: string) => Promise<void>
   createBypass: (input: BypassInput) => Promise<void>
   updateBypass: (id: number, input: BypassInput) => Promise<void>
@@ -16,16 +26,23 @@ export const useLaporanStore = create<LaporanStore>((set, get) => ({
   rows: [],
   isLoading: false,
 
-  fetch: async () => {
+  fetch: async (opts) => {
     set({ isLoading: true })
     try {
-      const data = await client.get<LaporanRow[]>('/api/laporan')
+      const path = opts?.fresh ? '/api/laporan?fresh=1' : '/api/laporan'
+      const data = await client.get<LaporanRow[]>(path)
       set({ rows: data })
     } catch (err) {
       console.error('[laporanStore.fetch]', err)
     } finally {
       set({ isLoading: false })
     }
+  },
+
+  patchRow: (noDo, patch) => {
+    set((state) => ({
+      rows: state.rows.map((row) => (row.No_DO === noDo ? { ...row, ...patch } : row)),
+    }))
   },
 
   updateSapField: async (noDo: string, field: string, value: string) => {
