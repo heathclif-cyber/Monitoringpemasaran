@@ -7,6 +7,8 @@ from services.superman.runner import (
     SupermanNotConfiguredError,
     get_deklarasi_progress,
     get_status,
+    inspect_superman_todo,
+    recover_superman_from_todo,
     preview_deklarasi,
     refresh_captcha,
     request_captcha,
@@ -60,6 +62,24 @@ def superman_captcha_verify(body: SupermanCaptchaVerifyBody, _user=Depends(requi
         raise HTTPException(status_code=410, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/recover")
+def superman_recover(no_do: str = Query(..., min_length=1), _user=Depends(require_write)):
+    """Pulihkan nomor SPPn/SPPb dari To Do List ke kolom Superman DO."""
+    try:
+        return recover_superman_from_todo(no_do.strip())
+    except Exception as exc:
+        raise _map_deklarasi_error(exc) from exc
+
+
+@router.get("/todo-inspect")
+def superman_todo_inspect(no_do: str = Query(..., min_length=1), _user=Depends(require_write)):
+    """Debug: baca To Do List Superman untuk DO tertentu."""
+    try:
+        return inspect_superman_todo(no_do.strip())
+    except Exception as exc:
+        raise _map_deklarasi_error(exc) from exc
 
 
 @router.get("/preview")

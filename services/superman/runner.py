@@ -26,7 +26,12 @@ from services.superman.config import SupermanConfig
 from services.superman.documents import resolve_support_doc_from_do
 from services.superman.filler import fill_sppn_draft, submit_sppn_draft
 from services.superman.payload import build_payload_from_do
-from services.superman.persist import assert_do_not_submitted, format_superman_ref, save_superman_to_do
+from services.superman.persist import (
+    assert_do_not_submitted,
+    format_superman_ref,
+    get_do_superman,
+    save_superman_to_do,
+)
 from services.superman.progress import (
     ProgressCallback,
     complete_job,
@@ -118,6 +123,7 @@ def _score_todo_row(
     mitra_pembeli: str,
     total_sppn: int,
     expect_sppb: bool,
+    tanggal_transfer: str = "",
 ) -> int:
     blob = _todo_row_blob(row)
     score = 0
@@ -131,12 +137,26 @@ def _score_todo_row(
     for field in (
         "berita_acara",
         "au58",
+        "au58_sppn",
+        "au58_sppb",
         "no_ba",
         "ba_au58",
         "berita_acara_sppb",
         "berita_acara_sppn",
+        "referensi",
+        "referensi_sppn",
+        "referensi_sppb",
+        "sp_opl",
+        "sp_opl_sppn",
+        "kwitansi",
+        "kwitansi_sppn",
         "keterangan",
         "uraian",
+        "sppn_uraian",
+        "sppn_uraian2",
+        "nomor",
+        "nomor_spp",
+        "no_spp",
     ):
         val = _normalize_match_text(row.get(field))
         if no_do_n and val and (no_do_n == val or no_do_n in val or val in no_do_n):
@@ -156,6 +176,7 @@ def _score_todo_row(
         else:
             score -= 50
 
+    amount_matched = False
     for amount_field in ("sppn_jumlah", "sppb_total", "total", "jumlah", "nominal"):
         raw = row.get(amount_field)
         if raw is None:
@@ -166,7 +187,38 @@ def _score_todo_row(
             continue
         if total_sppn > 0 and abs(amount - total_sppn) <= 1:
             score += 30
+            amount_matched = True
             break
+
+    def _norm_date_key(value: str) -> str:
+        text = _normalize_match_text(value)
+        if not text:
+            return ""
+        if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+            return text[:10]
+        if len(text) >= 10 and text[2] == "-" and text[5] == "-":
+            d, m, y = text.split("-", 2)
+            return f"{y}-{m}-{d}"[:10]
+        if "/" in text:
+            parts = text.split("/")
+            if len(parts) == 3 and len(parts[2]) == 4:
+                return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+        return text
+
+    tanggal_matched = False
+    tanggal_key = _norm_date_key(tanggal_transfer)
+    for date_field in ("sppn_tanggal", "tanggal", "tanggal_sppn", "tanggal_sppb"):
+        row_key = _norm_date_key(str(row.get(date_field) or ""))
+        if tanggal_key and row_key and tanggal_key == row_key:
+            score += 25
+            tanggal_matched = True
+            break
+
+    if amount_matched and mitra_n and mitra_n in blob:
+        score += 25
+
+    if tanggal_key and not tanggal_matched and score < 800:
+        return 0
 
     return score
 
@@ -190,6 +242,15 @@ def _extract_numbers_from_blob(text: str) -> tuple[str | None, str | None]:
         sppb_m.group(1) if sppb_m else None,
         sppn_m.group(1) if sppn_m else None,
     )
+
+
+def _extract_numbers_from_page(page) -> tuple[str | None, str | None]:
+    try:
+        url = page.url or ""
+        body = page.content()
+    except Exception:
+        return None, None
+    return _extract_numbers_from_blob(f"{url}\n{body}")
 
 
 def _coalesce_spp_numbers(
@@ -243,11 +304,27 @@ def _extract_numbers_from_store(body: Any) -> tuple[str | None, str | None]:
                     text = str(value).strip()
                     if not text:
                         continue
-                    if key_l in {"sppb_no", "no_sppb", "nomor_sppb"}:
+                    if key_l in {"sppb_no", "no_sppb", "nomor_sppb", "no_sppb_draft"}:
                         sppb_no = text
-                    elif key_l in {"sppn_no", "no_sppn", "nomor_sppn", "nomor", "no_spp"}:
-                        if "sppn" in text.lower() or key_l != "nomor" or "/sppn/" in text.lower():
+                    elif key_l in {
+                        "sppn_no",
+                        "no_sppn",
+                        "nomor_sppn",
+                        "nomor",
+                        "no_spp",
+                        "no_sppn_draft",
+                        "nomor_draft",
+                    }:
+                        if (
+                            "sppn" in text.lower()
+                            or key_l != "nomor"
+                            or "/sppn/" in text.lower()
+                        ):
                             sppn_no = text
+                    elif key_l in {"message", "msg", "info"} and isinstance(text, str):
+                        blob_sppb, blob_sppn = _extract_numbers_from_blob(text)
+                        sppb_no = sppb_no or blob_sppb
+                        sppn_no = sppn_no or blob_sppn
                 child_sppb, child_sppn = walk(value)
                 sppb_no = sppb_no or child_sppb
                 sppn_no = sppn_no or child_sppn
@@ -276,14 +353,46 @@ def _extract_numbers_from_store(body: Any) -> tuple[str | None, str | None]:
     return walk(body)
 
 
+def _score_all_todo_rows(
+    rows: list[Any],
+    payload,
+    *,
+    expect_sppb: bool,
+) -> list[tuple[int, dict[str, Any]]]:
+    total_sppn = int(payload.dpp_pokok or 0) + int(payload.pajak_ppn or 0)
+    scored: list[tuple[int, dict[str, Any]]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        score = _score_todo_row(
+            row,
+            no_do=payload.no_do,
+            no_kontrak=payload.no_kontrak,
+            mitra_pembeli=payload.mitra_pembeli,
+            total_sppn=total_sppn,
+            expect_sppb=expect_sppb,
+            tanggal_transfer=payload.tanggal_transfer,
+        )
+        if score > 0:
+            scored.append((score, row))
+    scored.sort(
+        key=lambda item: (
+            item[0],
+            int(item[1].get("sppn_id") or item[1].get("spp_id") or 0),
+        ),
+        reverse=True,
+    )
+    return scored
+
+
 def _find_todo_match(
     page,
     base_url: str,
     payload,
     *,
     expect_sppb: bool,
-    retries: int = 6,
-    delay_ms: int = 1500,
+    retries: int = 12,
+    delay_ms: int = 2000,
 ) -> dict[str, Any] | None:
     best: dict[str, Any] | None = None
     best_score = 0
@@ -304,6 +413,7 @@ def _find_todo_match(
                     mitra_pembeli=payload.mitra_pembeli,
                     total_sppn=total_sppn,
                     expect_sppb=expect_sppb,
+                    tanggal_transfer=payload.tanggal_transfer,
                 )
                 if score > best_score:
                     best_score = score
@@ -313,9 +423,101 @@ def _find_todo_match(
         if _attempt < retries - 1:
             page.wait_for_timeout(delay_ms)
 
-    if best_score >= 100:
+    if best_score >= 70:
         return best
     return None
+
+
+def recover_superman_from_todo(no_do: str) -> dict[str, Any]:
+    """Cari nomor SPPn/SPPb di To Do List lalu simpan ke kolom DO."""
+    no_do = no_do.strip()
+    existing = get_do_superman(no_do)
+    if existing:
+        return {
+            "ok": True,
+            "no_do": no_do,
+            "superman_saved": existing,
+            "message": "Sudah tersimpan sebelumnya.",
+            "recovered": False,
+        }
+
+    inspect = inspect_superman_todo(no_do, limit=3)
+    coalesce = inspect.get("coalesce") or {}
+    sppb_no = coalesce.get("sppb_no")
+    sppn_no = coalesce.get("sppn_no")
+    top = inspect.get("top_scores") or []
+    best_score = top[0]["score"] if top else 0
+
+    if best_score < 70 or not (sppb_no or sppn_no):
+        return {
+            "ok": False,
+            "no_do": no_do,
+            "message": "Tidak menemukan SPPn/SPPb yang cocok di To Do List Superman.",
+            "inspect": inspect,
+        }
+
+    saved = save_superman_to_do(no_do, sppb_no, sppn_no)
+    return {
+        "ok": bool(saved),
+        "no_do": no_do,
+        "sppb_no": sppb_no,
+        "sppn_no": sppn_no,
+        "superman_saved": saved,
+        "best_score": best_score,
+        "recovered": True,
+        "message": f"Nomor Superman dipulihkan dari To Do List: {saved}" if saved else "Gagal menyimpan",
+    }
+
+
+def inspect_superman_todo(no_do: str, *, limit: int = 8) -> dict[str, Any]:
+    """Baca To Do List Superman untuk debug / recovery nomor SPPn."""
+    no_do = no_do.strip()
+    cfg = _api_config()
+    ensure_session(cfg)
+    payload = build_payload_from_do(no_do)
+    expect_sppb = payload.pph_nominal > 0
+
+    pw, browser, context = open_authenticated_context(cfg)
+    try:
+        page = context.new_page()
+        resp = page.request.get(f"{cfg.base_url.rstrip('/')}/sppd/getTodo")
+        rows = resp.json().get("data") or [] if resp.ok else []
+        scored = _score_all_todo_rows(rows, payload, expect_sppb=expect_sppb)
+        hits = []
+        no_do_n = _normalize_match_text(no_do)
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if no_do_n and no_do_n in _todo_row_blob(row):
+                hits.append(row)
+
+        best = scored[0][1] if scored else None
+        sppb_no, sppn_no = _coalesce_spp_numbers(
+            store_sppb=None,
+            store_sppn=None,
+            match=best,
+            store_body=None,
+        )
+        return {
+            "no_do": no_do,
+            "todo_rows": len(rows),
+            "direct_blob_hits": len(hits),
+            "top_scores": [
+                {
+                    "score": score,
+                    "sppn_no": row.get("sppn_no"),
+                    "sppb_no": row.get("sppb_no"),
+                    "keys": list(row.keys()),
+                    "row": row,
+                }
+                for score, row in scored[:limit]
+            ],
+            "coalesce": {"sppb_no": sppb_no, "sppn_no": sppn_no},
+        }
+    finally:
+        context.close()
+        browser.close()
+        pw.stop()
 
 
 def request_captcha() -> dict[str, Any]:
@@ -340,7 +542,7 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
     cfg = _api_config()
 
     report(10, "Memvalidasi session Superman")
-    ensure_session(cfg, auto_login=False)
+    ensure_session(cfg)
 
     payload = build_payload_from_do(no_do)
     support = resolve_support_doc_from_do(no_do)
@@ -348,7 +550,9 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
     report(20, "Membuka browser Superman")
     store_sppb: str | None = None
     store_sppn: str | None = None
+    store_body: Any = None
     match: dict[str, Any] | None = None
+    todo_debug: list[dict[str, Any]] = []
     pw, browser, context = open_authenticated_context(cfg)
     try:
         page = context.new_page()
@@ -362,12 +566,28 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
         store_body = submit_sppn_draft(page, on_progress=on_progress)
         report(95, "Memverifikasi To Do List")
         store_sppb, store_sppn = _extract_numbers_from_store(store_body)
+        page_sppb, page_sppn = _extract_numbers_from_page(page)
+        store_sppb = store_sppb or page_sppb
+        store_sppn = store_sppn or page_sppn
         match = _find_todo_match(
             page,
             cfg.base_url,
             payload,
             expect_sppb=payload.pph_nominal > 0,
         )
+        if not match:
+            resp = page.request.get(f"{cfg.base_url.rstrip('/')}/sppd/getTodo")
+            rows = resp.json().get("data") or [] if resp.ok else []
+            for score, row in _score_all_todo_rows(
+                rows, payload, expect_sppb=payload.pph_nominal > 0
+            )[:5]:
+                todo_debug.append(
+                    {
+                        "score": score,
+                        "sppn_no": row.get("sppn_no"),
+                        "sppb_no": row.get("sppb_no"),
+                    }
+                )
     finally:
         context.close()
         browser.close()
@@ -413,6 +633,15 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
             f"Draft SPPn/SPPb berhasil, namun nomor belum tersimpan otomatis ke DO. "
             f"Salin manual: {format_superman_ref(sppb_no, sppn_no)}"
         )
+    else:
+        result["extract_debug"] = {
+            "store_extract": {"sppb": store_sppb, "sppn": store_sppn},
+            "store_body_preview": json.dumps(store_body, ensure_ascii=False, default=str)[:2500]
+            if store_body is not None
+            else None,
+            "todo_top": todo_debug,
+            "match_found": match is not None,
+        }
 
     report(100, "Selesai")
     return result
@@ -430,7 +659,7 @@ def start_deklarasi_job(no_do: str) -> dict[str, Any]:
     no_do = no_do.strip()
     assert_do_not_submitted(no_do)
     cfg = _api_config()
-    ensure_session(cfg, auto_login=False)
+    ensure_session(cfg)
     job_id = create_job(no_do)
     update_job(job_id, 0, "Memulai proses...")
     thread = threading.Thread(target=_run_deklarasi_job, args=(job_id, no_do), daemon=True)
