@@ -731,8 +731,15 @@ def generate_do_docx(do) -> io.BytesIO:
         _run(p, h, bold=True, size=10)
 
     # 8. Data Row
-    vol_str = _id_fmt(k.volume) if (k.volume and k.volume > 0) else '-'
-    bale_str = _id_fmt(k.banyaknya_bale_karung) if (k.banyaknya_bale_karung and k.banyaknya_bale_karung > 0) else '-'
+    do_vol = float(do.volume_do or 0)
+    vol_str = _id_fmt(do_vol) if do_vol > 0 else (_id_fmt(k.volume) if (k.volume and k.volume > 0) else '-')
+    bale_total = float(k.banyaknya_bale_karung or 0)
+    if bale_total > 0 and do_vol > 0 and k.volume and k.volume > 0:
+        bale_str = _id_fmt(round(bale_total * (do_vol / float(k.volume))))
+    elif bale_total > 0:
+        bale_str = _id_fmt(bale_total)
+    else:
+        bale_str = '-'
 
     data = [
         _s(k.kebun_produsen),

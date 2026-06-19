@@ -461,6 +461,7 @@ export interface DeliveryOrderInput {
   is_pph_disetor?: string
   rencana_pengambilan?: string | null
   no_ba?: string
+  volume_do?: number
 }
 
 export interface BypassInput {

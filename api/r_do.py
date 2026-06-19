@@ -40,19 +40,21 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     no_ba = do.no_ba or db_invoice.no_ba
     db_ba = get_ba_for_entity(db, no_ba) if payung_ba else None
 
+    volume_for_calc = kontrak_volume
+    nilai_unit_penuh = invoice_total
+
     if payung_ba:
         if not db_ba:
             raise HTTPException(status_code=400, detail="Kontrak payung wajib memilih Berita Acara (no_ba)")
         if db_ba.no_kontrak != db_invoice.no_kontrak:
             raise HTTPException(status_code=400, detail="BA tidak sesuai dengan kontrak invoice")
-        volume_do = float(db_ba.volume_ba or 0)
+        volume_for_calc = float(db_ba.volume_ba or 0)
+        nilai_unit_penuh = invoice_total
         rencana_pengambilan = db_ba.tanggal_ba
     else:
         if do.no_ba:
             raise HTTPException(status_code=400, detail="no_ba hanya untuk kontrak PAYUNG_BA")
 
-        # Jika invoice terkait unit, pakai volume unit untuk perhitungan proporsional
-        volume_for_calc = kontrak_volume
         if db_invoice.nama_unit and db_kontrak:
             unit = next((u for u in db_kontrak.units if u.nama_unit == db_invoice.nama_unit), None)
             if unit and (unit.volume or 0) > 0:
@@ -67,12 +69,24 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
         pokok_full = (kontrak_volume * harga_satuan) + premi
         ppn_full = pokok_full * ppn_persen if is_ppn else 0.0
         nilai_unit_penuh = (pokok_full + ppn_full) * unit_ratio
-
-        if nilai_unit_penuh > 0 and volume_for_calc > 0:
-            volume_do = (nominal / nilai_unit_penuh) * volume_for_calc
-        else:
-            volume_do = volume_for_calc
         rencana_pengambilan = do.rencana_pengambilan
+
+    user_volume = float(do.volume_do or 0) if do.volume_do is not None else 0.0
+    if user_volume > 0:
+        volume_do = user_volume
+    elif nilai_unit_penuh > 0 and volume_for_calc > 0 and nominal > 0:
+        volume_do = (nominal / nilai_unit_penuh) * volume_for_calc
+    elif nominal <= 0:
+        volume_do = 0.0
+    else:
+        volume_do = volume_for_calc
+
+    max_volume = volume_for_calc
+    if max_volume > 0 and volume_do > max_volume + 0.5:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Volume barang ({volume_do:,.0f}) melebihi volume maksimum ({max_volume:,.0f})",
+        )
 
     # Calculate selisih — sisa dari invoice yang belum ditransfer
     selisih = invoice_total - nominal

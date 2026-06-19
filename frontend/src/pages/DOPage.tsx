@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -21,24 +21,26 @@ import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { client } from '@/lib/client'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
-import type { StokSaldo } from '@/types'
+import type { DeliveryOrderInput, StokSaldo } from '@/types'
 import { calculateProportionalVolume, calculateSelisih, getVolumePercentage } from '@/utils/doUtils'
 import type { Kontrak } from '@/types'
 
 // Exact replica of forms.js buildDOPreview() format
-function DOPreviewContent({ noDo, noInv, tgl, unit, k, nilaiPenuh, nominal, kontrakVol }: {
+function DOPreviewContent({ noDo, noInv, tgl, unit, k, volumeKeluar, maxVolume }: {
   noDo: string; noInv: string; tgl: string; unit: string; k: Partial<Kontrak>;
-  nilaiPenuh: number; nominal: number; kontrakVol: number;
+  volumeKeluar: number; maxVolume: number;
 }) {
   const pembeli = k.pembeli ? k.pembeli.split('\n')[0] : '-'
   const tglDoStr = tgl ? tgl.split('-').reverse().join('/') : '-'
 
-  let propVol = 0
-  if (nilaiPenuh > 0 && kontrakVol > 0) {
-    propVol = (nominal / nilaiPenuh) * kontrakVol
-  }
-  const volStr = propVol > 0 ? Math.round(propVol).toLocaleString('id-ID') : (k.volume ? Math.round(k.volume).toLocaleString('id-ID') : '-')
-  const baleStr = k.banyaknya_bale_karung ? Number(k.banyaknya_bale_karung) : '-'
+  const volStr = volumeKeluar > 0
+    ? Math.round(volumeKeluar).toLocaleString('id-ID')
+    : '-'
+  const baleTotal = Number(k.banyaknya_bale_karung || 0)
+  const refVol = maxVolume > 0 ? maxVolume : (k.volume || 0)
+  const baleStr = baleTotal > 0 && volumeKeluar > 0 && refVol > 0
+    ? Math.round(baleTotal * (volumeKeluar / refVol)).toLocaleString('id-ID')
+    : (baleTotal > 0 ? baleTotal.toLocaleString('id-ID') : '-')
 
   const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '9pt', fontFamily: '"Calibri", Arial, sans-serif', color: '#000', border: '1px solid #000', backgroundColor: '#fff' }
   const tdStyle: React.CSSProperties = { border: '1px solid #000', padding: '6px', verticalAlign: 'top' }
@@ -121,6 +123,7 @@ const doSchema = z.object({
   kepada_unit: z.string().optional(),
   tanggal_pembayaran: z.string().optional(),
   nominal_transfer: z.coerce.number().min(0),
+  volume_keluar: z.coerce.number().min(0).optional(),
   is_pph_disetor: z.string().optional(),
   rencana_pengambilan: z.string().optional(),
   no_ba: z.string().optional(),
@@ -138,6 +141,7 @@ export default function DOPage() {
   const [exportNo, setExportNo] = useState<string | null>(null)
   const [existingSuperman, setExistingSuperman] = useState<string | null>(null)
   const [isExisting, setIsExisting] = useState(false)
+  const volumeManualRef = useRef(false)
 
   const form = useForm<DOFormData>({
     resolver: zodResolver(doSchema),
@@ -148,6 +152,7 @@ export default function DOPage() {
       kepada_unit: '',
       tanggal_pembayaran: '',
       nominal_transfer: 0,
+      volume_keluar: 0,
       is_pph_disetor: 'false',
       rencana_pengambilan: '',
     },
@@ -156,6 +161,7 @@ export default function DOPage() {
   const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors, isSubmitting } } = form
   const selectedInvoice = watch('no_invoice')
   const nominalTransfer = watch('nominal_transfer')
+  const volumeKeluar = watch('volume_keluar')
   const kepadaUnit = watch('kepada_unit')
   const noDo = watch('no_do')
   const tanggalDo = watch('tanggal_do')
@@ -195,6 +201,8 @@ export default function DOPage() {
       setValue('kepada_unit', data.kepada_unit || '')
       setValue('tanggal_pembayaran', data.tanggal_pembayaran || '')
       setValue('nominal_transfer', data.nominal_transfer)
+      setValue('volume_keluar', data.volume_do || 0)
+      volumeManualRef.current = true
       setValue('is_pph_disetor', data.is_pph_disetor)
       setValue('rencana_pengambilan', data.rencana_pengambilan || '')
     } else {
@@ -211,33 +219,53 @@ export default function DOPage() {
     return currentKontrak.units.find(u => u.nama_unit === currentInvoice.nama_unit) || null
   }, [currentInvoice, currentKontrak])
 
-  // Volume calculation — pakai unit volume jika ada
   const invoiceTotal = currentInvoice?.jumlah_pembayaran || 0
-  const kontrakVolume = unitForDO?.volume || currentKontrak?.volume || 0
+  const isPayungBA = String(currentKontrak?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
+  const linkedBA = currentInvoice?.no_ba
+  const linkedBAData = useMemo(
+    () => (linkedBA ? baStore.data.find((b) => b.no_ba === linkedBA) : null),
+    [baStore.data, linkedBA],
+  )
 
-  // Nilai penuh unit/kontrak = denominator yang benar untuk volume proporsional
-  // (bukan invoice.jumlah_pembayaran yang bisa berupa pembayaran parsial)
+  const maxVolume = useMemo(() => {
+    if (isPayungBA) return linkedBAData?.volume_ba || 0
+    return unitForDO?.volume || currentKontrak?.volume || 0
+  }, [isPayungBA, linkedBAData, unitForDO, currentKontrak])
+
   const nilaiUnitPenuh = useMemo(() => {
     if (!currentKontrak) return 0
+    if (isPayungBA) return invoiceTotal
     const vol = currentKontrak.volume || 0
     const harga = currentKontrak.harga_satuan || 0
     const premi = currentKontrak.premi || 0
     const isppn = String(currentKontrak.is_ppn).toLowerCase() === 'true'
     const ppnPct = (currentKontrak.ppn_persen || 0) / 100
-    if (!vol) return 0
-    const ratio = kontrakVolume / vol
+    if (!vol) return invoiceTotal
+    const ratio = maxVolume / vol
     const pokokFull = vol * harga + premi
     const ppnFull = isppn ? pokokFull * ppnPct : 0
     return Math.round((pokokFull + ppnFull) * ratio)
-  }, [currentKontrak, kontrakVolume])
+  }, [currentKontrak, isPayungBA, invoiceTotal, maxVolume])
 
-  const isPayungBA = String(currentKontrak?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
-  const linkedBA = currentInvoice?.no_ba
-  const volumeDo = isPayungBA
-    ? (baStore.data.find((b) => b.no_ba === linkedBA)?.volume_ba || 0)
-    : calculateProportionalVolume(Number(nominalTransfer) || 0, nilaiUnitPenuh, kontrakVolume)
+  const volumeProporsional = useMemo(
+    () => calculateProportionalVolume(Number(nominalTransfer) || 0, nilaiUnitPenuh, maxVolume),
+    [nominalTransfer, nilaiUnitPenuh, maxVolume],
+  )
+
+  useEffect(() => {
+    if (volumeManualRef.current || isExisting) return
+    setValue('volume_keluar', volumeProporsional)
+  }, [volumeProporsional, isExisting, setValue])
+
+  useEffect(() => {
+    if (!selectedInvoice) {
+      volumeManualRef.current = false
+    }
+  }, [selectedInvoice])
+
+  const volumeDo = Number(volumeKeluar) || 0
   const selisih = calculateSelisih(invoiceTotal, Number(nominalTransfer) || 0)
-  const volumePct = getVolumePercentage(volumeDo, kontrakVolume)
+  const volumePct = getVolumePercentage(volumeDo, maxVolume)
 
   const stokUnit = kepadaUnit || currentInvoice?.nama_unit || ''
   const stokMaterial =
@@ -268,7 +296,21 @@ export default function DOPage() {
 
   const onSubmit = async (data: DOFormData) => {
     try {
-      await doStore.save(data)
+      const payload: DeliveryOrderInput = {
+        no_do: data.no_do,
+        no_invoice: data.no_invoice,
+        tanggal_do: data.tanggal_do,
+        kepada_unit: data.kepada_unit,
+        tanggal_pembayaran: data.tanggal_pembayaran || null,
+        nominal_transfer: data.nominal_transfer,
+        is_pph_disetor: data.is_pph_disetor,
+        rencana_pengambilan: data.rencana_pengambilan || null,
+        no_ba: data.no_ba,
+      }
+      if (data.volume_keluar && data.volume_keluar > 0) {
+        payload.volume_do = Math.round(data.volume_keluar)
+      }
+      await doStore.save(payload)
       setExportNo(data.no_do)
       setIsExisting(true)
       addNotification('Delivery Order berhasil disimpan', 'success')
@@ -281,6 +323,7 @@ export default function DOPage() {
     reset()
     setIsExisting(false)
     setExportNo(null)
+    volumeManualRef.current = false
   }
 
   const handleExport = () => {
@@ -405,22 +448,45 @@ export default function DOPage() {
                   <option value="true">Sudah</option>
                 </NativeSelect>
               </div>
-              <div>
-                <Label className="text-xs">Volume Dapat Diambil</Label>
-                <p className={`text-lg font-bold mt-1 ${
-                  volumePct > 100 ? 'text-red-600' : volumePct > 0 ? 'text-green-600' : 'text-blue-600'
-                }`}>
-                  {formatNumber(volumeDo)} {currentKontrak?.satuan || ''}
-                  {volumePct > 0 && ` (${Math.round(volumePct)}%)`}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">Selisih: {formatCurrency(selisih)}</p>
-                {stokUnit && stokMaterial && (
-                  <p className={cn('text-xs mt-2', stokKurang ? 'text-amber-700' : 'text-slate-600')}>
-                    Persediaan tersedia{tanggalDo ? ` per ${tanggalDo.split('-').reverse().join('/')}` : ''}:{' '}
-                    {stokSaldo != null ? `${formatNumber(stokSaldo.saldo)} ${stokSatuan}` : '—'}
-                    {stokKurang && ' — kurang, DO tetap dapat disimpan'}
+              <div className="col-span-3 border-t pt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs">Volume Barang Keluar ({currentKontrak?.satuan || 'Kg'}) *</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    {...register('volume_keluar', {
+                      onChange: () => { volumeManualRef.current = true },
+                    })}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Proporsional dari pembayaran:{' '}
+                    <strong>{formatNumber(volumeProporsional)} {currentKontrak?.satuan || 'Kg'}</strong>
+                    {nilaiUnitPenuh > 0 && nominalTransfer > 0 && (
+                      <> ({Math.round((Number(nominalTransfer) / nilaiUnitPenuh) * 100)}% dari invoice)</>
+                    )}
+                    {maxVolume > 0 && <> — maks {formatNumber(maxVolume)} {currentKontrak?.satuan || 'Kg'}</>}
                   </p>
-                )}
+                  {volumeDo > maxVolume && maxVolume > 0 && (
+                    <p className="text-xs text-red-600 mt-1">Volume melebihi maksimum ({formatNumber(maxVolume)})</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">Ringkasan</Label>
+                  <p className={`text-lg font-bold mt-1 ${
+                    volumePct > 100 ? 'text-red-600' : volumePct > 0 ? 'text-green-600' : 'text-blue-600'
+                  }`}>
+                    {formatNumber(volumeDo)} {currentKontrak?.satuan || ''}
+                    {volumePct > 0 && ` (${Math.round(volumePct)}% volume)`}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">Selisih pembayaran: {formatCurrency(selisih)}</p>
+                  {stokUnit && stokMaterial && (
+                    <p className={cn('text-xs mt-2', stokKurang ? 'text-amber-700' : 'text-slate-600')}>
+                      Persediaan tersedia{tanggalDo ? ` per ${tanggalDo.split('-').reverse().join('/')}` : ''}:{' '}
+                      {stokSaldo != null ? `${formatNumber(stokSaldo.saldo)} ${stokSatuan}` : '—'}
+                      {stokKurang && ' — kurang, DO tetap dapat disimpan'}
+                    </p>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -438,7 +504,7 @@ export default function DOPage() {
                   {currentInvoice.nama_unit && (
                     <><span className="text-slate-500">Unit:</span><span className="font-medium text-brand-600">{currentInvoice.nama_unit}</span></>
                   )}
-                  <span className="text-slate-500">{currentInvoice.nama_unit ? 'Volume Unit:' : 'Volume Kontrak:'}</span><span>{formatCurrency(kontrakVolume)} {currentKontrak.satuan}</span>
+                  <span className="text-slate-500">{isPayungBA ? 'Volume BA:' : currentInvoice.nama_unit ? 'Volume Unit:' : 'Volume Kontrak:'}</span><span>{formatCurrency(maxVolume)} {currentKontrak.satuan}</span>
                   <span className="text-slate-500">Nilai Penuh Unit:</span><span className="text-slate-700">{formatCurrency(nilaiUnitPenuh)}</span>
                   <span className="text-slate-500">Invoice ini:</span><span className="font-semibold">{formatCurrency(invoiceTotal)}{nilaiUnitPenuh > 0 ? ` (${Math.round(invoiceTotal / nilaiUnitPenuh * 100)}%)` : ''}</span>
                   {isPayungBA && linkedBA && (
@@ -511,9 +577,8 @@ export default function DOPage() {
           tgl={watch('tanggal_do') || ''}
           unit={watch('kepada_unit') || '-'}
           k={currentKontrak || {}}
-          nilaiPenuh={nilaiUnitPenuh}
-          nominal={Number(nominalTransfer) || 0}
-          kontrakVol={kontrakVolume}
+          volumeKeluar={volumeDo}
+          maxVolume={maxVolume}
         />
       </PreviewPanel>
     </div>

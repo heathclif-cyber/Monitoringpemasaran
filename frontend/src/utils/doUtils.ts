@@ -3,9 +3,10 @@ export function calculateProportionalVolume(
   nilaiPenuh: number,
   unitVolume: number,
 ): number {
-  if (nilaiPenuh > 0 && unitVolume > 0) {
+  if (nilaiPenuh > 0 && unitVolume > 0 && nominal > 0) {
     return Math.round((nominal / nilaiPenuh) * unitVolume)
   }
+  if (nominal <= 0) return 0
   return unitVolume || 0
 }
 

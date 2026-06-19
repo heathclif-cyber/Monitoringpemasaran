@@ -169,7 +169,7 @@ class DeliveryOrderBase(BaseModel):
     no_ba: Optional[str] = None
 
 class DeliveryOrderCreate(DeliveryOrderBase):
-    pass
+    volume_do: Optional[float] = None  # opsional — user input; kosong = hitung proporsional
 
 class DeliveryOrderOut(DeliveryOrderBase):
     selisih: float
