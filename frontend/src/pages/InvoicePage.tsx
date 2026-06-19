@@ -20,7 +20,7 @@ import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
-import { calculateKontrakPricing, calculateJatuhTempo } from '@/utils/kontrakUtils'
+import { calculateKontrakPricing, calculateJatuhTempo, isPayungBA as isPayungBAKontrak } from '@/utils/kontrakUtils'
 import { calculateBAInvoiceAmount } from '@/utils/baUtils'
 import type { Kontrak } from '@/types'
 
@@ -238,9 +238,14 @@ export default function InvoicePage() {
   }
 
 
-  // Pricing
-  const k = currentKontrak ?? kontrakFromList
-  const isPayungBA = String(k?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
+  // Kontrak aktif harus match no_kontrak yang dipilih — hindari stale currentKontrak dari pilihan sebelumnya
+  const k = useMemo(() => {
+    if (kontrakFromList?.no_kontrak === selectedKontrak) return kontrakFromList
+    if (currentKontrak?.no_kontrak === selectedKontrak) return currentKontrak
+    return kontrakFromList ?? null
+  }, [kontrakFromList, currentKontrak, selectedKontrak])
+
+  const isPayungBA = isPayungBAKontrak(k?.tipe_alur)
 
   const baOptions = useMemo(() => {
     if (!isPayungBA || !selectedKontrak) return []

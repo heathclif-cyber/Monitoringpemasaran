@@ -47,6 +47,11 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   },
 
   fetchKontrakForInvoice: async (noKontrak: string) => {
+    set((state) => (
+      state.currentKontrak?.no_kontrak === noKontrak
+        ? state
+        : { ...state, currentKontrak: null }
+    ))
     try {
       const data = await client.get<Kontrak>(`/api/kontrak/${encodeURIComponent(noKontrak)}`)
       set({ currentKontrak: data })
