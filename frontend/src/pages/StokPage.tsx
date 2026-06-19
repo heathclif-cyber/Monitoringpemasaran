@@ -212,7 +212,7 @@ export default function StokPage() {
                 <div>
                   <CardTitle className="text-sm font-semibold">Saldo Saat Ini</CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Persediaan masuk per tanggal input. DO lama otomatis mengurangi persediaan per tanggal DO.
+                    Persediaan masuk per tanggal input. DO mengurangi persediaan per tanggal DO (saldo boleh negatif).
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

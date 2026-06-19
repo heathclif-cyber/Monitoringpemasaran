@@ -415,10 +415,10 @@ export default function DOPage() {
                 </p>
                 <p className="text-xs text-slate-500 mt-1">Selisih: {formatCurrency(selisih)}</p>
                 {stokUnit && stokMaterial && (
-                  <p className={cn('text-xs mt-2', stokKurang ? 'text-red-600 font-medium' : 'text-slate-600')}>
+                  <p className={cn('text-xs mt-2', stokKurang ? 'text-amber-700' : 'text-slate-600')}>
                     Persediaan tersedia{tanggalDo ? ` per ${tanggalDo.split('-').reverse().join('/')}` : ''}:{' '}
                     {stokSaldo != null ? `${formatNumber(stokSaldo.saldo)} ${stokSatuan}` : '—'}
-                    {stokKurang && ' — tidak cukup untuk DO ini'}
+                    {stokKurang && ' — kurang, DO tetap dapat disimpan'}
                   </p>
                 )}
               </div>

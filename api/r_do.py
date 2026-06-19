@@ -14,7 +14,6 @@ from services.stok_utils import (
     record_stok_keluar_do,
     resolve_do_stock_context,
     reverse_stok_do,
-    validate_stok_cukup,
 )
 
 router = APIRouter(prefix="/api/do", tags=["Delivery Order"])
@@ -111,7 +110,6 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
         )
 
     reverse_stok_do(db, do.no_do)
-    validate_stok_cukup(db, ctx, as_of=saved_do.tanggal_do)
     record_stok_keluar_do(db, saved_do, ctx)
 
     db.commit()

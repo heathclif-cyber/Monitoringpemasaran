@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 import models
@@ -127,15 +126,16 @@ def get_saldo(
     return masuk - keluar
 
 
-def validate_stok_cukup(
+def stok_kurang_info(
     db: Session,
     ctx: dict,
     *,
     as_of: Optional[date] = None,
     exclude_referensi_id: Optional[str] = None,
-) -> None:
+) -> Optional[str]:
+    """Info peringatan jika saldo kurang — tidak memblokir penyimpanan DO."""
     if ctx["volume"] <= 0:
-        return
+        return None
     cutoff = as_of or date.today()
     saldo = get_saldo(
         db,
@@ -148,13 +148,11 @@ def validate_stok_cukup(
     needed = ctx["volume"]
     if saldo < needed:
         tgl = cutoff.strftime("%d/%m/%Y")
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Persediaan tidak cukup per tanggal {tgl}: {ctx['unit']} / {ctx['jenis_material']} "
-                f"tersedia {saldo:,.0f} {ctx['satuan']}, dibutuhkan {needed:,.0f} {ctx['satuan']}"
-            ),
+        return (
+            f"Persediaan kurang per tanggal {tgl}: {ctx['unit']} / {ctx['jenis_material']} "
+            f"tersedia {saldo:,.0f} {ctx['satuan']}, DO membutuhkan {needed:,.0f} {ctx['satuan']}"
         )
+    return None
 
 
 def reverse_stok_do(db: Session, no_do: str) -> None:
