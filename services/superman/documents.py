@@ -114,32 +114,31 @@ def _resolve_upload(
 SupportSource = tuple[str, str, str, str]
 
 _PENDING_SUPPORT_HINT = (
-    "Upload salah satu: Kontrak, Berita Acara, Deklarasi Penerimaan, atau Dokumen DO/SPPB."
+    "Upload salah satu: Kontrak, Invoice, atau Kuitansi (pada nomor invoice terkait)."
 )
 
 
-def _do_support_sources(no_do: str) -> list[SupportSource]:
-    """Dokumen pendukung pada entity DO — berlaku semua komoditi."""
+def _invoice_support_sources(no_invoice: str) -> list[SupportSource]:
+    """Dokumen pendukung pada entity Invoice — berlaku semua komoditi."""
     return [
-        ("do", no_do, "berita_acara", "Berita Acara (DO)"),
-        ("do", no_do, "deklarasi", "Deklarasi Penerimaan (DO)"),
-        ("do", no_do, "do", "Dokumen DO/SPPB"),
+        ("invoice", no_invoice, "invoice", "Dokumen Invoice"),
+        ("invoice", no_invoice, "kuitansi", "Kuitansi"),
     ]
 
 
-def _standar_support_sources(kontrak_id: str, no_do: str) -> list[SupportSource]:
+def _standar_support_sources(kontrak_id: str, no_invoice: str) -> list[SupportSource]:
     """Kontrak standar — cukup salah satu sumber (semua komoditi)."""
     return [
         ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
-        *_do_support_sources(no_do),
+        *_invoice_support_sources(no_invoice),
     ]
 
 
-def _payung_ba_support_sources(no_ba: str, no_do: str) -> list[SupportSource]:
-    """Kontrak payung BA — BA atau dokumen DO (semua komoditi)."""
+def _payung_ba_support_sources(no_ba: str, no_invoice: str) -> list[SupportSource]:
+    """Kontrak payung BA — BA atau dokumen invoice (semua komoditi)."""
     return [
         ("ba", no_ba, "berita_acara", "Berita Acara"),
-        *_do_support_sources(no_do),
+        *_invoice_support_sources(no_invoice),
     ]
 
 
@@ -209,6 +208,10 @@ def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
     if not kontrak:
         raise ValueError(f"Kontrak tidak ditemukan untuk DO: {no_do}")
 
+    no_invoice = invoice.no_invoice
+    if not no_invoice:
+        raise ValueError(f"Nomor invoice kosong untuk DO: {no_do}")
+
     if is_payung_ba(kontrak):
         no_ba = do.no_ba or invoice.no_ba
         if not no_ba and do.berita_acara:
@@ -220,12 +223,12 @@ def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
             )
         return _resolve_first_available(
             db,
-            _payung_ba_support_sources(no_ba, no_do),
+            _payung_ba_support_sources(no_ba, no_invoice),
         )
 
     return _resolve_first_available(
         db,
-        _standar_support_sources(kontrak.no_kontrak, no_do),
+        _standar_support_sources(kontrak.no_kontrak, no_invoice),
     )
 
 
@@ -266,7 +269,22 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
         return [], False
 
     kontrak = do.invoice.kontrak
+    no_invoice = do.invoice.no_invoice
     requirements: list[dict[str, str | bool | None]] = []
+
+    if not no_invoice:
+        requirements.append(
+            {
+                "label": "Invoice",
+                "entity_type": "invoice",
+                "entity_id": "-",
+                "doc_type": "invoice",
+                "uploaded": False,
+                "file_name": None,
+                "upload_hint": f"DO {no_do} belum terhubung ke invoice",
+            }
+        )
+        return requirements, False
 
     if is_payung_ba(kontrak):
         no_ba = do.no_ba or do.invoice.no_ba
@@ -286,7 +304,7 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
             )
             return requirements, False
 
-        sources = _payung_ba_support_sources(no_ba, no_do)
+        sources = _payung_ba_support_sources(no_ba, no_invoice)
         matched = _find_first_uploaded(db, sources)
         if matched:
             requirements.append(matched)
@@ -294,18 +312,18 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
         requirements.append(
             {
                 "label": "Dokumen Pendukung",
-                "entity_type": "ba",
-                "entity_id": no_ba,
-                "doc_type": "berita_acara",
+                "entity_type": "invoice",
+                "entity_id": no_invoice,
+                "doc_type": "invoice",
                 "uploaded": False,
                 "file_name": None,
-                "upload_hint": f"{_PENDING_SUPPORT_HINT} BA: {no_ba}, DO: {no_do}.",
+                "upload_hint": f"{_PENDING_SUPPORT_HINT} BA: {no_ba}, Invoice: {no_invoice}.",
             }
         )
         return requirements, False
 
     kontrak_id = kontrak.no_kontrak
-    sources = _standar_support_sources(kontrak_id, no_do)
+    sources = _standar_support_sources(kontrak_id, no_invoice)
     matched = _find_first_uploaded(db, sources)
 
     if matched:
@@ -315,12 +333,12 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
     requirements.append(
         {
             "label": "Dokumen Pendukung",
-            "entity_type": "kontrak",
-            "entity_id": kontrak_id,
-            "doc_type": "kontrak",
+            "entity_type": "invoice",
+            "entity_id": no_invoice,
+            "doc_type": "invoice",
             "uploaded": False,
             "file_name": None,
-            "upload_hint": f"{_PENDING_SUPPORT_HINT} Kontrak: {kontrak_id}, DO: {no_do}.",
+            "upload_hint": f"{_PENDING_SUPPORT_HINT} Kontrak: {kontrak_id}, Invoice: {no_invoice}.",
         }
     )
     return requirements, False

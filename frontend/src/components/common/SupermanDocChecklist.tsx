@@ -40,17 +40,15 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
             <span className={cn(!req.uploaded && 'text-amber-800 dark:text-amber-300')}>
               {req.label === 'Dokumen Kontrak'
                 ? 'Kontrak'
-                : req.label === 'Berita Acara (DO)'
-                  ? 'BA DO'
-                  : req.label === 'Deklarasi Penerimaan (DO)'
-                    ? 'Deklarasi'
-                    : req.label === 'Dokumen DO/SPPB'
-                      ? 'DO/SPPB'
-                      : req.label === 'Dokumen Pendukung'
-                        ? 'Belum upload'
-                        : req.label === 'Berita Acara'
-                          ? 'BA'
-                          : req.label}
+                : req.label === 'Dokumen Invoice'
+                  ? 'Invoice'
+                  : req.label === 'Kuitansi'
+                    ? 'Kuitansi'
+                    : req.label === 'Dokumen Pendukung'
+                      ? 'Belum upload'
+                      : req.label === 'Berita Acara'
+                        ? 'BA'
+                        : req.label}
             </span>
           </li>
         ))}
