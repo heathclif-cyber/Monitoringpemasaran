@@ -93,31 +93,52 @@ def get_ba_list(
     return q.order_by(models.BeritaAcara.tanggal_ba.desc()).offset(skip).limit(limit).all()
 
 
+def _ba_invoice_map(db: Session, no_kontrak: str) -> dict[str, str]:
+    rows = (
+        db.query(models.Invoice.no_ba, models.Invoice.no_invoice)
+        .filter(
+            models.Invoice.no_kontrak == no_kontrak,
+            models.Invoice.no_ba.isnot(None),
+        )
+        .all()
+    )
+    return {no_ba: no_invoice for no_ba, no_invoice in rows if no_ba}
+
+
 @router.get("/available")
 def get_available_ba(no_kontrak: str = Query(...), db: Session = Depends(get_db)):
-    """BA yang belum ter-invoice untuk dipilih di form invoice."""
+    """BA yang belum punya invoice — dipilih di form invoice payung."""
+    invoiced = _ba_invoice_map(db, no_kontrak)
     rows = (
         db.query(models.BeritaAcara)
-        .filter(
-            models.BeritaAcara.no_kontrak == no_kontrak,
-            models.BeritaAcara.status != "Ter-invoice",
-        )
+        .filter(models.BeritaAcara.no_kontrak == no_kontrak)
         .order_by(models.BeritaAcara.tanggal_ba.desc())
         .all()
     )
-    return [
-        {
-            "no_ba": r.no_ba,
-            "tanggal_ba": r.tanggal_ba.isoformat() if r.tanggal_ba else None,
-            "bulan_buku": r.bulan_buku.isoformat() if r.bulan_buku else None,
-            "volume_ba": r.volume_ba,
-            "harga_satuan": r.harga_satuan,
-            "nama_unit": r.nama_unit,
-            "komoditi": r.komoditi,
-            "status": r.status,
-        }
-        for r in rows
-    ]
+    result = []
+    for r in rows:
+        linked_invoice = invoiced.get(r.no_ba)
+        if linked_invoice:
+            if r.status != "Ter-invoice":
+                r.status = "Ter-invoice"
+            continue
+        if r.status == "Ter-invoice":
+            r.status = "Selesai"
+        result.append(
+            {
+                "no_ba": r.no_ba,
+                "tanggal_ba": r.tanggal_ba.isoformat() if r.tanggal_ba else None,
+                "bulan_buku": r.bulan_buku.isoformat() if r.bulan_buku else None,
+                "volume_ba": float(r.volume_ba or 0),
+                "harga_satuan": float(r.harga_satuan or 0),
+                "nama_unit": r.nama_unit,
+                "komoditi": r.komoditi,
+                "status": r.status,
+                "siap_invoice": float(r.harga_satuan or 0) > 0 and float(r.volume_ba or 0) > 0,
+            }
+        )
+    db.commit()
+    return result
 
 
 @router.get("/{no_ba:path}", response_model=schemas.BeritaAcaraOut)

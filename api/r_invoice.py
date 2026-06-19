@@ -235,7 +235,14 @@ def delete_invoice(no_invoice: str, db: Session = Depends(get_db), _: models.Use
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
+    no_ba = db_invoice.no_ba
     db.delete(db_invoice)
+    if no_ba:
+        db_ba = db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == no_ba).first()
+        if db_ba:
+            still_linked = db.query(models.Invoice).filter(models.Invoice.no_ba == no_ba).first()
+            if not still_linked and db_ba.status == "Ter-invoice":
+                db_ba.status = "Selesai"
     db.commit()
     api_cache.invalidate_reporting()
     return {"success": True, "message": "Invoice deleted successfully"}

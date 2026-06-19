@@ -171,7 +171,8 @@ type InvoiceFormData = z.infer<typeof invoiceSchema>
 export default function InvoicePage() {
   const invoiceStore = useInvoiceStore()
   const kontrakStore = useKontrakStore()
-  const { currentKontrak, fetchKontrakForInvoice } = invoiceStore
+  const currentKontrak = useInvoiceStore((s) => s.currentKontrak)
+  const fetchKontrakForInvoice = useInvoiceStore((s) => s.fetchKontrakForInvoice)
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [exportNo, setExportNo] = useState<string | null>(null)
@@ -204,14 +205,19 @@ export default function InvoicePage() {
     invoiceStore.fetch()
   }, [])
 
+  const kontrakFromList = useMemo(
+    () => kontrakStore.data.find((row) => row.no_kontrak === selectedKontrak),
+    [kontrakStore.data, selectedKontrak],
+  )
+
   // Auto-populate when kontrak selected
   useEffect(() => {
-    if (selectedKontrak) {
-      fetchKontrakForInvoice(selectedKontrak)
-      baStore.fetchAvailable(selectedKontrak)
-      baStore.fetch(selectedKontrak)
-    }
-  }, [selectedKontrak])
+    if (!selectedKontrak) return
+    setValue('no_ba', '')
+    fetchKontrakForInvoice(selectedKontrak)
+    baStore.fetchAvailable(selectedKontrak)
+    baStore.fetch(selectedKontrak)
+  }, [selectedKontrak, fetchKontrakForInvoice, setValue])
 
   // Auto-load invoice for edit
   const autoLoadInvoice = async () => {
@@ -233,8 +239,31 @@ export default function InvoicePage() {
 
 
   // Pricing
-  const k = currentKontrak
+  const k = currentKontrak ?? kontrakFromList
   const isPayungBA = String(k?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'
+
+  const baOptions = useMemo(() => {
+    if (!isPayungBA || !selectedKontrak) return []
+    if (baStore.available.length > 0) return baStore.available
+    const invoicedBa = new Set(
+      invoiceStore.data
+        .filter((inv) => inv.no_kontrak === selectedKontrak && inv.no_ba && inv.no_invoice !== watch('no_invoice'))
+        .map((inv) => inv.no_ba as string),
+    )
+    return baStore.data
+      .filter((b) => b.no_kontrak === selectedKontrak && !invoicedBa.has(b.no_ba))
+      .map((b) => ({
+        no_ba: b.no_ba,
+        tanggal_ba: b.tanggal_ba,
+        bulan_buku: b.bulan_buku,
+        volume_ba: b.volume_ba,
+        harga_satuan: b.harga_satuan,
+        nama_unit: b.nama_unit,
+        komoditi: b.komoditi,
+        status: b.status,
+        siap_invoice: (b.harga_satuan || 0) > 0 && (b.volume_ba || 0) > 0,
+      }))
+  }, [isPayungBA, selectedKontrak, baStore.available, baStore.data, invoiceStore.data, watch('no_invoice')])
   const pricing = k
     ? calculateKontrakPricing(
         k.volume || 0, k.harga_satuan || 0, k.premi || 0,
@@ -267,7 +296,7 @@ export default function InvoicePage() {
 
   const selectedBAObj = useMemo(() => {
     if (!selectedBA) return null
-    const fromAvailable = baStore.available.find((b) => b.no_ba === selectedBA)
+    const fromAvailable = baOptions.find((b) => b.no_ba === selectedBA)
     if (fromAvailable) return fromAvailable
     const fromData = baStore.data.find((b) => b.no_ba === selectedBA)
     if (!fromData) return null
@@ -281,7 +310,7 @@ export default function InvoicePage() {
       komoditi: fromData.komoditi,
       status: fromData.status,
     }
-  }, [baStore.available, baStore.data, selectedBA])
+  }, [baOptions, baStore.data, selectedBA])
 
   const payungInvoiceMax = useMemo(() => {
     if (!isPayungBA || !selectedBAObj || !k) return 0
@@ -440,15 +469,23 @@ export default function InvoicePage() {
                   <Label className="text-xs">Berita Acara *</Label>
                   <NativeSelect {...register('no_ba')}>
                     <option value="">-- Pilih BA --</option>
-                    {baStore.available.map((b) => (
+                    {baOptions.map((b) => (
                       <option key={b.no_ba} value={b.no_ba}>
-                        {b.no_ba} — {b.volume_ba?.toLocaleString('id-ID')} {k?.satuan || 'Kg'} @ {formatCurrency(b.harga_satuan)} ({b.tanggal_ba})
+                        {b.no_ba} — {b.volume_ba?.toLocaleString('id-ID')} {k?.satuan || 'Kg'} @ {formatCurrency(b.harga_satuan)}
+                        {!b.siap_invoice ? ' (belum ada harga/volume)' : ''} ({b.tanggal_ba})
                       </option>
                     ))}
                   </NativeSelect>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Invoice payung wajib terhubung ke BA. Nilai = volume BA × harga BA + PPN.
-                  </p>
+                  {baOptions.length === 0 ? (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Tidak ada BA tersedia untuk kontrak ini. Buat Berita Acara baru di menu Berita Acara
+                      (status Selesai, isi volume & harga satuan).
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Invoice payung wajib terhubung ke BA. Nilai = volume BA × harga BA + PPN.
+                    </p>
+                  )}
                 </div>
               )}
               {showUnitSelector && !isPayungBA && (

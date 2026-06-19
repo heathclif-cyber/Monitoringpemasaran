@@ -160,6 +160,7 @@ export interface BAAvailable {
   nama_unit?: string | null
   komoditi?: string | null
   status: string
+  siap_invoice?: boolean
 }
 
 export interface LaporanBypass {

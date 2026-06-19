@@ -32,6 +32,7 @@ export const useBAStore = create<BAStore>((set, get) => ({
   },
 
   fetchAvailable: async (noKontrak: string) => {
+    set({ available: [] })
     try {
       const data = await client.get<BAAvailable[]>(
         `/api/ba/available?no_kontrak=${encodeURIComponent(noKontrak)}`,
