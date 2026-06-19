@@ -285,10 +285,12 @@ export default function KontrakPage() {
     }
   }, [unitList, payungMode, setValue])
 
-  // Kontrak payung: volume hanya di Berita Acara, bukan di kontrak
+  // Kontrak payung: volume & harga hanya di Berita Acara, bukan di kontrak
   useEffect(() => {
     if (!payungMode) return
     setValue('volume', 0)
+    setValue('premi', 0)
+    setValue('harga_satuan', 0)
     setUnitList((prev) => prev.map((u) => ({ ...u, volume: 0 })))
   }, [payungMode, setValue])
 
@@ -337,6 +339,7 @@ export default function KontrakPage() {
       if (isPayungBA(data.tipe_alur)) {
         payload.volume = 0
         payload.premi = 0
+        payload.harga_satuan = 0
         payload.units = validUnits.map((u) => ({ ...u, volume: 0 }))
       } else if (validUnits.length > 0 && validUnits.every(u => (u.volume || 0) > 0)) {
         payload.volume = validUnits.reduce((s, u) => s + (u.volume || 0), 0)
@@ -396,14 +399,7 @@ export default function KontrakPage() {
       return trigger(['no_kontrak', 'tanggal_kontrak', 'pembeli'])
     }
     if (step === 2) {
-      if (payungMode) {
-        const harga = Number(getValues('harga_satuan')) || 0
-        if (harga <= 0) {
-          form.setError('harga_satuan', { message: 'Harga satuan wajib diisi untuk kontrak payung' })
-          return false
-        }
-        return trigger(['harga_satuan'])
-      }
+      if (payungMode) return true
       return trigger(['volume', 'harga_satuan'])
     }
     return true
@@ -736,15 +732,14 @@ export default function KontrakPage() {
           <>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">{payungMode ? 'Harga Satuan (Payung)' : 'Harga & Volume'}</CardTitle>
+              <CardTitle className="text-sm font-semibold">{payungMode ? 'Kontrak Payung' : 'Harga & Volume'}</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
-              {payungMode && (
+              {payungMode ? (
                 <div className="col-span-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  Volume dan nilai transaksi dihitung per Berita Acara. Kontrak payung hanya menyimpan harga satuan referensi.
+                  Kontrak payung tidak memuat volume maupun harga. Volume dan harga komoditi diinput per Berita Acara saat transaksi.
                 </div>
-              )}
-              {!payungMode && (
+              ) : (
               <div>
                 <Label className="text-xs">Volume *</Label>
                 {(() => {
@@ -761,25 +756,27 @@ export default function KontrakPage() {
                 })()}
               </div>
               )}
+              {!payungMode && (
+              <>
               <div>
                 <Label className="text-xs">Harga Satuan *</Label>
                 <Input type="number" step="any" {...register('harga_satuan')}  />
               </div>
-              {!payungMode && (
               <div>
                 <Label className="text-xs">Premi</Label>
                 <Input type="number" step="any" {...register('premi')}  />
               </div>
+              </>
               )}
             </CardContent>
             {/* Quick calculation */}
             <div className="px-5 pb-4 grid grid-cols-2 gap-2 text-sm">
               {payungMode ? (
                 <>
-                  <div className="text-slate-500">Volume Kontrak:</div>
-                  <div className="text-right text-slate-600">— (per Berita Acara)</div>
+                  <div className="text-slate-500">Volume:</div>
+                  <div className="text-right text-slate-600">Sesuai Berita Acara</div>
                   <div className="text-slate-500">Harga Satuan:</div>
-                  <div className="text-right font-semibold">{formatCurrency(Number(watchedFields.harga_satuan) || 0)}</div>
+                  <div className="text-right text-slate-600">Sesuai harga pasar / Berita Acara</div>
                   <div className="text-slate-500">Jatuh Tempo:</div>
                   <div className="text-right">{formatDate(jatuhTempo)}</div>
                 </>

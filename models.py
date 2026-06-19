@@ -162,6 +162,7 @@ class BeritaAcara(Base):
     tanggal_ba = Column(Date, nullable=False)
     bulan_buku = Column(Date, nullable=True)  # periode pembukuan (biasanya ≠ bulan tanggal BA)
     volume_ba = Column(Float, default=0.0)
+    harga_satuan = Column(Float, default=0.0)  # harga komoditi saat transaksi (payung)
     nama_unit = Column(String, nullable=True)
     komoditi = Column(String, nullable=True)
     deskripsi = Column(String, nullable=True)

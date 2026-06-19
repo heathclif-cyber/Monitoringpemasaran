@@ -186,6 +186,7 @@ class BeritaAcaraBase(BaseModel):
     tanggal_ba: date
     bulan_buku: date
     volume_ba: float = 0.0
+    harga_satuan: float = 0.0
     nama_unit: Optional[str] = None
     komoditi: Optional[str] = None
     deskripsi: Optional[str] = None

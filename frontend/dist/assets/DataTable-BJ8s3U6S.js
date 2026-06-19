@@ -1,0 +1,6 @@
+import{c,j as a,m as r}from"./index-DDYcdztY.js";/**
+ * @license lucide-react v0.460.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const x=c("SquarePen",[["path",{d:"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7",key:"1m0v6g"}],["path",{d:"M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z",key:"ohrbg2"}]]),l={left:"text-left",center:"text-center",right:"text-right"};function p({columns:d,data:i,keyExtractor:n,maxHeight:m="65vh",onRowClick:s}){return a.jsx("div",{className:"overflow-auto",style:{maxHeight:m},children:a.jsxs("table",{className:"w-full text-sm",children:[a.jsx("thead",{children:a.jsx("tr",{className:"sticky top-0 z-10 border-b bg-muted/95 backdrop-blur-sm",children:d.map(e=>a.jsx("th",{className:r("px-3 py-2.5 text-xs font-medium text-muted-foreground",l[e.align??"left"],e.headerClassName),children:e.header},e.key))})}),a.jsx("tbody",{className:"divide-y divide-slate-100",children:i.map(e=>a.jsx("tr",{className:r("group transition-colors hover:bg-muted/50",s&&"cursor-pointer"),onClick:s?()=>s(e):void 0,children:d.map(t=>a.jsx("td",{className:r("px-3 py-2.5",l[t.align??"left"],t.className),children:t.render(e)},t.key))},n(e)))})]})})}export{p as D,x as S};

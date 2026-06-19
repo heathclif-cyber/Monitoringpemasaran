@@ -91,6 +91,13 @@ def run_migrations() -> None:
         add_column_safely(db, "invoice", "no_ba", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "delivery_order", "no_ba", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "berita_acara", "bulan_buku", "DATE DEFAULT NULL")
+        add_column_safely(db, "berita_acara", "harga_satuan", "FLOAT DEFAULT 0.0")
+        db.execute(text(
+            "UPDATE berita_acara ba SET harga_satuan = k.harga_satuan "
+            "FROM kontrak k WHERE ba.no_kontrak = k.no_kontrak "
+            "AND COALESCE(ba.harga_satuan, 0) = 0 AND COALESCE(k.harga_satuan, 0) > 0"
+        ))
+        db.commit()
         db.execute(text(
             "UPDATE berita_acara SET bulan_buku = DATE_TRUNC('month', tanggal_ba)::date "
             "WHERE bulan_buku IS NULL AND tanggal_ba IS NOT NULL"

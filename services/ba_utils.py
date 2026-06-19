@@ -12,6 +12,15 @@ def is_payung_ba(kontrak: models.Kontrak | None) -> bool:
     return str(getattr(kontrak, "tipe_alur", "STANDAR") or "STANDAR").upper() == "PAYUNG_BA"
 
 
+def ba_effective_harga(ba: models.BeritaAcara | None, kontrak: models.Kontrak) -> float:
+    """Harga per BA; fallback ke kontrak hanya untuk data lama sebelum migrasi."""
+    if ba is not None:
+        harga_ba = float(getattr(ba, "harga_satuan", 0) or 0)
+        if harga_ba > 0:
+            return harga_ba
+    return float(kontrak.harga_satuan or 0.0)
+
+
 def kontrak_nilai_maksimum(kontrak: models.Kontrak) -> float:
     kontrak_volume = float(kontrak.volume or 0.0)
     pokok = (kontrak_volume * float(kontrak.harga_satuan or 0.0)) + float(kontrak.premi or 0.0)
@@ -21,10 +30,14 @@ def kontrak_nilai_maksimum(kontrak: models.Kontrak) -> float:
     return pokok + ppn_val
 
 
-def calculate_ba_pokok(kontrak: models.Kontrak, volume_ba: float) -> float:
-    """Nilai pokok per BA. Kontrak payung biasanya tanpa volume — hitung langsung dari volume_ba."""
+def calculate_ba_pokok(
+    kontrak: models.Kontrak,
+    volume_ba: float,
+    harga_satuan_ba: float | None = None,
+) -> float:
+    """Nilai pokok per BA. Harga diambil dari BA (dinamis per transaksi)."""
     kontrak_volume = float(kontrak.volume or 0.0)
-    harga = float(kontrak.harga_satuan or 0.0)
+    harga = float(harga_satuan_ba if harga_satuan_ba is not None else (kontrak.harga_satuan or 0.0))
     premi = float(kontrak.premi or 0.0)
     pokok_ba = float(volume_ba) * harga
     if kontrak_volume > 0 and premi > 0:
@@ -34,8 +47,12 @@ def calculate_ba_pokok(kontrak: models.Kontrak, volume_ba: float) -> float:
     return pokok_ba
 
 
-def calculate_ba_invoice_amount(kontrak: models.Kontrak, volume_ba: float) -> int:
-    pokok_ba = calculate_ba_pokok(kontrak, volume_ba)
+def calculate_ba_invoice_amount(
+    kontrak: models.Kontrak,
+    volume_ba: float,
+    harga_satuan_ba: float | None = None,
+) -> int:
+    pokok_ba = calculate_ba_pokok(kontrak, volume_ba, harga_satuan_ba)
     ppn_val = 0.0
     if str(getattr(kontrak, "is_ppn", "true")).lower() == "true":
         ppn_val = pokok_ba * (float(kontrak.ppn_persen or 0.0) / 100)

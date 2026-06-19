@@ -43,6 +43,10 @@ def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: m
     if volume_ba <= 0:
         raise HTTPException(status_code=400, detail="Volume BA harus > 0")
 
+    harga_satuan = float(ba.harga_satuan or 0)
+    if harga_satuan <= 0:
+        raise HTTPException(status_code=400, detail="Harga satuan BA harus > 0")
+
     try:
         validate_ba_volume_quota(db, db_kontrak, volume_ba)
     except ValueError as exc:
@@ -107,6 +111,7 @@ def get_available_ba(no_kontrak: str = Query(...), db: Session = Depends(get_db)
             "tanggal_ba": r.tanggal_ba.isoformat() if r.tanggal_ba else None,
             "bulan_buku": r.bulan_buku.isoformat() if r.bulan_buku else None,
             "volume_ba": r.volume_ba,
+            "harga_satuan": r.harga_satuan,
             "nama_unit": r.nama_unit,
             "komoditi": r.komoditi,
             "status": r.status,

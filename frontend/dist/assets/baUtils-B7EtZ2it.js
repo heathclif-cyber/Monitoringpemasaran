@@ -1,0 +1,1 @@
+function f(c,e,t=0,n=0){let o=c*e;return n>0&&t>0?o+=t*(c/n):n<=0&&t>0&&(o+=t),o}function l(c,e,t="true",n=11,o=0,u=0){const s=f(c,e,o,u),a=String(t).toLowerCase()!=="false"?s*(n/100):0;return Math.round(s+a)}export{l as c};

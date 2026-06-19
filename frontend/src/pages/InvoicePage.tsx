@@ -21,17 +21,21 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
 import { calculateKontrakPricing, calculateJatuhTempo } from '@/utils/kontrakUtils'
+import { calculateBAInvoiceAmount } from '@/utils/baUtils'
 import type { Kontrak } from '@/types'
 
 // Exact replica of forms.js buildInvoicePreview() format
-function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayaran }: {
+function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayaran, baVolume, baHarga }: {
   noInv: string; noK: string; tgl: string; k: Kontrak;
   pricing: ReturnType<typeof calculateKontrakPricing> | null;
   jumlahPembayaran: number;
+  baVolume?: number;
+  baHarga?: number;
 }) {
-  const vol = k.volume || 0
-  const hrg = k.harga_satuan || 0
-  const premi = k.premi || 0
+  const useBaPricing = (baVolume || 0) > 0 && (baHarga || 0) > 0
+  const vol = useBaPricing ? (baVolume || 0) : (k.volume || 0)
+  const hrg = useBaPricing ? (baHarga || 0) : (k.harga_satuan || 0)
+  const premi = useBaPricing ? 0 : (k.premi || 0)
   const nilaiPokok = (vol * hrg) + premi
   const ppnPct = k.ppn_persen || 11
   const isPpn = String(k.is_ppn).toLowerCase() !== 'false'
@@ -205,6 +209,7 @@ export default function InvoicePage() {
     if (selectedKontrak) {
       fetchKontrakForInvoice(selectedKontrak)
       baStore.fetchAvailable(selectedKontrak)
+      baStore.fetch(selectedKontrak)
     }
   }, [selectedKontrak])
 
@@ -260,7 +265,35 @@ export default function InvoicePage() {
     return invoiceStore.data.filter((inv) => inv.no_kontrak === selectedKontrak && inv.no_invoice !== watch('no_invoice'))
   }, [selectedKontrak, invoiceStore.data, watch('no_invoice')])
 
-  const kontrakMax = pricing?.nilaiTransaksi || 0
+  const selectedBAObj = useMemo(() => {
+    if (!selectedBA) return null
+    const fromAvailable = baStore.available.find((b) => b.no_ba === selectedBA)
+    if (fromAvailable) return fromAvailable
+    const fromData = baStore.data.find((b) => b.no_ba === selectedBA)
+    if (!fromData) return null
+    return {
+      no_ba: fromData.no_ba,
+      tanggal_ba: fromData.tanggal_ba,
+      bulan_buku: fromData.bulan_buku,
+      volume_ba: fromData.volume_ba,
+      harga_satuan: fromData.harga_satuan,
+      nama_unit: fromData.nama_unit,
+      komoditi: fromData.komoditi,
+      status: fromData.status,
+    }
+  }, [baStore.available, baStore.data, selectedBA])
+
+  const payungInvoiceMax = useMemo(() => {
+    if (!isPayungBA || !selectedBAObj || !k) return 0
+    return calculateBAInvoiceAmount(
+      selectedBAObj.volume_ba,
+      selectedBAObj.harga_satuan,
+      k.is_ppn || 'true',
+      k.ppn_persen || 11,
+    )
+  }, [isPayungBA, selectedBAObj, k])
+
+  const kontrakMax = isPayungBA ? payungInvoiceMax : (pricing?.nilaiTransaksi || 0)
 
   // Batas per-unit jika ada unit dipilih (hanya berlaku jika unit punya volume)
   const unitMax = useMemo(() => {
@@ -273,11 +306,14 @@ export default function InvoicePage() {
 
   // Filter invoice untuk progress bar: per-unit jika unit dipilih, semua jika tidak
   const invoicesForProgress = useMemo(() => {
+    if (isPayungBA && selectedBA) {
+      return existingInvoices.filter((inv) => inv.no_ba === selectedBA)
+    }
     if (selectedUnit) {
       return existingInvoices.filter(inv => inv.nama_unit === selectedUnit)
     }
     return existingInvoices
-  }, [existingInvoices, selectedUnit])
+  }, [existingInvoices, selectedUnit, isPayungBA, selectedBA])
 
   // Live-tracking jumlah_pembayaran via onInput DOM event — bypass RHF watch
   const currentJumlah = liveJumlah
@@ -406,12 +442,12 @@ export default function InvoicePage() {
                     <option value="">-- Pilih BA --</option>
                     {baStore.available.map((b) => (
                       <option key={b.no_ba} value={b.no_ba}>
-                        {b.no_ba} — {b.volume_ba?.toLocaleString('id-ID')} {k?.satuan || 'Kg'} ({b.tanggal_ba})
+                        {b.no_ba} — {b.volume_ba?.toLocaleString('id-ID')} {k?.satuan || 'Kg'} @ {formatCurrency(b.harga_satuan)} ({b.tanggal_ba})
                       </option>
                     ))}
                   </NativeSelect>
                   <p className="text-xs text-slate-400 mt-1">
-                    Invoice payung wajib terhubung ke BA. Nilai dihitung proporsional volume BA.
+                    Invoice payung wajib terhubung ke BA. Nilai = volume BA × harga BA + PPN.
                   </p>
                 </div>
               )}
@@ -443,14 +479,23 @@ export default function InvoicePage() {
                   <span className="font-medium">{(k.pembeli || '-').split('\n')[0]}</span>
                   <span className="text-slate-500">Komoditi:</span>
                   <span>{k.komoditi || '-'}</span>
-                  <span className="text-slate-500">Volume:</span>
-                  <span>{formatCurrency(k.volume)} {k.satuan}</span>
-                  <span className="text-slate-500">Nilai Kontrak:</span>
-                  <span className="font-bold text-brand-600">{formatCurrency(kontrakMax)}</span>
-                  {isPayungBA && selectedBA && (
+                  {isPayungBA && selectedBAObj ? (
                     <>
                       <span className="text-slate-500">BA Dipilih:</span>
                       <span className="font-medium text-brand-600">{selectedBA}</span>
+                      <span className="text-slate-500">Volume BA:</span>
+                      <span>{formatCurrency(selectedBAObj.volume_ba)} {k.satuan}</span>
+                      <span className="text-slate-500">Harga Satuan BA:</span>
+                      <span>{formatCurrency(selectedBAObj.harga_satuan)} / {k.satuan}</span>
+                      <span className="text-slate-500">Nilai Invoice (BA):</span>
+                      <span className="font-bold text-brand-600">{formatCurrency(kontrakMax)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-500">Volume:</span>
+                      <span>{formatCurrency(k.volume)} {k.satuan}</span>
+                      <span className="text-slate-500">Nilai Kontrak:</span>
+                      <span className="font-bold text-brand-600">{formatCurrency(kontrakMax)}</span>
                     </>
                   )}
                 </div>
@@ -518,7 +563,7 @@ export default function InvoicePage() {
                     })()}
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
-                    Kosongkan untuk auto (nilai penuh{selectedUnit ? ` unit ${selectedUnit}` : ' kontrak'}). Maks: {formatCurrency(sisaKontrak)}
+                    Kosongkan untuk auto (nilai penuh{isPayungBA ? ' BA' : selectedUnit ? ` unit ${selectedUnit}` : ' kontrak'}). Maks: {formatCurrency(sisaKontrak)}
                   </p>
                   {Number(watch('jumlah_pembayaran')) > 0 && kontrakMax > 0 && (
                     <p className="text-xs text-slate-500 mt-1">
@@ -578,6 +623,8 @@ export default function InvoicePage() {
           k={k!}
           pricing={pricing}
           jumlahPembayaran={Number(watch('jumlah_pembayaran')) || 0}
+          baVolume={isPayungBA ? selectedBAObj?.volume_ba : undefined}
+          baHarga={isPayungBA ? selectedBAObj?.harga_satuan : undefined}
         />
       </PreviewPanel>
     </div>

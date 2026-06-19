@@ -10,7 +10,7 @@ from database import get_db
 from services.auth import require_write
 from services.cache import api_cache
 from services.utils import terbilang_rupiah
-from services.ba_utils import is_payung_ba, calculate_ba_invoice_amount, kontrak_nilai_maksimum
+from services.ba_utils import is_payung_ba, calculate_ba_invoice_amount, kontrak_nilai_maksimum, ba_effective_harga
 
 router = APIRouter(prefix="/api/invoice", tags=["Invoice"])
 
@@ -45,7 +45,17 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
     nilai_maksimum = kontrak_nilai_maksimum(db_kontrak)
 
     if payung_ba and db_ba:
-        nilai_maksimum = calculate_ba_invoice_amount(db_kontrak, float(db_ba.volume_ba or 0))
+        harga_ba = ba_effective_harga(db_ba, db_kontrak)
+        if harga_ba <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="BA belum memiliki harga satuan. Isi harga di form Berita Acara terlebih dahulu.",
+            )
+        nilai_maksimum = calculate_ba_invoice_amount(
+            db_kontrak,
+            float(db_ba.volume_ba or 0),
+            harga_ba,
+        )
 
     # Jika invoice untuk unit tertentu, hitung batas nilai per-unit
     nama_unit = invoice.nama_unit

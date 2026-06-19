@@ -172,7 +172,12 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
           )}
           <RowS label="Pelabuhan Muat" value={safe(pelabuhan_muat)} />
           <RowS label="Volume" value={payungMode ? 'Sesuai Berita Acara' : fmtVol(displayVolume, satuan || 'Unit')} />
-          <RowD l1="Harga Satuan" v1={fmtHarga(harga_satuan || 0, satuan || 'Unit')} l2="Premi" v2={premi && premi > 0 ? fmtRpLocal(premi) : '-'} />
+          <RowD
+            l1="Harga Satuan"
+            v1={payungMode ? 'Sesuai harga pasar / Berita Acara' : fmtHarga(harga_satuan || 0, satuan || 'Unit')}
+            l2="Premi"
+            v2={payungMode ? '-' : (premi && premi > 0 ? fmtRpLocal(premi) : '-')}
+          />
           <RowS label="PPN" value={isPpn ? `Tarif Efektif ${ppn_persen || 11}%` : 'Non-PPN (Bebas PPN)'} />
           <RowS label="Kondisi Penyerahan" value={safe(kondisi_penyerahan)} />
 

@@ -17,6 +17,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { formatCurrency } from '@/lib/utils'
+import { calculateBAInvoiceAmount } from '@/utils/baUtils'
 import type { Kontrak } from '@/types'
 
 function previousMonthFrom(isoDate: string): string {
@@ -35,6 +36,7 @@ const baSchema = z.object({
   tanggal_ba: z.string().min(1, 'Tanggal BA wajib diisi'),
   bulan_buku: z.string().min(1, 'Bulan buku wajib diisi'),
   volume_ba: z.coerce.number().min(0.01, 'Volume harus > 0'),
+  harga_satuan: z.coerce.number().min(0.01, 'Harga satuan harus > 0'),
   nama_unit: z.string().optional(),
   komoditi: z.string().optional(),
   deskripsi: z.string().optional(),
@@ -62,6 +64,7 @@ export default function BAPage() {
       tanggal_ba: new Date().toISOString().split('T')[0],
       bulan_buku: previousMonthFrom(new Date().toISOString().split('T')[0]),
       volume_ba: 0,
+      harga_satuan: 0,
       nama_unit: '',
       komoditi: '',
       deskripsi: '',
@@ -74,6 +77,7 @@ export default function BAPage() {
   const selectedKontrak = watch('no_kontrak')
   const tanggalBa = watch('tanggal_ba')
   const volumeBa = watch('volume_ba')
+  const hargaSatuan = watch('harga_satuan')
 
   useEffect(() => {
     kontrakStore.fetch()
@@ -99,6 +103,16 @@ export default function BAPage() {
 
   const sisaKuota = Math.max(0, (currentKontrak?.volume || 0) - usedVolume)
 
+  const nilaiBA = useMemo(() => {
+    if (!currentKontrak || volumeBa <= 0 || hargaSatuan <= 0) return 0
+    return calculateBAInvoiceAmount(
+      volumeBa,
+      hargaSatuan,
+      currentKontrak.is_ppn || 'true',
+      currentKontrak.ppn_persen || 11,
+    )
+  }, [currentKontrak, volumeBa, hargaSatuan])
+
   useEffect(() => {
     if (currentKontrak) {
       if (!watch('komoditi')) setValue('komoditi', currentKontrak.komoditi || '')
@@ -121,6 +135,7 @@ export default function BAPage() {
       setValue('tanggal_ba', data.tanggal_ba)
       setValue('bulan_buku', toMonthInput(data.bulan_buku || data.tanggal_ba))
       setValue('volume_ba', data.volume_ba)
+      setValue('harga_satuan', data.harga_satuan || 0)
       setValue('nama_unit', data.nama_unit || '')
       setValue('komoditi', data.komoditi || '')
       setValue('deskripsi', data.deskripsi || '')
@@ -226,6 +241,12 @@ export default function BAPage() {
               {errors.volume_ba && <p className="text-xs text-red-500 mt-1">{errors.volume_ba.message}</p>}
             </div>
             <div>
+              <Label className="text-xs">Harga Satuan (saat transaksi) *</Label>
+              <Input type="number" step="any" {...register('harga_satuan')} />
+              <p className="text-xs text-slate-400 mt-1">Harga komoditi berlaku pada pengiriman ini — tidak disimpan di kontrak payung.</p>
+              {errors.harga_satuan && <p className="text-xs text-red-500 mt-1">{errors.harga_satuan.message}</p>}
+            </div>
+            <div>
               <Label className="text-xs">Unit</Label>
               <NativeSelect {...register('nama_unit')}>
                 <option value="">-- Pilih Unit --</option>
@@ -275,12 +296,14 @@ export default function BAPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-slate-500">Harga Satuan Kontrak:</span>
-                  <span>{formatCurrency(currentKontrak.harga_satuan)} / {currentKontrak.satuan || 'Kg'}</span>
+                  <span className="text-slate-500">Harga Satuan (form):</span>
+                  <span>{hargaSatuan > 0 ? `${formatCurrency(hargaSatuan)} / ${currentKontrak.satuan || 'Kg'}` : '—'}</span>
+                  <span className="text-slate-500">Nilai Invoice (estimasi):</span>
+                  <span className="font-semibold text-brand-600">{nilaiBA > 0 ? formatCurrency(nilaiBA) : '—'}</span>
                   <span className="text-slate-500">Total sudah di-BA:</span>
                   <span>{formatCurrency(usedVolume)} {currentKontrak.satuan || 'Kg'}</span>
                   <span className="col-span-2 text-xs text-slate-500 pt-1">
-                    Kontrak payung tanpa volume tetap — setiap pengiriman barang dicatat terpisah di BA.
+                    Kontrak payung tanpa harga tetap — volume dan harga dicatat per Berita Acara.
                   </span>
                 </>
               )}

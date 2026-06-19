@@ -101,7 +101,7 @@ def generate_contract_docx(k) -> io.BytesIO:
     nilai = 0 if payung else (k.nilai_transaksi or 0)
 
     vol_str = 'Sesuai Berita Acara' if payung else (_id_fmt(vol) + ' ' + sat if vol else '-')
-    harga_str = _rp_full(harga) + ' per ' + sat if harga else '-'
+    harga_str = 'Sesuai harga pasar / Berita Acara' if payung else (_rp_full(harga) + ' per ' + sat if harga else '-')
     premi_str = _rp(premi)
     jml_str = 'Sesuai Berita Acara' if payung else (_rp_full(nilai) + (f" ({_s(k.terbilang)} Rupiah)" if k.terbilang else ""))
     lama = k.lama_pembayaran_hari or 15
@@ -418,20 +418,37 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     v = c_nil._tc.get_or_add_tcPr().find(qn('w:vAlign'))
     if v is not None: v.set(qn('w:val'), 'center')
 
-    # Hitung nilai kontrak penuh — invoice = pokok + PPN, tanpa PPh
-    pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
-    ppn_val = 0.0
-    if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
-        ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
-    full_total = pokok + ppn_val
+    from services.ba_utils import is_payung_ba, calculate_ba_pokok, ba_effective_harga
 
-    # Rasio proporsional invoice terhadap kontrak penuh
-    inv_amount = float(invoice.jumlah_pembayaran or 0)
-    ratio = (inv_amount / full_total) if full_total > 0 else 1.0
+    payung = is_payung_ba(k)
+    ba = getattr(invoice, 'berita_acara', None) if payung else None
 
-    display_vol = (k.volume or 0.0) * ratio
-    display_pokok = pokok * ratio
-    display_ppn = ppn_val * ratio
+    if payung and ba:
+        vol_ba = float(ba.volume_ba or 0)
+        harga_ba = ba_effective_harga(ba, k)
+        pokok = calculate_ba_pokok(k, vol_ba, harga_ba)
+        ppn_val = 0.0
+        if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
+            ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
+        full_total = pokok + ppn_val
+        inv_amount = float(invoice.jumlah_pembayaran or 0)
+        ratio = (inv_amount / full_total) if full_total > 0 else 1.0
+        display_vol = vol_ba * ratio
+        line_harga = harga_ba
+        display_pokok = pokok * ratio
+        display_ppn = ppn_val * ratio
+    else:
+        pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
+        ppn_val = 0.0
+        if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
+            ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
+        full_total = pokok + ppn_val
+        inv_amount = float(invoice.jumlah_pembayaran or 0)
+        ratio = (inv_amount / full_total) if full_total > 0 else 1.0
+        display_vol = (k.volume or 0.0) * ratio
+        line_harga = k.harga_satuan or 0
+        display_pokok = pokok * ratio
+        display_ppn = ppn_val * ratio
 
     # Row 11 (Item values) — proporsional ke invoice
     def c_txt(idx, text, align="left"):
@@ -447,7 +464,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_txt(4, _s(k.simbol))
     c_txt(5, '-')
     c_txt(6, f" {_id_fmt(display_vol)} ", 'right')
-    c_txt(7, f" {_rp(k.harga_satuan).replace('Rp', '').strip()} ", 'right')
+    c_txt(7, f" {_rp(line_harga).replace('Rp', '').strip()} ", 'right')
     c_txt(8, ' Rp')
     c_txt(9, f" {_rp(display_pokok).replace('Rp', '').strip()} ", 'right')
 
@@ -505,16 +522,26 @@ def generate_kuitansi_docx(invoice) -> io.BytesIO:
     template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'kuitansi_template.docx')
     doc = Document(template_path)
 
-    # Hitung nilai kuitansi = pokok + PPN (tanpa PPh), proporsional
-    pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
-    ppn_val = 0.0
-    if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
-        ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
+    from services.ba_utils import is_payung_ba, calculate_ba_pokok, ba_effective_harga, calculate_ba_invoice_amount
 
-    nilai_transaksi = pokok + ppn_val
+    payung = is_payung_ba(k)
+    ba = getattr(invoice, 'berita_acara', None) if payung else None
+    if payung and ba:
+        nilai_transaksi = float(calculate_ba_invoice_amount(
+            k,
+            float(ba.volume_ba or 0),
+            ba_effective_harga(ba, k),
+        ))
+    else:
+        pokok = (k.volume or 0.0) * (k.harga_satuan or 0.0) + (k.premi or 0.0)
+        ppn_val = 0.0
+        if str(getattr(k, 'is_ppn', 'true')).lower() == 'true':
+            ppn_val = pokok * ((getattr(k, 'ppn_persen', 11.0) or 0.0) / 100)
+        nilai_transaksi = pokok + ppn_val
+
     inv_amount = float(invoice.jumlah_pembayaran or 0)
     ratio = (inv_amount / nilai_transaksi) if nilai_transaksi > 0 else 1.0
-    nilai_kuitansi = nilai_transaksi * ratio
+    nilai_kuitansi = inv_amount if nilai_transaksi <= 0 else nilai_transaksi * ratio
     terbilang_kuitansi = terbilang_rupiah(math.floor(nilai_kuitansi))
 
     # Helper: replace text in a paragraph, preserving ALL formatting of first run

@@ -143,6 +143,7 @@ export interface BeritaAcara {
   tanggal_ba: string
   bulan_buku: string
   volume_ba: number
+  harga_satuan: number
   nama_unit?: string | null
   komoditi?: string | null
   deskripsi?: string | null
@@ -155,6 +156,7 @@ export interface BAAvailable {
   tanggal_ba: string | null
   bulan_buku: string | null
   volume_ba: number
+  harga_satuan: number
   nama_unit?: string | null
   komoditi?: string | null
   status: string
@@ -440,6 +442,7 @@ export interface BeritaAcaraInput {
   tanggal_ba: string
   bulan_buku: string
   volume_ba: number
+  harga_satuan: number
   nama_unit?: string
   komoditi?: string
   deskripsi?: string

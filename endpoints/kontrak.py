@@ -28,6 +28,7 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     if payung:
         kontrak_data['volume'] = 0.0
         kontrak_data['premi'] = 0.0
+        kontrak_data['harga_satuan'] = 0.0
         volume_for_calc = 0.0
         pokok = 0.0
         nominal_ppn = 0.0
@@ -158,6 +159,7 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
         ppn_nom = pokok * (ppn_pct / 100)
     total_nilai = pokok + ppn_nom
     vol_label = 'Sesuai Berita Acara' if payung else f'{vol:,.0f}'.replace(",",".") + " " + satuan
+    harga_label = 'Sesuai harga pasar / Berita Acara' if payung else fmt_rp(harga) + " per " + satuan
     jml_label = 'Sesuai Berita Acara' if payung else fmt_rp(total_nilai)
     tgl = k.tanggal_kontrak
     months = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -216,7 +218,7 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
         {row('Produsen / Unit', produsen_html)}
         {row('Pelabuhan Muat', s(k.pelabuhan_muat))}
         {row('Volume', vol_label)}
-        {rowD('Harga Satuan', fmt_rp(harga) + " per " + satuan, 'Premi', fmt_rp(premi) if premi else "-")}
+        {rowD('Harga Satuan', harga_label, 'Premi', fmt_rp(premi) if premi else "-")}
         {row('PPN', f'Tarif Efektif {ppn_pct}%')}
         {row('Kondisi Penyerahan', s(k.kondisi_penyerahan))}
         

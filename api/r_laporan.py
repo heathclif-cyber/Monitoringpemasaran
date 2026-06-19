@@ -9,7 +9,7 @@ import models
 from database import get_db, SessionLocal
 from services.auth import require_write
 from services.cache import api_cache
-from services.ba_utils import is_payung_ba
+from services.ba_utils import is_payung_ba, ba_effective_harga
 from services.superman.documents import superman_doc_requirements_for_do
 
 router = APIRouter(prefix="/api/laporan", tags=["Laporan"])
@@ -122,6 +122,10 @@ def _build_laporan_rows(db: Session):
         ba_date = ba_ref.tanggal_ba if ba_ref else None
         ba_buku_date = ba_ref.bulan_buku if ba_ref else None
 
+        if is_payung_ba(k) and ba_ref:
+            k_harga_local = ba_effective_harga(ba_ref, k)
+            k_premi = 0.0
+
         # Unit: prioritas — BA.nama_unit > DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen
         unit_val = ""
         if ba_ref and getattr(ba_ref, "nama_unit", None):
@@ -162,7 +166,7 @@ def _build_laporan_rows(db: Session):
             "Mitra_Pembeli": k.pembeli or "",
             "Deskripsi_Produk": jenis_komoditi_val,
             "Jumlah_Invoice": float(inv.jumlah_pembayaran or 0) if inv else 0,
-            "Harga_Satuan": k.harga_satuan or 0,
+            "Harga_Satuan": k_harga_local,
             "Jumlah_DO": do_volume,
             "Pendapatan_Pokok": round(pendapatan_do),
             "Pendapatan_Setelah_PPN": pendapatan_setelah_ppn,
