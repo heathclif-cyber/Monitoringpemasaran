@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from dataclasses import asdict
 from pathlib import Path
@@ -170,6 +171,59 @@ def _score_todo_row(
     return score
 
 
+_SPPN_NO_RE = re.compile(r"(R\d+/R\d+D/SPPn/[^\s\"'<>]+)", re.I)
+_SPPB_NO_RE = re.compile(r"(R\d+/R\d+D/SPPb/[^\s\"'<>]+)", re.I)
+
+
+def _extract_numbers_from_blob(text: str) -> tuple[str | None, str | None]:
+    if not text:
+        return None, None
+    sppb_m = _SPPB_NO_RE.search(text)
+    sppn_m = _SPPN_NO_RE.search(text)
+    return (
+        sppb_m.group(1) if sppb_m else None,
+        sppn_m.group(1) if sppn_m else None,
+    )
+
+
+def _coalesce_spp_numbers(
+    *,
+    store_sppb: str | None,
+    store_sppn: str | None,
+    match: dict[str, Any] | None,
+    store_body: Any,
+) -> tuple[str | None, str | None]:
+    sppb_no = store_sppb
+    sppn_no = store_sppn
+
+    if match:
+        sppb_no = sppb_no or match.get("sppb_no") or match.get("no_sppb") or match.get("nomor_sppb")
+        sppn_no = sppn_no or match.get("sppn_no") or match.get("no_sppn") or match.get("nomor_sppn")
+        blob_sppb, blob_sppn = _extract_numbers_from_blob(_todo_row_blob(match))
+        sppb_no = sppb_no or blob_sppb
+        sppn_no = sppn_no or blob_sppn
+
+    if store_body is not None and (not sppb_no or not sppn_no):
+        body_sppb, body_sppn = _extract_numbers_from_store(store_body)
+        sppb_no = sppb_no or body_sppb
+        sppn_no = sppn_no or body_sppn
+
+    if not sppb_no or not sppn_no:
+        combined = json.dumps(
+            {"store": store_body, "match": match},
+            ensure_ascii=False,
+            default=str,
+        )
+        blob_sppb, blob_sppn = _extract_numbers_from_blob(combined)
+        sppb_no = sppb_no or blob_sppb
+        sppn_no = sppn_no or blob_sppn
+
+    return (
+        str(sppb_no).strip() if sppb_no else None,
+        str(sppn_no).strip() if sppn_no else None,
+    )
+
+
 def _extract_numbers_from_store(body: Any) -> tuple[str | None, str | None]:
     """Ambil nomor SPPn/SPPb dari response POST /spp/store."""
 
@@ -324,11 +378,13 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
         "superman_url": f"{cfg.base_url.rstrip('/')}/sppd#tab-to-do-list-petugas",
         "message": "Draft SPPn/SPPb berhasil masuk To Do List Superman.",
     }
-    sppb_no = store_sppb
-    sppn_no = store_sppn
+    sppb_no, sppn_no = _coalesce_spp_numbers(
+        store_sppb=store_sppb,
+        store_sppn=store_sppn,
+        match=match,
+        store_body=store_body,
+    )
     if match:
-        sppb_no = sppb_no or match.get("sppb_no")
-        sppn_no = sppn_no or match.get("sppn_no")
         result.update(
             {
                 "sppb_no": sppb_no,

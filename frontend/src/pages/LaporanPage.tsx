@@ -207,9 +207,14 @@ export default function LaporanPage() {
     const label = supermanLabelFromResult(result)
     if (label) {
       patchRow(noDo, { Superman: label })
+      try {
+        await updateSapField(noDo, 'Superman', label)
+      } catch {
+        // Backend mungkin sudah menyimpan; refresh tetap dijalankan
+      }
     }
-    await fetch({ fresh: true })
-  }, [fetch, patchRow])
+    await fetch({ fresh: true, silent: true })
+  }, [fetch, patchRow, updateSapField])
 
   const handleSapSave = async (noDo: string, field: string, value: string) => {
     if (!value.trim()) return

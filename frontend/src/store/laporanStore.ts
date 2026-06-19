@@ -14,7 +14,7 @@ export function supermanLabelFromResult(result: SupermanDeklarasiResult): string
 interface LaporanStore {
   rows: LaporanRow[]
   isLoading: boolean
-  fetch: (opts?: { fresh?: boolean }) => Promise<void>
+  fetch: (opts?: { fresh?: boolean; silent?: boolean }) => Promise<void>
   patchRow: (noDo: string, patch: Partial<LaporanRow>) => void
   updateSapField: (noDo: string, field: string, value: string) => Promise<void>
   createBypass: (input: BypassInput) => Promise<void>
@@ -27,7 +27,7 @@ export const useLaporanStore = create<LaporanStore>((set, get) => ({
   isLoading: false,
 
   fetch: async (opts) => {
-    set({ isLoading: true })
+    if (!opts?.silent) set({ isLoading: true })
     try {
       const path = opts?.fresh ? '/api/laporan?fresh=1' : '/api/laporan'
       const data = await client.get<LaporanRow[]>(path)
@@ -35,7 +35,7 @@ export const useLaporanStore = create<LaporanStore>((set, get) => ({
     } catch (err) {
       console.error('[laporanStore.fetch]', err)
     } finally {
-      set({ isLoading: false })
+      if (!opts?.silent) set({ isLoading: false })
     }
   },
 

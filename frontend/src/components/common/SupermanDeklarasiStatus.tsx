@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { SupermanDeklarasiButton } from '@/components/common/SupermanDeklarasiButton'
+import { supermanLabelFromResult } from '@/store/laporanStore'
 import type { SupermanDeklarasiResult } from '@/types'
 
 interface SupermanDeklarasiStatusProps {
@@ -15,7 +17,17 @@ export function SupermanDeklarasiStatus({
   docsReady = false,
   onSuccess,
 }: SupermanDeklarasiStatusProps) {
-  const savedLabel = (existingSuperman || '').trim()
+  const [savedLabel, setSavedLabel] = useState(() => (existingSuperman || '').trim())
+
+  useEffect(() => {
+    setSavedLabel((existingSuperman || '').trim())
+  }, [existingSuperman, noDo])
+
+  const handleSuccess = async (result: SupermanDeklarasiResult) => {
+    const label = supermanLabelFromResult(result)
+    if (label) setSavedLabel(label)
+    await onSuccess?.(result)
+  }
 
   if (savedLabel) {
     return (
@@ -32,7 +44,7 @@ export function SupermanDeklarasiStatus({
       existingSuperman={existingSuperman}
       docsReady={docsReady}
       compact
-      onSuccess={onSuccess}
+      onSuccess={handleSuccess}
     />
   )
 }
