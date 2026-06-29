@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { FileDown, RotateCcw, Save } from 'lucide-react'
 import { useDOStore } from '@/store/doStore'
 import { usePembayaranStore } from '@/store/pembayaranStore'
+import { useInvoiceStore } from '@/store/invoiceStore'
+import { useKontrakStore } from '@/store/kontrakStore'
 import { useBAStore } from '@/store/baStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -22,8 +24,14 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { client } from '@/lib/client'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import type { DeliveryOrderInput, StokSaldo } from '@/types'
-import { calculateProportionalVolume, calculateSelisih, getVolumePercentage } from '@/utils/doUtils'
-import type { Kontrak } from '@/types'
+import {
+  calculateProportionalVolume,
+  calculateSelisih,
+  formatDOSelectLabel,
+  formatSupermanSelectLabel,
+  getVolumePercentage,
+} from '@/utils/doUtils'
+import type { Kontrak, Pembayaran } from '@/types'
 
 // Exact replica of forms.js buildDOPreview() format
 function DOPreviewContent({ noDo, noInv, tgl, unit, k, volumeKeluar, maxVolume }: {
@@ -132,9 +140,11 @@ type DOFormData = z.infer<typeof doSchema>
 export default function DOPage() {
   const doStore = useDOStore()
   const pembayaranStore = usePembayaranStore()
+  const invoiceStore = useInvoiceStore()
+  const kontrakStore = useKontrakStore()
   const baStore = useBAStore()
   const { currentInvoice, currentKontrak, currentPembayaran, fetchPembayaranForDO } = doStore
-  const [availablePembayaran, setAvailablePembayaran] = useState<{ value: string; label: string }[]>([])
+  const [availablePembayaranRows, setAvailablePembayaranRows] = useState<Pembayaran[]>([])
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [exportNo, setExportNo] = useState<string | null>(null)
@@ -167,14 +177,37 @@ export default function DOPage() {
 
   useEffect(() => {
     pembayaranStore.fetch()
+    invoiceStore.fetch()
+    kontrakStore.fetch()
     doStore.fetch()
-    pembayaranStore.fetchAvailableForDO().then((rows) => {
-      setAvailablePembayaran(rows.map((p) => ({
-        value: p.no_pembayaran,
-        label: (p.superman || '').trim() || p.no_invoice,
-      })))
-    })
+    pembayaranStore.fetchAvailableForDO().then(setAvailablePembayaranRows)
   }, [])
+
+  const invoiceByNo = useMemo(
+    () => Object.fromEntries(invoiceStore.data.map((i) => [i.no_invoice, i])),
+    [invoiceStore.data],
+  )
+
+  const kontrakByNo = useMemo(
+    () => Object.fromEntries(kontrakStore.data.map((k) => [k.no_kontrak, k])),
+    [kontrakStore.data],
+  )
+
+  const availablePembayaran = useMemo(
+    () => availablePembayaranRows.map((p) => ({
+      value: p.no_pembayaran,
+      label: formatSupermanSelectLabel(p, invoiceByNo, kontrakByNo),
+    })),
+    [availablePembayaranRows, invoiceByNo, kontrakByNo],
+  )
+
+  const doOptions = useMemo(
+    () => doStore.data.map((d) => ({
+      value: d.no_do,
+      label: formatDOSelectLabel(d, invoiceByNo, kontrakByNo),
+    })),
+    [doStore.data, invoiceByNo, kontrakByNo],
+  )
 
   useEffect(() => {
     if (selectedPembayaran) fetchPembayaranForDO(selectedPembayaran)
@@ -212,14 +245,24 @@ export default function DOPage() {
       volumeManualRef.current = true
       setValue('rencana_pengambilan', data.rencana_pengambilan || '')
       if (data.no_pembayaran) {
-        const opts = [...availablePembayaran]
-        if (!opts.some((o) => o.value === data.no_pembayaran)) {
-          opts.unshift({
-            value: data.no_pembayaran,
-            label: (data.superman || '').trim() || data.no_invoice,
-          })
-          setAvailablePembayaran(opts)
-        }
+        setAvailablePembayaranRows((rows) => {
+          if (rows.some((r) => r.no_pembayaran === data.no_pembayaran)) return rows
+          const existing = pembayaranStore.data.find((p) => p.no_pembayaran === data.no_pembayaran)
+          if (existing) return [existing, ...rows]
+          const noPay = data.no_pembayaran as string
+          return [
+            {
+              no_pembayaran: noPay,
+              no_invoice: data.no_invoice,
+              tanggal_pembayaran: data.tanggal_pembayaran || '',
+              nominal_transfer: data.nominal_transfer || 0,
+              is_pph_disetor: data.is_pph_disetor || 'false',
+              selisih: 0,
+              superman: data.superman,
+            } satisfies Pembayaran,
+            ...rows,
+          ]
+        })
       }
     } else {
       setIsExisting(false)
@@ -375,22 +418,23 @@ export default function DOPage() {
                 {errors.no_pembayaran && <p className="text-xs text-red-500 mt-1">{errors.no_pembayaran.message}</p>}
                 <p className="text-xs text-slate-400 mt-1">
                   Pilih nomor Superman dari pembayaran yang sudah lunas. Buat deklarasi di menu Input Pembayaran.
+                  Format: nomor Superman - nama pembeli - tanggal pembayaran.
                 </p>
               </div>
               <div>
                 <Label className="text-xs">No DO *</Label>
                 <SearchableSelect
-                  options={doStore.data.map((d) => ({
-                    value: d.no_do,
-                    label: d.no_do,
-                  }))}
+                  options={doOptions}
                   value={watch('no_do')}
                   allowCustom={canEdit()}
                   onChange={(v) => setValue('no_do', v, { shouldValidate: true })}
                   onValueCommit={() => autoLoadDO()}
                   placeholder="Ketik baru atau pilih dari daftar"
                 />
-                <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih DO lama → data terisi otomatis.</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Daftar dari database. Pilih DO lama → data terisi otomatis.
+                  Format: nomor DO - nama pembeli - tanggal DO.
+                </p>
               </div>
               {selectedInvoice && (
                 <div className="col-span-2">
