@@ -202,7 +202,7 @@ def get_dashboard_data(
         total_invoice_count = len(invoices)
         total_kontrak = int(base_kontrak.count())
 
-        d_ids = base_do_cash.with_entities(models.DeliveryOrder.no_do)
+        d_ids = base_do_pend.with_entities(models.DeliveryOrder.no_do)
         b_ids = base_bypass.with_entities(models.LaporanBypass.id)
 
         # 5. Filter lists

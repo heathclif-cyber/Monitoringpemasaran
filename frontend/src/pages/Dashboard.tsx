@@ -43,7 +43,7 @@ function useChartTheme() {
 
 function StatCards() {
   const data = useDashboardStore((s) => s.data)
-  if (!data) return null
+  if (!data?.summary || !data?.charts?.bulanan) return null
   const { summary, charts } = data
   const { bulanan } = charts
 
@@ -89,7 +89,7 @@ function StatCards() {
 function TrendChart() {
   const data = useDashboardStore((s) => s.data)
   const chartTheme = useChartTheme()
-  if (!data) return null
+  if (!data?.charts?.bulanan) return null
 
   const chartData = data.charts.bulanan.labels.map((label, i) => ({
     bulan: label,
@@ -124,7 +124,7 @@ function TrendChart() {
 function UnitChart() {
   const data = useDashboardStore((s) => s.data)
   const chartTheme = useChartTheme()
-  if (!data) return null
+  if (!data?.charts?.unit) return null
 
   const chartData = data.charts.unit.labels.map((label, i) => ({
     unit: label,
@@ -158,7 +158,7 @@ function UnitChart() {
 function VolumeChart() {
   const data = useDashboardStore((s) => s.data)
   const chartTheme = useChartTheme()
-  if (!data) return null
+  if (!data?.charts?.bulanan) return null
 
   const chartData = data.charts.bulanan.labels.map((label, i) => ({
     bulan: label,
@@ -190,7 +190,7 @@ function VolumeChart() {
 
 function CommodityChart() {
   const data = useDashboardStore((s) => s.data)
-  if (!data) return null
+  if (!data?.charts?.komoditas) return null
 
   const chartData = data.charts.komoditas.labels
     .map((label, i) => ({
@@ -236,7 +236,7 @@ function CommodityChart() {
 
 function MonthlyBreakdown() {
   const data = useDashboardStore((s) => s.data)
-  if (!data) return null
+  if (!data?.charts?.bulanan) return null
 
   const { bulanan } = data.charts
   const rows = bulanan.labels.map((label, i) => {
@@ -313,7 +313,7 @@ function MonthlyBreakdown() {
 
 function SapStatus() {
   const data = useDashboardStore((s) => s.data)
-  if (!data) return null
+  if (!data?.summary?.sap_stats || !data?.charts?.sap_bulanan) return null
 
   const { sap_stats } = data.summary
   const sap_bulanan = data.charts.sap_bulanan
@@ -471,7 +471,7 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-      ) : data ? (
+      ) : data?.summary && data?.charts ? (
         <>
           <StatCards />
           <SapStatus />

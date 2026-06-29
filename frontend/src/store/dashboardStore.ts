@@ -28,10 +28,18 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         unit,
         komoditi,
       })
-      const data = await client.get<DashboardResponse>(`/api/dashboard?${params}`)
+      const data = await client.get<DashboardResponse & { error?: string }>(`/api/dashboard?${params}`)
+      if (data && typeof data === 'object' && 'error' in data && data.error) {
+        throw new Error(data.error)
+      }
+      if (!data?.summary || !data?.charts) {
+        throw new Error('Format data dashboard tidak valid')
+      }
       set({ data })
     } catch (err) {
       console.error('[dashboardStore.fetch]', err)
+      set({ data: null })
+      throw err
     } finally {
       set({ isLoading: false })
     }
