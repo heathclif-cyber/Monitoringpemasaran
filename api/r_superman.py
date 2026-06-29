@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from database import get_db
 from services.auth import require_write
+from services.superman.documents import (
+    superman_doc_requirements_for_invoice,
+    superman_doc_requirements_for_pembayaran,
+)
 from services.superman.auth import SupermanCaptchaError, SupermanCaptchaRequired
 from services.superman.runner import (
     SupermanNotConfiguredError,
@@ -14,6 +19,7 @@ from services.superman.runner import (
     request_captcha,
     start_deklarasi_job,
     submit_deklarasi,
+    submit_deklarasi_invoice,
     verify_captcha,
 )
 
@@ -65,28 +71,72 @@ def superman_captcha_verify(body: SupermanCaptchaVerifyBody, _user=Depends(requi
 
 
 @router.post("/recover")
-def superman_recover(no_do: str = Query(..., min_length=1), _user=Depends(require_write)):
-    """Pulihkan nomor SPPn/SPPb dari To Do List ke kolom Superman DO."""
+def superman_recover(
+    no_invoice: str | None = Query(None, min_length=1),
+    no_pembayaran: str | None = Query(None, min_length=1),
+    no_do: str | None = Query(None, min_length=1),
+    force: bool = Query(False),
+    _user=Depends(require_write),
+):
+    """Pulihkan nomor SPPn/SPPb dari To Do List ke kolom Superman invoice."""
     try:
-        return recover_superman_from_todo(no_do.strip())
+        return recover_superman_from_todo(
+            no_invoice=no_invoice,
+            no_pembayaran=no_pembayaran,
+            no_do=no_do,
+            force=force,
+        )
     except Exception as exc:
         raise _map_deklarasi_error(exc) from exc
 
 
 @router.get("/todo-inspect")
-def superman_todo_inspect(no_do: str = Query(..., min_length=1), _user=Depends(require_write)):
-    """Debug: baca To Do List Superman untuk DO tertentu."""
+def superman_todo_inspect(
+    no_invoice: str | None = Query(None, min_length=1),
+    no_pembayaran: str | None = Query(None, min_length=1),
+    no_do: str | None = Query(None, min_length=1),
+    _user=Depends(require_write),
+):
+    """Debug: baca To Do List Superman untuk invoice tertentu."""
     try:
-        return inspect_superman_todo(no_do.strip())
+        return inspect_superman_todo(
+            no_invoice=no_invoice,
+            no_pembayaran=no_pembayaran,
+            no_do=no_do,
+        )
     except Exception as exc:
         raise _map_deklarasi_error(exc) from exc
 
 
+@router.get("/doc-requirements")
+def superman_doc_requirements(
+    no_invoice: str | None = Query(None, min_length=1),
+    no_pembayaran: str | None = Query(None, min_length=1),
+    db=Depends(get_db),
+    _user=Depends(require_write),
+):
+    if no_invoice:
+        reqs, ready = superman_doc_requirements_for_invoice(db, no_invoice.strip())
+        return {"requirements": reqs, "ready": ready}
+    if no_pembayaran:
+        reqs, ready = superman_doc_requirements_for_pembayaran(db, no_pembayaran.strip())
+        return {"requirements": reqs, "ready": ready}
+    raise HTTPException(status_code=400, detail="no_invoice wajib diisi")
+
+
 @router.get("/preview")
-def superman_preview(no_do: str = Query(..., min_length=1), _user=Depends(require_write)):
-    no_do = no_do.strip()
+def superman_preview(
+    no_invoice: str | None = Query(None, min_length=1),
+    no_pembayaran: str | None = Query(None, min_length=1),
+    no_do: str | None = Query(None, min_length=1),
+    _user=Depends(require_write),
+):
     try:
-        return preview_deklarasi(no_do)
+        return preview_deklarasi(
+            no_invoice=no_invoice,
+            no_pembayaran=no_pembayaran,
+            no_do=no_do,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except FileNotFoundError as exc:
@@ -115,10 +165,19 @@ def _map_deklarasi_error(exc: Exception) -> HTTPException:
 
 
 @router.post("/deklarasi/start")
-def superman_deklarasi_start(no_do: str = Query(..., min_length=1), _user=Depends(require_write)):
+def superman_deklarasi_start(
+    no_invoice: str | None = Query(None, min_length=1),
+    no_pembayaran: str | None = Query(None, min_length=1),
+    no_do: str | None = Query(None, min_length=1),
+    _user=Depends(require_write),
+):
     """Mulai job deklarasi Superman — lacak progres via /deklarasi/progress."""
     try:
-        return start_deklarasi_job(no_do.strip())
+        return start_deklarasi_job(
+            no_invoice=no_invoice,
+            no_pembayaran=no_pembayaran,
+            no_do=no_do,
+        )
     except Exception as exc:
         raise _map_deklarasi_error(exc) from exc
 
@@ -132,10 +191,23 @@ def superman_deklarasi_progress(job_id: str = Query(..., min_length=1), _user=De
 
 
 @router.post("/deklarasi")
-def superman_deklarasi(no_do: str = Query(..., min_length=1), _user=Depends(require_write)):
+def superman_deklarasi(
+    no_invoice: str | None = Query(None, min_length=1),
+    no_pembayaran: str | None = Query(None, min_length=1),
+    no_do: str | None = Query(None, min_length=1),
+    _user=Depends(require_write),
+):
     """Isi dan simpan draft SPPn/SPPb di Superman (To Do List)."""
-    no_do = no_do.strip()
     try:
-        return submit_deklarasi(no_do)
+        if no_invoice:
+            return submit_deklarasi_invoice(no_invoice.strip())
+        if no_pembayaran:
+            from services.superman.runner import submit_deklarasi_pembayaran
+            return submit_deklarasi_pembayaran(no_pembayaran.strip())
+        if no_do:
+            return submit_deklarasi(no_do.strip())
+        raise HTTPException(status_code=400, detail="no_invoice wajib diisi")
+    except HTTPException:
+        raise
     except Exception as exc:
         raise _map_deklarasi_error(exc) from exc

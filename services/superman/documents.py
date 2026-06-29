@@ -352,3 +352,299 @@ def resolve_support_doc_from_do(no_do: str) -> ResolvedSupportDoc:
         return resolve_support_doc_for_do(db, no_do)
     finally:
         db.close()
+
+
+def resolve_support_doc_for_pembayaran(db: Session, no_pembayaran: str) -> ResolvedSupportDoc:
+    pay = (
+        db.query(models.Pembayaran)
+        .options(
+            joinedload(models.Pembayaran.invoice).joinedload(models.Invoice.kontrak),
+            joinedload(models.Pembayaran.invoice).joinedload(models.Invoice.berita_acara),
+            joinedload(models.Pembayaran.delivery_order).joinedload(models.DeliveryOrder.berita_acara),
+        )
+        .filter(models.Pembayaran.no_pembayaran == no_pembayaran)
+        .first()
+    )
+    if not pay:
+        raise ValueError(f"Pembayaran tidak ditemukan: {no_pembayaran}")
+
+    invoice = pay.invoice
+    if not invoice:
+        raise ValueError(f"Invoice tidak ditemukan untuk pembayaran: {no_pembayaran}")
+
+    kontrak = invoice.kontrak
+    if not kontrak:
+        raise ValueError(f"Kontrak tidak ditemukan untuk pembayaran: {no_pembayaran}")
+
+    no_invoice = invoice.no_invoice
+    if not no_invoice:
+        raise ValueError(f"Nomor invoice kosong untuk pembayaran: {no_pembayaran}")
+
+    if is_payung_ba(kontrak):
+        no_ba = invoice.no_ba
+        if pay.delivery_order and pay.delivery_order.no_ba:
+            no_ba = pay.delivery_order.no_ba
+        if not no_ba and pay.delivery_order and pay.delivery_order.berita_acara:
+            no_ba = pay.delivery_order.berita_acara.no_ba
+        if not no_ba and invoice.berita_acara:
+            no_ba = invoice.berita_acara.no_ba
+        if not no_ba:
+            raise ValueError(
+                f"Pembayaran {no_pembayaran} kontrak payung tanpa nomor BA. "
+                "Pastikan invoice terhubung ke Berita Acara."
+            )
+        return _resolve_first_available(
+            db,
+            _payung_ba_support_sources(no_ba, no_invoice),
+        )
+
+    return _resolve_first_available(
+        db,
+        _standar_support_sources(kontrak.no_kontrak, no_invoice),
+    )
+
+
+def resolve_support_doc_from_pembayaran(no_pembayaran: str) -> ResolvedSupportDoc:
+    from database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return resolve_support_doc_for_pembayaran(db, no_pembayaran)
+    finally:
+        db.close()
+
+
+def resolve_support_doc_for_invoice(db: Session, no_invoice: str) -> ResolvedSupportDoc:
+    invoice = (
+        db.query(models.Invoice)
+        .options(
+            joinedload(models.Invoice.kontrak),
+            joinedload(models.Invoice.berita_acara),
+        )
+        .filter(models.Invoice.no_invoice == no_invoice)
+        .first()
+    )
+    if not invoice:
+        raise ValueError(f"Invoice tidak ditemukan: {no_invoice}")
+
+    kontrak = invoice.kontrak
+    if not kontrak:
+        raise ValueError(f"Kontrak tidak ditemukan untuk invoice: {no_invoice}")
+
+    if not invoice.no_invoice:
+        raise ValueError(f"Nomor invoice kosong: {no_invoice}")
+
+    if is_payung_ba(kontrak):
+        no_ba = invoice.no_ba
+        if not no_ba and invoice.berita_acara:
+            no_ba = invoice.berita_acara.no_ba
+        if not no_ba:
+            raise ValueError(
+                f"Invoice {no_invoice} kontrak payung tanpa nomor BA. "
+                "Pastikan invoice terhubung ke Berita Acara."
+            )
+        return _resolve_first_available(
+            db,
+            _payung_ba_support_sources(no_ba, invoice.no_invoice),
+        )
+
+    return _resolve_first_available(
+        db,
+        _standar_support_sources(kontrak.no_kontrak, invoice.no_invoice),
+    )
+
+
+def resolve_support_doc_from_invoice(no_invoice: str) -> ResolvedSupportDoc:
+    from database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return resolve_support_doc_for_invoice(db, no_invoice)
+    finally:
+        db.close()
+
+
+def superman_doc_requirements_for_invoice(
+    db: Session,
+    no_invoice: str,
+) -> tuple[list[dict[str, str | bool | None]], bool]:
+    invoice = (
+        db.query(models.Invoice)
+        .options(
+            joinedload(models.Invoice.kontrak),
+            joinedload(models.Invoice.berita_acara),
+        )
+        .filter(models.Invoice.no_invoice == no_invoice)
+        .first()
+    )
+    if not invoice or not invoice.kontrak:
+        return [], False
+
+    kontrak = invoice.kontrak
+    requirements: list[dict[str, str | bool | None]] = []
+
+    if not invoice.no_invoice:
+        requirements.append(
+            {
+                "label": "Invoice",
+                "entity_type": "invoice",
+                "entity_id": "-",
+                "doc_type": "invoice",
+                "uploaded": False,
+                "file_name": None,
+                "upload_hint": f"Invoice {no_invoice} tidak valid",
+            }
+        )
+        return requirements, False
+
+    if is_payung_ba(kontrak):
+        no_ba = invoice.no_ba
+        if not no_ba and invoice.berita_acara:
+            no_ba = invoice.berita_acara.no_ba
+        if not no_ba:
+            requirements.append(
+                {
+                    "label": "Berita Acara",
+                    "entity_type": "ba",
+                    "entity_id": "-",
+                    "doc_type": "berita_acara",
+                    "uploaded": False,
+                    "file_name": None,
+                    "upload_hint": "Hubungkan invoice ke Berita Acara terlebih dahulu",
+                }
+            )
+            return requirements, False
+
+        sources = _payung_ba_support_sources(no_ba, invoice.no_invoice)
+        matched = _find_first_uploaded(db, sources)
+        if matched:
+            requirements.append(matched)
+            return requirements, True
+        requirements.append(
+            {
+                "label": "Dokumen Pendukung",
+                "entity_type": "invoice",
+                "entity_id": invoice.no_invoice,
+                "doc_type": "invoice",
+                "uploaded": False,
+                "file_name": None,
+                "upload_hint": f"{_PENDING_SUPPORT_HINT} BA: {no_ba}, Invoice: {invoice.no_invoice}.",
+            }
+        )
+        return requirements, False
+
+    kontrak_id = kontrak.no_kontrak
+    sources = _standar_support_sources(kontrak_id, invoice.no_invoice)
+    matched = _find_first_uploaded(db, sources)
+    if matched:
+        requirements.append(matched)
+        return requirements, True
+
+    requirements.append(
+        {
+            "label": "Dokumen Pendukung",
+            "entity_type": "invoice",
+            "entity_id": invoice.no_invoice,
+            "doc_type": "invoice",
+            "uploaded": False,
+            "file_name": None,
+            "upload_hint": f"{_PENDING_SUPPORT_HINT} Kontrak: {kontrak_id}, Invoice: {invoice.no_invoice}.",
+        }
+    )
+    return requirements, False
+
+
+def superman_doc_requirements_for_pembayaran(
+    db: Session,
+    no_pembayaran: str,
+) -> tuple[list[dict[str, str | bool | None]], bool]:
+    pay = (
+        db.query(models.Pembayaran)
+        .options(
+            joinedload(models.Pembayaran.invoice).joinedload(models.Invoice.kontrak),
+            joinedload(models.Pembayaran.invoice).joinedload(models.Invoice.berita_acara),
+            joinedload(models.Pembayaran.delivery_order).joinedload(models.DeliveryOrder.berita_acara),
+        )
+        .filter(models.Pembayaran.no_pembayaran == no_pembayaran)
+        .first()
+    )
+    if not pay or not pay.invoice or not pay.invoice.kontrak:
+        return [], False
+
+    kontrak = pay.invoice.kontrak
+    no_invoice = pay.invoice.no_invoice
+    requirements: list[dict[str, str | bool | None]] = []
+
+    if not no_invoice:
+        requirements.append(
+            {
+                "label": "Invoice",
+                "entity_type": "invoice",
+                "entity_id": "-",
+                "doc_type": "invoice",
+                "uploaded": False,
+                "file_name": None,
+                "upload_hint": f"Pembayaran {no_pembayaran} belum terhubung ke invoice",
+            }
+        )
+        return requirements, False
+
+    if is_payung_ba(kontrak):
+        no_ba = pay.invoice.no_ba
+        if pay.delivery_order and pay.delivery_order.no_ba:
+            no_ba = pay.delivery_order.no_ba
+        if not no_ba and pay.delivery_order and pay.delivery_order.berita_acara:
+            no_ba = pay.delivery_order.berita_acara.no_ba
+        if not no_ba and pay.invoice.berita_acara:
+            no_ba = pay.invoice.berita_acara.no_ba
+        if not no_ba:
+            requirements.append(
+                {
+                    "label": "Berita Acara",
+                    "entity_type": "ba",
+                    "entity_id": "-",
+                    "doc_type": "berita_acara",
+                    "uploaded": False,
+                    "file_name": None,
+                    "upload_hint": "Hubungkan invoice ke Berita Acara terlebih dahulu",
+                }
+            )
+            return requirements, False
+
+        sources = _payung_ba_support_sources(no_ba, no_invoice)
+        matched = _find_first_uploaded(db, sources)
+        if matched:
+            requirements.append(matched)
+            return requirements, True
+        requirements.append(
+            {
+                "label": "Dokumen Pendukung",
+                "entity_type": "invoice",
+                "entity_id": no_invoice,
+                "doc_type": "invoice",
+                "uploaded": False,
+                "file_name": None,
+                "upload_hint": f"{_PENDING_SUPPORT_HINT} BA: {no_ba}, Invoice: {no_invoice}.",
+            }
+        )
+        return requirements, False
+
+    kontrak_id = kontrak.no_kontrak
+    sources = _standar_support_sources(kontrak_id, no_invoice)
+    matched = _find_first_uploaded(db, sources)
+    if matched:
+        requirements.append(matched)
+        return requirements, True
+
+    requirements.append(
+        {
+            "label": "Dokumen Pendukung",
+            "entity_type": "invoice",
+            "entity_id": no_invoice,
+            "doc_type": "invoice",
+            "uploaded": False,
+            "file_name": None,
+            "upload_hint": f"{_PENDING_SUPPORT_HINT} Kontrak: {kontrak_id}, Invoice: {no_invoice}.",
+        }
+    )
+    return requirements, False

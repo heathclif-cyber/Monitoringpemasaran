@@ -25,8 +25,9 @@ def get_dashboard_data(
         from sqlalchemy.orm import joinedload
         
         # Base queries (Pisahkan DO berdasarkan tanggal yang sesuai)
-        do_transfer_col = func.coalesce(models.DeliveryOrder.tanggal_pembayaran, models.DeliveryOrder.tanggal_do)
-        base_do_cash = db.query(models.DeliveryOrder).filter(func.extract('year', do_transfer_col) == year)
+        base_pembayaran_cash = db.query(models.Pembayaran).filter(
+            func.extract('year', models.Pembayaran.tanggal_pembayaran) == year
+        )
         
         do_rencana_col = func.coalesce(models.DeliveryOrder.rencana_pengambilan, models.DeliveryOrder.tanggal_do)
         base_do_pend = db.query(models.DeliveryOrder).filter(func.extract('year', do_rencana_col) == year)
@@ -37,14 +38,18 @@ def get_dashboard_data(
 
         # Filters (Unit & Komoditi)
         if unit != "ALL":
-            base_do_cash = base_do_cash.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit)))
+            base_pembayaran_cash = base_pembayaran_cash.filter(
+                models.Pembayaran.invoice.has(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit))
+            )
             base_do_pend = base_do_pend.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit)))
             base_invoice = base_invoice.filter(models.Invoice.kontrak.has(models.Kontrak.kebun_produsen == unit))
             base_bypass = base_bypass.filter(models.LaporanBypass.unit == unit)
             base_kontrak = base_kontrak.filter(models.Kontrak.kebun_produsen == unit)
 
         if komoditi != "ALL":
-            base_do_cash = base_do_cash.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi)))
+            base_pembayaran_cash = base_pembayaran_cash.filter(
+                models.Pembayaran.invoice.has(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi))
+            )
             base_do_pend = base_do_pend.filter(models.DeliveryOrder.invoice.has(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi)))
             base_invoice = base_invoice.filter(models.Invoice.kontrak.has(models.Kontrak.komoditi == komoditi))
             base_bypass = base_bypass.filter(models.LaporanBypass.komoditi == komoditi)
@@ -139,12 +144,12 @@ def get_dashboard_data(
             kom_map[kom] = kom_map.get(kom, 0) + pendapatan_do
             unit_map[unt] = unit_map.get(unt, 0) + pendapatan_do
 
-        # 2. CASH IN
-        dos_cash = base_do_cash.all()
-        for do in dos_cash:
-            nom = float(do.nominal_transfer or 0)
+        # 2. CASH IN (dari Pembayaran)
+        pays_cash = base_pembayaran_cash.all()
+        for pay in pays_cash:
+            nom = float(pay.nominal_transfer or 0)
             total_cash_in += nom
-            m = do.tanggal_pembayaran.month if do.tanggal_pembayaran else do.tanggal_do.month if do.tanggal_do else 1
+            m = pay.tanggal_pembayaran.month if pay.tanggal_pembayaran else 1
             cash_m[f"{m:02d}"] += nom
 
         # 3. INVOICES

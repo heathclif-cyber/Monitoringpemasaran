@@ -10,7 +10,10 @@ from database import get_db, SessionLocal
 from services.auth import require_write
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba, ba_effective_harga
-from services.superman.documents import superman_doc_requirements_for_do
+from services.superman.documents import (
+    superman_doc_requirements_for_do,
+    superman_doc_requirements_for_pembayaran,
+)
 
 router = APIRouter(prefix="/api/laporan", tags=["Laporan"])
 
@@ -27,7 +30,8 @@ def get_bulan_buku(d):
 def _build_laporan_rows(db: Session):
     kontraks = db.query(models.Kontrak).options(
         joinedload(models.Kontrak.units),
-        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders),
+        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.pembayaran),
+        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders).joinedload(models.DeliveryOrder.pembayaran),
         joinedload(models.Kontrak.invoices).joinedload(models.Invoice.berita_acara),
         joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders).joinedload(models.DeliveryOrder.berita_acara),
     ).all()
@@ -148,13 +152,35 @@ def _build_laporan_rows(db: Session):
         if not jenis_komoditi_val:
             jenis_komoditi_val = k.jenis_komoditi or k.deskripsi_produk or k.komoditi or ""
 
+        no_pembayaran_val = ""
+        superman_val = ""
+        if do:
+            no_pembayaran_val = do.no_pembayaran or ""
+        if inv and (inv.superman or "").strip():
+            superman_val = inv.superman or ""
+        elif do:
+            if do.pembayaran and do.pembayaran.superman:
+                superman_val = do.pembayaran.superman or ""
+            if not superman_val:
+                superman_val = do.superman or ""
+
         dokumen_superman: list = []
         dokumen_superman_siap = False
-        if do:
+        if inv and inv.no_invoice:
+            from services.superman.documents import superman_doc_requirements_for_invoice
+            dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_invoice(
+                db, inv.no_invoice
+            )
+        elif no_pembayaran_val:
+            dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_pembayaran(
+                db, no_pembayaran_val
+            )
+        elif do:
             dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_do(db, do.no_do)
 
         return {
             "No_DO": do.no_do if do else "",
+            "No_Pembayaran": no_pembayaran_val,
             "No_Invoice": inv.no_invoice if inv else "",
             "No_Kontrak": k.no_kontrak or "",
             "Unit": unit_val,
@@ -190,7 +216,7 @@ def _build_laporan_rows(db: Session):
                     do.rencana_pengambilan.strftime("%Y-%m-%d") if do and getattr(do, 'rencana_pengambilan', None) else ""
                 )
             ),
-            "Superman": do.superman if do else "",
+            "Superman": superman_val,
             "Kontrak_SAP": do.kontrak_sap if do else "",
             "SO_SAP": do.so_sap if do else "",
             "DO_SAP": do.do_sap if do else "",
@@ -218,17 +244,17 @@ def _build_laporan_rows(db: Session):
                 if str(getattr(k, 'is_pph', 'false')).lower() == 'true':
                     k_pph = k_nilai * (float(getattr(k, 'pph_persen', 0) or 0) / 100)
                 
+                inv_total = float(inv.jumlah_pembayaran or 0)
+
                 total_pelunasan = 0
-                for d in inv.delivery_orders:
-                    nom = float(d.nominal_transfer or 0)
-                    if str(getattr(d, 'is_pph_disetor', 'false')).lower() == 'true':
-                        d_ratio = float(d.volume_do or 0) / k_vol if k_vol > 0 else 0
-                        d_pph = k_pph * d_ratio
-                        total_pelunasan += (nom + d_pph)
+                for pay in inv.pembayaran:
+                    nom = float(pay.nominal_transfer or 0)
+                    if str(getattr(pay, 'is_pph_disetor', 'false')).lower() == 'true':
+                        pay_ratio = nom / inv_total if inv_total > 0 else 0
+                        pay_pph = k_pph * pay_ratio
+                        total_pelunasan += (nom + pay_pph)
                     else:
                         total_pelunasan += nom
-
-                inv_total = float(inv.jumlah_pembayaran or 0)
                 
                 if not inv.delivery_orders:
                     rows.append(build_row(k, inv, None, inv_total, k_vol, total_pelunasan, total_do_volume))

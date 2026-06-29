@@ -18,7 +18,8 @@ TTL_SECONDS = 3600
 @dataclass
 class SupermanJob:
     job_id: str
-    no_do: str
+    no_invoice: str
+    no_pembayaran: str = ""
     status: JobStatus = "pending"
     percent: int = 0
     stage: str = "Menunggu..."
@@ -40,11 +41,15 @@ def _cleanup_expired() -> None:
             _jobs.pop(job_id, None)
 
 
-def create_job(no_do: str) -> str:
+def create_job(no_invoice: str, no_pembayaran: str = "") -> str:
     _cleanup_expired()
     job_id = str(uuid.uuid4())
     with _lock:
-        _jobs[job_id] = SupermanJob(job_id=job_id, no_do=no_do)
+        _jobs[job_id] = SupermanJob(
+            job_id=job_id,
+            no_invoice=no_invoice.strip(),
+            no_pembayaran=no_pembayaran.strip(),
+        )
     return job_id
 
 

@@ -10,17 +10,20 @@ import { cn } from '@/lib/utils'
 
 interface SupermanProgressDialogProps {
   open: boolean
-  noDo: string
+  noInvoice?: string
+  noPembayaran?: string
   percent: number
   stage: string
 }
 
 export function SupermanProgressDialog({
   open,
-  noDo,
+  noInvoice,
+  noPembayaran,
   percent,
   stage,
 }: SupermanProgressDialogProps) {
+  const refLabel = noInvoice || noPembayaran || '-'
   const clamped = Math.max(0, Math.min(100, percent))
 
   return (
@@ -36,24 +39,18 @@ export function SupermanProgressDialog({
             Membuat SPPn Superman
           </DialogTitle>
           <DialogDescription>
-            DO {noDo} — mohon tunggu, proses berjalan di server (~1–2 menit).
+            Invoice {refLabel} — mohon tunggu, proses berjalan di server (~1–2 menit).
           </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{stage}</span>
-            <span className="font-semibold tabular-nums">{clamped}%</span>
-          </div>
-          <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
+        <div className="space-y-2">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className={cn(
-                'h-full rounded-full bg-primary transition-all duration-500 ease-out',
-                clamped >= 100 && 'bg-emerald-500',
-              )}
+              className={cn('h-full bg-primary transition-all duration-300')}
               style={{ width: `${clamped}%` }}
             />
           </div>
+          <p className="text-sm text-muted-foreground">{stage}</p>
+          <p className="text-xs text-muted-foreground text-right">{clamped}%</p>
         </div>
       </DialogContent>
     </Dialog>

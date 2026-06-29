@@ -739,7 +739,7 @@ function LaporanTableRow({
         </td>
       ))}
       <td className={cn(TD, 'min-w-[7rem]')}>
-        {!isBypass && row.No_DO ? (
+        {!isBypass && row.No_Pembayaran ? (
           <SupermanDocChecklist
             requirements={row.Dokumen_Superman}
             docsReady={row.Dokumen_Superman_Siap}
@@ -749,10 +749,10 @@ function LaporanTableRow({
         )}
       </td>
       <td className={cn(TD, 'min-w-[9rem]')}>
-        {!isBypass && row.No_DO ? (
+        {!isBypass && row.No_Invoice ? (
           <SupermanDeklarasiStatus
-            key={`${row.No_DO}-superman-status-${row.Superman || ''}`}
-            noDo={row.No_DO}
+            key={`${row.No_Invoice}-superman-status-${row.Superman || ''}`}
+            noInvoice={row.No_Invoice}
             existingSuperman={row.Superman}
             docsReady={row.Dokumen_Superman_Siap}
             onSuccess={(result) => onSupermanSuccess(row.No_DO, result)}

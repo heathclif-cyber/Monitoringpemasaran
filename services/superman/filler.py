@@ -55,10 +55,10 @@ def _fill_shared_informasi(page: Page, payload: DeklarasiPayload, cfg: SupermanC
     if payload.jenis_form == "sppb_sppn":
         page.fill("#kwitansi_spp", payload.mitra_pembeli)
         page.fill("#referensi_spp", payload.referensi or "-")
-        page.fill("#berita_acara_sppb", payload.ba_au58 or payload.no_do or "-")
+        page.fill("#berita_acara_sppb", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
         page.fill("#sp_opl_sppb", payload.no_kontrak or "-")
         page.fill("#sp_opl_sppn", payload.no_kontrak or "-")
-        page.fill("#au58_sppn", payload.ba_au58 or payload.no_do or "-")
+        page.fill("#au58_sppn", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
         page.select_option("#bagian_sppb", cfg.bagian)
         page.select_option("#bagian_sppn", cfg.bagian)
         if payload.tanggal_transfer:
@@ -87,7 +87,7 @@ def _fill_shared_informasi(page: Page, payload: DeklarasiPayload, cfg: SupermanC
 
     page.fill("#kwitansi_sppn", payload.mitra_pembeli)
     page.fill("#referensi_sppn", payload.referensi or "-")
-    page.fill("#au58_sppn", payload.ba_au58 or payload.no_do or "-")
+    page.fill("#au58_sppn", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
     page.fill("#sp_opl_sppn", payload.no_kontrak or "-")
     page.select_option("#bagian_sppn", cfg.bagian)
     if payload.tanggal_transfer:

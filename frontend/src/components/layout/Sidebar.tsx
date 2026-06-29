@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   FileText,
   Receipt,
+  Banknote,
   Truck,
   Table,
   Zap,
@@ -32,6 +33,7 @@ const navItems: NavItemDef[] = [
   { label: 'Dashboard', to: '/', icon: <LayoutDashboard size={16} /> },
   { label: 'Buat Kontrak', to: '/kontrak', icon: <FileText size={16} /> },
   { label: 'Cetak Invoice', to: '/invoice', icon: <Receipt size={16} /> },
+  { label: 'Input Pembayaran', to: '/pembayaran', icon: <Banknote size={16} /> },
   { label: 'Delivery Order', to: '/delivery-order', icon: <Truck size={16} /> },
   { label: 'Berita Acara', to: '/berita-acara', icon: <ClipboardList size={16} /> },
   { label: 'Upload Dokumen', to: '/upload', icon: <CloudUpload size={16} /> },
@@ -44,6 +46,7 @@ const navItems: NavItemDef[] = [
     children: [
       { label: 'Kontrak', to: '/repo/kontrak' },
       { label: 'Invoice', to: '/repo/invoice' },
+      { label: 'Pembayaran', to: '/repo/pembayaran' },
       { label: 'Delivery Order', to: '/repo/do' },
     ],
   },

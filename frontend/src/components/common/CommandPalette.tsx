@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   FileText,
   Receipt,
+  Banknote,
   Truck,
   Table,
   Zap,
@@ -26,6 +27,7 @@ const NAV_COMMANDS = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard, group: 'Menu' },
   { label: 'Buat Kontrak', to: '/kontrak', icon: FileText, group: 'Menu' },
   { label: 'Cetak Invoice', to: '/invoice', icon: Receipt, group: 'Menu' },
+  { label: 'Input Pembayaran', to: '/pembayaran', icon: Banknote, group: 'Menu' },
   { label: 'Delivery Order', to: '/delivery-order', icon: Truck, group: 'Menu' },
   { label: 'Berita Acara', to: '/berita-acara', icon: ClipboardList, group: 'Menu' },
   { label: 'Upload Dokumen', to: '/upload', icon: CloudUpload, group: 'Menu' },
@@ -34,6 +36,7 @@ const NAV_COMMANDS = [
   { label: 'Input Bypass', to: '/bypass', icon: Zap, group: 'Menu' },
   { label: 'Arsip Kontrak', to: '/repo/kontrak', icon: Archive, group: 'Repository' },
   { label: 'Arsip Invoice', to: '/repo/invoice', icon: Receipt, group: 'Repository' },
+  { label: 'Arsip Pembayaran', to: '/repo/pembayaran', icon: Banknote, group: 'Repository' },
   { label: 'Arsip Delivery Order', to: '/repo/do', icon: Truck, group: 'Repository' },
 ]
 

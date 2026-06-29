@@ -21,11 +21,45 @@ router = APIRouter(prefix="/api/do", tags=["Delivery Order"])
 
 @router.post("", response_model=schemas.DeliveryOrderOut)
 def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
-    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == do.no_invoice).first()
+    if not do.no_pembayaran:
+        raise HTTPException(status_code=400, detail="no_pembayaran wajib diisi")
+
+    db_pay = (
+        db.query(models.Pembayaran)
+        .options(
+            joinedload(models.Pembayaran.delivery_order),
+            joinedload(models.Pembayaran.invoice),
+        )
+        .filter(models.Pembayaran.no_pembayaran == do.no_pembayaran)
+        .first()
+    )
+    if not db_pay:
+        raise HTTPException(status_code=404, detail="Pembayaran not found")
+
+    no_invoice = do.no_invoice or db_pay.no_invoice
+    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Get kontrak for volume calculation (eager-load units for stok material)
+    if not (db_invoice.superman or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Invoice belum punya nomor Superman. Lunasi pembayaran dan buat deklarasi Superman terlebih dahulu.",
+        )
+
+    if db_pay.no_invoice != no_invoice:
+        raise HTTPException(status_code=400, detail="Pembayaran tidak sesuai dengan invoice")
+
+    existing_do_for_pay = db.query(models.DeliveryOrder).filter(
+        models.DeliveryOrder.no_pembayaran == do.no_pembayaran,
+        models.DeliveryOrder.no_do != do.no_do,
+    ).first()
+    if existing_do_for_pay:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Pembayaran sudah digunakan DO {existing_do_for_pay.no_do}",
+        )
+
     db_kontrak = (
         db.query(models.Kontrak)
         .options(joinedload(models.Kontrak.units))
@@ -34,7 +68,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     )
     kontrak_volume = float(db_kontrak.volume or 0) if db_kontrak else 0
     invoice_total = float(db_invoice.jumlah_pembayaran or 0)
-    nominal = float(do.nominal_transfer or 0)
+    nominal = float(db_pay.nominal_transfer or 0)
     payung_ba = is_payung_ba(db_kontrak)
 
     no_ba = do.no_ba or db_invoice.no_ba
@@ -88,10 +122,21 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
             detail=f"Volume barang ({volume_do:,.0f}) melebihi volume maksimum ({max_volume:,.0f})",
         )
 
-    # Calculate selisih — sisa dari invoice yang belum ditransfer
     selisih = invoice_total - nominal
 
-    do_payload = do.model_dump(exclude={"volume_do"})
+    do_payload = {
+        "no_do": do.no_do,
+        "no_invoice": no_invoice,
+        "no_pembayaran": do.no_pembayaran,
+        "tanggal_do": do.tanggal_do,
+        "kepada_unit": do.kepada_unit,
+        "alamat_unit": do.alamat_unit,
+        "tanggal_pembayaran": db_pay.tanggal_pembayaran,
+        "nominal_transfer": nominal,
+        "is_pph_disetor": db_pay.is_pph_disetor,
+        "rencana_pengambilan": rencana_pengambilan,
+        "superman": db_invoice.superman or db_pay.superman,
+    }
     if payung_ba and db_ba:
         do_payload["no_ba"] = db_ba.no_ba
         do_payload["rencana_pengambilan"] = db_ba.tanggal_ba
@@ -171,12 +216,14 @@ def get_do(no_do: str, db: Session = Depends(get_db)):
     if not db_do:
         raise HTTPException(status_code=404, detail="DO not found")
     return db_do
+
+
 @router.delete("/{no_do:path}")
 def delete_do(no_do: str, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == no_do).first()
     if not db_do:
         raise HTTPException(status_code=404, detail="DO not found")
-    
+
     reverse_stok_do(db, no_do)
     db.delete(db_do)
     db.commit()

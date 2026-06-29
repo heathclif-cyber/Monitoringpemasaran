@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Edit, FileDown, Trash2, Eye } from 'lucide-react'
-import { SupermanDeklarasiButton } from '@/components/common/SupermanDeklarasiButton'
+
 import { useNavigate } from 'react-router-dom'
 import { useDOStore } from '@/store/doStore'
 import { useAppStore } from '@/store/appStore'
@@ -110,6 +110,7 @@ export default function RepoDO() {
               columns={[
                 { key: 'no', header: 'No DO', render: (item) => <span className="font-medium">{item.no_do}</span> },
                 { key: 'inv', header: 'No Invoice', render: (item) => <span className="text-slate-600">{item.no_invoice}</span> },
+                { key: 'pay', header: 'No Pembayaran', render: (item) => <span className="text-slate-600">{safe(item.no_pembayaran)}</span> },
                 { key: 'tgl', header: 'Tanggal DO', render: (item) => formatDate(item.tanggal_do) },
                 { key: 'unit', header: 'Unit Tujuan', render: (item) => safe(item.kepada_unit) },
                 {
@@ -126,14 +127,7 @@ export default function RepoDO() {
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary" onClick={() => { setPreviewDO(item); setPreviewOpen(true) }}>
                         <Eye size={14} />
                       </Button>
-                      {canEdit() && (
-                        <SupermanDeklarasiButton
-                          noDo={item.no_do}
-                          existingSuperman={item.superman}
-                          compact
-                          className="h-8 px-2"
-                        />
-                      )}
+
                       {canEdit() && (
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(item.no_do)}>
                           <Trash2 size={14} />

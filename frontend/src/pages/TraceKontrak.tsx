@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton'
 import { formatCurrency, formatDate, safe } from '@/lib/utils'
 import { client } from '@/lib/client'
-import type { KontrakTrace, TraceInvoice, PaymentStatus } from '@/types'
+import type { KontrakTrace, TraceInvoice, TracePembayaran, PaymentStatus } from '@/types'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -344,7 +344,7 @@ function InvoiceExpandable({
             <span className="font-normal text-gray-400">/ {formatCurrency(inv.kewajiban)}</span>
           </div>
           <div className="text-xs text-gray-400 mt-0.5">
-            {inv.persen_terbayar.toFixed(1)}% terbayar · {inv.jumlah_do} DO
+            {inv.persen_terbayar.toFixed(1)}% terbayar · {inv.jumlah_record_pembayaran ?? inv.pembayaran?.length ?? 0} bayar · {inv.jumlah_do} DO
           </div>
         </div>
       </button>
@@ -363,9 +363,31 @@ function InvoiceExpandable({
         />
       </div>
 
-      {/* DO list */}
+      {/* Pembayaran & DO list */}
       {open && (
         <div className="border-t bg-gray-50/60">
+          {(inv.pembayaran?.length ?? 0) > 0 && (
+            <div className="px-6 py-3 border-b">
+              <div className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5">
+                <Banknote size={12} /> Pembayaran
+              </div>
+              <div className="divide-y rounded border bg-white">
+                {inv.pembayaran!.map((pay: TracePembayaran) => (
+                  <div key={pay.no_pembayaran} className="px-3 py-2 flex flex-wrap gap-4 text-sm">
+                    <div className="font-medium min-w-[120px]">{pay.no_pembayaran}</div>
+                    <div className="text-xs">
+                      <span className="text-gray-400">Tgl </span>
+                      {formatDate(pay.tanggal_pembayaran) || '-'}
+                    </div>
+                    <div className="text-xs font-semibold text-emerald-700">{formatCurrency(pay.nominal_transfer)}</div>
+                    <div className={`text-xs ${pay.status_do === 'Sudah DO' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {pay.status_do}{pay.no_do ? `: ${pay.no_do}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {inv.delivery_orders.length === 0 ? (
             <div className="flex items-center gap-2 px-6 py-4 text-sm text-gray-400">
               <AlertCircle size={14} />

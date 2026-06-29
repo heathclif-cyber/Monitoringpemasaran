@@ -152,13 +152,37 @@ class InvoiceOut(InvoiceBase):
     terbilang_invoice: Optional[str]
     nama_unit: Optional[str] = None
     no_ba: Optional[str] = None
+    superman: Optional[str] = None
 
     class Config:
         from_attributes = True
 
+
+class PembayaranBase(BaseModel):
+    no_invoice: str
+    tanggal_pembayaran: date
+    nominal_transfer: float
+    is_pph_disetor: Optional[str] = "false"
+
+
+class PembayaranCreate(PembayaranBase):
+    no_pembayaran: Optional[str] = None
+
+
+class PembayaranOut(PembayaranBase):
+    no_pembayaran: str
+    selisih: float
+    superman: Optional[str] = None
+    no_do: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class DeliveryOrderBase(BaseModel):
     no_do: str
     no_invoice: str
+    no_pembayaran: Optional[str] = None
     tanggal_do: date
     kepada_unit: Optional[str] = None
     alamat_unit: Optional[str] = None
@@ -168,8 +192,17 @@ class DeliveryOrderBase(BaseModel):
     rencana_pengambilan: Optional[date] = None
     no_ba: Optional[str] = None
 
-class DeliveryOrderCreate(DeliveryOrderBase):
-    volume_do: Optional[float] = None  # opsional — user input; kosong = hitung proporsional
+
+class DeliveryOrderCreate(BaseModel):
+    no_do: str
+    no_pembayaran: str
+    no_invoice: Optional[str] = None
+    tanggal_do: date
+    kepada_unit: Optional[str] = None
+    alamat_unit: Optional[str] = None
+    rencana_pengambilan: Optional[date] = None
+    no_ba: Optional[str] = None
+    volume_do: Optional[float] = None
 
 class DeliveryOrderOut(DeliveryOrderBase):
     selisih: float

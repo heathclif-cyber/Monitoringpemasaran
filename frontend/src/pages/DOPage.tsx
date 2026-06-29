@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { FileDown, RotateCcw, Save } from 'lucide-react'
 import { useDOStore } from '@/store/doStore'
-import { useInvoiceStore } from '@/store/invoiceStore'
+import { usePembayaranStore } from '@/store/pembayaranStore'
 import { useBAStore } from '@/store/baStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label'
 import { PreviewPanel } from '@/components/common/PreviewPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
-import { SupermanDeklarasiButton } from '@/components/common/SupermanDeklarasiButton'
+
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { client } from '@/lib/client'
@@ -118,13 +118,11 @@ function DOPreviewContent({ noDo, noInv, tgl, unit, k, volumeKeluar, maxVolume }
 
 const doSchema = z.object({
   no_do: z.string().min(1, 'No DO wajib diisi'),
-  no_invoice: z.string().min(1, 'Invoice wajib dipilih'),
+  no_pembayaran: z.string().min(1, 'Pembayaran wajib dipilih'),
+  no_invoice: z.string().optional(),
   tanggal_do: z.string().min(1, 'Tanggal wajib diisi'),
   kepada_unit: z.string().optional(),
-  tanggal_pembayaran: z.string().optional(),
-  nominal_transfer: z.coerce.number().min(0),
   volume_keluar: z.coerce.number().min(0).optional(),
-  is_pph_disetor: z.string().optional(),
   rencana_pengambilan: z.string().optional(),
   no_ba: z.string().optional(),
 })
@@ -133,13 +131,14 @@ type DOFormData = z.infer<typeof doSchema>
 
 export default function DOPage() {
   const doStore = useDOStore()
-  const invoiceStore = useInvoiceStore()
+  const pembayaranStore = usePembayaranStore()
   const baStore = useBAStore()
-  const { currentInvoice, currentKontrak, fetchInvoiceForDO } = doStore
+  const { currentInvoice, currentKontrak, currentPembayaran, fetchPembayaranForDO } = doStore
+  const [availablePembayaran, setAvailablePembayaran] = useState<{ value: string; label: string }[]>([])
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [exportNo, setExportNo] = useState<string | null>(null)
-  const [existingSuperman, setExistingSuperman] = useState<string | null>(null)
+
   const [isExisting, setIsExisting] = useState(false)
   const volumeManualRef = useRef(false)
 
@@ -147,20 +146,19 @@ export default function DOPage() {
     resolver: zodResolver(doSchema),
     defaultValues: {
       no_do: '',
+      no_pembayaran: '',
       no_invoice: '',
       tanggal_do: new Date().toISOString().split('T')[0],
       kepada_unit: '',
-      tanggal_pembayaran: '',
-      nominal_transfer: 0,
       volume_keluar: 0,
-      is_pph_disetor: 'false',
       rencana_pengambilan: '',
     },
   })
 
   const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors, isSubmitting } } = form
+  const selectedPembayaran = watch('no_pembayaran')
   const selectedInvoice = watch('no_invoice')
-  const nominalTransfer = watch('nominal_transfer')
+  const nominalTransfer = currentPembayaran?.nominal_transfer || 0
   const volumeKeluar = watch('volume_keluar')
   const kepadaUnit = watch('kepada_unit')
   const noDo = watch('no_do')
@@ -168,13 +166,23 @@ export default function DOPage() {
   const [stokSaldo, setStokSaldo] = useState<StokSaldo | null>(null)
 
   useEffect(() => {
-    invoiceStore.fetch()
+    pembayaranStore.fetch()
     doStore.fetch()
+    pembayaranStore.fetchAvailableForDO().then((rows) => {
+      setAvailablePembayaran(rows.map((p) => ({
+        value: p.no_pembayaran,
+        label: `${p.superman || p.no_invoice} · ${p.no_pembayaran}`,
+      })))
+    })
   }, [])
 
   useEffect(() => {
-    if (selectedInvoice) fetchInvoiceForDO(selectedInvoice)
-  }, [selectedInvoice])
+    if (selectedPembayaran) fetchPembayaranForDO(selectedPembayaran)
+  }, [selectedPembayaran])
+
+  useEffect(() => {
+    if (currentInvoice?.no_invoice) setValue('no_invoice', currentInvoice.no_invoice)
+  }, [currentInvoice?.no_invoice, setValue])
 
   useEffect(() => {
     if (currentInvoice?.no_kontrak) baStore.fetch(currentInvoice.no_kontrak)
@@ -195,20 +203,25 @@ export default function DOPage() {
     if (data) {
       setIsExisting(true)
       setExportNo(no)
-      setExistingSuperman(data.superman || null)
+
+      if (data.no_pembayaran) setValue('no_pembayaran', data.no_pembayaran)
       setValue('no_invoice', data.no_invoice)
       setValue('tanggal_do', data.tanggal_do)
       setValue('kepada_unit', data.kepada_unit || '')
-      setValue('tanggal_pembayaran', data.tanggal_pembayaran || '')
-      setValue('nominal_transfer', data.nominal_transfer)
       setValue('volume_keluar', data.volume_do || 0)
       volumeManualRef.current = true
-      setValue('is_pph_disetor', data.is_pph_disetor)
       setValue('rencana_pengambilan', data.rencana_pengambilan || '')
+      if (data.no_pembayaran) {
+        const opts = [...availablePembayaran]
+        if (!opts.some((o) => o.value === data.no_pembayaran)) {
+          opts.unshift({ value: data.no_pembayaran, label: `${data.no_pembayaran} — ${data.no_invoice}` })
+          setAvailablePembayaran(opts)
+        }
+      }
     } else {
       setIsExisting(false)
       setExportNo(null)
-      setExistingSuperman(null)
+
     }
   }
 
@@ -258,10 +271,10 @@ export default function DOPage() {
   }, [volumeProporsional, isExisting, setValue])
 
   useEffect(() => {
-    if (!selectedInvoice) {
+    if (!selectedPembayaran) {
       volumeManualRef.current = false
     }
-  }, [selectedInvoice])
+  }, [selectedPembayaran])
 
   const volumeDo = Number(volumeKeluar) || 0
   const selisih = calculateSelisih(invoiceTotal, Number(nominalTransfer) || 0)
@@ -298,12 +311,10 @@ export default function DOPage() {
     try {
       const payload: DeliveryOrderInput = {
         no_do: data.no_do,
-        no_invoice: data.no_invoice,
+        no_pembayaran: data.no_pembayaran,
+        no_invoice: data.no_invoice || currentInvoice?.no_invoice,
         tanggal_do: data.tanggal_do,
         kepada_unit: data.kepada_unit,
-        tanggal_pembayaran: data.tanggal_pembayaran || null,
-        nominal_transfer: data.nominal_transfer,
-        is_pph_disetor: data.is_pph_disetor,
         rencana_pengambilan: data.rencana_pengambilan || null,
         no_ba: data.no_ba,
       }
@@ -351,17 +362,17 @@ export default function DOPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs">No Invoice *</Label>
+                <Label className="text-xs">No Pembayaran *</Label>
                 <SearchableSelect
-                  options={invoiceStore.data.map((i) => ({
-                    value: i.no_invoice,
-                    label: i.no_invoice,
-                  }))}
-                  value={watch('no_invoice')}
-                  onChange={(v) => setValue('no_invoice', v, { shouldValidate: true })}
-                  placeholder="-- Pilih / Cari Invoice --"
+                  options={availablePembayaran}
+                  value={watch('no_pembayaran')}
+                  onChange={(v) => setValue('no_pembayaran', v, { shouldValidate: true })}
+                  placeholder="-- Pilih Pembayaran (belum punya DO) --"
                 />
-                {errors.no_invoice && <p className="text-xs text-red-500 mt-1">{errors.no_invoice.message}</p>}
+                {errors.no_pembayaran && <p className="text-xs text-red-500 mt-1">{errors.no_pembayaran.message}</p>}
+                <p className="text-xs text-slate-400 mt-1">
+                  Hanya pembayaran yang sudah punya nomor Superman (SPPn/SPPb). Buat di menu Input Pembayaran.
+                </p>
               </div>
               <div>
                 <Label className="text-xs">No DO *</Label>
@@ -378,10 +389,44 @@ export default function DOPage() {
                 />
                 <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih DO lama → data terisi otomatis.</p>
               </div>
+              {selectedInvoice && (
+                <div className="col-span-2">
+                  <Label className="text-xs">No Invoice</Label>
+                  <Input value={selectedInvoice} className="bg-slate-50" readOnly />
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <ReadOnlyFieldset className="space-y-6 block">
+          {currentPembayaran && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Info Pembayaran</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-xs text-slate-500 block">Tanggal Pembayaran</span>
+                  <span className="font-medium">{currentPembayaran.tanggal_pembayaran?.split('-').reverse().join('/') || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500 block">Nominal Transfer</span>
+                  <span className="font-semibold text-emerald-700">{formatCurrency(currentPembayaran.nominal_transfer)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500 block">PPh Disetor</span>
+                  <span className="font-medium">{currentPembayaran.is_pph_disetor === 'true' ? 'Sudah' : 'Belum'}</span>
+                </div>
+                {currentPembayaran.superman && (
+                  <div className="col-span-3">
+                    <span className="text-xs text-slate-500 block">Superman (SPPn)</span>
+                    <span className="font-medium text-emerald-700">{currentPembayaran.superman}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Data Dokumen</CardTitle>
@@ -414,17 +459,9 @@ export default function DOPage() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Data Pembayaran</CardTitle>
+              <CardTitle className="text-sm font-semibold">Data Pengiriman</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
-              <div>
-                <Label className="text-xs">Tanggal Pembayaran</Label>
-                <Input type="date" {...register('tanggal_pembayaran')} />
-              </div>
-              <div>
-                <Label className="text-xs">Nominal Transfer</Label>
-                <Input type="number" step="any" {...register('nominal_transfer')} />
-              </div>
               <div>
                 <Label className="text-xs">Rencana Pengambilan</Label>
                 {isPayungBA ? (
@@ -440,13 +477,6 @@ export default function DOPage() {
                 ) : (
                   <Input type="date" {...register('rencana_pengambilan')} />
                 )}
-              </div>
-              <div>
-                <Label className="text-xs">PPh Disetor</Label>
-                <NativeSelect {...register('is_pph_disetor')}>
-                  <option value="false">Belum</option>
-                  <option value="true">Sudah</option>
-                </NativeSelect>
               </div>
               <div className="col-span-3 border-t pt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -519,7 +549,7 @@ export default function DOPage() {
           ) : (
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                Pilih No Invoice untuk melihat ringkasan kontrak dan invoice.
+                Pilih No Pembayaran untuk melihat ringkasan kontrak dan invoice.
               </CardContent>
             </Card>
           )}
@@ -543,20 +573,6 @@ export default function DOPage() {
                 <Button type="button" variant="secondary" onClick={handleExport} className="gap-2">
                   <FileDown size={14} /> Export .docx
                 </Button>
-                <SupermanDeklarasiButton
-                  noDo={exportNo}
-                  existingSuperman={existingSuperman}
-                  onSuccess={async (result) => {
-                    const label = [result.sppb_no, result.sppn_no]
-                      .map((p) => (p == null ? '' : String(p).trim()))
-                      .filter(Boolean)
-                      .join(' + ')
-                    const saved = (result.superman_saved || label || '').trim()
-                    if (saved) setExistingSuperman(saved)
-                    const data = await doStore.fetchOne(exportNo)
-                    setExistingSuperman(data?.superman || saved || null)
-                  }}
-                />
               </>
             )}
             <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
@@ -569,7 +585,7 @@ export default function DOPage() {
       <PreviewPanel
         title="Preview Delivery Order"
         isEmpty={!currentInvoice && !currentKontrak}
-        emptyDescription="Pilih No Invoice untuk melihat preview"
+        emptyDescription="Pilih No Pembayaran untuk melihat preview"
       >
         <DOPreviewContent
           noDo={watch('no_do') || '[No DO]'}

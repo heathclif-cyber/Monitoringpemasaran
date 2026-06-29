@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # --- Router imports ---
 from endpoints.kontrak import router as kontrak_router
 from api.r_invoice import router as invoice_router
+from api.r_pembayaran import router as pembayaran_router
 from api.r_do import router as do_router
 from api.r_dashboard import router as dashboard_router
 from api.r_laporan import router as laporan_router
@@ -81,6 +82,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(kontrak_router)
 app.include_router(invoice_router)
+app.include_router(pembayaran_router)
 app.include_router(do_router)
 app.include_router(dashboard_router)
 app.include_router(laporan_router)

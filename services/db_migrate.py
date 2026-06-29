@@ -105,6 +105,55 @@ def run_migrations() -> None:
         db.commit()
         add_column_safely(db, "document_upload", "storage_path", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "users", "jabatan", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "delivery_order", "no_pembayaran", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "pembayaran", "superman", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "invoice", "superman", "VARCHAR DEFAULT NULL")
+
+        db.execute(text(
+            "UPDATE invoice i SET superman = sub.superman "
+            "FROM ("
+            "  SELECT DISTINCT ON (no_invoice) no_invoice, superman "
+            "  FROM pembayaran "
+            "  WHERE superman IS NOT NULL AND TRIM(superman) <> '' "
+            "  ORDER BY no_invoice, tanggal_pembayaran"
+            ") sub "
+            "WHERE i.no_invoice = sub.no_invoice "
+            "AND (i.superman IS NULL OR TRIM(i.superman) = '')"
+        ))
+        db.commit()
+
+        # Backfill pembayaran dari DO existing
+        dos_without_pay = db.execute(text(
+            "SELECT no_do, no_invoice, COALESCE(tanggal_pembayaran, tanggal_do), "
+            "nominal_transfer, is_pph_disetor, selisih "
+            "FROM delivery_order WHERE no_pembayaran IS NULL"
+        )).fetchall()
+        for row in dos_without_pay:
+            no_do, no_invoice, tgl, nominal, pph, selisih = row
+            if not tgl:
+                continue
+            no_pay = f"PAY-{no_do}"
+            existing_pay = db.execute(
+                text("SELECT 1 FROM pembayaran WHERE no_pembayaran = :no"),
+                {"no": no_pay},
+            ).fetchone()
+            if not existing_pay:
+                db.execute(text(
+                    "INSERT INTO pembayaran (no_pembayaran, no_invoice, tanggal_pembayaran, "
+                    "nominal_transfer, is_pph_disetor, selisih) "
+                    "VALUES (:no_pay, :no_inv, :tgl, :nominal, :pph, :selisih)"
+                ), {
+                    "no_pay": no_pay,
+                    "no_inv": no_invoice,
+                    "tgl": tgl,
+                    "nominal": float(nominal or 0),
+                    "pph": pph or "false",
+                    "selisih": float(selisih or 0),
+                })
+            db.execute(text(
+                "UPDATE delivery_order SET no_pembayaran = :no_pay WHERE no_do = :no_do"
+            ), {"no_pay": no_pay, "no_do": no_do})
+        db.commit()
 
         fixes = [
             ("laporan_bypass", "unit", "Awaya Telpaputih", "Awaya-Telpaputih"),

@@ -20,9 +20,14 @@ const PAGE_META: Record<string, PageMeta> = {
     description: 'Buat proforma invoice dan kuitansi dari kontrak',
     breadcrumb: 'Dokumen / Invoice',
   },
+  '/pembayaran': {
+    title: 'Input Pembayaran',
+    description: 'Catat transfer mitra dan buat SPPn Superman (no pembayaran = referensi AU58)',
+    breadcrumb: 'Dokumen / Pembayaran',
+  },
   '/delivery-order': {
     title: 'Delivery Order',
-    description: 'Terbitkan DO berdasarkan invoice dan pembayaran',
+    description: 'Terbitkan DO berdasarkan pembayaran yang sudah dicatat',
     breadcrumb: 'Dokumen / Delivery Order',
   },
   '/laporan': {
@@ -54,6 +59,11 @@ const PAGE_META: Record<string, PageMeta> = {
     title: 'Arsip Invoice',
     description: 'Kelola invoice dan kuitansi tersimpan',
     breadcrumb: 'Repository / Invoice',
+  },
+  '/repo/pembayaran': {
+    title: 'Arsip Pembayaran',
+    description: 'Kelola pembayaran mitra tersimpan',
+    breadcrumb: 'Repository / Pembayaran',
   },
   '/repo/do': {
     title: 'Arsip Delivery Order',

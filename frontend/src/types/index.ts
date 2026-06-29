@@ -107,13 +107,34 @@ export interface Invoice {
   // Computed
   jumlah_pembayaran: number
   terbilang_invoice: string | null
+  superman?: string | null
   // Joined relation
   kontrak?: Kontrak
+}
+
+export interface Pembayaran {
+  no_pembayaran: string
+  no_invoice: string
+  tanggal_pembayaran: string
+  nominal_transfer: number
+  is_pph_disetor: string
+  selisih: number
+  superman?: string | null
+  no_do?: string | null
+}
+
+export interface PembayaranInput {
+  no_pembayaran?: string
+  no_invoice: string
+  tanggal_pembayaran: string
+  nominal_transfer: number
+  is_pph_disetor?: string
 }
 
 export interface DeliveryOrder {
   no_do: string
   no_invoice: string
+  no_pembayaran?: string | null
   tanggal_do: string // date
   kepada_unit: string | null
   alamat_unit: string | null
@@ -197,6 +218,7 @@ export interface SupermanDocRequirement {
 
 export interface LaporanRow {
   No_DO: string
+  No_Pembayaran?: string
   No_Invoice: string
   No_Kontrak: string
   Unit: string
@@ -453,13 +475,11 @@ export interface BeritaAcaraInput {
 
 export interface DeliveryOrderInput {
   no_do: string
-  no_invoice: string
+  no_pembayaran: string
+  no_invoice?: string
   tanggal_do: string
   kepada_unit?: string
   alamat_unit?: string
-  tanggal_pembayaran?: string | null
-  nominal_transfer?: number
-  is_pph_disetor?: string
   rencana_pengambilan?: string | null
   no_ba?: string
   volume_do?: number
@@ -493,8 +513,19 @@ export interface SapUpdateInput {
 
 export type PaymentStatus = 'LUNAS' | 'SEBAGIAN' | 'BELUM'
 
+export interface TracePembayaran {
+  no_pembayaran: string
+  tanggal_pembayaran: string | null
+  nominal_transfer: number
+  selisih: number
+  is_pph_disetor: string
+  no_do: string | null
+  status_do: string
+}
+
 export interface TraceDO {
   no_do: string
+  no_pembayaran?: string | null
   tanggal_do: string | null
   tanggal_pembayaran: string | null
   rencana_pengambilan: string | null
@@ -515,7 +546,9 @@ export interface TraceInvoice {
   sisa_pembayaran: number
   persen_terbayar: number
   payment_status: PaymentStatus
+  jumlah_record_pembayaran?: number
   jumlah_do: number
+  pembayaran?: TracePembayaran[]
   delivery_orders: TraceDO[]
 }
 
@@ -632,12 +665,14 @@ export interface SupermanCaptchaVerifyResult {
 
 export interface SupermanDeklarasiJobStart {
   job_id: string
-  no_do: string
+  no_invoice?: string
+  no_pembayaran?: string
 }
 
 export interface SupermanDeklarasiProgress {
   job_id: string
-  no_do: string
+  no_invoice?: string
+  no_pembayaran?: string
   status: 'pending' | 'running' | 'completed' | 'failed'
   percent: number
   stage: string
@@ -647,7 +682,9 @@ export interface SupermanDeklarasiProgress {
 
 export interface SupermanDeklarasiResult {
   ok: boolean
-  no_do: string
+  no_invoice?: string
+  no_pembayaran?: string
+  no_do?: string
   no_kontrak: string
   jenis_form: string
   pph_nominal: number

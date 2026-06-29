@@ -268,7 +268,8 @@ def preview_kontrak(no_kontrak: str, db: Session = Depends(get_db)):
 def get_kontrak_trace(no_kontrak: str, db: Session = Depends(get_db)):
     from sqlalchemy.orm import joinedload
     k = db.query(models.Kontrak).options(
-        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders)
+        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.pembayaran).joinedload(models.Pembayaran.delivery_order),
+        joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders),
     ).filter(models.Kontrak.no_kontrak == no_kontrak).first()
 
     if not k:
@@ -284,16 +285,31 @@ def get_kontrak_trace(no_kontrak: str, db: Session = Depends(get_db)):
     for inv in k.invoices:
         kewajiban = float(inv.jumlah_pembayaran or 0)
         dos_data = []
+        pembayaran_data = []
         inv_terbayar = 0.0
+
+        for pay in inv.pembayaran:
+            pay_nominal = float(pay.nominal_transfer or 0)
+            inv_terbayar += pay_nominal
+            total_do_nominal += pay_nominal
+            linked_do = pay.delivery_order
+            pembayaran_data.append({
+                "no_pembayaran": pay.no_pembayaran,
+                "tanggal_pembayaran": pay.tanggal_pembayaran.isoformat() if pay.tanggal_pembayaran else None,
+                "nominal_transfer": pay_nominal,
+                "selisih": float(pay.selisih or 0),
+                "is_pph_disetor": pay.is_pph_disetor or "false",
+                "no_do": linked_do.no_do if linked_do else None,
+                "status_do": "Sudah DO" if linked_do else "Menunggu DO",
+            })
 
         for do in inv.delivery_orders:
             do_nominal = float(do.nominal_transfer or 0)
             do_vol = float(do.volume_do or 0)
-            inv_terbayar += do_nominal
-            total_do_nominal += do_nominal
             total_do_volume += do_vol
             dos_data.append({
                 "no_do": do.no_do,
+                "no_pembayaran": do.no_pembayaran,
                 "tanggal_do": do.tanggal_do.isoformat() if do.tanggal_do else None,
                 "tanggal_pembayaran": do.tanggal_pembayaran.isoformat() if do.tanggal_pembayaran else None,
                 "rencana_pengambilan": do.rencana_pengambilan.isoformat() if do.rencana_pengambilan else None,
@@ -322,7 +338,9 @@ def get_kontrak_trace(no_kontrak: str, db: Session = Depends(get_db)):
             "sisa_pembayaran": inv_sisa,
             "persen_terbayar": round((inv_terbayar / kewajiban * 100) if kewajiban > 0 else 0, 1),
             "payment_status": pay_status,
+            "jumlah_record_pembayaran": len(pembayaran_data),
             "jumlah_do": len(dos_data),
+            "pembayaran": pembayaran_data,
             "delivery_orders": dos_data,
         })
 

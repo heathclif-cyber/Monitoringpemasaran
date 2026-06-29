@@ -16,7 +16,9 @@ import type {
 } from '@/types'
 
 interface SupermanDeklarasiButtonProps {
-  noDo: string
+  noInvoice?: string
+  noPembayaran?: string
+  noDo?: string
   existingSuperman?: string | null
   docsReady?: boolean
   compact?: boolean
@@ -32,6 +34,8 @@ function sleep(ms: number) {
 }
 
 export function SupermanDeklarasiButton({
+  noInvoice,
+  noPembayaran = '',
   noDo,
   existingSuperman,
   docsReady = true,
@@ -111,8 +115,12 @@ export function SupermanDeklarasiButton({
     setOpen(false)
 
     try {
+      const params = new URLSearchParams()
+      if (noInvoice) params.set('no_invoice', noInvoice)
+      else if (noPembayaran) params.set('no_pembayaran', noPembayaran)
+      if (noDo) params.set('no_do', noDo)
       const start = await client.post<SupermanDeklarasiJobStart>(
-        `/api/superman/deklarasi/start?no_do=${encodeURIComponent(noDo)}`,
+        `/api/superman/deklarasi/start?${params.toString()}`,
       )
       const result = await pollJob(start.job_id)
       await showResult(result)
@@ -188,7 +196,7 @@ export function SupermanDeklarasiButton({
         variant={compact ? 'outline' : 'secondary'}
         size={compact ? 'sm' : 'default'}
         className={cn(compact ? 'h-8 text-xs gap-1.5' : 'gap-2', className)}
-        disabled={disabled || loading || !noDo || !docsReady}
+        disabled={disabled || loading || !(noInvoice || noPembayaran) || !docsReady}
         title={!docsReady ? 'Upload dokumen wajib terlebih dahulu' : undefined}
         onClick={() => setOpen(true)}
       >
@@ -201,7 +209,7 @@ export function SupermanDeklarasiButton({
         open={open}
         onOpenChange={setOpen}
         title="Buat SPPn di Superman"
-        description={`Draft masuk To Do List Superman untuk DO ${noDo}. Syarat sama semua komoditi: upload salah satu dokumen pendukung pada invoice terkait (kontrak, invoice, atau kuitansi). Jika kontrak kena PPh, sistem otomatis membuat SPPb + SPPn.`}
+        description={`Draft masuk To Do List Superman untuk invoice ${noInvoice || noPembayaran}. Nomor invoice dipakai sebagai referensi Superman (AU58). Upload salah satu dokumen pendukung (kontrak, invoice, atau kuitansi). Jika kontrak kena PPh, sistem otomatis membuat SPPb + SPPn.`}
         confirmLabel={loading ? 'Memproses...' : 'Buat di Superman'}
         isLoading={loading}
         onConfirm={handleConfirm}
@@ -215,7 +223,8 @@ export function SupermanDeklarasiButton({
 
       <SupermanProgressDialog
         open={progressOpen}
-        noDo={noDo}
+        noInvoice={noInvoice}
+        noPembayaran={noPembayaran}
         percent={percent}
         stage={stage}
       />

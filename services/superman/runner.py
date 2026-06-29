@@ -23,14 +23,28 @@ from services.superman.captcha_challenge import (
     verify_captcha_challenge,
 )
 from services.superman.config import SupermanConfig
-from services.superman.documents import resolve_support_doc_from_do
+from services.superman.documents import (
+    resolve_support_doc_from_do,
+    resolve_support_doc_from_invoice,
+    resolve_support_doc_from_pembayaran,
+)
 from services.superman.filler import fill_sppn_draft, submit_sppn_draft
-from services.superman.payload import build_payload_from_do
+from services.superman.payload import (
+    build_payload_from_do,
+    build_payload_from_invoice,
+    build_payload_from_pembayaran,
+)
 from services.superman.persist import (
     assert_do_not_submitted,
+    assert_invoice_not_submitted,
+    assert_pembayaran_not_submitted,
     format_superman_ref,
     get_do_superman,
+    get_invoice_superman,
+    get_pembayaran_superman,
     save_superman_to_do,
+    save_superman_to_invoice,
+    save_superman_to_pembayaran,
 )
 from services.superman.progress import (
     ProgressCallback,
@@ -96,9 +110,82 @@ def get_status() -> dict[str, Any]:
     }
 
 
-def preview_deklarasi(no_do: str) -> dict[str, Any]:
-    payload = build_payload_from_do(no_do)
-    support = resolve_support_doc_from_do(no_do)
+def resolve_no_invoice(
+    *,
+    no_invoice: str | None = None,
+    no_pembayaran: str | None = None,
+    no_do: str | None = None,
+) -> str:
+    if no_invoice and no_invoice.strip():
+        return no_invoice.strip()
+    if no_pembayaran and no_pembayaran.strip():
+        import models
+        from database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            pay = db.query(models.Pembayaran).filter(
+                models.Pembayaran.no_pembayaran == no_pembayaran.strip()
+            ).first()
+            if pay and pay.no_invoice:
+                return pay.no_invoice
+        finally:
+            db.close()
+    if no_do and no_do.strip():
+        import models
+        from database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            do = db.query(models.DeliveryOrder).filter(
+                models.DeliveryOrder.no_do == no_do.strip()
+            ).first()
+            if do and do.no_invoice:
+                return do.no_invoice
+        finally:
+            db.close()
+    raise ValueError("no_invoice wajib diisi")
+
+
+def resolve_no_pembayaran(
+    *,
+    no_pembayaran: str | None = None,
+    no_do: str | None = None,
+) -> str:
+    if no_pembayaran and no_pembayaran.strip():
+        return no_pembayaran.strip()
+    if no_do and no_do.strip():
+        import models
+        from database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            do = db.query(models.DeliveryOrder).filter(
+                models.DeliveryOrder.no_do == no_do.strip()
+            ).first()
+            if do and do.no_pembayaran:
+                return do.no_pembayaran
+        finally:
+            db.close()
+        raise ValueError(
+            f"DO {no_do} belum terhubung ke pembayaran. Buat pembayaran terlebih dahulu."
+        )
+    raise ValueError("no_pembayaran wajib diisi")
+
+
+def preview_deklarasi(
+    *,
+    no_invoice: str | None = None,
+    no_pembayaran: str | None = None,
+    no_do: str | None = None,
+) -> dict[str, Any]:
+    ref = resolve_no_invoice(
+        no_invoice=no_invoice,
+        no_pembayaran=no_pembayaran,
+        no_do=no_do,
+    )
+    payload = build_payload_from_invoice(ref)
+    support = resolve_support_doc_from_invoice(ref)
     data = payload.to_dict()
     data["support_doc"] = {
         "path": str(support.path),
@@ -119,6 +206,7 @@ def _score_todo_row(
     row: dict[str, Any],
     *,
     no_do: str,
+    no_pembayaran: str = "",
     no_kontrak: str,
     mitra_pembeli: str,
     total_sppn: int,
@@ -127,12 +215,15 @@ def _score_todo_row(
 ) -> int:
     blob = _todo_row_blob(row)
     score = 0
+    ref_n = _normalize_match_text(no_pembayaran or no_do)
     no_do_n = _normalize_match_text(no_do)
     no_kontrak_n = _normalize_match_text(no_kontrak)
     mitra_n = _normalize_match_text(mitra_pembeli)
 
-    if no_do_n and no_do_n in blob:
+    if ref_n and ref_n in blob:
         score += 1000
+    if no_do_n and no_do_n in blob and no_do_n != ref_n:
+        score += 500
 
     for field in (
         "berita_acara",
@@ -159,8 +250,10 @@ def _score_todo_row(
         "no_spp",
     ):
         val = _normalize_match_text(row.get(field))
-        if no_do_n and val and (no_do_n == val or no_do_n in val or val in no_do_n):
+        if ref_n and val and (ref_n == val or ref_n in val or val in ref_n):
             score += 800
+        elif no_do_n and val and (no_do_n == val or no_do_n in val or val in no_do_n):
+            score += 400
 
     if no_kontrak_n and no_kontrak_n in blob:
         score += 100
@@ -264,8 +357,18 @@ def _coalesce_spp_numbers(
     sppn_no = store_sppn
 
     if match:
-        sppb_no = sppb_no or match.get("sppb_no") or match.get("no_sppb") or match.get("nomor_sppb")
-        sppn_no = sppn_no or match.get("sppn_no") or match.get("no_sppn") or match.get("nomor_sppn")
+        sppb_no = (
+            match.get("sppb_no")
+            or match.get("no_sppb")
+            or match.get("nomor_sppb")
+            or sppb_no
+        )
+        sppn_no = (
+            match.get("sppn_no")
+            or match.get("no_sppn")
+            or match.get("nomor_sppn")
+            or sppn_no
+        )
         blob_sppb, blob_sppn = _extract_numbers_from_blob(_todo_row_blob(match))
         sppb_no = sppb_no or blob_sppb
         sppn_no = sppn_no or blob_sppn
@@ -367,6 +470,7 @@ def _score_all_todo_rows(
         score = _score_todo_row(
             row,
             no_do=payload.no_do,
+            no_pembayaran=payload.no_pembayaran,
             no_kontrak=payload.no_kontrak,
             mitra_pembeli=payload.mitra_pembeli,
             total_sppn=total_sppn,
@@ -409,6 +513,7 @@ def _find_todo_match(
                 score = _score_todo_row(
                     row,
                     no_do=payload.no_do,
+                    no_pembayaran=payload.no_pembayaran,
                     no_kontrak=payload.no_kontrak,
                     mitra_pembeli=payload.mitra_pembeli,
                     total_sppn=total_sppn,
@@ -428,20 +533,30 @@ def _find_todo_match(
     return None
 
 
-def recover_superman_from_todo(no_do: str) -> dict[str, Any]:
-    """Cari nomor SPPn/SPPb di To Do List lalu simpan ke kolom DO."""
-    no_do = no_do.strip()
-    existing = get_do_superman(no_do)
-    if existing:
+def recover_superman_from_todo(
+    *,
+    no_invoice: str | None = None,
+    no_pembayaran: str | None = None,
+    no_do: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Cari nomor SPPn/SPPb di To Do List lalu simpan ke kolom invoice."""
+    ref = resolve_no_invoice(
+        no_invoice=no_invoice,
+        no_pembayaran=no_pembayaran,
+        no_do=no_do,
+    )
+    existing = get_invoice_superman(ref)
+    if existing and not force:
         return {
             "ok": True,
-            "no_do": no_do,
+            "no_invoice": ref,
             "superman_saved": existing,
             "message": "Sudah tersimpan sebelumnya.",
             "recovered": False,
         }
 
-    inspect = inspect_superman_todo(no_do, limit=3)
+    inspect = inspect_superman_todo(no_invoice=ref, limit=3)
     coalesce = inspect.get("coalesce") or {}
     sppb_no = coalesce.get("sppb_no")
     sppn_no = coalesce.get("sppn_no")
@@ -451,15 +566,15 @@ def recover_superman_from_todo(no_do: str) -> dict[str, Any]:
     if best_score < 70 or not (sppb_no or sppn_no):
         return {
             "ok": False,
-            "no_do": no_do,
+            "no_invoice": ref,
             "message": "Tidak menemukan SPPn/SPPb yang cocok di To Do List Superman.",
             "inspect": inspect,
         }
 
-    saved = save_superman_to_do(no_do, sppb_no, sppn_no)
+    saved = save_superman_to_invoice(ref, sppb_no, sppn_no)
     return {
         "ok": bool(saved),
-        "no_do": no_do,
+        "no_invoice": ref,
         "sppb_no": sppb_no,
         "sppn_no": sppn_no,
         "superman_saved": saved,
@@ -469,12 +584,22 @@ def recover_superman_from_todo(no_do: str) -> dict[str, Any]:
     }
 
 
-def inspect_superman_todo(no_do: str, *, limit: int = 8) -> dict[str, Any]:
+def inspect_superman_todo(
+    *,
+    no_invoice: str | None = None,
+    no_pembayaran: str | None = None,
+    no_do: str | None = None,
+    limit: int = 8,
+) -> dict[str, Any]:
     """Baca To Do List Superman untuk debug / recovery nomor SPPn."""
-    no_do = no_do.strip()
+    ref = resolve_no_invoice(
+        no_invoice=no_invoice,
+        no_pembayaran=no_pembayaran,
+        no_do=no_do,
+    )
     cfg = _api_config()
     ensure_session(cfg)
-    payload = build_payload_from_do(no_do)
+    payload = build_payload_from_invoice(ref)
     expect_sppb = payload.pph_nominal > 0
 
     pw, browser, context = open_authenticated_context(cfg)
@@ -484,11 +609,11 @@ def inspect_superman_todo(no_do: str, *, limit: int = 8) -> dict[str, Any]:
         rows = resp.json().get("data") or [] if resp.ok else []
         scored = _score_all_todo_rows(rows, payload, expect_sppb=expect_sppb)
         hits = []
-        no_do_n = _normalize_match_text(no_do)
+        ref_n = _normalize_match_text(ref)
         for row in rows:
             if not isinstance(row, dict):
                 continue
-            if no_do_n and no_do_n in _todo_row_blob(row):
+            if ref_n and ref_n in _todo_row_blob(row):
                 hits.append(row)
 
         best = scored[0][1] if scored else None
@@ -499,7 +624,7 @@ def inspect_superman_todo(no_do: str, *, limit: int = 8) -> dict[str, Any]:
             store_body=None,
         )
         return {
-            "no_do": no_do,
+            "no_invoice": ref,
             "todo_rows": len(rows),
             "direct_blob_hits": len(hits),
             "top_scores": [
@@ -532,20 +657,23 @@ def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
     return verify_captcha_challenge(challenge_id.strip(), answer.strip())
 
 
-def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) -> dict[str, Any]:
-    no_do = no_do.strip()
-    assert_do_not_submitted(no_do)
+def submit_deklarasi_invoice(
+    no_invoice: str,
+    on_progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
+    no_invoice = no_invoice.strip()
+    assert_invoice_not_submitted(no_invoice)
 
     report = on_progress or (lambda _percent, _stage: None)
 
-    report(5, "Memuat data DO dan dokumen")
+    report(5, "Memuat data invoice dan dokumen")
     cfg = _api_config()
 
     report(10, "Memvalidasi session Superman")
     ensure_session(cfg)
 
-    payload = build_payload_from_do(no_do)
-    support = resolve_support_doc_from_do(no_do)
+    payload = build_payload_from_invoice(no_invoice)
+    support = resolve_support_doc_from_invoice(no_invoice)
 
     report(20, "Membuka browser Superman")
     store_sppb: str | None = None
@@ -566,15 +694,16 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
         store_body = submit_sppn_draft(page, on_progress=on_progress)
         report(95, "Memverifikasi To Do List")
         store_sppb, store_sppn = _extract_numbers_from_store(store_body)
-        page_sppb, page_sppn = _extract_numbers_from_page(page)
-        store_sppb = store_sppb or page_sppb
-        store_sppn = store_sppn or page_sppn
         match = _find_todo_match(
             page,
             cfg.base_url,
             payload,
             expect_sppb=payload.pph_nominal > 0,
         )
+        if not (store_sppb or store_sppn) and not match:
+            page_sppb, page_sppn = _extract_numbers_from_page(page)
+            store_sppb = store_sppb or page_sppb
+            store_sppn = store_sppn or page_sppn
         if not match:
             resp = page.request.get(f"{cfg.base_url.rstrip('/')}/sppd/getTodo")
             rows = resp.json().get("data") or [] if resp.ok else []
@@ -595,7 +724,9 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
 
     result: dict[str, Any] = {
         "ok": True,
-        "no_do": no_do,
+        "no_invoice": no_invoice,
+        "no_pembayaran": payload.no_pembayaran,
+        "no_do": payload.no_do,
         "no_kontrak": payload.no_kontrak,
         "jenis_form": payload.jenis_form,
         "pph_nominal": payload.pph_nominal,
@@ -625,12 +756,12 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
     elif sppb_no or sppn_no:
         result.update({"sppb_no": sppb_no, "sppn_no": sppn_no, "todo_matched": False})
 
-    saved = save_superman_to_do(no_do, sppb_no, sppn_no)
+    saved = save_superman_to_invoice(no_invoice, sppb_no, sppn_no)
     if saved:
         result["superman_saved"] = saved
     elif sppb_no or sppn_no:
         result["message"] = (
-            f"Draft SPPn/SPPb berhasil, namun nomor belum tersimpan otomatis ke DO. "
+            f"Draft SPPn/SPPb berhasil, namun nomor belum tersimpan otomatis ke invoice. "
             f"Salin manual: {format_superman_ref(sppb_no, sppn_no)}"
         )
     else:
@@ -647,24 +778,49 @@ def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) ->
     return result
 
 
-def _run_deklarasi_job(job_id: str, no_do: str) -> None:
+def submit_deklarasi_pembayaran(
+    no_pembayaran: str,
+    on_progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
+    no_invoice = resolve_no_invoice(no_pembayaran=no_pembayaran.strip())
+    return submit_deklarasi_invoice(no_invoice, on_progress=on_progress)
+
+
+def submit_deklarasi(no_do: str, on_progress: ProgressCallback | None = None) -> dict[str, Any]:
+    no_invoice = resolve_no_invoice(no_do=no_do)
+    return submit_deklarasi_invoice(no_invoice, on_progress=on_progress)
+
+
+def _run_deklarasi_job(job_id: str, no_invoice: str) -> None:
     try:
-        result = submit_deklarasi(no_do, on_progress=make_progress_callback(job_id))
+        result = submit_deklarasi_invoice(
+            no_invoice,
+            on_progress=make_progress_callback(job_id),
+        )
         complete_job(job_id, result)
     except Exception as exc:
         fail_job(job_id, str(exc))
 
 
-def start_deklarasi_job(no_do: str) -> dict[str, Any]:
-    no_do = no_do.strip()
-    assert_do_not_submitted(no_do)
+def start_deklarasi_job(
+    *,
+    no_invoice: str | None = None,
+    no_pembayaran: str | None = None,
+    no_do: str | None = None,
+) -> dict[str, Any]:
+    ref = resolve_no_invoice(
+        no_invoice=no_invoice,
+        no_pembayaran=no_pembayaran,
+        no_do=no_do,
+    )
+    assert_invoice_not_submitted(ref)
     cfg = _api_config()
     ensure_session(cfg)
-    job_id = create_job(no_do)
+    job_id = create_job(ref, no_pembayaran=(no_pembayaran or "").strip())
     update_job(job_id, 0, "Memulai proses...")
-    thread = threading.Thread(target=_run_deklarasi_job, args=(job_id, no_do), daemon=True)
+    thread = threading.Thread(target=_run_deklarasi_job, args=(job_id, ref), daemon=True)
     thread.start()
-    return {"job_id": job_id, "no_do": no_do}
+    return {"job_id": job_id, "no_invoice": ref, "no_pembayaran": (no_pembayaran or "").strip()}
 
 
 def get_deklarasi_progress(job_id: str) -> dict[str, Any]:
@@ -673,7 +829,8 @@ def get_deklarasi_progress(job_id: str) -> dict[str, Any]:
         raise ValueError("Job deklarasi tidak ditemukan atau sudah kedaluwarsa.")
     payload: dict[str, Any] = {
         "job_id": job.job_id,
-        "no_do": job.no_do,
+        "no_invoice": job.no_invoice,
+        "no_pembayaran": job.no_pembayaran,
         "status": job.status,
         "percent": job.percent,
         "stage": job.stage,

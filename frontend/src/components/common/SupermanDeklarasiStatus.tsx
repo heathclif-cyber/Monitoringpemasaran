@@ -5,13 +5,17 @@ import { supermanLabelFromResult } from '@/store/laporanStore'
 import type { SupermanDeklarasiResult } from '@/types'
 
 interface SupermanDeklarasiStatusProps {
-  noDo: string
+  noInvoice?: string
+  noPembayaran?: string
+  noDo?: string
   existingSuperman?: string | null
   docsReady?: boolean
   onSuccess?: (result: SupermanDeklarasiResult) => void | Promise<void>
 }
 
 export function SupermanDeklarasiStatus({
+  noInvoice,
+  noPembayaran = '',
   noDo,
   existingSuperman,
   docsReady = false,
@@ -23,7 +27,7 @@ export function SupermanDeklarasiStatus({
   useEffect(() => {
     pendingLabelRef.current = null
     setSavedLabel((existingSuperman || '').trim())
-  }, [noDo])
+  }, [noInvoice, noPembayaran])
 
   useEffect(() => {
     const fromProp = (existingSuperman || '').trim()
@@ -57,6 +61,8 @@ export function SupermanDeklarasiStatus({
 
   return (
     <SupermanDeklarasiButton
+      noInvoice={noInvoice}
+      noPembayaran={noPembayaran}
       noDo={noDo}
       existingSuperman={existingSuperman}
       docsReady={docsReady}

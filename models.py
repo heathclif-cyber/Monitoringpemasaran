@@ -117,16 +117,35 @@ class Invoice(Base):
     # Calculated Fields
     jumlah_pembayaran = Column(Float, default=0.0)
     terbilang_invoice = Column(String)
+    superman = Column(String, nullable=True)
 
     kontrak = relationship("Kontrak", back_populates="invoices")
     berita_acara = relationship("BeritaAcara", back_populates="invoice", foreign_keys=[no_ba])
+    pembayaran = relationship("Pembayaran", back_populates="invoice", cascade="all, delete-orphan")
     delivery_orders = relationship("DeliveryOrder", back_populates="invoice", cascade="all, delete-orphan")
+
+
+class Pembayaran(Base):
+    __tablename__ = "pembayaran"
+
+    no_pembayaran = Column(String, primary_key=True, index=True)
+    no_invoice = Column(String, ForeignKey("invoice.no_invoice"))
+    tanggal_pembayaran = Column(Date, nullable=False)
+    nominal_transfer = Column(Float, default=0.0)
+    is_pph_disetor = Column(String, default="false")
+    selisih = Column(Float, default=0.0)
+    superman = Column(String, nullable=True)
+
+    invoice = relationship("Invoice", back_populates="pembayaran")
+    delivery_order = relationship("DeliveryOrder", back_populates="pembayaran", uselist=False)
+
 
 class DeliveryOrder(Base):
     __tablename__ = "delivery_order"
     
     no_do = Column(String, primary_key=True, index=True)
     no_invoice = Column(String, ForeignKey("invoice.no_invoice"))
+    no_pembayaran = Column(String, ForeignKey("pembayaran.no_pembayaran"), nullable=True)
     no_ba = Column(String, ForeignKey("berita_acara.no_ba"), nullable=True)
     tanggal_do = Column(Date, nullable=False)
     kepada_unit = Column(String)
@@ -151,6 +170,7 @@ class DeliveryOrder(Base):
     volume_do = Column(Float, default=0.0)
     
     invoice = relationship("Invoice", back_populates="delivery_orders")
+    pembayaran = relationship("Pembayaran", back_populates="delivery_order")
     berita_acara = relationship("BeritaAcara", back_populates="delivery_orders", foreign_keys=[no_ba])
 
 
