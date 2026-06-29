@@ -185,12 +185,11 @@ def preview_deklarasi(
         no_do=no_do,
     )
     payload = build_payload_from_invoice(ref)
-    support = resolve_support_doc_from_invoice(ref)
+    supports = resolve_support_doc_from_invoice(ref)
     data = payload.to_dict()
-    data["support_doc"] = {
-        "path": str(support.path),
-        "source": support.describe(),
-    }
+    data["support_docs"] = [
+        {"path": str(doc.path), "source": doc.describe()} for doc in supports
+    ]
     return data
 
 
@@ -673,7 +672,7 @@ def submit_deklarasi_invoice(
     ensure_session(cfg)
 
     payload = build_payload_from_invoice(no_invoice)
-    support = resolve_support_doc_from_invoice(no_invoice)
+    supports = resolve_support_doc_from_invoice(no_invoice)
 
     report(20, "Membuka browser Superman")
     store_sppb: str | None = None
@@ -688,7 +687,7 @@ def submit_deklarasi_invoice(
             page,
             cfg,
             payload,
-            support_doc=support.path,
+            support_docs=[doc.path for doc in supports],
             on_progress=on_progress,
         )
         store_body = submit_sppn_draft(page, on_progress=on_progress)
@@ -731,7 +730,7 @@ def submit_deklarasi_invoice(
         "jenis_form": payload.jenis_form,
         "pph_nominal": payload.pph_nominal,
         "total_sppn": payload.dpp_pokok + payload.pajak_ppn,
-        "support_doc": support.describe(),
+        "support_docs": [doc.describe() for doc in supports],
         "superman_url": f"{cfg.base_url.rstrip('/')}/sppd#tab-to-do-list-petugas",
         "message": "Draft SPPn/SPPb berhasil masuk To Do List Superman.",
     }

@@ -13,7 +13,7 @@ import {
   X,
   SlidersHorizontal,
 } from 'lucide-react'
-import { supermanLabelFromResult, useLaporanStore } from '@/store/laporanStore'
+import { useLaporanStore } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,10 +40,7 @@ import {
   type LaporanFilters,
 } from '@/utils/laporanUtils'
 import { formatCurrency, formatNumber, formatDate, safe, cn } from '@/lib/utils'
-import type { LaporanRow, SupermanDeklarasiResult } from '@/types'
-import { DocumentUpload } from '@/components/common/DocumentUpload'
-import { SupermanDocChecklist } from '@/components/common/SupermanDocChecklist'
-import { SupermanDeklarasiStatus } from '@/components/common/SupermanDeklarasiStatus'
+import type { LaporanRow } from '@/types'
 import * as XLSX from 'xlsx'
 
 /** Kepadatan seimbang — antara padat & lega, nominal penuh tanpa ellipsis */
@@ -202,22 +199,6 @@ export default function LaporanPage() {
     if (filters.statusBayar !== 'ALL') n++
     return n
   }, [filters])
-
-  const handleSupermanSuccess = useCallback(async (noDo: string, result: SupermanDeklarasiResult) => {
-    const label = supermanLabelFromResult(result)
-    if (label) {
-      patchRow(noDo, { Superman: label })
-      try {
-        await updateSapField(noDo, 'Superman', label)
-      } catch {
-        // Backend mungkin sudah menyimpan; patch lokal tetap dipertahankan
-      }
-    }
-    await fetch({ fresh: true, silent: true })
-    if (label) {
-      patchRow(noDo, { Superman: label })
-    }
-  }, [fetch, patchRow, updateSapField])
 
   const handleSapSave = async (noDo: string, field: string, value: string) => {
     if (!value.trim()) return
@@ -569,9 +550,6 @@ export default function LaporanPage() {
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[7rem]')}>SO SAP</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[7rem]')}>DO SAP</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[7.5rem]')}>Billing</th>
-                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[7rem]')}>Dok. Wajib</th>
-                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[9rem]')}>Status Deklarasi Superman</th>
-                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[10rem]')}>Berita Acara</th>
                     <th className={cn(TH, STICKY_TH, 'text-center min-w-[6.5rem]')}>Aksi</th>
                   </tr>
                 </thead>
@@ -584,8 +562,6 @@ export default function LaporanPage() {
                         row={row}
                         isBypass={isBypass}
                         onSapSave={handleSapSave}
-                        onRefresh={fetch}
-                        onSupermanSuccess={handleSupermanSuccess}
                         onDeleteBypass={(noDo, id) => {
                           setDeleteTarget(noDo)
                           setDeleteId(id)
@@ -626,15 +602,11 @@ function LaporanTableRow({
   row,
   isBypass,
   onSapSave,
-  onRefresh,
-  onSupermanSuccess,
   onDeleteBypass,
 }: {
   row: LaporanRow
   isBypass: boolean
   onSapSave: (noDo: string, field: string, value: string) => Promise<void>
-  onRefresh: () => void
-  onSupermanSuccess: (noDo: string, result: SupermanDeklarasiResult) => void | Promise<void>
   onDeleteBypass: (noDo: string, id: number) => void
 }) {
   const canEdit = useAuthStore((s) => s.canEdit)
@@ -738,65 +710,6 @@ function LaporanTableRow({
           />
         </td>
       ))}
-      <td className={cn(TD, 'min-w-[7rem]')}>
-        {!isBypass && row.No_Pembayaran ? (
-          <SupermanDocChecklist
-            requirements={row.Dokumen_Superman}
-            docsReady={row.Dokumen_Superman_Siap}
-          />
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
-      </td>
-      <td className={cn(TD, 'min-w-[9rem]')}>
-        {!isBypass && row.No_Invoice ? (
-          <SupermanDeklarasiStatus
-            key={`${row.No_Invoice}-superman-status-${row.Superman || ''}`}
-            noInvoice={row.No_Invoice}
-            existingSuperman={row.Superman}
-            docsReady={row.Dokumen_Superman_Siap}
-            onSuccess={(result) => onSupermanSuccess(row.No_DO, result)}
-          />
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
-      </td>
-      <td className={cn(TD, 'min-w-[10rem]')}>
-        <div className="flex flex-col gap-1.5 min-w-[9rem]">
-          {(row.Link_Berita_Acara_Serah_Terima || '').startsWith('http') && (
-            <a
-              href={row.Link_Berita_Acara_Serah_Terima!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[13px] text-primary hover:underline"
-            >
-              Buka Link
-            </a>
-          )}
-          {!isBypass && (
-            <>
-              <input
-                className={TD_INPUT}
-                defaultValue={row.Link_Berita_Acara_Serah_Terima || ''}
-                readOnly={!canEdit()}
-                onBlur={(e) => {
-                  if (canEdit() && e.target.value !== (row.Link_Berita_Acara_Serah_Terima || '')) {
-                    onSapSave(row.No_DO, 'Link_Berita_Acara_Serah_Terima', e.target.value)
-                  }
-                }}
-                placeholder="-"
-              />
-              <DocumentUpload
-                compact
-                entityType="do"
-                entityId={row.No_DO}
-                docType="berita_acara"
-                onUploaded={onRefresh}
-              />
-            </>
-          )}
-        </div>
-      </td>
       <td className={cn(TD, 'text-center min-w-[6.5rem]')}>
         {isBypass && canEdit() ? (
           <div className="flex gap-1 justify-center">

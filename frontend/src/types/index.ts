@@ -21,7 +21,7 @@ export type SapField =
   | 'link_berita_acara_serah_terima'
 
 export type DocumentEntityType = 'kontrak' | 'invoice' | 'do' | 'bypass' | 'ba'
-export type DocumentDocType = 'kontrak' | 'invoice' | 'kuitansi' | 'do' | 'deklarasi' | 'berita_acara'
+export type DocumentDocType = 'kontrak' | 'invoice' | 'kuitansi' | 'rekening_koran' | 'do' | 'deklarasi' | 'berita_acara'
 
 // ============================================================
 // Entity Interfaces — matching backend models.py / schemas.py

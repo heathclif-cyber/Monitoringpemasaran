@@ -182,7 +182,7 @@ def pembayaran_doc_requirements(
     db: Session = Depends(get_db),
     _: models.User = Depends(require_write),
 ):
-    """Status dokumen wajib Superman (kontrak + invoice) untuk invoice tertentu."""
+    """Status dokumen wajib Superman (kontrak + invoice + rekening koran) untuk invoice."""
     reqs, ready = superman_doc_requirements_for_invoice(db, no_invoice.strip())
     return {"requirements": reqs, "ready": ready}
 

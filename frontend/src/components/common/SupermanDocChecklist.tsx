@@ -35,7 +35,9 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
                 ? 'Invoice'
                 : req.label === 'Kuitansi' || req.label.startsWith('Kuitansi')
                   ? 'Kuitansi'
-                  : req.label === 'Dokumen Pendukung'
+                  : req.label === 'Rekening Koran Penerimaan' || req.label.startsWith('Rekening Koran')
+                    ? 'Rek. Koran'
+                    : req.label === 'Dokumen Pendukung'
                     ? 'Belum upload'
                     : req.label === 'Berita Acara'
                       ? 'BA'

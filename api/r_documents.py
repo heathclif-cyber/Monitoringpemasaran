@@ -23,12 +23,13 @@ from services.local_storage import (
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
 VALID_ENTITY_TYPES = {"kontrak", "invoice", "do", "bypass", "ba"}
-VALID_DOC_TYPES = {"kontrak", "invoice", "kuitansi", "do", "deklarasi", "berita_acara"}
+VALID_DOC_TYPES = {"kontrak", "invoice", "kuitansi", "rekening_koran", "do", "deklarasi", "berita_acara"}
 
 DOC_TYPE_LABELS = {
     "kontrak": "Dokumen Kontrak",
     "invoice": "Invoice",
     "kuitansi": "Kuitansi",
+    "rekening_koran": "Rekening Koran Penerimaan",
     "do": "Delivery Order",
     "deklarasi": "Deklarasi Penerimaan",
     "berita_acara": "Berita Acara Serah Terima",
@@ -36,7 +37,7 @@ DOC_TYPE_LABELS = {
 
 ENTITY_DOC_REQUIREMENTS: dict[str, list[str]] = {
     "kontrak": ["kontrak"],
-    "invoice": ["invoice", "kuitansi"],
+    "invoice": ["invoice", "rekening_koran", "kuitansi"],
     "do": ["do", "deklarasi", "berita_acara"],
     "bypass": ["deklarasi"],
     "ba": ["berita_acara"],

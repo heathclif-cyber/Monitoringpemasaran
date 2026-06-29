@@ -147,18 +147,22 @@ def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None
     page.locator(f"#nominal_sppb_{isi_index}_1").dispatch_event("keyup")
 
 
-def _upload_support_docs(page: Page, support_doc: Path, *, combined: bool) -> None:
+def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool) -> None:
+    paths = [str(path) for path in support_docs if path.exists()]
+    if not paths:
+        return
+    files = paths if len(paths) > 1 else paths[0]
     if combined:
         page.locator('a[href="#tab-informasi-sppb"]').click(force=True)
         page.wait_for_timeout(500)
-        page.set_input_files("#dokumen_pendukung_sppb", str(support_doc))
+        page.set_input_files("#dokumen_pendukung_sppb", files)
         page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
         page.wait_for_timeout(500)
-        page.set_input_files("#dokumen_pendukung_sppn", str(support_doc))
+        page.set_input_files("#dokumen_pendukung_sppn", files)
     else:
         page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
         page.wait_for_timeout(600)
-        page.set_input_files("#dokumen_pendukung_sppn", str(support_doc))
+        page.set_input_files("#dokumen_pendukung_sppn", files)
 
     page.evaluate(
         """() => {
@@ -180,7 +184,7 @@ def fill_sppn_draft(
     cfg: SupermanConfig,
     payload: DeklarasiPayload,
     *,
-    support_doc: Path | None = None,
+    support_docs: list[Path] | None = None,
     on_progress: ProgressCallback | None = None,
 ) -> None:
     def report(percent: int, stage: str) -> None:
@@ -196,9 +200,11 @@ def fill_sppn_draft(
     _select_form(page, cfg, payload.jenis_form)
     _fill_shared_informasi(page, payload, cfg)
 
-    if support_doc and support_doc.exists():
-        report(45, "Mengunggah dokumen pendukung")
-        _upload_support_docs(page, support_doc, combined=combined)
+    if support_docs:
+        existing = [doc for doc in support_docs if doc.exists()]
+        if existing:
+            report(45, "Mengunggah dokumen pendukung")
+            _upload_support_docs(page, existing, combined=combined)
 
     if combined and payload.sppb_item:
         report(55, "Mengisi baris SPPb (PPh)")

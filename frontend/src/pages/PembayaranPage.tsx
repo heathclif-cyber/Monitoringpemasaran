@@ -397,10 +397,12 @@ export default function PembayaranPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Dokumen Pendukung Superman</CardTitle>
-              <p className="text-xs text-slate-500 mt-1">Wajib: Kontrak dan Invoice. Kuitansi opsional.</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Wajib: Kontrak, Invoice, dan Rekening Koran Penerimaan. Ketiga file ini dilampirkan ke Superman. Kuitansi opsional.
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                 {currentKontrak?.no_kontrak && (
                   <DocumentUpload
                     entityType="kontrak"
@@ -413,6 +415,12 @@ export default function PembayaranPage() {
                   entityType="invoice"
                   entityId={currentInvoice.no_invoice}
                   docType="invoice"
+                  onUploaded={handleDocumentUploaded}
+                />
+                <DocumentUpload
+                  entityType="invoice"
+                  entityId={currentInvoice.no_invoice}
+                  docType="rekening_koran"
                   onUploaded={handleDocumentUploaded}
                 />
                 <DocumentUpload

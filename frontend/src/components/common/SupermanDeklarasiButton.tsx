@@ -209,7 +209,7 @@ export function SupermanDeklarasiButton({
         open={open}
         onOpenChange={setOpen}
         title="Buat SPPn di Superman"
-        description={`Draft masuk To Do List Superman untuk invoice ${noInvoice || noPembayaran}. Nomor invoice dipakai sebagai referensi Superman (AU58). Wajib upload Kontrak dan Invoice; kuitansi opsional. Jika kontrak kena PPh, sistem otomatis membuat SPPb + SPPn.`}
+        description={`Draft masuk To Do List Superman untuk invoice ${noInvoice || noPembayaran}. Nomor invoice dipakai sebagai referensi Superman (AU58). Wajib upload Kontrak, Invoice, dan Rekening Koran Penerimaan; kuitansi opsional. Jika kontrak kena PPh, sistem otomatis membuat SPPb + SPPn.`}
         confirmLabel={loading ? 'Memproses...' : 'Buat di Superman'}
         isLoading={loading}
         onConfirm={handleConfirm}

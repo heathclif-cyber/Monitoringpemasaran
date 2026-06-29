@@ -114,13 +114,21 @@ def _resolve_upload(
 SupportSource = tuple[str, str, str, str]
 
 _PENDING_SUPPORT_HINT = (
-    "Upload dokumen Kontrak dan Invoice (wajib). Kuitansi opsional."
+    "Upload Kontrak, Invoice, dan Rekening Koran Penerimaan (wajib). Kuitansi opsional."
 )
+
+_ATTACH_ORDER = {"invoice": 0, "kontrak": 1, "berita_acara": 1, "rekening_koran": 2}
 
 
 def _invoice_mandatory_sources(no_invoice: str) -> list[SupportSource]:
     return [
         ("invoice", no_invoice, "invoice", "Dokumen Invoice"),
+    ]
+
+
+def _rekening_koran_mandatory_sources(no_invoice: str) -> list[SupportSource]:
+    return [
+        ("invoice", no_invoice, "rekening_koran", "Rekening Koran Penerimaan"),
     ]
 
 
@@ -134,6 +142,7 @@ def _standar_mandatory_sources(kontrak_id: str, no_invoice: str) -> list[Support
     return [
         ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
         *_invoice_mandatory_sources(no_invoice),
+        *_rekening_koran_mandatory_sources(no_invoice),
     ]
 
 
@@ -141,6 +150,7 @@ def _payung_ba_mandatory_sources(no_ba: str, no_invoice: str) -> list[SupportSou
     return [
         ("ba", no_ba, "berita_acara", "Berita Acara"),
         *_invoice_mandatory_sources(no_invoice),
+        *_rekening_koran_mandatory_sources(no_invoice),
     ]
 
 
@@ -219,11 +229,12 @@ def _requirements_from_sources(
     return requirements, ready
 
 
-def _resolve_mandatory_support_doc(
+def _resolve_mandatory_support_docs(
     db: Session,
     mandatory_sources: list[SupportSource],
-) -> ResolvedSupportDoc:
+) -> list[ResolvedSupportDoc]:
     missing: list[str] = []
+    resolved: list[ResolvedSupportDoc] = []
     for entity_type, entity_id, doc_type, label in mandatory_sources:
         uploaded, _ = _upload_status(
             db,
@@ -233,16 +244,25 @@ def _resolve_mandatory_support_doc(
         )
         if not uploaded:
             missing.append(label)
+            continue
+        try:
+            resolved.append(
+                _resolve_upload(
+                    db,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    doc_type=doc_type,
+                    label=label,
+                )
+            )
+        except FileNotFoundError:
+            missing.append(label)
     if missing:
         raise FileNotFoundError(
             f"Dokumen wajib belum lengkap: {', '.join(missing)}. {_PENDING_SUPPORT_HINT}"
         )
-
-    attach_order = sorted(
-        mandatory_sources,
-        key=lambda s: 0 if s[2] == "invoice" else 1,
-    )
-    return _resolve_first_available(db, attach_order)
+    resolved.sort(key=lambda doc: _ATTACH_ORDER.get(doc.doc_type, 9))
+    return resolved
 
 
 def _find_first_uploaded(
@@ -269,7 +289,7 @@ def _find_first_uploaded(
     return None
 
 
-def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
+def resolve_support_docs_for_do(db: Session, no_do: str) -> list[ResolvedSupportDoc]:
     do = (
         db.query(models.DeliveryOrder)
         .options(
@@ -303,12 +323,12 @@ def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
                 f"DO {no_do} kontrak payung tanpa nomor BA. "
                 "Pastikan invoice/DO terhubung ke Berita Acara."
             )
-        return _resolve_mandatory_support_doc(
+        return _resolve_mandatory_support_docs(
             db,
             _payung_ba_mandatory_sources(no_ba, no_invoice),
         )
 
-    return _resolve_mandatory_support_doc(
+    return _resolve_mandatory_support_docs(
         db,
         _standar_mandatory_sources(kontrak.no_kontrak, no_invoice),
     )
@@ -406,17 +426,17 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
     )
 
 
-def resolve_support_doc_from_do(no_do: str) -> ResolvedSupportDoc:
+def resolve_support_docs_from_do(no_do: str) -> list[ResolvedSupportDoc]:
     from database import SessionLocal
 
     db = SessionLocal()
     try:
-        return resolve_support_doc_for_do(db, no_do)
+        return resolve_support_docs_for_do(db, no_do)
     finally:
         db.close()
 
 
-def resolve_support_doc_for_pembayaran(db: Session, no_pembayaran: str) -> ResolvedSupportDoc:
+def resolve_support_docs_for_pembayaran(db: Session, no_pembayaran: str) -> list[ResolvedSupportDoc]:
     pay = (
         db.query(models.Pembayaran)
         .options(
@@ -455,28 +475,28 @@ def resolve_support_doc_for_pembayaran(db: Session, no_pembayaran: str) -> Resol
                 f"Pembayaran {no_pembayaran} kontrak payung tanpa nomor BA. "
                 "Pastikan invoice terhubung ke Berita Acara."
             )
-        return _resolve_mandatory_support_doc(
+        return _resolve_mandatory_support_docs(
             db,
             _payung_ba_mandatory_sources(no_ba, no_invoice),
         )
 
-    return _resolve_mandatory_support_doc(
+    return _resolve_mandatory_support_docs(
         db,
         _standar_mandatory_sources(kontrak.no_kontrak, no_invoice),
     )
 
 
-def resolve_support_doc_from_pembayaran(no_pembayaran: str) -> ResolvedSupportDoc:
+def resolve_support_docs_from_pembayaran(no_pembayaran: str) -> list[ResolvedSupportDoc]:
     from database import SessionLocal
 
     db = SessionLocal()
     try:
-        return resolve_support_doc_for_pembayaran(db, no_pembayaran)
+        return resolve_support_docs_for_pembayaran(db, no_pembayaran)
     finally:
         db.close()
 
 
-def resolve_support_doc_for_invoice(db: Session, no_invoice: str) -> ResolvedSupportDoc:
+def resolve_support_docs_for_invoice(db: Session, no_invoice: str) -> list[ResolvedSupportDoc]:
     invoice = (
         db.query(models.Invoice)
         .options(
@@ -505,25 +525,38 @@ def resolve_support_doc_for_invoice(db: Session, no_invoice: str) -> ResolvedSup
                 f"Invoice {no_invoice} kontrak payung tanpa nomor BA. "
                 "Pastikan invoice terhubung ke Berita Acara."
             )
-        return _resolve_mandatory_support_doc(
+        return _resolve_mandatory_support_docs(
             db,
             _payung_ba_mandatory_sources(no_ba, invoice.no_invoice),
         )
 
-    return _resolve_mandatory_support_doc(
+    return _resolve_mandatory_support_docs(
         db,
         _standar_mandatory_sources(kontrak.no_kontrak, invoice.no_invoice),
     )
 
 
-def resolve_support_doc_from_invoice(no_invoice: str) -> ResolvedSupportDoc:
+def resolve_support_docs_from_invoice(no_invoice: str) -> list[ResolvedSupportDoc]:
     from database import SessionLocal
 
     db = SessionLocal()
     try:
-        return resolve_support_doc_for_invoice(db, no_invoice)
+        return resolve_support_docs_for_invoice(db, no_invoice)
     finally:
         db.close()
+
+
+# Alias kompatibilitas skrip lama
+def resolve_support_doc_from_invoice(no_invoice: str) -> list[ResolvedSupportDoc]:
+    return resolve_support_docs_from_invoice(no_invoice)
+
+
+def resolve_support_doc_from_do(no_do: str) -> list[ResolvedSupportDoc]:
+    return resolve_support_docs_from_do(no_do)
+
+
+def resolve_support_doc_from_pembayaran(no_pembayaran: str) -> list[ResolvedSupportDoc]:
+    return resolve_support_docs_from_pembayaran(no_pembayaran)
 
 
 def superman_doc_requirements_for_invoice(
