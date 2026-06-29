@@ -110,7 +110,7 @@ export default function RepoDO() {
               columns={[
                 { key: 'no', header: 'No DO', render: (item) => <span className="font-medium">{item.no_do}</span> },
                 { key: 'inv', header: 'No Invoice', render: (item) => <span className="text-slate-600">{item.no_invoice}</span> },
-                { key: 'pay', header: 'No Pembayaran', render: (item) => <span className="text-slate-600">{safe(item.no_pembayaran)}</span> },
+                { key: 'pay', header: 'Superman', render: (item) => <span className="text-slate-600">{safe(item.superman)}</span> },
                 { key: 'tgl', header: 'Tanggal DO', render: (item) => formatDate(item.tanggal_do) },
                 { key: 'unit', header: 'Unit Tujuan', render: (item) => safe(item.kepada_unit) },
                 {

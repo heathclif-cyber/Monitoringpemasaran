@@ -118,7 +118,7 @@ function DOPreviewContent({ noDo, noInv, tgl, unit, k, volumeKeluar, maxVolume }
 
 const doSchema = z.object({
   no_do: z.string().min(1, 'No DO wajib diisi'),
-  no_pembayaran: z.string().min(1, 'Pembayaran wajib dipilih'),
+  no_pembayaran: z.string().min(1, 'Superman wajib dipilih'),
   no_invoice: z.string().optional(),
   tanggal_do: z.string().min(1, 'Tanggal wajib diisi'),
   kepada_unit: z.string().optional(),
@@ -171,7 +171,7 @@ export default function DOPage() {
     pembayaranStore.fetchAvailableForDO().then((rows) => {
       setAvailablePembayaran(rows.map((p) => ({
         value: p.no_pembayaran,
-        label: `${p.superman || p.no_invoice} · ${p.no_pembayaran}`,
+        label: (p.superman || '').trim() || p.no_invoice,
       })))
     })
   }, [])
@@ -214,7 +214,10 @@ export default function DOPage() {
       if (data.no_pembayaran) {
         const opts = [...availablePembayaran]
         if (!opts.some((o) => o.value === data.no_pembayaran)) {
-          opts.unshift({ value: data.no_pembayaran, label: `${data.no_pembayaran} — ${data.no_invoice}` })
+          opts.unshift({
+            value: data.no_pembayaran,
+            label: (data.superman || '').trim() || data.no_invoice,
+          })
           setAvailablePembayaran(opts)
         }
       }
@@ -362,16 +365,16 @@ export default function DOPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs">No Pembayaran *</Label>
+                <Label className="text-xs">Superman (SPPn/SPPb) *</Label>
                 <SearchableSelect
                   options={availablePembayaran}
                   value={watch('no_pembayaran')}
                   onChange={(v) => setValue('no_pembayaran', v, { shouldValidate: true })}
-                  placeholder="-- Pilih Pembayaran (belum punya DO) --"
+                  placeholder="-- Pilih Superman (belum punya DO) --"
                 />
                 {errors.no_pembayaran && <p className="text-xs text-red-500 mt-1">{errors.no_pembayaran.message}</p>}
                 <p className="text-xs text-slate-400 mt-1">
-                  Hanya pembayaran yang sudah punya nomor Superman (SPPn/SPPb). Buat di menu Input Pembayaran.
+                  Pilih nomor Superman dari pembayaran yang sudah lunas. Buat deklarasi di menu Input Pembayaran.
                 </p>
               </div>
               <div>
