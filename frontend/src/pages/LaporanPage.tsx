@@ -12,6 +12,7 @@ import {
   ChevronUp,
   X,
   SlidersHorizontal,
+  CheckCircle2,
 } from 'lucide-react'
 import { useLaporanStore } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
@@ -545,7 +546,7 @@ export default function LaporanPage() {
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Sisa Bayar</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[8rem]')}>Sisa Volume</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Bulan Buku</th>
-                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[7.5rem]')}>Superman</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[9rem]')}>Superman</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Kontrak SAP</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[7rem]')}>SO SAP</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[7rem]')}>DO SAP</th>
@@ -694,10 +695,22 @@ function LaporanTableRow({
         {(row.Sisa_Volume || 0) <= 0 ? 'Selesai' : formatNumber(row.Sisa_Volume)}
       </td>
       <td className={cn(TD, 'whitespace-nowrap min-w-[8rem]')}>{row.Bulan_Buku}</td>
-      {(['Superman', 'Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const).map((field) => (
+      <td className={cn(TD, 'min-w-[9rem]')}>
+        {(row.Superman || '').trim() ? (
+          <span
+            className="inline-flex items-start gap-1 text-[12px] font-medium text-emerald-700 dark:text-emerald-400 break-words"
+            title={row.Superman || undefined}
+          >
+            <CheckCircle2 size={13} className="shrink-0 mt-0.5" />
+            {row.Superman}
+          </span>
+        ) : (
+          <span className="text-[12px] text-muted-foreground">Belum</span>
+        )}
+      </td>
+      {(['Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const).map((field) => (
         <td key={field} className={cn(TD, 'min-w-[7.5rem]')}>
           <input
-            key={field === 'Superman' ? `${row.No_DO}-superman-${row.Superman || ''}` : field}
             className={TD_INPUT}
             defaultValue={row[field] || ''}
             readOnly={!canEdit()}
