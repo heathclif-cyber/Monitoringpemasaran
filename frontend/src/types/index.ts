@@ -212,6 +212,7 @@ export interface SupermanDocRequirement {
   entity_id: string
   doc_type: string
   uploaded: boolean
+  required?: boolean
   file_name?: string | null
   upload_hint?: string | null
 }

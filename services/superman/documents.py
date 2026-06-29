@@ -114,32 +114,44 @@ def _resolve_upload(
 SupportSource = tuple[str, str, str, str]
 
 _PENDING_SUPPORT_HINT = (
-    "Upload salah satu: Kontrak, Invoice, atau Kuitansi (pada nomor invoice terkait)."
+    "Upload dokumen Kontrak dan Invoice (wajib). Kuitansi opsional."
 )
 
 
-def _invoice_support_sources(no_invoice: str) -> list[SupportSource]:
-    """Dokumen pendukung pada entity Invoice — berlaku semua komoditi."""
+def _invoice_mandatory_sources(no_invoice: str) -> list[SupportSource]:
     return [
         ("invoice", no_invoice, "invoice", "Dokumen Invoice"),
+    ]
+
+
+def _kuitansi_optional_sources(no_invoice: str) -> list[SupportSource]:
+    return [
         ("invoice", no_invoice, "kuitansi", "Kuitansi"),
     ]
 
 
-def _standar_support_sources(kontrak_id: str, no_invoice: str) -> list[SupportSource]:
-    """Kontrak standar — cukup salah satu sumber (semua komoditi)."""
+def _standar_mandatory_sources(kontrak_id: str, no_invoice: str) -> list[SupportSource]:
     return [
         ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
-        *_invoice_support_sources(no_invoice),
+        *_invoice_mandatory_sources(no_invoice),
     ]
+
+
+def _payung_ba_mandatory_sources(no_ba: str, no_invoice: str) -> list[SupportSource]:
+    return [
+        ("ba", no_ba, "berita_acara", "Berita Acara"),
+        *_invoice_mandatory_sources(no_invoice),
+    ]
+
+
+def _standar_support_sources(kontrak_id: str, no_invoice: str) -> list[SupportSource]:
+    """Alias: dokumen wajib standar (kontrak + invoice)."""
+    return _standar_mandatory_sources(kontrak_id, no_invoice)
 
 
 def _payung_ba_support_sources(no_ba: str, no_invoice: str) -> list[SupportSource]:
-    """Kontrak payung BA — BA atau dokumen invoice (semua komoditi)."""
-    return [
-        ("ba", no_ba, "berita_acara", "Berita Acara"),
-        *_invoice_support_sources(no_invoice),
-    ]
+    """Alias: dokumen wajib payung BA (BA + invoice)."""
+    return _payung_ba_mandatory_sources(no_ba, no_invoice)
 
 
 def _resolve_first_available(
@@ -161,6 +173,76 @@ def _resolve_first_available(
     if last_error:
         raise last_error
     raise FileNotFoundError("Dokumen pendukung tidak ditemukan.")
+
+
+def _requirement_entry(
+    db: Session,
+    source: SupportSource,
+    *,
+    required: bool = True,
+) -> dict[str, str | bool | None]:
+    entity_type, entity_id, doc_type, label = source
+    uploaded, file_name = _upload_status(
+        db,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        doc_type=doc_type,
+    )
+    suffix = "" if required else " (opsional)"
+    return {
+        "label": f"{label}{suffix}",
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "doc_type": doc_type,
+        "uploaded": uploaded,
+        "file_name": file_name,
+        "required": required,
+        "upload_hint": (
+            f"{label} sudah diupload ({file_name})"
+            if uploaded and file_name
+            else f"Upload {label} untuk {entity_type}={entity_id}"
+        ),
+    }
+
+
+def _requirements_from_sources(
+    db: Session,
+    mandatory_sources: list[SupportSource],
+    optional_sources: list[SupportSource] | None = None,
+) -> tuple[list[dict[str, str | bool | None]], bool]:
+    requirements = [
+        _requirement_entry(db, source, required=True) for source in mandatory_sources
+    ]
+    for source in optional_sources or []:
+        requirements.append(_requirement_entry(db, source, required=False))
+    ready = all(req["uploaded"] for req in requirements if req.get("required", True))
+    return requirements, ready
+
+
+def _resolve_mandatory_support_doc(
+    db: Session,
+    mandatory_sources: list[SupportSource],
+) -> ResolvedSupportDoc:
+    missing: list[str] = []
+    for entity_type, entity_id, doc_type, label in mandatory_sources:
+        uploaded, _ = _upload_status(
+            db,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            doc_type=doc_type,
+        )
+        if not uploaded:
+            missing.append(label)
+    if missing:
+        raise FileNotFoundError(
+            f"Dokumen wajib belum lengkap: {', '.join(missing)}. {_PENDING_SUPPORT_HINT}"
+        )
+
+    attach_order = sorted(
+        mandatory_sources,
+        key=lambda s: 0 if s[2] == "invoice" else 1,
+    )
+    return _resolve_first_available(db, attach_order)
 
 
 def _find_first_uploaded(
@@ -221,14 +303,14 @@ def resolve_support_doc_for_do(db: Session, no_do: str) -> ResolvedSupportDoc:
                 f"DO {no_do} kontrak payung tanpa nomor BA. "
                 "Pastikan invoice/DO terhubung ke Berita Acara."
             )
-        return _resolve_first_available(
+        return _resolve_mandatory_support_doc(
             db,
-            _payung_ba_support_sources(no_ba, no_invoice),
+            _payung_ba_mandatory_sources(no_ba, no_invoice),
         )
 
-    return _resolve_first_available(
+    return _resolve_mandatory_support_doc(
         db,
-        _standar_support_sources(kontrak.no_kontrak, no_invoice),
+        _standar_mandatory_sources(kontrak.no_kontrak, no_invoice),
     )
 
 
@@ -241,6 +323,12 @@ def _upload_status(
 ) -> tuple[bool, str | None]:
     upload = _latest_upload(db, entity_type, entity_id, doc_type)
     if upload:
+        if upload.storage_path:
+            try:
+                get_file_path(upload.storage_path)
+                return True, upload.file_name
+            except StorageError:
+                pass
         try:
             path = _path_from_upload(upload)
             if path.is_file():
@@ -304,44 +392,18 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
             )
             return requirements, False
 
-        sources = _payung_ba_support_sources(no_ba, no_invoice)
-        matched = _find_first_uploaded(db, sources)
-        if matched:
-            requirements.append(matched)
-            return requirements, True
-        requirements.append(
-            {
-                "label": "Dokumen Pendukung",
-                "entity_type": "invoice",
-                "entity_id": no_invoice,
-                "doc_type": "invoice",
-                "uploaded": False,
-                "file_name": None,
-                "upload_hint": f"{_PENDING_SUPPORT_HINT} BA: {no_ba}, Invoice: {no_invoice}.",
-            }
+        return _requirements_from_sources(
+            db,
+            _payung_ba_mandatory_sources(no_ba, no_invoice),
+            _kuitansi_optional_sources(no_invoice),
         )
-        return requirements, False
 
     kontrak_id = kontrak.no_kontrak
-    sources = _standar_support_sources(kontrak_id, no_invoice)
-    matched = _find_first_uploaded(db, sources)
-
-    if matched:
-        requirements.append(matched)
-        return requirements, True
-
-    requirements.append(
-        {
-            "label": "Dokumen Pendukung",
-            "entity_type": "invoice",
-            "entity_id": no_invoice,
-            "doc_type": "invoice",
-            "uploaded": False,
-            "file_name": None,
-            "upload_hint": f"{_PENDING_SUPPORT_HINT} Kontrak: {kontrak_id}, Invoice: {no_invoice}.",
-        }
+    return _requirements_from_sources(
+        db,
+        _standar_mandatory_sources(kontrak_id, no_invoice),
+        _kuitansi_optional_sources(no_invoice),
     )
-    return requirements, False
 
 
 def resolve_support_doc_from_do(no_do: str) -> ResolvedSupportDoc:
@@ -393,14 +455,14 @@ def resolve_support_doc_for_pembayaran(db: Session, no_pembayaran: str) -> Resol
                 f"Pembayaran {no_pembayaran} kontrak payung tanpa nomor BA. "
                 "Pastikan invoice terhubung ke Berita Acara."
             )
-        return _resolve_first_available(
+        return _resolve_mandatory_support_doc(
             db,
-            _payung_ba_support_sources(no_ba, no_invoice),
+            _payung_ba_mandatory_sources(no_ba, no_invoice),
         )
 
-    return _resolve_first_available(
+    return _resolve_mandatory_support_doc(
         db,
-        _standar_support_sources(kontrak.no_kontrak, no_invoice),
+        _standar_mandatory_sources(kontrak.no_kontrak, no_invoice),
     )
 
 
@@ -443,14 +505,14 @@ def resolve_support_doc_for_invoice(db: Session, no_invoice: str) -> ResolvedSup
                 f"Invoice {no_invoice} kontrak payung tanpa nomor BA. "
                 "Pastikan invoice terhubung ke Berita Acara."
             )
-        return _resolve_first_available(
+        return _resolve_mandatory_support_doc(
             db,
-            _payung_ba_support_sources(no_ba, invoice.no_invoice),
+            _payung_ba_mandatory_sources(no_ba, invoice.no_invoice),
         )
 
-    return _resolve_first_available(
+    return _resolve_mandatory_support_doc(
         db,
-        _standar_support_sources(kontrak.no_kontrak, invoice.no_invoice),
+        _standar_mandatory_sources(kontrak.no_kontrak, invoice.no_invoice),
     )
 
 
@@ -515,43 +577,18 @@ def superman_doc_requirements_for_invoice(
             )
             return requirements, False
 
-        sources = _payung_ba_support_sources(no_ba, invoice.no_invoice)
-        matched = _find_first_uploaded(db, sources)
-        if matched:
-            requirements.append(matched)
-            return requirements, True
-        requirements.append(
-            {
-                "label": "Dokumen Pendukung",
-                "entity_type": "invoice",
-                "entity_id": invoice.no_invoice,
-                "doc_type": "invoice",
-                "uploaded": False,
-                "file_name": None,
-                "upload_hint": f"{_PENDING_SUPPORT_HINT} BA: {no_ba}, Invoice: {invoice.no_invoice}.",
-            }
+        return _requirements_from_sources(
+            db,
+            _payung_ba_mandatory_sources(no_ba, invoice.no_invoice),
+            _kuitansi_optional_sources(invoice.no_invoice),
         )
-        return requirements, False
 
     kontrak_id = kontrak.no_kontrak
-    sources = _standar_support_sources(kontrak_id, invoice.no_invoice)
-    matched = _find_first_uploaded(db, sources)
-    if matched:
-        requirements.append(matched)
-        return requirements, True
-
-    requirements.append(
-        {
-            "label": "Dokumen Pendukung",
-            "entity_type": "invoice",
-            "entity_id": invoice.no_invoice,
-            "doc_type": "invoice",
-            "uploaded": False,
-            "file_name": None,
-            "upload_hint": f"{_PENDING_SUPPORT_HINT} Kontrak: {kontrak_id}, Invoice: {invoice.no_invoice}.",
-        }
+    return _requirements_from_sources(
+        db,
+        _standar_mandatory_sources(kontrak_id, invoice.no_invoice),
+        _kuitansi_optional_sources(invoice.no_invoice),
     )
-    return requirements, False
 
 
 def superman_doc_requirements_for_pembayaran(
@@ -611,40 +648,15 @@ def superman_doc_requirements_for_pembayaran(
             )
             return requirements, False
 
-        sources = _payung_ba_support_sources(no_ba, no_invoice)
-        matched = _find_first_uploaded(db, sources)
-        if matched:
-            requirements.append(matched)
-            return requirements, True
-        requirements.append(
-            {
-                "label": "Dokumen Pendukung",
-                "entity_type": "invoice",
-                "entity_id": no_invoice,
-                "doc_type": "invoice",
-                "uploaded": False,
-                "file_name": None,
-                "upload_hint": f"{_PENDING_SUPPORT_HINT} BA: {no_ba}, Invoice: {no_invoice}.",
-            }
+        return _requirements_from_sources(
+            db,
+            _payung_ba_mandatory_sources(no_ba, no_invoice),
+            _kuitansi_optional_sources(no_invoice),
         )
-        return requirements, False
 
     kontrak_id = kontrak.no_kontrak
-    sources = _standar_support_sources(kontrak_id, no_invoice)
-    matched = _find_first_uploaded(db, sources)
-    if matched:
-        requirements.append(matched)
-        return requirements, True
-
-    requirements.append(
-        {
-            "label": "Dokumen Pendukung",
-            "entity_type": "invoice",
-            "entity_id": no_invoice,
-            "doc_type": "invoice",
-            "uploaded": False,
-            "file_name": None,
-            "upload_hint": f"{_PENDING_SUPPORT_HINT} Kontrak: {kontrak_id}, Invoice: {no_invoice}.",
-        }
+    return _requirements_from_sources(
+        db,
+        _standar_mandatory_sources(kontrak_id, no_invoice),
+        _kuitansi_optional_sources(no_invoice),
     )
-    return requirements, False

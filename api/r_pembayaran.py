@@ -7,6 +7,7 @@ import models
 import schemas
 from database import get_db
 from services.auth import require_write
+from services.superman.documents import superman_doc_requirements_for_invoice
 
 router = APIRouter(prefix="/api/pembayaran", tags=["Pembayaran"])
 
@@ -173,6 +174,17 @@ def get_pembayaran_list(
     if sudah_superman:
         rows = [p for p in rows if is_ready_for_do(p)]
     return [_pembayaran_out(p) for p in rows]
+
+
+@router.get("/doc-requirements")
+def pembayaran_doc_requirements(
+    no_invoice: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_write),
+):
+    """Status dokumen wajib Superman (kontrak + invoice) untuk invoice tertentu."""
+    reqs, ready = superman_doc_requirements_for_invoice(db, no_invoice.strip())
+    return {"requirements": reqs, "ready": ready}
 
 
 @router.get("/{no_pembayaran:path}", response_model=schemas.PembayaranOut)

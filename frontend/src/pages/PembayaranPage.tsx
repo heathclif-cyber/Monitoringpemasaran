@@ -22,7 +22,7 @@ import { SupermanCaptchaDialog } from '@/components/common/SupermanCaptchaDialog
 import { SupermanProgressDialog } from '@/components/common/SupermanProgressDialog'
 import { client } from '@/lib/client'
 import { cn, formatCurrency } from '@/lib/utils'
-import { formatInvoiceSelectLabel } from '@/utils/invoiceUtils'
+import { fetchInvoiceDocRequirements, formatInvoiceSelectLabel } from '@/utils/invoiceUtils'
 import type {
   Pembayaran,
   PembayaranInput,
@@ -119,27 +119,33 @@ export default function PembayaranPage() {
     }
   }, [selectedInvoice])
 
-  const refreshDocRequirements = async (noInvoice: string) => {
+  const fetchDocRequirements = async (noInvoice: string) => {
     try {
-      const res = await client.get<{ requirements: SupermanDocRequirement[]; ready: boolean }>(
-        `/api/superman/doc-requirements?no_invoice=${encodeURIComponent(noInvoice)}`,
-      )
-      setDocRequirements(res.requirements || [])
-      setDocsReady(!!res.ready)
-    } catch {
+      const res = await fetchInvoiceDocRequirements(noInvoice)
+      setDocRequirements(res.requirements)
+      setDocsReady(res.ready)
+      return res
+    } catch (err) {
       setDocRequirements([])
       setDocsReady(false)
+      throw err
     }
   }
 
   useEffect(() => {
     if (selectedInvoice) {
-      refreshDocRequirements(selectedInvoice)
+      void fetchDocRequirements(selectedInvoice)
     } else {
       setDocRequirements([])
       setDocsReady(false)
     }
   }, [selectedInvoice])
+
+  const handleDocumentUploaded = () => {
+    if (selectedInvoice) {
+      void fetchDocRequirements(selectedInvoice)
+    }
+  }
 
   const loadPembayaran = async (no: string) => {
     const data = await pembayaranStore.fetchOne(no)
@@ -238,8 +244,27 @@ export default function PembayaranPage() {
   }
 
   const startSupermanFlow = async (noInvoice: string) => {
-    if (!docsReady) {
-      addNotification('Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.', 'warning')
+    let fresh: Awaited<ReturnType<typeof fetchDocRequirements>>
+    try {
+      fresh = await fetchDocRequirements(noInvoice)
+    } catch (err) {
+      addNotification(
+        err instanceof Error ? err.message : 'Gagal memuat status dokumen pendukung',
+        'error',
+      )
+      return
+    }
+    if (!fresh.ready) {
+      const missing = fresh.requirements
+        .filter((r) => r.required !== false && !r.uploaded)
+        .map((r) => r.label.replace(' (opsional)', ''))
+        .join(', ')
+      addNotification(
+        missing
+          ? `Dokumen wajib belum lengkap: ${missing}`
+          : 'Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.',
+        'warning',
+      )
       return
     }
     try {
@@ -271,12 +296,30 @@ export default function PembayaranPage() {
       }
 
       const willTriggerSuperman = willCompleteInvoice && !invoiceSuperman
-      if (willTriggerSuperman && !docsReady) {
-        addNotification(
-          'Upload dokumen pendukung (kontrak/invoice/kuitansi) sebelum melunasi invoice.',
-          'warning',
-        )
-        return
+      if (willTriggerSuperman) {
+        let fresh: Awaited<ReturnType<typeof fetchDocRequirements>>
+        try {
+          fresh = await fetchDocRequirements(data.no_invoice)
+        } catch (err) {
+          addNotification(
+            err instanceof Error ? err.message : 'Gagal memuat status dokumen pendukung',
+            'error',
+          )
+          return
+        }
+        if (!fresh.ready) {
+          const missing = fresh.requirements
+            .filter((r) => r.required !== false && !r.uploaded)
+            .map((r) => r.label.replace(' (opsional)', ''))
+            .join(', ')
+          addNotification(
+            missing
+              ? `Dokumen wajib belum lengkap: ${missing}`
+              : 'Upload dokumen Kontrak dan Invoice sebelum melunasi invoice.',
+            'warning',
+          )
+          return
+        }
       }
 
       const saved = await pembayaranStore.save(payload)
@@ -354,14 +397,31 @@ export default function PembayaranPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Dokumen Pendukung Superman</CardTitle>
+              <p className="text-xs text-slate-500 mt-1">Wajib: Kontrak dan Invoice. Kuitansi opsional.</p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {currentKontrak?.no_kontrak && (
-                  <DocumentUpload entityType="kontrak" entityId={currentKontrak.no_kontrak} docType="kontrak" />
+                  <DocumentUpload
+                    entityType="kontrak"
+                    entityId={currentKontrak.no_kontrak}
+                    docType="kontrak"
+                    onUploaded={handleDocumentUploaded}
+                  />
                 )}
-                <DocumentUpload entityType="invoice" entityId={currentInvoice.no_invoice} docType="invoice" />
-                <DocumentUpload entityType="invoice" entityId={currentInvoice.no_invoice} docType="kuitansi" />
+                <DocumentUpload
+                  entityType="invoice"
+                  entityId={currentInvoice.no_invoice}
+                  docType="invoice"
+                  onUploaded={handleDocumentUploaded}
+                />
+                <DocumentUpload
+                  entityType="invoice"
+                  entityId={currentInvoice.no_invoice}
+                  docType="kuitansi"
+                  label="Kuitansi (opsional)"
+                  onUploaded={handleDocumentUploaded}
+                />
               </div>
               <SupermanDocChecklist requirements={docRequirements} docsReady={docsReady} />
             </CardContent>
