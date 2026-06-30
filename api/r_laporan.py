@@ -35,6 +35,7 @@ def _build_laporan_rows(db: Session):
         joinedload(models.Kontrak.invoices).joinedload(models.Invoice.berita_acara),
         joinedload(models.Kontrak.invoices).joinedload(models.Invoice.delivery_orders).joinedload(models.DeliveryOrder.berita_acara),
     ).all()
+    ba_by_no = {ba.no_ba: ba for ba in db.query(models.BeritaAcara).all()}
 
     rows = []
     
@@ -122,6 +123,9 @@ def _build_laporan_rows(db: Session):
             ba_ref = do.berita_acara
         elif inv and getattr(inv, "berita_acara", None):
             ba_ref = inv.berita_acara
+        elif k.no_kontrak:
+            # Sawit RO: kontrak per-pengiriman sering bernama sama dengan no_ba
+            ba_ref = ba_by_no.get(k.no_kontrak)
 
         ba_date = ba_ref.tanggal_ba if ba_ref else None
         ba_buku_date = ba_ref.bulan_buku if ba_ref else None
@@ -259,12 +263,12 @@ def _build_laporan_rows(db: Session):
             "No_BA": ba_ref.no_ba if ba_ref else "",
             "Tanggal_BA": ba_date.strftime("%Y-%m-%d") if ba_date else "",
             "Bulan_Buku": get_bulan_buku(
-                (ba_buku_date or ba_date) if (is_payung_ba(k) and (ba_buku_date or ba_date)) else (
+                (ba_buku_date or ba_date) if (ba_ref and (ba_buku_date or ba_date)) else (
                     do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)
                 )
             ),
             "Rencana_Pengambilan": (
-                ba_date.strftime("%Y-%m-%d") if (is_payung_ba(k) and ba_date) else (
+                ba_date.strftime("%Y-%m-%d") if (ba_ref and ba_date) else (
                     do.rencana_pengambilan.strftime("%Y-%m-%d") if do and getattr(do, 'rencana_pengambilan', None) else ""
                 )
             ),
