@@ -51,14 +51,29 @@ def _set_readonly_input(page: Page, selector: str, value: str) -> None:
     )
 
 
+def _fill_input(page: Page, selector: str, value: str) -> None:
+    page.evaluate(
+        """([sel, val]) => {
+            const el = document.querySelector(sel);
+            if (!el) return;
+            el.removeAttribute('readonly');
+            el.value = val;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            if (window.jQuery) window.jQuery(el).trigger('input').trigger('change');
+        }""",
+        [selector, value],
+    )
+
+
 def _fill_shared_informasi(page: Page, payload: DeklarasiPayload, cfg: SupermanConfig) -> None:
     if payload.jenis_form == "sppb_sppn":
-        page.fill("#kwitansi_spp", payload.mitra_pembeli)
-        page.fill("#referensi_spp", payload.referensi or "-")
-        page.fill("#berita_acara_sppb", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
-        page.fill("#sp_opl_sppb", payload.no_kontrak or "-")
-        page.fill("#sp_opl_sppn", payload.no_kontrak or "-")
-        page.fill("#au58_sppn", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
+        _fill_input(page, "#kwitansi_spp", payload.mitra_pembeli)
+        _fill_input(page, "#referensi_spp", payload.referensi or payload.no_invoice or "-")
+        _fill_input(page, "#berita_acara_sppb", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
+        _fill_input(page, "#sp_opl_sppb", payload.no_kontrak or "-")
+        _fill_input(page, "#sp_opl_sppn", payload.no_kontrak or "-")
+        _fill_input(page, "#au58_sppn", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
         page.select_option("#bagian_sppb", cfg.bagian)
         page.select_option("#bagian_sppn", cfg.bagian)
         if payload.tanggal_transfer:
@@ -85,15 +100,17 @@ def _fill_shared_informasi(page: Page, payload: DeklarasiPayload, cfg: SupermanC
         page.fill("#alamat_diterima_sppn_input", "tertanggu")
         return
 
-    page.fill("#kwitansi_sppn", payload.mitra_pembeli)
-    page.fill("#referensi_sppn", payload.referensi or "-")
-    page.fill("#au58_sppn", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
-    page.fill("#sp_opl_sppn", payload.no_kontrak or "-")
+    _fill_input(page, "#kwitansi_sppn", payload.mitra_pembeli)
+    _fill_input(page, "#referensi_sppn", payload.referensi or payload.no_invoice or "-")
+    _fill_input(page, "#au58_sppn", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
+    _fill_input(page, "#sp_opl_sppn", payload.no_kontrak or "-")
     page.select_option("#bagian_sppn", cfg.bagian)
     if payload.tanggal_transfer:
         _set_readonly_input(page, "#tanggal_sppn", payload.tanggal_transfer)
-    page.fill("#nama_diterima_sppn_input", "tertanggu")
-    page.fill("#alamat_diterima_sppn_input", "tertanggu")
+    _fill_input(page, "#nama_diterima_sppn_input", "tertanggu")
+    _fill_input(page, "#alamat_diterima_sppn_input", "tertanggu")
+    if page.locator("#faktur_pajak_sppn_1").count():
+        _fill_input(page, "#faktur_pajak_sppn_1", "-")
 
 
 def _set_ckeditor(page: Page, editor_id: str, text: str) -> None:
@@ -302,6 +319,12 @@ def fill_sppn_draft(
     report(82, "Memvalidasi isian form")
     page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
     page.wait_for_timeout(600)
+    referensi_val = page.locator("#referensi_sppn").input_value(timeout=2000).strip()
+    if not referensi_val:
+        raise RuntimeError("Field Referensi SPPn kosong — gagal mengisi nomor invoice")
+    kwitansi_val = page.locator("#kwitansi_sppn").input_value(timeout=2000).strip()
+    if not kwitansi_val:
+        raise RuntimeError("Field Kwitansi SPPn kosong — gagal mengisi nama pembeli")
     page.evaluate("() => { if (typeof bandingkan_dpp_sisa === 'function') bandingkan_dpp_sisa(); }")
     page.wait_for_timeout(500)
 
