@@ -222,19 +222,18 @@ def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None
 
 
 def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
-    for path in paths:
-        page.set_input_files(input_selector, path)
-        page.wait_for_timeout(1200)
-        page.evaluate(
-            """(sel) => {
-                const input = document.querySelector(sel);
-                if (!input) return;
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) jQuery(input).trigger('change');
-            }""",
-            input_selector,
-        )
-        page.wait_for_timeout(800)
+    files = paths[0] if len(paths) == 1 else paths
+    page.set_input_files(input_selector, files)
+    page.wait_for_timeout(2000)
+    page.evaluate(
+        """(sel) => {
+            const input = document.querySelector(sel);
+            if (!input) return;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }""",
+        input_selector,
+    )
+    page.wait_for_timeout(1500)
 
 
 def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool) -> None:
