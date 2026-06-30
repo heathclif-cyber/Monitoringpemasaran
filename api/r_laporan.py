@@ -178,6 +178,58 @@ def _build_laporan_rows(db: Session):
         elif do:
             dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_do(db, do.no_do)
 
+        tanggal_transfer_val = do.tanggal_pembayaran if do else None
+        raw_date_val = (
+            do.tanggal_pembayaran.strftime("%Y-%m-%d")
+            if do and do.tanggal_pembayaran
+            else (
+                inv.tanggal_transaksi.strftime("%Y-%m-%d")
+                if inv and inv.tanggal_transaksi
+                else (k.tanggal_kontrak.strftime("%Y-%m-%d") if k.tanggal_kontrak else "")
+            )
+        )
+
+        # Invoice-first flow: pembayaran + Superman sebelum DO — tampilkan data pembayaran di Laporan
+        if not do and inv and inv.pembayaran:
+            sorted_pays = sorted(
+                inv.pembayaran,
+                key=lambda p: (
+                    p.tanggal_pembayaran.isoformat() if p.tanggal_pembayaran else "",
+                    p.no_pembayaran or "",
+                ),
+            )
+            pay_nominal_total = sum(float(p.nominal_transfer or 0) for p in sorted_pays)
+            if pay_nominal_total > 0:
+                do_nominal = pay_nominal_total
+                pelunasan_do = float(total_do_nominal) if total_do_nominal > 0 else pay_nominal_total
+                no_pembayaran_val = sorted_pays[-1].no_pembayaran or no_pembayaran_val
+                tanggal_transfer_val = sorted_pays[-1].tanggal_pembayaran
+                if tanggal_transfer_val:
+                    raw_date_val = tanggal_transfer_val.strftime("%Y-%m-%d")
+
+                vol_base = k_vol_local
+                if is_payung_ba(k) and ba_ref and (ba_ref.volume_ba or 0) > 0:
+                    vol_base = float(ba_ref.volume_ba)
+                elif inv.nama_unit and hasattr(k, "units") and k.units:
+                    matched = next((u for u in k.units if u.nama_unit == inv.nama_unit), None)
+                    if matched and (matched.volume or 0) > 0:
+                        vol_base = float(matched.volume)
+                if k_harga_local > 0:
+                    do_volume = pay_nominal_total / k_harga_local
+                elif inv_gross > 0 and vol_base > 0:
+                    do_volume = vol_base * (pay_nominal_total / inv_gross)
+                if inv_gross > 0:
+                    pay_ratio = pay_nominal_total / inv_gross
+                    pendapatan_do = pokok_inv * pay_ratio
+                    ppn_do = ppn_inv * pay_ratio
+                    pph_do = pph_inv * pay_ratio
+                    pendapatan_setelah_ppn = round(pendapatan_do + ppn_do)
+                    if k_vol_local > 0:
+                        ratio_premi = do_volume / k_vol_local
+                        dpp_pokok = (k_harga_local * do_volume) + (k_premi * ratio_premi)
+                    else:
+                        dpp_pokok = (k_harga_local * do_volume) + k_premi
+
         return {
             "No_DO": do.no_do if do else "",
             "No_Pembayaran": no_pembayaran_val,
@@ -186,8 +238,8 @@ def _build_laporan_rows(db: Session):
             "Unit": unit_val,
             "Komoditi": k.komoditi or "",
             "Billing_Date": format_date(inv.tanggal_transaksi) if inv else format_date(k.tanggal_kontrak),
-            "Tanggal_Transfer": format_date(do.tanggal_pembayaran) if do else "",
-            "Raw_Date": (do.tanggal_pembayaran.strftime("%Y-%m-%d") if (do and do.tanggal_pembayaran) else (inv.tanggal_transaksi.strftime("%Y-%m-%d") if inv and inv.tanggal_transaksi else (k.tanggal_kontrak.strftime("%Y-%m-%d") if k.tanggal_kontrak else ""))),
+            "Tanggal_Transfer": format_date(tanggal_transfer_val) if tanggal_transfer_val else "",
+            "Raw_Date": raw_date_val,
             "Jumlah_Transfer": do_nominal,
             "Mitra_Pembeli": k.pembeli or "",
             "Deskripsi_Produk": jenis_komoditi_val,

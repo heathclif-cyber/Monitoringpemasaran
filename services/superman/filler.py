@@ -244,7 +244,14 @@ def _dismiss_swal_dialogs(page: Page, *, print_after: bool = False) -> None:
         text = popup.inner_text()
         lower = text.lower()
         if "belum terisi" in lower:
-            raise RuntimeError(f"Validasi Superman gagal: {text.strip()}")
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            short = next(
+                (ln for ln in lines if "belum terisi" in ln.lower() or "wajib" in ln.lower()),
+                lines[0] if lines else "",
+            )
+            if not short or len(short) > 240:
+                short = "Ada field wajib di form Superman yang belum terisi."
+            raise RuntimeError(f"Validasi Superman gagal: {short}")
 
         if popup.locator(".swal2-loading").count():
             page.wait_for_timeout(800)
