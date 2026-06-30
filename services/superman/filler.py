@@ -100,17 +100,72 @@ def _set_ckeditor(page: Page, editor_id: str, text: str) -> None:
     page.evaluate(
         """([editorId, value]) => {
             if (window.CKEDITOR && CKEDITOR.instances[editorId]) {
-                CKEDITOR.instances[editorId].setData(value);
+                const inst = CKEDITOR.instances[editorId];
+                inst.setData(value);
+                inst.updateElement();
                 return;
             }
             const el = document.getElementById(editorId);
             if (el) {
                 el.value = value;
                 el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
             }
         }""",
         [editor_id, text],
     )
+
+
+def _count_uploaded_docs(page: Page, input_selector: str) -> int:
+    return int(
+        page.evaluate(
+            """(inputSel) => {
+                const input = document.querySelector(inputSel);
+                if (input && input.files && input.files.length) return input.files.length;
+                const markers = [
+                    '#list_dokumen_pendukung_sppn li',
+                    '#list_dokumen_pendukung_sppb li',
+                    '#dokumen_pendukung_sppn_preview img',
+                    '#dokumen_pendukung_sppn_preview .file-name',
+                    '.dokumen-pendukung-sppn',
+                    '.dz-preview',
+                ];
+                for (const sel of markers) {
+                    const count = document.querySelectorAll(sel).length;
+                    if (count > 0) return count;
+                }
+                return 0;
+            }""",
+            input_selector,
+        )
+        or 0
+    )
+
+
+def _assert_line_item_ready(page: Page, isi_index: int, gl_code: str, nominal: int) -> None:
+    gl_val = page.locator(f"#sap_gl_sppn_id_{isi_index}").input_value(timeout=2000)
+    if not gl_val:
+        raise RuntimeError(f"GL {gl_code} belum terpilih di baris SPPn {isi_index}")
+    nominal_val = page.locator(f"#nominal_sppn_{isi_index}_1").input_value(timeout=2000)
+    if not nominal_val or int(float(nominal_val.replace(",", "") or 0)) <= 0:
+        raise RuntimeError(f"Nominal baris SPPn {isi_index} belum terisi")
+    if nominal_val.replace(",", "") != str(nominal):
+        page.fill(f"#nominal_sppn_{isi_index}_1", str(nominal))
+        page.locator(f"#nominal_sppn_{isi_index}_1").dispatch_event("keyup")
+        page.locator(f"#nominal_sppn_{isi_index}_1").dispatch_event("change")
+    uraian_val = page.evaluate(
+        """(editorId) => {
+            if (window.CKEDITOR && CKEDITOR.instances[editorId]) {
+                const text = CKEDITOR.instances[editorId].getData().replace(/<[^>]+>/g, '').trim();
+                if (text) return text;
+            }
+            const el = document.getElementById(editorId);
+            return (el && el.value ? el.value : '').trim();
+        }""",
+        f"ckeditors_{isi_index}_1",
+    )
+    if not uraian_val:
+        raise RuntimeError(f"Uraian baris SPPn {isi_index} belum terisi")
 
 
 def _fill_isi_sppn_block(page: Page, isi_index: int, item: LineItem) -> None:
@@ -128,6 +183,8 @@ def _fill_isi_sppn_block(page: Page, isi_index: int, item: LineItem) -> None:
     )
     page.fill(f"#nominal_sppn_{isi_index}_1", str(item.nominal))
     page.locator(f"#nominal_sppn_{isi_index}_1").dispatch_event("keyup")
+    page.locator(f"#nominal_sppn_{isi_index}_1").dispatch_event("change")
+    _assert_line_item_ready(page, isi_index, item.gl_code, item.nominal)
 
 
 def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None:
@@ -147,30 +204,48 @@ def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None
     page.locator(f"#nominal_sppb_{isi_index}_1").dispatch_event("keyup")
 
 
+def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
+    for path in paths:
+        page.set_input_files(input_selector, path)
+        page.wait_for_timeout(1200)
+        page.evaluate(
+            """(sel) => {
+                const input = document.querySelector(sel);
+                if (!input) return;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.jQuery) jQuery(input).trigger('change');
+            }""",
+            input_selector,
+        )
+        page.wait_for_timeout(800)
+
+
 def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool) -> None:
     paths = [str(path) for path in support_docs if path.exists()]
     if not paths:
         return
-    files = paths if len(paths) > 1 else paths[0]
     if combined:
         page.locator('a[href="#tab-informasi-sppb"]').click(force=True)
         page.wait_for_timeout(500)
-        page.set_input_files("#dokumen_pendukung_sppb", files)
+        _upload_files_to_input(page, "#dokumen_pendukung_sppb", paths)
         page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
         page.wait_for_timeout(500)
-        page.set_input_files("#dokumen_pendukung_sppn", files)
+        _upload_files_to_input(page, "#dokumen_pendukung_sppn", paths)
     else:
         page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
         page.wait_for_timeout(600)
-        page.set_input_files("#dokumen_pendukung_sppn", files)
+        _upload_files_to_input(page, "#dokumen_pendukung_sppn", paths)
+
+    page.wait_for_timeout(1500)
+    uploaded = _count_uploaded_docs(page, "#dokumen_pendukung_sppn")
+    if uploaded < len(paths):
+        raise RuntimeError(
+            f"Dokumen pendukung Superman belum terlampir ({uploaded}/{len(paths)} file). "
+            "Coba upload ulang Kontrak, Invoice, dan Rekening Koran."
+        )
 
     page.evaluate(
         """() => {
-            ['#dokumen_pendukung_sppb', '#dokumen_pendukung_sppn'].forEach((sel) => {
-                const input = document.querySelector(sel);
-                if (!input) return;
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-            });
             if (typeof bandingkan_dpp_sisa === 'function') {
                 bandingkan_dpp_sisa();
             }
@@ -225,6 +300,8 @@ def fill_sppn_draft(
         _fill_isi_sppn_block(page, idx, item)
 
     report(82, "Memvalidasi isian form")
+    page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
+    page.wait_for_timeout(600)
     page.evaluate("() => { if (typeof bandingkan_dpp_sisa === 'function') bandingkan_dpp_sisa(); }")
     page.wait_for_timeout(500)
 
@@ -243,13 +320,22 @@ def _dismiss_swal_dialogs(page: Page, *, print_after: bool = False) -> None:
 
         text = popup.inner_text()
         lower = text.lower()
-        if "belum terisi" in lower:
+        if "belum terisi" in lower or "belum lengkap" in lower:
+            details = popup.locator(".swal2-html-container li").all_inner_texts()
             lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
             short = next(
-                (ln for ln in lines if "belum terisi" in ln.lower() or "wajib" in ln.lower()),
+                (
+                    ln
+                    for ln in lines
+                    if "belum terisi" in ln.lower()
+                    or "belum lengkap" in ln.lower()
+                    or "wajib" in ln.lower()
+                ),
                 lines[0] if lines else "",
             )
-            if not short or len(short) > 240:
+            if details:
+                short = f"{short} — {', '.join(details[:5])}"
+            elif not short or len(short) > 240:
                 short = "Ada field wajib di form Superman yang belum terisi."
             raise RuntimeError(f"Validasi Superman gagal: {short}")
 

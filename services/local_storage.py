@@ -17,6 +17,7 @@ DOC_TYPE_SUBFOLDERS: dict[str, str] = {
     "kontrak": "Kontrak",
     "invoice": "Invoice",
     "kuitansi": "Invoice/Kuitansi",
+    "rekening_koran": "Invoice/Rekening-Koran",
     "do": "DO",
     "deklarasi": "Deklarasi",
     "berita_acara": "Berita-Acara",

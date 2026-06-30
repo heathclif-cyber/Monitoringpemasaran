@@ -530,7 +530,9 @@ def build_payload_from_invoice(no_invoice: str) -> DeklarasiPayload:
         ppn_full = pokok_full * ppn_rate if is_ppn else 0.0
         nilai_unit_penuh = inv_gross if inv_gross > 0 else (pokok_full + ppn_full)
 
-        if nilai_unit_penuh > 0 and volume_for_calc > 0:
+        if harga > 0 and inv_gross > 0:
+            volume_do = inv_gross / harga
+        elif nilai_unit_penuh > 0 and volume_for_calc > 0:
             volume_do = volume_for_calc
         else:
             volume_do = volume_for_calc * pay_ratio
