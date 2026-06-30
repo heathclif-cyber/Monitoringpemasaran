@@ -283,7 +283,7 @@ export default function PembayaranPage() {
     }
   }
 
-  const onSubmit = async (data: PembayaranFormData) => {
+  const savePembayaran = async (data: PembayaranFormData, triggerSuperman: boolean) => {
     try {
       const payload: PembayaranInput = {
         no_invoice: data.no_invoice,
@@ -295,8 +295,7 @@ export default function PembayaranPage() {
         payload.no_pembayaran = savedNo
       }
 
-      const willTriggerSuperman = willCompleteInvoice && !invoiceSuperman
-      if (willTriggerSuperman) {
+      if (triggerSuperman) {
         let fresh: Awaited<ReturnType<typeof fetchDocRequirements>>
         try {
           fresh = await fetchDocRequirements(data.no_invoice)
@@ -315,7 +314,7 @@ export default function PembayaranPage() {
           addNotification(
             missing
               ? `Dokumen wajib belum lengkap: ${missing}`
-              : 'Upload dokumen Kontrak dan Invoice sebelum melunasi invoice.',
+              : 'Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.',
             'warning',
           )
           return
@@ -330,7 +329,7 @@ export default function PembayaranPage() {
       setInvoicePembayaran(updated)
       await fetchInvoiceContext(data.no_invoice)
 
-      if (willTriggerSuperman) {
+      if (triggerSuperman) {
         addNotification('Invoice lunas — memulai deklarasi Superman...', 'info')
         await startSupermanFlow(data.no_invoice)
       }
@@ -340,25 +339,28 @@ export default function PembayaranPage() {
     }
   }
 
+  const onSaveOnly = handleSubmit((data) => savePembayaran(data, false))
+  const onSaveAndSuperman = handleSubmit((data) => savePembayaran(data, true))
+
   const handleReset = () => {
     reset()
     setIsExisting(false)
     setSavedNo(null)
   }
 
-  const submitLabel = (() => {
+  const saveOnlyLabel = (() => {
     if (!canEdit()) return 'Read-Only (Tamu)'
     if (isSubmitting || supermanRunning) return 'Memproses...'
-    if (willCompleteInvoice && !invoiceSuperman) {
-      return 'Catat Pembayaran dan Buat Deklarasi Superman'
-    }
     if (isExisting) return 'Simpan Perubahan'
     return 'Catat Pembayaran'
   })()
 
+  const showSupermanSaveOption = willCompleteInvoice && !invoiceSuperman && canEdit()
+  const actionsBusy = isSubmitting || supermanRunning
+
   return (
     <div className="max-w-3xl">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
+      <form onSubmit={(e) => e.preventDefault()} className="space-y-6" autoComplete="off">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">Pilih Invoice</CardTitle>
@@ -385,7 +387,7 @@ export default function PembayaranPage() {
                 </p>
                 {!invoiceSuperman && (
                   <p className="text-xs text-slate-400 mt-1">
-                    Deklarasi Superman dibuat otomatis saat seluruh pembayaran invoice lunas.
+                    Catat pembayaran dulu. Superman dibuat terpisah setelah invoice lunas dan dokumen wajib lengkap.
                   </p>
                 )}
               </div>
@@ -573,14 +575,30 @@ export default function PembayaranPage() {
 
         <div className="flex flex-wrap gap-3">
           {!isInvoiceLocked && (
-            <Button
-              type="submit"
-              disabled={isSubmitting || supermanRunning || !canEdit()}
-              className="gap-2"
-            >
-              {supermanRunning ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              {submitLabel}
-            </Button>
+            <>
+              <Button
+                type="button"
+                disabled={actionsBusy || !canEdit()}
+                className="gap-2"
+                onClick={() => void onSaveOnly()}
+              >
+                {actionsBusy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {saveOnlyLabel}
+              </Button>
+              {showSupermanSaveOption && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={actionsBusy || !docsReady}
+                  className="gap-2"
+                  onClick={() => void onSaveAndSuperman()}
+                  title={!docsReady ? 'Upload dokumen wajib terlebih dahulu' : undefined}
+                >
+                  {supermanRunning ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  Catat Pembayaran dan Buat Deklarasi Superman
+                </Button>
+              )}
+            </>
           )}
           <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
             <RotateCcw size={14} /> Reset
