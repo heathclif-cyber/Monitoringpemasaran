@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -133,6 +134,11 @@ def _set_ckeditor(page: Page, editor_id: str, text: str) -> None:
     )
 
 
+def _parse_id_number(value: str) -> int:
+    digits = re.sub(r"[^\d]", "", value or "")
+    return int(digits or 0)
+
+
 def _count_uploaded_docs(page: Page, input_selector: str) -> int:
     return int(
         page.evaluate(
@@ -164,9 +170,9 @@ def _assert_line_item_ready(page: Page, isi_index: int, gl_code: str, nominal: i
     if not gl_val:
         raise RuntimeError(f"GL {gl_code} belum terpilih di baris SPPn {isi_index}")
     nominal_val = page.locator(f"#nominal_sppn_{isi_index}_1").input_value(timeout=2000)
-    if not nominal_val or int(float(nominal_val.replace(",", "") or 0)) <= 0:
+    if _parse_id_number(nominal_val) <= 0:
         raise RuntimeError(f"Nominal baris SPPn {isi_index} belum terisi")
-    if nominal_val.replace(",", "") != str(nominal):
+    if _parse_id_number(nominal_val) != int(nominal):
         page.fill(f"#nominal_sppn_{isi_index}_1", str(nominal))
         page.locator(f"#nominal_sppn_{isi_index}_1").dispatch_event("keyup")
         page.locator(f"#nominal_sppn_{isi_index}_1").dispatch_event("change")
