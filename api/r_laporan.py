@@ -330,11 +330,15 @@ def _build_laporan_rows(db: Session):
                 )
             ),
             "Superman": superman_val,
-            "Kontrak_SAP": do.kontrak_sap if do else "",
-            "SO_SAP": do.so_sap if do else "",
-            "DO_SAP": do.do_sap if do else "",
-            "Billing": do.billing_sap if do else "",
-            "Link_Deklarasi_Penerimaan": do.link_deklarasi_penerimaan if do else "",
+            "Kontrak_SAP": (
+                do.kontrak_sap if do else (inv.kontrak_sap if inv else "")
+            ) or "",
+            "SO_SAP": (do.so_sap if do else (inv.so_sap if inv else "")) or "",
+            "DO_SAP": (do.do_sap if do else (inv.do_sap if inv else "")) or "",
+            "Billing": (do.billing_sap if do else (inv.billing_sap if inv else "")) or "",
+            "Link_Deklarasi_Penerimaan": (
+                do.link_deklarasi_penerimaan if do else (inv.link_deklarasi_penerimaan if inv else "")
+            ) or "",
             "Link_Berita_Acara_Serah_Terima": do.link_berita_acara_serah_terima if do else "",
             "Dokumen_Superman": dokumen_superman,
             "Dokumen_Superman_Siap": dokumen_superman_siap,
@@ -437,37 +441,47 @@ def get_laporan(fresh: bool = Query(False, description="Lewati cache — dipakai
     finally:
         db.close()
 
+def _apply_sap_fields(entity, data: dict) -> None:
+    if "Superman" in data:
+        entity.superman = data["Superman"]
+    if "Kontrak_SAP" in data:
+        entity.kontrak_sap = data["Kontrak_SAP"]
+    if "SO_SAP" in data:
+        entity.so_sap = data["SO_SAP"]
+    if "DO_SAP" in data:
+        entity.do_sap = data["DO_SAP"]
+    if "Billing" in data:
+        entity.billing_sap = data["Billing"]
+    if "Link_Deklarasi_Penerimaan" in data:
+        entity.link_deklarasi_penerimaan = data["Link_Deklarasi_Penerimaan"]
+    if hasattr(entity, "link_berita_acara_serah_terima") and "Link_Berita_Acara_Serah_Terima" in data:
+        entity.link_berita_acara_serah_terima = data["Link_Berita_Acara_Serah_Terima"]
+
+
 @router.put("/update-sap")
 def update_sap_fields(data: dict, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
-    no_do = data.get("No_DO")
-    if not no_do:
-        return {"success": False, "message": "No. DO diperlukan"}
-    
+    no_do = (data.get("No_DO") or "").strip()
+    no_invoice = (data.get("No_Invoice") or "").strip()
+
     if no_do.startswith("BYPASS-"):
         bypass_id = int(no_do.replace("BYPASS-", ""))
         rec = db.query(models.LaporanBypass).filter(models.LaporanBypass.id == bypass_id).first()
-        if not rec: return {"success": False, "message": "Data bypass tidak ditemukan"}
-        
-        if "Superman" in data: rec.superman = data["Superman"]
-        if "Kontrak_SAP" in data: rec.kontrak_sap = data["Kontrak_SAP"]
-        if "SO_SAP" in data: rec.so_sap = data["SO_SAP"]
-        if "DO_SAP" in data: rec.do_sap = data["DO_SAP"]
-        if "Billing" in data: rec.billing_sap = data["Billing"]
-        if "Link_Deklarasi_Penerimaan" in data: rec.link_deklarasi_penerimaan = data["Link_Deklarasi_Penerimaan"]
-    else:
+        if not rec:
+            return {"success": False, "message": "Data bypass tidak ditemukan"}
+        _apply_sap_fields(rec, data)
+    elif no_do:
         do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == no_do).first()
         if not do:
             return {"success": False, "message": "Data DO tidak ditemukan"}
-        
-        # Update fields
-        if "Superman" in data: do.superman = data["Superman"]
-        if "Kontrak_SAP" in data: do.kontrak_sap = data["Kontrak_SAP"]
-        if "SO_SAP" in data: do.so_sap = data["SO_SAP"]
-        if "DO_SAP" in data: do.do_sap = data["DO_SAP"]
-        if "Billing" in data: do.billing_sap = data["Billing"]
-        if "Link_Deklarasi_Penerimaan" in data: do.link_deklarasi_penerimaan = data["Link_Deklarasi_Penerimaan"]
-        if "Link_Berita_Acara_Serah_Terima" in data: do.link_berita_acara_serah_terima = data["Link_Berita_Acara_Serah_Terima"]
-    
+        _apply_sap_fields(do, data)
+    elif no_invoice and no_invoice != "-":
+        inv = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
+        if not inv:
+            return {"success": False, "message": "Invoice tidak ditemukan"}
+        _apply_sap_fields(inv, data)
+    else:
+        return {"success": False, "message": "No. DO atau Invoice diperlukan"}
+
     db.commit()
     api_cache.invalidate_reporting()
     return {"success": True}

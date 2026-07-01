@@ -119,6 +119,13 @@ class Invoice(Base):
     terbilang_invoice = Column(String)
     superman = Column(String, nullable=True)
 
+    # SAP fields — disimpan di invoice jika DO belum dibuat (alur invoice-first)
+    kontrak_sap = Column(String, nullable=True)
+    so_sap = Column(String, nullable=True)
+    do_sap = Column(String, nullable=True)
+    billing_sap = Column(String, nullable=True)
+    link_deklarasi_penerimaan = Column(String, nullable=True)
+
     kontrak = relationship("Kontrak", back_populates="invoices")
     berita_acara = relationship("BeritaAcara", back_populates="invoice", foreign_keys=[no_ba])
     pembayaran = relationship("Pembayaran", back_populates="invoice", cascade="all, delete-orphan")

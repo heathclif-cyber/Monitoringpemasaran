@@ -141,6 +141,17 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
         do_payload["no_ba"] = db_ba.no_ba
         do_payload["rencana_pengambilan"] = db_ba.tanggal_ba
 
+    for sap_field in (
+        "kontrak_sap",
+        "so_sap",
+        "do_sap",
+        "billing_sap",
+        "link_deklarasi_penerimaan",
+    ):
+        inv_val = getattr(db_invoice, sap_field, None) if db_invoice else None
+        if inv_val and str(inv_val).strip():
+            do_payload[sap_field] = inv_val
+
     rounded_volume = round(volume_do)
     db_do = db.query(models.DeliveryOrder).filter(models.DeliveryOrder.no_do == do.no_do).first()
     if db_do:

@@ -2,6 +2,22 @@ import { create } from 'zustand'
 import { client } from '@/lib/client'
 import type { LaporanRow, BypassInput, SupermanDeklarasiResult } from '@/types'
 
+export function matchLaporanRow(row: LaporanRow, key: LaporanRowKey): boolean {
+  if (key.noDo) return row.No_DO === key.noDo
+  if (key.noInvoice) return !row.No_DO && row.No_Invoice === key.noInvoice
+  return false
+}
+
+export function laporanRowKey(row: LaporanRow): LaporanRowKey {
+  return { noDo: row.No_DO || '', noInvoice: row.No_Invoice || '' }
+}
+
+export function canSaveSapFields(row: LaporanRow): boolean {
+  if (row.No_DO.startsWith('BYPASS-')) return true
+  if (row.No_DO) return true
+  return !!(row.No_Invoice && row.No_Invoice !== '-')
+}
+
 export function supermanLabelFromResult(result: SupermanDeklarasiResult): string | null {
   const saved = (result.superman_saved || '').trim()
   if (saved) return saved
@@ -11,12 +27,17 @@ export function supermanLabelFromResult(result: SupermanDeklarasiResult): string
   return parts.length > 0 ? parts.join(' + ') : null
 }
 
+export interface LaporanRowKey {
+  noDo: string
+  noInvoice: string
+}
+
 interface LaporanStore {
   rows: LaporanRow[]
   isLoading: boolean
   fetch: (opts?: { fresh?: boolean; silent?: boolean }) => Promise<void>
-  patchRow: (noDo: string, patch: Partial<LaporanRow>) => void
-  updateSapField: (noDo: string, field: string, value: string) => Promise<void>
+  patchRow: (key: LaporanRowKey, patch: Partial<LaporanRow>) => void
+  updateSapField: (key: LaporanRowKey, field: string, value: string) => Promise<void>
   createBypass: (input: BypassInput) => Promise<void>
   updateBypass: (id: number, input: BypassInput) => Promise<void>
   deleteBypass: (id: number) => Promise<void>
@@ -39,18 +60,28 @@ export const useLaporanStore = create<LaporanStore>((set, get) => ({
     }
   },
 
-  patchRow: (noDo, patch) => {
+  patchRow: (key, patch) => {
     set((state) => ({
-      rows: state.rows.map((row) => (row.No_DO === noDo ? { ...row, ...patch } : row)),
+      rows: state.rows.map((row) => (
+        matchLaporanRow(row, key) ? { ...row, ...patch } : row
+      )),
     }))
   },
 
-  updateSapField: async (noDo: string, field: string, value: string) => {
+  updateSapField: async (key, field, value) => {
+    const body: Record<string, string> = { [field]: value }
+    if (key.noDo) body.No_DO = key.noDo
+    else if (key.noInvoice) body.No_Invoice = key.noInvoice
+    else throw new Error('No. DO atau Invoice diperlukan')
+
     try {
-      await client.put('/api/laporan/update-sap', {
-        No_DO: noDo,
-        [field]: value,
-      })
+      const result = await client.put<{ success: boolean; message?: string }>(
+        '/api/laporan/update-sap',
+        body,
+      )
+      if (!result.success) {
+        throw new Error(result.message || 'Gagal menyimpan data SAP')
+      }
     } catch (err) {
       console.error('[laporanStore.updateSapField]', err)
       throw err

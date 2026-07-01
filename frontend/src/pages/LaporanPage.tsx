@@ -14,7 +14,11 @@ import {
   SlidersHorizontal,
   CheckCircle2,
 } from 'lucide-react'
-import { useLaporanStore } from '@/store/laporanStore'
+import {
+  useLaporanStore,
+  canSaveSapFields,
+  laporanRowKey,
+} from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -201,13 +205,18 @@ export default function LaporanPage() {
     return n
   }, [filters])
 
-  const handleSapSave = async (noDo: string, field: string, value: string) => {
-    if (!value.trim()) return
+  const handleSapSave = async (row: LaporanRow, field: string, value: string) => {
+    if (!canSaveSapFields(row)) {
+      addNotification('Belum ada DO/Invoice — nomor SAP tidak bisa disimpan', 'error')
+      return
+    }
     try {
-      await updateSapField(noDo, field, value)
+      await updateSapField(laporanRowKey(row), field, value)
+      patchRow(laporanRowKey(row), { [field]: value } as Partial<LaporanRow>)
       addNotification(`${field} tersimpan`, 'success')
-    } catch {
-      addNotification('Gagal menyimpan', 'error')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal menyimpan'
+      addNotification(msg, 'error')
     }
   }
 
@@ -563,7 +572,7 @@ export default function LaporanPage() {
                         key={`${row.No_DO}-${idx}`}
                         row={row}
                         isBypass={isBypass}
-                        onSapSave={handleSapSave}
+                        onSapSave={(field, value) => handleSapSave(row, field, value)}
                         onDeleteBypass={(noDo, id) => {
                           setDeleteTarget(noDo)
                           setDeleteId(id)
@@ -608,7 +617,7 @@ function LaporanTableRow({
 }: {
   row: LaporanRow
   isBypass: boolean
-  onSapSave: (noDo: string, field: string, value: string) => Promise<void>
+  onSapSave: (field: string, value: string) => Promise<void>
   onDeleteBypass: (noDo: string, id: number) => void
 }) {
   const canEdit = useAuthStore((s) => s.canEdit)
@@ -629,7 +638,15 @@ function LaporanTableRow({
           ? 'bg-amber-50 group-hover:bg-amber-100 dark:bg-amber-950 dark:group-hover:bg-amber-900'
           : 'bg-card group-hover:bg-muted',
       )}>
-        {row.No_DO}
+        {row.No_DO ? (
+          row.No_DO
+        ) : (
+          <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium dark:bg-amber-900/50">
+              Belum DO
+            </span>
+          </span>
+        )}
       </td>
       <td className={cn(
         TD,
@@ -710,21 +727,34 @@ function LaporanTableRow({
           <span className="text-[12px] text-muted-foreground">Belum</span>
         )}
       </td>
-      {(['Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const).map((field) => (
-        <td key={field} className={cn(TD, 'min-w-[7.5rem]')}>
-          <input
-            className={TD_INPUT}
-            defaultValue={row[field] || ''}
-            readOnly={!canEdit()}
-            onBlur={(e) => {
-              if (canEdit() && e.target.value !== (row[field] || '')) {
-                onSapSave(row.No_DO, field, e.target.value)
+      {(['Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const).map((field) => {
+        const sapEditable = canEdit() && canSaveSapFields(row)
+        return (
+          <td key={field} className={cn(TD, 'min-w-[7.5rem]')}>
+            <input
+              className={cn(
+                TD_INPUT,
+                !sapEditable && 'opacity-60 cursor-not-allowed bg-muted/40',
+              )}
+              defaultValue={row[field] || ''}
+              readOnly={!sapEditable}
+              title={
+                !canSaveSapFields(row)
+                  ? 'Simpan ke invoice — tersedia setelah ada nomor invoice'
+                  : !row.No_DO
+                    ? 'Disimpan sementara di invoice (DO belum dibuat)'
+                    : undefined
               }
-            }}
-            placeholder="-"
-          />
-        </td>
-      ))}
+              onBlur={(e) => {
+                if (sapEditable && e.target.value !== (row[field] || '')) {
+                  void onSapSave(field, e.target.value)
+                }
+              }}
+              placeholder={sapEditable ? '-' : '—'}
+            />
+          </td>
+        )
+      })}
       <td className={cn(TD, 'text-center min-w-[6.5rem]')}>
         {isBypass && canEdit() ? (
           <div className="flex gap-1 justify-center">

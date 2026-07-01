@@ -108,6 +108,11 @@ def run_migrations() -> None:
         add_column_safely(db, "delivery_order", "no_pembayaran", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "pembayaran", "superman", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "invoice", "superman", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "invoice", "kontrak_sap", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "invoice", "so_sap", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "invoice", "do_sap", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "invoice", "billing_sap", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "invoice", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
 
         db.execute(text(
             "UPDATE invoice i SET superman = sub.superman "
