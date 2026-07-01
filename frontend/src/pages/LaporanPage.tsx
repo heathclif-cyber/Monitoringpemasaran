@@ -207,7 +207,7 @@ export default function LaporanPage() {
 
   const handleSapSave = async (row: LaporanRow, field: string, value: string) => {
     if (!canSaveSapFields(row)) {
-      addNotification('Belum ada DO/Invoice — nomor SAP tidak bisa disimpan', 'error')
+      addNotification('Belum ada invoice — nomor SAP tidak bisa disimpan', 'error')
       return
     }
     try {
@@ -507,7 +507,7 @@ export default function LaporanPage() {
           <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-sm font-semibold">Tabel Laporan</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Scroll horizontal · edit langsung di kolom SAP
+              Scroll horizontal · nomor SAP diisi per invoice (DO belum wajib)
             </p>
           </div>
         </CardHeader>
@@ -740,9 +740,9 @@ function LaporanTableRow({
               readOnly={!sapEditable}
               title={
                 !canSaveSapFields(row)
-                  ? 'Simpan ke invoice — tersedia setelah ada nomor invoice'
+                  ? 'Isi nomor invoice terlebih dahulu'
                   : !row.No_DO
-                    ? 'Disimpan sementara di invoice (DO belum dibuat)'
+                    ? 'Disimpan berdasarkan invoice (belum ada DO)'
                     : undefined
               }
               onBlur={(e) => {
