@@ -177,6 +177,17 @@ def _build_laporan_rows(db: Session):
 
         volume_invoice = _compute_volume_invoice(k, inv, ba_ref)
 
+        ppn_persen_val = (
+            float(getattr(k, "ppn_persen", 0) or 0)
+            if str(getattr(k, "is_ppn", "true")).lower() != "false"
+            else 0.0
+        )
+        pph_persen_val = (
+            float(getattr(k, "pph_persen", 0) or 0)
+            if str(getattr(k, "is_pph", "false")).lower() == "true"
+            else 0.0
+        )
+
         # Unit: prioritas — BA.nama_unit > DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen
         unit_val = ""
         if ba_ref and getattr(ba_ref, "nama_unit", None):
@@ -294,6 +305,8 @@ def _build_laporan_rows(db: Session):
             "Harga_Satuan": k_harga_local,
             "Volume_Invoice": volume_invoice,
             "Jumlah_DO": do_volume,
+            "PPN_Persen": ppn_persen_val,
+            "PPh_Persen": pph_persen_val,
             "Pendapatan_Pokok": round(pendapatan_do),
             "Pendapatan_Setelah_PPN": pendapatan_setelah_ppn,
             "DPP_Pokok": round(dpp_pokok),
@@ -385,6 +398,8 @@ def _build_laporan_rows(db: Session):
             "Harga_Satuan": (b.nominal / b.volume) if (b.volume and b.volume > 0) else 0,
             "Volume_Invoice": b.volume or 0,
             "Jumlah_DO": b.volume or 0,
+            "PPN_Persen": 0,
+            "PPh_Persen": 0,
             "Satuan": b.satuan or "Kg",
             "Pendapatan_Pokok": b.nominal or 0,
             "Pendapatan_Setelah_PPN": b.nominal or 0,

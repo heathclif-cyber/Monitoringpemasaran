@@ -42,7 +42,7 @@ import {
 } from '@/utils/laporanUtils'
 import { formatCurrency, formatNumber, formatDate, safe, cn } from '@/lib/utils'
 import type { LaporanRow } from '@/types'
-import * as XLSX from 'xlsx'
+import { exportLaporanExcel } from '@/utils/laporanExport'
 
 /** Kepadatan seimbang — antara padat & lega, nominal penuh tanpa ellipsis */
 const TH = 'px-3 py-2.5 text-[13px] font-semibold whitespace-nowrap'
@@ -224,10 +224,10 @@ export default function LaporanPage() {
   }
 
   const handleExportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(sorted)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Laporan')
-    XLSX.writeFile(wb, `Laporan_Digital_${periodLabel.replace(/\s+/g, '_')}.xlsx`)
+    exportLaporanExcel(
+      sorted,
+      `Laporan_Digital_${periodLabel.replace(/\s+/g, '_')}.xlsx`,
+    )
   }
 
   const handleResetFilters = () => setFilters(createDefaultLaporanFilters())
