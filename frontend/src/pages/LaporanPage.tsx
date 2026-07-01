@@ -17,6 +17,7 @@ import {
 import {
   useLaporanStore,
   canSaveSapFields,
+  isInvoiceOnlySapRow,
   laporanRowKey,
 } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
@@ -640,12 +641,20 @@ function LaporanTableRow({
       )}>
         {row.No_DO ? (
           row.No_DO
-        ) : (
-          <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
+        ) : row.No_Invoice ? (
+          <span
+            className="inline-flex flex-col gap-0.5 text-amber-700 dark:text-amber-400"
+            title="Invoice sudah ada — kolom SAP di kanan bisa langsung diisi"
+          >
             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium dark:bg-amber-900/50">
               Belum DO
             </span>
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
+              SAP via invoice
+            </span>
           </span>
+        ) : (
+          <span className="text-muted-foreground text-[12px]">—</span>
         )}
       </td>
       <td className={cn(
@@ -729,20 +738,23 @@ function LaporanTableRow({
       </td>
       {(['Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const).map((field) => {
         const sapEditable = canEdit() && canSaveSapFields(row)
+        const invoiceOnly = isInvoiceOnlySapRow(row)
         return (
           <td key={field} className={cn(TD, 'min-w-[7.5rem]')}>
             <input
+              key={`${row.No_Invoice}-${row.No_DO}-${field}-${row[field] || ''}`}
               className={cn(
                 TD_INPUT,
                 !sapEditable && 'opacity-60 cursor-not-allowed bg-muted/40',
+                sapEditable && invoiceOnly && 'border-emerald-300/80 bg-emerald-50/40 dark:border-emerald-800 dark:bg-emerald-950/20',
               )}
               defaultValue={row[field] || ''}
               readOnly={!sapEditable}
               title={
                 !canSaveSapFields(row)
-                  ? 'Isi nomor invoice terlebih dahulu'
-                  : !row.No_DO
-                    ? 'Disimpan berdasarkan invoice (belum ada DO)'
+                  ? 'Buat invoice terlebih dahulu'
+                  : invoiceOnly
+                    ? 'Disimpan ke invoice — bisa diisi sebelum DO dibuat'
                     : undefined
               }
               onBlur={(e) => {
@@ -750,7 +762,7 @@ function LaporanTableRow({
                   void onSapSave(field, e.target.value)
                 }
               }}
-              placeholder={sapEditable ? '-' : '—'}
+              placeholder={sapEditable ? (invoiceOnly ? 'Isi SAP' : '-') : '—'}
             />
           </td>
         )

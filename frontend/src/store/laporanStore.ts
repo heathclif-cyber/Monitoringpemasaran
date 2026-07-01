@@ -8,14 +8,25 @@ export function matchLaporanRow(row: LaporanRow, key: LaporanRowKey): boolean {
   return false
 }
 
+/** Kunci penyimpanan SAP: DO jika ada, selain itu invoice (aturan invoice-first). */
 export function laporanRowKey(row: LaporanRow): LaporanRowKey {
-  return { noDo: row.No_DO || '', noInvoice: row.No_Invoice || '' }
+  const noDo = (row.No_DO || '').trim()
+  if (noDo.startsWith('BYPASS-') || noDo) {
+    return { noDo, noInvoice: '' }
+  }
+  return { noDo: '', noInvoice: (row.No_Invoice || '').trim() }
 }
 
+/** SAP bisa diisi setelah invoice dibuat — DO tidak wajib. */
 export function canSaveSapFields(row: LaporanRow): boolean {
-  if (row.No_DO.startsWith('BYPASS-')) return true
-  if (row.No_DO) return true
-  return !!(row.No_Invoice && row.No_Invoice !== '-')
+  if ((row.No_DO || '').startsWith('BYPASS-')) return true
+  if ((row.No_DO || '').trim()) return true
+  const inv = (row.No_Invoice || '').trim()
+  return !!inv && inv !== '-'
+}
+
+export function isInvoiceOnlySapRow(row: LaporanRow): boolean {
+  return canSaveSapFields(row) && !(row.No_DO || '').trim()
 }
 
 export function supermanLabelFromResult(result: SupermanDeklarasiResult): string | null {
@@ -81,6 +92,9 @@ export const useLaporanStore = create<LaporanStore>((set, get) => ({
       )
       if (!result.success) {
         throw new Error(result.message || 'Gagal menyimpan data SAP')
+      }
+      if (!key.noDo && key.noInvoice) {
+        await get().fetch({ fresh: true, silent: true })
       }
     } catch (err) {
       console.error('[laporanStore.updateSapField]', err)
