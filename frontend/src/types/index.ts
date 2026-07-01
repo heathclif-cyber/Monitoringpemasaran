@@ -233,6 +233,7 @@ export interface LaporanRow {
   Deskripsi_Produk: string
   Jumlah_Invoice: number
   Harga_Satuan: number
+  Volume_Invoice: number
   Jumlah_DO: number
   Pendapatan_Pokok: number
   Pendapatan_Setelah_PPN: number

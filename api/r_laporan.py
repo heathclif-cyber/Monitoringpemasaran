@@ -9,7 +9,12 @@ import models
 from database import get_db, SessionLocal
 from services.auth import require_write
 from services.cache import api_cache
-from services.ba_utils import is_payung_ba, ba_effective_harga
+from services.ba_utils import (
+    is_payung_ba,
+    ba_effective_harga,
+    calculate_ba_invoice_amount,
+    kontrak_nilai_maksimum,
+)
 from services.superman.documents import (
     superman_doc_requirements_for_do,
     superman_doc_requirements_for_pembayaran,
@@ -26,6 +31,42 @@ def get_bulan_buku(d):
     months = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
               "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     return f"{d.month:02d}-{months[d.month]}"
+
+
+def _invoice_volume_scope(k, inv, ba_ref):
+    k_vol = float(k.volume or 0)
+    vol_base = k_vol
+    nilai_penuh = kontrak_nilai_maksimum(k)
+
+    if is_payung_ba(k) and ba_ref and (ba_ref.volume_ba or 0) > 0:
+        vol_base = float(ba_ref.volume_ba)
+        nilai_penuh = float(
+            calculate_ba_invoice_amount(k, vol_base, ba_effective_harga(ba_ref, k))
+        )
+    elif inv and inv.nama_unit and hasattr(k, "units") and k.units:
+        matched = next((u for u in k.units if u.nama_unit == inv.nama_unit), None)
+        if matched and (matched.volume or 0) > 0:
+            vol_base = float(matched.volume)
+            if k_vol > 0:
+                unit_ratio = vol_base / k_vol
+                pokok_full = (k_vol * float(k.harga_satuan or 0)) + float(k.premi or 0)
+                ppn_full = 0.0
+                if str(getattr(k, "is_ppn", "true")).lower() == "true":
+                    ppn_full = pokok_full * (float(k.ppn_persen or 0) / 100)
+                nilai_penuh = (pokok_full + ppn_full) * unit_ratio
+
+    return vol_base, nilai_penuh
+
+
+def _compute_volume_invoice(k, inv, ba_ref):
+    vol_base, nilai_penuh = _invoice_volume_scope(k, inv, ba_ref)
+    if not inv:
+        return vol_base
+    inv_gross = float(inv.jumlah_pembayaran or 0)
+    if nilai_penuh > 0 and inv_gross > 0:
+        return vol_base * (inv_gross / nilai_penuh)
+    return vol_base
+
 
 def _build_laporan_rows(db: Session):
     kontraks = db.query(models.Kontrak).options(
@@ -133,6 +174,8 @@ def _build_laporan_rows(db: Session):
         if is_payung_ba(k) and ba_ref:
             k_harga_local = ba_effective_harga(ba_ref, k)
             k_premi = 0.0
+
+        volume_invoice = _compute_volume_invoice(k, inv, ba_ref)
 
         # Unit: prioritas — BA.nama_unit > DO.kepada_unit > Invoice.nama_unit > Kontrak.kebun_produsen
         unit_val = ""
@@ -249,6 +292,7 @@ def _build_laporan_rows(db: Session):
             "Deskripsi_Produk": jenis_komoditi_val,
             "Jumlah_Invoice": float(inv.jumlah_pembayaran or 0) if inv else 0,
             "Harga_Satuan": k_harga_local,
+            "Volume_Invoice": volume_invoice,
             "Jumlah_DO": do_volume,
             "Pendapatan_Pokok": round(pendapatan_do),
             "Pendapatan_Setelah_PPN": pendapatan_setelah_ppn,
@@ -339,6 +383,7 @@ def _build_laporan_rows(db: Session):
             "Deskripsi_Produk": b.deskripsi or "",
             "Jumlah_Invoice": 0,
             "Harga_Satuan": (b.nominal / b.volume) if (b.volume and b.volume > 0) else 0,
+            "Volume_Invoice": b.volume or 0,
             "Jumlah_DO": b.volume or 0,
             "Satuan": b.satuan or "Kg",
             "Pendapatan_Pokok": b.nominal or 0,

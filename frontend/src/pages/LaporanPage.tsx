@@ -519,7 +519,7 @@ export default function LaporanPage() {
             </div>
           ) : (
             <div className="overflow-auto max-h-[76vh]">
-              <table className="text-[13px] border-separate border-spacing-0 w-full" style={{ minWidth: '4300px' }}>
+              <table className="text-[13px] border-separate border-spacing-0 w-full" style={{ minWidth: '4420px' }}>
                 <thead>
                   <tr className="text-muted-foreground">
                     <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_DO, FROZEN_W_DO, 'text-left')}>No. DO</th>
@@ -536,6 +536,7 @@ export default function LaporanPage() {
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[12rem]')}>Jenis Material</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jml Invoice</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Harga Satuan</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[7.5rem]')}>Volume Invoice</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[7.5rem]')}>Jumlah DO</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Pendapatan Pokok</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Setelah PPN</th>
@@ -668,6 +669,7 @@ function LaporanTableRow({
         {row.Jumlah_Invoice > 0 ? formatCurrency(row.Jumlah_Invoice) : '-'}
       </td>
       <MoneyCell value={row.Harga_Satuan} />
+      <td className={cn(TD_MONEY, 'font-medium')}>{formatNumber(row.Volume_Invoice)}</td>
       <td className={cn(TD_MONEY, 'font-medium')}>{formatNumber(row.Jumlah_DO)}</td>
       <MoneyCell value={row.Pendapatan_Pokok} />
       <MoneyCell value={row.Pendapatan_Setelah_PPN} />
