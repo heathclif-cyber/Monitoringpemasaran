@@ -285,7 +285,7 @@ export default function LaporanPage() {
           fitValue
           label="Harga Rata-Rata"
           value={`${formatCurrency(summary.hargaRataKg)}/Kg`}
-          subtitle={`${formatCurrency(summary.hargaRataButir)}/Butir`}
+          subtitle={`${formatCurrency(summary.hargaRataButir)}/Butir · Σ(harga×vol)/Σvol`}
           icon={BarChart3}
         />
         <StatCard

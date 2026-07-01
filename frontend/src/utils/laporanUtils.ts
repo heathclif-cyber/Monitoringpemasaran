@@ -111,6 +111,13 @@ export interface LaporanSummary {
   totalPphNominals: number
 }
 
+function summaryRowKey(row: LaporanRow): string | null {
+  if (row.No_DO.startsWith('BYPASS-')) return row.No_DO
+  if (row.No_Invoice && row.No_Invoice !== '-') return `INV-${row.No_Invoice}`
+  if (row.No_Kontrak && row.No_Kontrak !== '-') return `KONTRAK-${row.No_Kontrak}`
+  return null
+}
+
 export function calculateLaporanSummary(rows: LaporanRow[]): LaporanSummary {
   const result: LaporanSummary = {
     cashIn: 0,
@@ -126,36 +133,45 @@ export function calculateLaporanSummary(rows: LaporanRow[]): LaporanSummary {
   }
 
   let totalKgVolume = 0
-  let totalKgPendapatan = 0
+  let totalKgHargaVolume = 0
   let totalButirVolume = 0
-  let totalButirPendapatan = 0
+  let totalButirHargaVolume = 0
+  const seenSisaKeys = new Set<string>()
 
   for (const row of rows) {
-    const isBypass = row.No_DO.startsWith('BYPASS-')
     const satuan = (row.Satuan || 'Kg').toLowerCase()
+    const volDo = row.Jumlah_DO || 0
+    const harga = row.Harga_Satuan || 0
 
     result.cashIn += row.Jumlah_Transfer || 0
     result.pendapatan += row.Pendapatan_Pokok || 0
     result.totalPphNominals += row.PPh_Nominal || 0
 
-    const sisaBayar = row.Sisa_Pembayaran || 0
-    if (sisaBayar > 0) result.sisaBayar += sisaBayar
+    const idKey = summaryRowKey(row)
+    if (idKey && !seenSisaKeys.has(idKey)) {
+      seenSisaKeys.add(idKey)
+      const sisaBayar = row.Sisa_Pembayaran || 0
+      if (sisaBayar > 0) result.sisaBayar += sisaBayar
+      const sisaVol = row.Sisa_Volume || 0
+      if (sisaVol > 0) {
+        if (satuan === 'butir') result.sisaVolumeButir += sisaVol
+        else result.sisaVolume += sisaVol
+      }
+    }
 
     if (satuan === 'butir') {
-      result.sisaVolumeButir += row.Sisa_Volume || 0
-      result.barangTerkirimButir += row.Jumlah_DO || 0
-      totalButirVolume += row.Jumlah_DO || 0
-      totalButirPendapatan += row.Pendapatan_Pokok || 0
+      result.barangTerkirimButir += volDo
+      totalButirVolume += volDo
+      totalButirHargaVolume += harga * volDo
     } else {
-      result.sisaVolume += row.Sisa_Volume || 0
-      result.barangTerkirimKg += row.Jumlah_DO || 0
-      totalKgVolume += row.Jumlah_DO || 0
-      totalKgPendapatan += row.Pendapatan_Pokok || 0
+      result.barangTerkirimKg += volDo
+      totalKgVolume += volDo
+      totalKgHargaVolume += harga * volDo
     }
   }
 
-  result.hargaRataKg = totalKgVolume > 0 ? totalKgPendapatan / totalKgVolume : 0
-  result.hargaRataButir = totalButirVolume > 0 ? totalButirPendapatan / totalButirVolume : 0
+  result.hargaRataKg = totalKgVolume > 0 ? totalKgHargaVolume / totalKgVolume : 0
+  result.hargaRataButir = totalButirVolume > 0 ? totalButirHargaVolume / totalButirVolume : 0
 
   return result
 }
