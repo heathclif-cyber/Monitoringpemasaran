@@ -9,6 +9,15 @@ from services.cache import api_cache
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
 
+def _sap_val(value) -> str:
+    return (value or "").strip()
+
+
+def _effective_sap(primary, fallback) -> str:
+    """Nilai SAP efektif: DO (atau entitas utama) → fallback invoice."""
+    return _sap_val(primary) or _sap_val(fallback)
+
+
 @router.get("")
 def get_dashboard_data(
     year: int = Query(default=2026, description="Tahun filter"),
@@ -81,6 +90,7 @@ def get_dashboard_data(
             joinedload(models.DeliveryOrder.berita_acara),
             joinedload(models.DeliveryOrder.invoice).joinedload(models.Invoice.berita_acara),
         ).all()
+        invoices = base_invoice.options(joinedload(models.Invoice.delivery_orders)).all()
         for do in dos_pend:
             k = do.invoice.kontrak
             do_vol = float(do.volume_do or 0)
@@ -118,10 +128,15 @@ def get_dashboard_data(
             pend_m[f"{m:02d}"] += pendapatan_do
 
             sk = f"{m:02d}"
-            if not (do.kontrak_sap or '').strip(): sap_m[sk]["missing_kontrak"] += 1
-            if not (do.so_sap or '').strip():      sap_m[sk]["missing_so"] += 1
-            if not (do.do_sap or '').strip():      sap_m[sk]["missing_do"] += 1
-            if not (do.billing_sap or '').strip(): sap_m[sk]["missing_billing"] += 1
+            inv = do.invoice
+            if not _effective_sap(do.kontrak_sap, getattr(inv, "kontrak_sap", None)):
+                sap_m[sk]["missing_kontrak"] += 1
+            if not _effective_sap(do.so_sap, getattr(inv, "so_sap", None)):
+                sap_m[sk]["missing_so"] += 1
+            if not _effective_sap(do.do_sap, getattr(inv, "do_sap", None)):
+                sap_m[sk]["missing_do"] += 1
+            if not _effective_sap(do.billing_sap, getattr(inv, "billing_sap", None)):
+                sap_m[sk]["missing_billing"] += 1
             
             if satuan == "butir":
                 vol_m_butir[f"{m:02d}"] += do_vol
@@ -152,13 +167,24 @@ def get_dashboard_data(
             m = pay.tanggal_pembayaran.month if pay.tanggal_pembayaran else 1
             cash_m[f"{m:02d}"] += nom
 
-        # 3. INVOICES
-        invoices = base_invoice.all()
+        # 3. INVOICES (termasuk invoice-first: SAP di invoice sebelum DO dibuat)
         for inv in invoices:
             nom = float(inv.jumlah_pembayaran or 0)
             total_nilai_invoice += nom
             m = inv.tanggal_transaksi.month if inv.tanggal_transaksi else 1
             inv_m[f"{m:02d}"] += nom
+
+            if inv.delivery_orders:
+                continue
+            sk = f"{m:02d}"
+            if not _sap_val(inv.kontrak_sap):
+                sap_m[sk]["missing_kontrak"] += 1
+            if not _sap_val(inv.so_sap):
+                sap_m[sk]["missing_so"] += 1
+            if not _sap_val(inv.do_sap):
+                sap_m[sk]["missing_do"] += 1
+            if not _sap_val(inv.billing_sap):
+                sap_m[sk]["missing_billing"] += 1
 
         # 4. BYPASS (Berlaku untuk semua)
         bypasses = base_bypass.all()
@@ -182,10 +208,14 @@ def get_dashboard_data(
             inv_m[f"{m:02d}"] += nom
 
             bk = f"{m:02d}"
-            if not (b.kontrak_sap or '').strip(): sap_m[bk]["missing_kontrak"] += 1
-            if not (b.so_sap or '').strip():      sap_m[bk]["missing_so"] += 1
-            if not (b.do_sap or '').strip():      sap_m[bk]["missing_do"] += 1
-            if not (b.billing_sap or '').strip(): sap_m[bk]["missing_billing"] += 1
+            if not _sap_val(b.kontrak_sap):
+                sap_m[bk]["missing_kontrak"] += 1
+            if not _sap_val(b.so_sap):
+                sap_m[bk]["missing_so"] += 1
+            if not _sap_val(b.do_sap):
+                sap_m[bk]["missing_do"] += 1
+            if not _sap_val(b.billing_sap):
+                sap_m[bk]["missing_billing"] += 1
             
             if satuan == "butir":
                 vol_m_butir[f"{m:02d}"] += vol
@@ -201,9 +231,6 @@ def get_dashboard_data(
         total_do_count = len(dos_pend) + len(bypasses)
         total_invoice_count = len(invoices)
         total_kontrak = int(base_kontrak.count())
-
-        d_ids = base_do_pend.with_entities(models.DeliveryOrder.no_do)
-        b_ids = base_bypass.with_entities(models.LaporanBypass.id)
 
         # 5. Filter lists
         y_q = db.query(func.extract('year', models.Kontrak.tanggal_kontrak)).distinct().all()
@@ -231,22 +258,10 @@ def get_dashboard_data(
                 "total_volume_kg": total_volume_kg,
                 "total_volume_butir": total_volume_butir,
                 "sap_stats": {
-                    "missing_kontrak": int(
-                        (db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.kontrak_sap == None) | (models.DeliveryOrder.kontrak_sap == '')).scalar() or 0)
-                        + (db.query(func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids), (models.LaporanBypass.kontrak_sap == None) | (models.LaporanBypass.kontrak_sap == '')).scalar() or 0)
-                    ),
-                    "missing_so": int(
-                        (db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.so_sap == None) | (models.DeliveryOrder.so_sap == '')).scalar() or 0)
-                        + (db.query(func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids), (models.LaporanBypass.so_sap == None) | (models.LaporanBypass.so_sap == '')).scalar() or 0)
-                    ),
-                    "missing_do": int(
-                        (db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.do_sap == None) | (models.DeliveryOrder.do_sap == '')).scalar() or 0)
-                        + (db.query(func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids), (models.LaporanBypass.do_sap == None) | (models.LaporanBypass.do_sap == '')).scalar() or 0)
-                    ),
-                    "missing_billing": int(
-                        (db.query(func.count(models.DeliveryOrder.no_do)).filter(models.DeliveryOrder.no_do.in_(d_ids), (models.DeliveryOrder.billing_sap == None) | (models.DeliveryOrder.billing_sap == '')).scalar() or 0)
-                        + (db.query(func.count(models.LaporanBypass.id)).filter(models.LaporanBypass.id.in_(b_ids), (models.LaporanBypass.billing_sap == None) | (models.LaporanBypass.billing_sap == '')).scalar() or 0)
-                    ),
+                    "missing_kontrak": sum(sap_m[m]["missing_kontrak"] for m in sap_m),
+                    "missing_so": sum(sap_m[m]["missing_so"] for m in sap_m),
+                    "missing_do": sum(sap_m[m]["missing_do"] for m in sap_m),
+                    "missing_billing": sum(sap_m[m]["missing_billing"] for m in sap_m),
                 }
             },
             "charts": {
