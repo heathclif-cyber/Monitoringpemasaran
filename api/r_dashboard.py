@@ -18,6 +18,32 @@ def _effective_sap(primary, fallback) -> str:
     return _sap_val(primary) or _sap_val(fallback)
 
 
+def _sap_month_for_do(do, k, ba_buku_date) -> int:
+    """Bulan SAP selaras dengan Laporan mode TRANSFER (default): tgl transfer → rencana → tgl DO."""
+    if str(getattr(k, "tipe_alur", "STANDAR")).upper() == "PAYUNG_BA" and ba_buku_date:
+        return ba_buku_date.month
+    if do.tanggal_pembayaran:
+        return do.tanggal_pembayaran.month
+    if do.rencana_pengambilan:
+        return do.rencana_pengambilan.month
+    if do.tanggal_do:
+        return do.tanggal_do.month
+    return 1
+
+
+def _sap_month_for_invoice(inv) -> int:
+    """Invoice tanpa DO: tanggal pembayaran terakhir → tanggal transaksi."""
+    pays = getattr(inv, "pembayaran", None) or []
+    if pays:
+        dated = [p for p in pays if p.tanggal_pembayaran]
+        if dated:
+            latest = max(dated, key=lambda p: p.tanggal_pembayaran)
+            return latest.tanggal_pembayaran.month
+    if inv.tanggal_transaksi:
+        return inv.tanggal_transaksi.month
+    return 1
+
+
 @router.get("")
 def get_dashboard_data(
     year: int = Query(default=2026, description="Tahun filter"),
@@ -90,7 +116,10 @@ def get_dashboard_data(
             joinedload(models.DeliveryOrder.berita_acara),
             joinedload(models.DeliveryOrder.invoice).joinedload(models.Invoice.berita_acara),
         ).all()
-        invoices = base_invoice.options(joinedload(models.Invoice.delivery_orders)).all()
+        invoices = base_invoice.options(
+            joinedload(models.Invoice.delivery_orders),
+            joinedload(models.Invoice.pembayaran),
+        ).all()
         for do in dos_pend:
             k = do.invoice.kontrak
             do_vol = float(do.volume_do or 0)
@@ -127,7 +156,7 @@ def get_dashboard_data(
                 m = do.rencana_pengambilan.month if do.rencana_pengambilan else do.tanggal_do.month if do.tanggal_do else 1
             pend_m[f"{m:02d}"] += pendapatan_do
 
-            sk = f"{m:02d}"
+            sk = f"{_sap_month_for_do(do, k, ba_buku_date):02d}"
             inv = do.invoice
             if not _effective_sap(do.kontrak_sap, getattr(inv, "kontrak_sap", None)):
                 sap_m[sk]["missing_kontrak"] += 1
@@ -176,7 +205,7 @@ def get_dashboard_data(
 
             if inv.delivery_orders:
                 continue
-            sk = f"{m:02d}"
+            sk = f"{_sap_month_for_invoice(inv):02d}"
             if not _sap_val(inv.kontrak_sap):
                 sap_m[sk]["missing_kontrak"] += 1
             if not _sap_val(inv.so_sap):

@@ -371,7 +371,7 @@ function SapStatus() {
         {rows.length > 0 && (
           <div className="border-t pt-3">
             <p className="text-xs text-muted-foreground mb-2">
-              Per bulan · DO, invoice (belum DO), dan bypass · SAP invoice dihitung lengkap
+              Per bulan (tgl transfer) · selaras filter Laporan · DO, invoice belum DO, bypass
             </p>
             <table className="w-full text-sm">
               <thead>

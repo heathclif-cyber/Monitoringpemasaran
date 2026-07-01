@@ -96,6 +96,12 @@ export const useLaporanStore = create<LaporanStore>((set, get) => ({
       if (!key.noDo && key.noInvoice) {
         await get().fetch({ fresh: true, silent: true })
       }
+      try {
+        const { useDashboardStore } = await import('@/store/dashboardStore')
+        await useDashboardStore.getState().fetch()
+      } catch {
+        /* dashboard optional refresh */
+      }
     } catch (err) {
       console.error('[laporanStore.updateSapField]', err)
       throw err
