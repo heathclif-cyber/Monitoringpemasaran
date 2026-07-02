@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CloudUpload, ExternalLink, Loader2 } from 'lucide-react'
+import { AlertTriangle, CloudUpload, ExternalLink, Loader2 } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore, useCanEdit } from '@/store/authStore'
@@ -47,6 +47,8 @@ export function DocumentUpload({
 
   const title = label || DOC_TYPE_LABELS[docType]
   const canUpload = canEdit && Boolean(entityId?.trim()) && !disabled
+  const fileMissing = Boolean(latest?.uploaded_at && latest.file_exists === false)
+  const hasValidFile = Boolean(latest && latest.file_exists !== false)
 
   const loadStatus = useCallback(async () => {
     try {
@@ -113,7 +115,7 @@ export function DocumentUpload({
   if (compact) {
     return (
       <div className={cn('flex flex-col gap-1', className)}>
-        {latest?.web_url && (
+        {hasValidFile && latest?.web_url && (
           <a
             href={latest.web_url}
             target={latest.web_url.startsWith('http') ? '_blank' : undefined}
@@ -153,7 +155,7 @@ export function DocumentUpload({
     <div className={cn('rounded-lg border bg-card p-3 space-y-2', className)}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium">{title}</p>
-        {latest && (
+        {hasValidFile && latest && (
           <a
             href={latest.web_url}
             target="_blank"
@@ -164,7 +166,15 @@ export function DocumentUpload({
           </a>
         )}
       </div>
-      {latest ? (
+      {fileMissing ? (
+        <p className="text-xs text-amber-700 dark:text-amber-300 flex items-start gap-1">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+          <span>
+            Catatan upload ada di database tetapi file tidak ditemukan di server.
+            Upload ulang <span className="font-medium">{latest?.file_name}</span>.
+          </span>
+        </p>
+      ) : latest ? (
         <p className="text-xs text-muted-foreground truncate">{latest.file_name}</p>
       ) : (
         <p className="text-xs text-muted-foreground">Belum ada file di-upload.</p>
@@ -189,7 +199,7 @@ export function DocumentUpload({
             onClick={() => inputRef.current?.click()}
           >
             {uploading ? <Loader2 size={14} className="animate-spin" /> : <CloudUpload size={14} />}
-            {uploading ? 'Mengupload...' : latest ? 'Ganti File' : 'Upload Dokumen'}
+            {uploading ? 'Mengupload...' : fileMissing ? 'Upload Ulang' : latest ? 'Ganti File' : 'Upload Dokumen'}
           </Button>
           {!canUpload && (
             <p className="text-xs text-muted-foreground">Simpan dokumen terlebih dahulu untuk mengaktifkan upload.</p>

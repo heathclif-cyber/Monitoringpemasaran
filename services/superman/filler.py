@@ -227,25 +227,55 @@ def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None
     page.locator(f"#nominal_sppb_{isi_index}_1").dispatch_event("keyup")
 
 
-def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
-    files = paths[0] if len(paths) == 1 else paths
-    page.set_input_files(input_selector, files)
-    page.wait_for_timeout(2000)
+def _dispatch_input_change(page: Page, input_selector: str) -> None:
     page.evaluate(
         """(sel) => {
             const input = document.querySelector(sel);
             if (!input) return;
             input.dispatchEvent(new Event('change', { bubbles: true }));
+            if (window.jQuery) window.jQuery(input).trigger('change');
         }""",
         input_selector,
     )
-    page.wait_for_timeout(1500)
+
+
+def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
+    page.wait_for_selector(input_selector, state="attached", timeout=15000)
+    for path in paths:
+        page.set_input_files(input_selector, path)
+        page.wait_for_timeout(1200)
+        _dispatch_input_change(page, input_selector)
+        page.wait_for_timeout(1200)
+
+
+def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeout_ms: int = 20000) -> int:
+    elapsed = 0
+    step = 1000
+    uploaded = 0
+    while elapsed <= timeout_ms:
+        uploaded = _count_uploaded_docs(page, input_selector)
+        if uploaded >= expected:
+            return uploaded
+        page.wait_for_timeout(step)
+        elapsed += step
+    return uploaded
 
 
 def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool) -> None:
+    missing = [path for path in support_docs if not path.exists()]
     paths = [str(path) for path in support_docs if path.exists()]
+    if missing:
+        labels = ", ".join(path.name for path in missing)
+        raise RuntimeError(
+            f"File dokumen tidak ditemukan di server: {labels}. "
+            "Upload ulang Kontrak, Invoice, dan Rekening Koran di menu Input Pembayaran."
+        )
     if not paths:
-        return
+        raise RuntimeError(
+            "Dokumen pendukung Superman kosong. "
+            "Upload Kontrak, Invoice, dan Rekening Koran terlebih dahulu."
+        )
+
     if combined:
         page.locator('a[href="#tab-informasi-sppb"]').click(force=True)
         page.wait_for_timeout(500)
@@ -258,12 +288,12 @@ def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool
         page.wait_for_timeout(600)
         _upload_files_to_input(page, "#dokumen_pendukung_sppn", paths)
 
-    page.wait_for_timeout(1500)
-    uploaded = _count_uploaded_docs(page, "#dokumen_pendukung_sppn")
+    uploaded = _wait_uploaded_docs(page, "#dokumen_pendukung_sppn", len(paths))
     if uploaded < len(paths):
         raise RuntimeError(
             f"Dokumen pendukung Superman belum terlampir ({uploaded}/{len(paths)} file). "
-            "Coba upload ulang Kontrak, Invoice, dan Rekening Koran."
+            "Coba upload ulang Kontrak, Invoice, dan Rekening Koran di aplikasi, "
+            "lalu jalankan deklarasi Superman sekali lagi."
         )
 
     page.evaluate(
@@ -298,10 +328,8 @@ def fill_sppn_draft(
     _fill_shared_informasi(page, payload, cfg)
 
     if support_docs:
-        existing = [doc for doc in support_docs if doc.exists()]
-        if existing:
-            report(45, "Mengunggah dokumen pendukung")
-            _upload_support_docs(page, existing, combined=combined)
+        report(45, "Mengunggah dokumen pendukung")
+        _upload_support_docs(page, support_docs, combined=combined)
 
     if combined and payload.sppb_item:
         report(55, "Mengisi baris SPPb (PPh)")

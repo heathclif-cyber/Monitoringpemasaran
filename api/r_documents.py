@@ -146,6 +146,12 @@ def _check_file_exists(upload: "models.DocumentUpload") -> bool:
         return False
 
 
+def _upload_out(record: "models.DocumentUpload") -> schemas.DocumentUploadOut:
+    data = schemas.DocumentUploadOut.model_validate(record).model_dump()
+    data["file_exists"] = _check_file_exists(record)
+    return schemas.DocumentUploadOut(**data)
+
+
 def _build_slots(db: Session, entity_type: str, entity_id: str) -> list[schemas.DocumentSlotOut]:
     required = ENTITY_DOC_REQUIREMENTS.get(entity_type, [])
     uploads = (
@@ -649,7 +655,8 @@ def list_documents(
             raise HTTPException(status_code=400, detail="doc_type tidak valid")
         q = q.filter(models.DocumentUpload.doc_type == doc_type)
 
-    return q.order_by(models.DocumentUpload.uploaded_at.desc()).all()
+    records = q.order_by(models.DocumentUpload.uploaded_at.desc()).all()
+    return [_upload_out(record) for record in records]
 
 
 _EXT_MEDIA_TYPE: dict[str, str] = {
@@ -784,7 +791,7 @@ async def upload_document(
         web_url=record.web_url,
     )
 
-    return record
+    return _upload_out(record)
 
 
 def _bundle_number_name(entity_id: str) -> str:

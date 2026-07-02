@@ -245,6 +245,7 @@ class DocumentUploadOut(BaseModel):
     storage_path: Optional[str] = None
     web_url: str
     uploaded_at: Optional[datetime] = None
+    file_exists: bool = True
 
     class Config:
         from_attributes = True

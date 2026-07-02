@@ -271,6 +271,7 @@ export interface DocumentUpload {
   storage_path: string | null
   web_url: string
   uploaded_at: string | null
+  file_exists?: boolean
 }
 
 export interface DocumentStatusResponse {

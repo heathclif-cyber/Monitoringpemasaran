@@ -198,7 +198,17 @@ def _requirement_entry(
         entity_id=entity_id,
         doc_type=doc_type,
     )
+    stale = _latest_upload(db, entity_type, entity_id, doc_type)
     suffix = "" if required else " (opsional)"
+    if uploaded and file_name:
+        hint = f"{label} sudah diupload ({file_name})"
+    elif stale and stale.file_name:
+        hint = (
+            f"{label} tercatat di database ({stale.file_name}) tetapi file tidak ada di server — "
+            "upload ulang"
+        )
+    else:
+        hint = f"Upload {label} untuk {entity_type}={entity_id}"
     return {
         "label": f"{label}{suffix}",
         "entity_type": entity_type,
@@ -207,11 +217,7 @@ def _requirement_entry(
         "uploaded": uploaded,
         "file_name": file_name,
         "required": required,
-        "upload_hint": (
-            f"{label} sudah diupload ({file_name})"
-            if uploaded and file_name
-            else f"Upload {label} untuk {entity_type}={entity_id}"
-        ),
+        "upload_hint": hint,
     }
 
 
