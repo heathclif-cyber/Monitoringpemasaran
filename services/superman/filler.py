@@ -550,23 +550,54 @@ def submit_sppn_draft(
         timeout=30000,
     )
 
-    store_body: dict | list | str | None = None
-    try:
+    def _parse_store_response(resp) -> dict | list | str | None:
+        try:
+            return resp.json()
+        except Exception:
+            try:
+                return resp.text()
+            except Exception:
+                return None
+
+    def _submit_form_direct() -> dict | list | str | None:
+        status_val = "1" if print_after else "0"
         with page.expect_response(
             lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
             timeout=300000,
         ) as resp_info:
+            page.evaluate(
+                """(statusVal) => {
+                    const status = document.getElementById('status_btn');
+                    if (status) status.value = statusVal;
+                    const form = document.getElementById('form_spp');
+                    if (form) form.submit();
+                }""",
+                status_val,
+            )
+        return _parse_store_response(resp_info.value)
+
+    store_body: dict | list | str | None = None
+    sppn_files = _count_uploaded_docs(page, "#dokumen_pendukung_sppn")
+    if sppn_files == 0:
+        raise RuntimeError(
+            "Dokumen pendukung SPPn tidak terlampir di form Superman sebelum simpan. "
+            "Coba upload ulang dokumen di Input Pembayaran."
+        )
+
+    try:
+        with page.expect_response(
+            lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
+            timeout=90000,
+        ) as resp_info:
             simpan.click()
-            _dismiss_swal_dialogs(page, print_after=print_after, timeout_ms=240000)
-            try:
-                store_body = resp_info.value.json()
-            except Exception:
-                try:
-                    store_body = resp_info.value.text()
-                except Exception:
-                    store_body = None
+            _dismiss_swal_dialogs(page, print_after=print_after, timeout_ms=75000)
+        store_body = _parse_store_response(resp_info.value)
     except Exception as exc:
-        logger.warning("Respons /spp/store tidak tertangkap: %s", exc)
+        logger.warning("Simpan via dialog gagal (%s) — coba submit form langsung", exc)
+        try:
+            store_body = _submit_form_direct()
+        except Exception as direct_exc:
+            logger.warning("Submit form langsung gagal: %s", direct_exc)
 
     page.wait_for_load_state("networkidle", timeout=120000)
 
