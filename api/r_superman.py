@@ -190,9 +190,15 @@ def superman_deklarasi_start(
 
 
 @router.get("/deklarasi/progress")
-def superman_deklarasi_progress(job_id: str = Query(..., min_length=1), _user=Depends(require_write)):
+def superman_deklarasi_progress(
+    job_id: str | None = Query(None, min_length=1),
+    no_invoice: str | None = Query(None, min_length=1),
+    _user=Depends(require_write),
+):
     try:
-        return get_deklarasi_progress(job_id)
+        if not job_id and not no_invoice:
+            raise ValueError("Parameter job_id atau no_invoice wajib diisi.")
+        return get_deklarasi_progress(job_id, no_invoice=no_invoice)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

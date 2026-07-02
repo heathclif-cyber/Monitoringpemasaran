@@ -13,6 +13,15 @@ function sleep(ms: number) {
 export interface PollSupermanJobOptions {
   onProgress?: (percent: number, stage: string) => void
   isCancelled?: () => boolean
+  noInvoice?: string
+}
+
+const JOB_LOST_MSG =
+  'Sesi job hilang (server restart). Tutup dialog ini, lalu klik "Buat Deklarasi Superman" lagi.'
+
+export function extractJobIdFromConflict(detail: string): string | null {
+  const m = detail.match(/job_id=([0-9a-f-]{36})/i)
+  return m?.[1] ?? null
 }
 
 export function formatMissingSupermanDocs(requirements: SupermanDocRequirement[]): string {
@@ -59,9 +68,24 @@ export async function pollSupermanJob(
     }
 
     try {
-      const progress = await client.get<SupermanDeklarasiProgress>(
-        `/api/superman/deklarasi/progress?job_id=${encodeURIComponent(jobId)}`,
-      )
+      let progress: SupermanDeklarasiProgress
+      try {
+        progress = await client.get<SupermanDeklarasiProgress>(
+          `/api/superman/deklarasi/progress?job_id=${encodeURIComponent(jobId)}`,
+        )
+      } catch (inner) {
+        if (
+          inner instanceof ApiError
+          && inner.status === 404
+          && options?.noInvoice
+        ) {
+          progress = await client.get<SupermanDeklarasiProgress>(
+            `/api/superman/deklarasi/progress?no_invoice=${encodeURIComponent(options.noInvoice)}`,
+          )
+        } else {
+          throw inner
+        }
+      }
       transientRetries = 0
       options?.onProgress?.(progress.percent, progress.stage)
 
@@ -77,9 +101,7 @@ export async function pollSupermanJob(
         throw err
       }
       if (err instanceof ApiError && err.status === 404) {
-        throw new Error(
-          'Sesi job hilang (server restart). Tutup dialog ini, lalu klik "Buat Deklarasi Superman" lagi.',
-        )
+        throw new Error(JOB_LOST_MSG)
       }
       if (
         err instanceof ApiError

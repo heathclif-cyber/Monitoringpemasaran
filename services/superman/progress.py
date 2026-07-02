@@ -81,6 +81,34 @@ def _persist_jobs_locked() -> None:
         logger.warning("gagal persist superman jobs: %s", exc)
 
 
+def _merge_job_from_disk(data: dict[str, Any], job_id: str, *, mark_interrupted: bool) -> None:
+    job = _job_from_dict({**data, "job_id": data.get("job_id") or job_id})
+    if mark_interrupted and job.status in ("pending", "running"):
+        job.status = "failed"
+        job.error = _INTERRUPTED_MSG
+        job.updated_at = time.time()
+    existing = _jobs.get(job.job_id)
+    if existing and existing.updated_at >= job.updated_at:
+        return
+    _jobs[job.job_id] = job
+
+
+def _sync_from_disk(*, mark_interrupted: bool = False) -> None:
+    """Muat ulang job dari disk — penting untuk multi-instance Railway."""
+    if not _JOBS_FILE.exists():
+        return
+    try:
+        raw = json.loads(_JOBS_FILE.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return
+        with _lock:
+            for job_id, data in raw.items():
+                if isinstance(data, dict):
+                    _merge_job_from_disk(data, job_id, mark_interrupted=mark_interrupted)
+    except Exception as exc:
+        logger.warning("gagal sync superman jobs dari disk: %s", exc)
+
+
 def _ensure_loaded() -> None:
     global _loaded
     if _loaded:
@@ -88,21 +116,7 @@ def _ensure_loaded() -> None:
     with _lock:
         if _loaded:
             return
-        if _JOBS_FILE.exists():
-            try:
-                raw = json.loads(_JOBS_FILE.read_text(encoding="utf-8"))
-                if isinstance(raw, dict):
-                    for job_id, data in raw.items():
-                        if not isinstance(data, dict):
-                            continue
-                        job = _job_from_dict({**data, "job_id": data.get("job_id") or job_id})
-                        if job.status in ("pending", "running"):
-                            job.status = "failed"
-                            job.error = _INTERRUPTED_MSG
-                            job.updated_at = time.time()
-                        _jobs[job.job_id] = job
-            except Exception as exc:
-                logger.warning("gagal load superman jobs: %s", exc)
+        _sync_from_disk(mark_interrupted=True)
         _loaded = True
 
 
@@ -204,11 +218,25 @@ def _fail_stale_job(job: SupermanJob) -> None:
     )
 
 
+def find_latest_job_for_invoice(no_invoice: str) -> SupermanJob | None:
+    ref = no_invoice.strip()
+    if not ref:
+        return None
+    _cleanup_expired()
+    _sync_from_disk()
+    with _lock:
+        matches = [j for j in _jobs.values() if j.no_invoice == ref]
+    if not matches:
+        return None
+    return max(matches, key=lambda j: j.updated_at)
+
+
 def find_active_job_for_invoice(no_invoice: str) -> SupermanJob | None:
     ref = no_invoice.strip()
     if not ref:
         return None
     _cleanup_expired()
+    _sync_from_disk()
     now = time.time()
     with _lock:
         for job in _jobs.values():
@@ -224,6 +252,7 @@ def find_active_job_for_invoice(no_invoice: str) -> SupermanJob | None:
 
 def get_job(job_id: str) -> SupermanJob | None:
     _cleanup_expired()
+    _sync_from_disk()
     with _lock:
         job = _jobs.get(job_id.strip())
         if (

@@ -20,7 +20,7 @@ import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { SupermanDocChecklist } from '@/components/common/SupermanDocChecklist'
 import { SupermanCaptchaDialog } from '@/components/common/SupermanCaptchaDialog'
 import { SupermanProgressDialog } from '@/components/common/SupermanProgressDialog'
-import { client, isSupermanSessionError } from '@/lib/client'
+import { ApiError, client, isSupermanSessionError } from '@/lib/client'
 import { cn, formatCurrency } from '@/lib/utils'
 import { fetchInvoiceDocRequirements, formatInvoiceSelectLabel } from '@/utils/invoiceUtils'
 import {
@@ -36,6 +36,7 @@ import { isPayungBA } from '@/utils/kontrakUtils'
 import {
   checkSupermanDocsReady,
   isSupermanSessionMessage,
+  extractJobIdFromConflict,
   pollSupermanJob,
   recoverSupermanFromTodo,
 } from '@/utils/supermanUtils'
@@ -269,10 +270,27 @@ export default function PembayaranPage() {
 
     try {
       const params = new URLSearchParams({ no_invoice: noInvoice })
-      const start = await client.post<SupermanDeklarasiJobStart>(
-        `/api/superman/deklarasi/start?${params.toString()}`,
-      )
-      const result = await pollSupermanJob(start.job_id, {
+      let jobId: string
+      try {
+        const start = await client.post<SupermanDeklarasiJobStart>(
+          `/api/superman/deklarasi/start?${params.toString()}`,
+        )
+        jobId = start.job_id
+      } catch (startErr: unknown) {
+        const detail = startErr instanceof ApiError ? startErr.message : ''
+        const resumeId =
+          startErr instanceof ApiError && startErr.status === 409
+            ? extractJobIdFromConflict(detail)
+            : null
+        if (resumeId) {
+          jobId = resumeId
+          addNotification('Melanjutkan job Superman yang masih berjalan...', 'info')
+        } else {
+          throw startErr
+        }
+      }
+      const result = await pollSupermanJob(jobId, {
+        noInvoice,
         isCancelled: () => cancelledRef.current,
         onProgress: (p, s) => {
           setPercent(p)

@@ -6,10 +6,11 @@ import { SupermanCaptchaDialog } from '@/components/common/SupermanCaptchaDialog
 import { SupermanProgressDialog } from '@/components/common/SupermanProgressDialog'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
-import { client, isSupermanSessionError } from '@/lib/client'
+import { ApiError, client, isSupermanSessionError } from '@/lib/client'
 import { cn } from '@/lib/utils'
 import {
   checkSupermanDocsReady,
+  extractJobIdFromConflict,
   isSupermanSessionMessage,
   pollSupermanJob,
   recoverSupermanFromTodo,
@@ -190,11 +191,26 @@ export function SupermanDeklarasiButton({
       if (noInvoice) params.set('no_invoice', noInvoice)
       else if (noPembayaran) params.set('no_pembayaran', noPembayaran)
       if (noDo) params.set('no_do', noDo)
-      const start = await client.post<SupermanDeklarasiJobStart>(
-        `/api/superman/deklarasi/start?${params.toString()}`,
-      )
-      setLastInvoice(start.no_invoice || noInvoice)
-      const result = await pollSupermanJob(start.job_id, {
+      let jobId: string
+      const invoiceRef = noInvoice || ''
+      try {
+        const start = await client.post<SupermanDeklarasiJobStart>(
+          `/api/superman/deklarasi/start?${params.toString()}`,
+        )
+        setLastInvoice(start.no_invoice || noInvoice)
+        jobId = start.job_id
+      } catch (startErr: unknown) {
+        const detail = startErr instanceof ApiError ? startErr.message : ''
+        const resumeId =
+          startErr instanceof ApiError && startErr.status === 409
+            ? extractJobIdFromConflict(detail)
+            : null
+        if (!resumeId) throw startErr
+        jobId = resumeId
+        addNotification('Melanjutkan job Superman yang masih berjalan...', 'info')
+      }
+      const result = await pollSupermanJob(jobId, {
+        noInvoice: invoiceRef || undefined,
         isCancelled: () => cancelledRef.current,
         onProgress: (p, s) => {
           setPercent(p)

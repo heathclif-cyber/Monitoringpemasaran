@@ -53,6 +53,7 @@ from services.superman.progress import (
     create_job,
     fail_job,
     find_active_job_for_invoice,
+    find_latest_job_for_invoice,
     get_job,
     make_progress_callback,
     update_job,
@@ -932,10 +933,21 @@ def start_deklarasi_job(
     return {"job_id": job_id, "no_invoice": ref, "no_pembayaran": (no_pembayaran or "").strip()}
 
 
-def get_deklarasi_progress(job_id: str) -> dict[str, Any]:
-    job = get_job(job_id.strip())
+def get_deklarasi_progress(
+    job_id: str | None = None,
+    *,
+    no_invoice: str | None = None,
+) -> dict[str, Any]:
+    job = None
+    if job_id:
+        job = get_job(job_id.strip())
+    if not job and no_invoice:
+        job = find_latest_job_for_invoice(no_invoice.strip())
     if not job:
-        raise ValueError("Job deklarasi tidak ditemukan atau sudah kedaluwarsa.")
+        raise ValueError(
+            "Job deklarasi tidak ditemukan atau sudah kedaluwarsa. "
+            "Tutup dialog dan klik 'Buat Deklarasi Superman' lagi."
+        )
     payload: dict[str, Any] = {
         "job_id": job.job_id,
         "no_invoice": job.no_invoice,
