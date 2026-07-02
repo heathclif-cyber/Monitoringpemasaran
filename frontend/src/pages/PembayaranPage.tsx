@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -23,6 +23,11 @@ import { SupermanProgressDialog } from '@/components/common/SupermanProgressDial
 import { client } from '@/lib/client'
 import { cn, formatCurrency } from '@/lib/utils'
 import { fetchInvoiceDocRequirements, formatInvoiceSelectLabel } from '@/utils/invoiceUtils'
+import {
+  effectivePelunasan,
+  paymentProgressPercent,
+  pphOnNetTransfer,
+} from '@/utils/pembayaranUtils'
 import type {
   Pembayaran,
   PembayaranInput,
@@ -81,6 +86,7 @@ export default function PembayaranPage() {
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = form
   const selectedInvoice = watch('no_invoice')
   const nominalTransfer = watch('nominal_transfer')
+  const isPphDisetor = watch('is_pph_disetor')
 
   const invoiceSuperman = (currentInvoice?.superman || '').trim()
   const invoiceTotal = currentInvoice?.jumlah_pembayaran || 0
@@ -168,18 +174,39 @@ export default function PembayaranPage() {
     }
   }, [editNo])
 
+  const pelunasanForPayment = useCallback(
+    (p: Pembayaran) => effectivePelunasan(p.nominal_transfer, p.is_pph_disetor, currentKontrak),
+    [currentKontrak],
+  )
+
+  const paidTotalAll = useMemo(
+    () => invoicePembayaran.reduce((sum, p) => sum + pelunasanForPayment(p), 0),
+    [invoicePembayaran, pelunasanForPayment],
+  )
+
   const existingTotal = useMemo(() => {
     return invoicePembayaran
       .filter((p) => p.no_pembayaran !== savedNo)
-      .reduce((sum, p) => sum + (p.nominal_transfer || 0), 0)
-  }, [invoicePembayaran, savedNo])
+      .reduce((sum, p) => sum + pelunasanForPayment(p), 0)
+  }, [invoicePembayaran, savedNo, pelunasanForPayment])
 
-  const totalAfterSave = existingTotal + (Number(nominalTransfer) || 0)
+  const effectiveCurrent = effectivePelunasan(
+    Number(nominalTransfer) || 0,
+    isPphDisetor || 'false',
+    currentKontrak,
+  )
+  const currentPphAddon =
+    String(isPphDisetor || 'false').toLowerCase() === 'true'
+      ? pphOnNetTransfer(Number(nominalTransfer) || 0, currentKontrak)
+      : 0
+
+  const totalAfterSave = existingTotal + effectiveCurrent
   const sisaPembayaran = Math.max(0, invoiceTotal - existingTotal)
-  const progressPct = invoiceTotal > 0 ? Math.round((existingTotal / invoiceTotal) * 100) : 0
-  const afterThisPct = invoiceTotal > 0 ? Math.round((totalAfterSave / invoiceTotal) * 100) : 0
+  const sisaAfterSave = Math.max(0, invoiceTotal - totalAfterSave)
+  const progressPct = paymentProgressPercent(existingTotal, invoiceTotal)
+  const afterThisPct = paymentProgressPercent(totalAfterSave, invoiceTotal)
   const willCompleteInvoice = invoiceTotal > 0 && totalAfterSave >= invoiceTotal - 0.5
-  const isInvoiceFullyPaid = invoiceTotal > 0 && existingTotal >= invoiceTotal - 0.5
+  const isInvoiceFullyPaid = invoiceTotal > 0 && paidTotalAll >= invoiceTotal - 0.5
   const isInvoiceLocked = Boolean(invoiceSuperman)
 
   const pollJob = async (jobId: string): Promise<SupermanDeklarasiResult> => {
@@ -461,6 +488,12 @@ export default function PembayaranPage() {
                   {selectedInvoice && sisaPembayaran > 0 && (
                     <p className="text-xs text-slate-500 mt-1">Sisa tersedia: {formatCurrency(sisaPembayaran)}</p>
                   )}
+                  {currentPphAddon > 0 && (
+                    <p className="text-xs text-emerald-700 mt-1">
+                      + PPh disetor: {formatCurrency(currentPphAddon)} → pelunasan efektif{' '}
+                      {formatCurrency(effectiveCurrent)}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs">PPh Disetor</Label>
@@ -468,6 +501,12 @@ export default function PembayaranPage() {
                     <option value="false">Belum</option>
                     <option value="true">Sudah</option>
                   </NativeSelect>
+                  {currentKontrak?.is_pph === 'true' && String(isPphDisetor || 'false') !== 'true' && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Jika pembeli memotong PPh, pilih <strong>Sudah</strong> agar pelunasan dihitung lengkap
+                      dan menu Superman muncul.
+                    </p>
+                  )}
                 </div>
                 {savedNo && (
                   <div>
@@ -488,9 +527,9 @@ export default function PembayaranPage() {
                     <span className="text-slate-500">Kewajiban Invoice:</span>
                     <span className="font-semibold">{formatCurrency(invoiceTotal)}</span>
                     <span className="text-slate-500">Sudah Dibayar:</span>
-                    <span className="text-emerald-700 font-medium">{formatCurrency(existingTotal)}</span>
+                    <span className="text-emerald-700 font-medium">{formatCurrency(paidTotalAll)}</span>
                     <span className="text-slate-500">Sisa:</span>
-                    <span className="font-medium">{formatCurrency(sisaPembayaran)}</span>
+                    <span className="font-medium">{formatCurrency(Math.max(0, invoiceTotal - paidTotalAll))}</span>
                     {currentKontrak && (
                       <>
                         <span className="text-slate-500">Kontrak:</span>
@@ -509,6 +548,9 @@ export default function PembayaranPage() {
                     </div>
                     <p className="text-xs text-slate-400 mt-1 text-right">
                       {progressPct}% terbayar saat ini · {afterThisPct}% setelah simpan
+                      {sisaAfterSave > 0.5 && afterThisPct < 100 && (
+                        <> · sisa {formatCurrency(sisaAfterSave)}</>
+                      )}
                     </p>
                   </div>
                   {invoicePembayaran.length > 0 && (
@@ -543,6 +585,19 @@ export default function PembayaranPage() {
             )}
           </fieldset>
         </ReadOnlyFieldset>
+
+        {docsReady && !willCompleteInvoice && !isInvoiceFullyPaid && !invoiceSuperman && selectedInvoice && (
+          <Card>
+            <CardContent className="py-4 text-sm text-amber-800">
+              Dokumen sudah lengkap, tetapi invoice belum lunas
+              {sisaAfterSave > 0.5 && <> (sisa {formatCurrency(sisaAfterSave)})</>}.
+              {currentKontrak?.is_pph === 'true' && String(isPphDisetor || 'false') !== 'true' && (
+                <> Jika transfer sudah termasuk pemotongan PPh pembeli, ubah <strong>PPh Disetor</strong> ke{' '}
+                <strong>Sudah</strong>.</>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {isInvoiceFullyPaid && !invoiceSuperman && selectedInvoice && (
           <Card>

@@ -7,6 +7,7 @@ import models
 import schemas
 from database import get_db
 from services.auth import require_write
+from services.pembayaran_utils import effective_pelunasan, pembayaran_paid_total
 from services.superman.documents import superman_doc_requirements_for_invoice
 
 router = APIRouter(prefix="/api/pembayaran", tags=["Pembayaran"])
@@ -52,18 +53,23 @@ def _validate_pembayaran_aggregate(
     db: Session,
     db_invoice: models.Invoice,
     nominal: float,
+    is_pph_disetor: Optional[str] = "false",
     exclude_no: Optional[str] = None,
 ) -> None:
     if nominal <= 0:
         raise HTTPException(status_code=400, detail="Nominal transfer harus lebih dari 0")
 
     invoice_total = float(db_invoice.jumlah_pembayaran or 0)
+    kontrak = db.query(models.Kontrak).filter(
+        models.Kontrak.no_kontrak == db_invoice.no_kontrak
+    ).first()
     q = db.query(models.Pembayaran).filter(models.Pembayaran.no_invoice == db_invoice.no_invoice)
     if exclude_no:
         q = q.filter(models.Pembayaran.no_pembayaran != exclude_no)
-    existing_total = sum(float(p.nominal_transfer or 0) for p in q.all())
+    existing_total = pembayaran_paid_total(q.all(), kontrak)
+    incoming = effective_pelunasan(nominal, is_pph_disetor, kontrak)
 
-    if existing_total + nominal > invoice_total + 0.5:
+    if existing_total + incoming > invoice_total + 0.5:
         sisa = max(0, round(invoice_total - existing_total))
         raise HTTPException(
             status_code=400,
@@ -72,10 +78,16 @@ def _validate_pembayaran_aggregate(
 
 
 def _invoice_paid_total(db: Session, no_invoice: str, exclude_no: Optional[str] = None) -> float:
+    invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
+    kontrak = None
+    if invoice and invoice.no_kontrak:
+        kontrak = db.query(models.Kontrak).filter(
+            models.Kontrak.no_kontrak == invoice.no_kontrak
+        ).first()
     q = db.query(models.Pembayaran).filter(models.Pembayaran.no_invoice == no_invoice)
     if exclude_no:
         q = q.filter(models.Pembayaran.no_pembayaran != exclude_no)
-    return sum(float(p.nominal_transfer or 0) for p in q.all())
+    return pembayaran_paid_total(q.all(), kontrak)
 
 
 @router.post("", response_model=schemas.PembayaranOut)
@@ -106,7 +118,9 @@ def create_pembayaran(
         ).first()
         if not db_pay:
             raise HTTPException(status_code=404, detail="Pembayaran not found")
-        _validate_pembayaran_aggregate(db, db_invoice, nominal, exclude_no=no_key)
+        _validate_pembayaran_aggregate(
+            db, db_invoice, nominal, pembayaran.is_pph_disetor, exclude_no=no_key
+        )
         existing_do = db.query(models.DeliveryOrder).filter(
             models.DeliveryOrder.no_pembayaran == no_key
         ).first()
@@ -122,7 +136,7 @@ def create_pembayaran(
         db_pay.selisih = invoice_total - nominal
         saved = db_pay
     else:
-        _validate_pembayaran_aggregate(db, db_invoice, nominal)
+        _validate_pembayaran_aggregate(db, db_invoice, nominal, pembayaran.is_pph_disetor)
         pay_no = _generate_pembayaran_no(db, pembayaran.no_invoice)
         saved = models.Pembayaran(
             no_pembayaran=pay_no,

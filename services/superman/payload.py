@@ -497,7 +497,9 @@ def build_payload_from_invoice(no_invoice: str) -> DeklarasiPayload:
             invoice.pembayaran or [],
             key=lambda p: (p.tanggal_pembayaran or "", p.no_pembayaran or ""),
         )
-        pay_total = sum(float(p.nominal_transfer or 0) for p in pay_rows)
+        from services.pembayaran_utils import pembayaran_paid_total
+
+        pay_total = pembayaran_paid_total(pay_rows, kontrak)
         if pay_total + 0.5 < inv_gross:
             raise ValueError(
                 f"Invoice {no_invoice} belum lunas. "
