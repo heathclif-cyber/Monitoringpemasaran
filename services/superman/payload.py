@@ -500,7 +500,8 @@ def build_payload_from_invoice(no_invoice: str) -> DeklarasiPayload:
         from services.pembayaran_utils import pembayaran_paid_total
 
         pay_total = pembayaran_paid_total(pay_rows, kontrak)
-        if pay_total + 0.5 < inv_gross:
+        # Toleransi Rp 1 untuk selisih pembulatan PPh pada transfer bersih
+        if pay_total + 1.5 < inv_gross:
             raise ValueError(
                 f"Invoice {no_invoice} belum lunas. "
                 f"Total pembayaran: Rp {pay_total:,.0f}, kewajiban: Rp {inv_gross:,.0f}"
