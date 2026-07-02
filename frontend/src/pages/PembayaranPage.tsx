@@ -26,6 +26,7 @@ import { fetchInvoiceDocRequirements, formatInvoiceSelectLabel } from '@/utils/i
 import {
   effectivePelunasan,
   isInvoicePaid,
+  maxNominalTransfer,
   paymentProgressPercent,
   pphOnNetTransfer,
   PAYMENT_LUNAS_TOLERANCE,
@@ -208,8 +209,11 @@ export default function PembayaranPage() {
       : 0
 
   const totalAfterSave = existingTotal + effectiveCurrent
-  const sisaPembayaran = Math.max(0, invoiceTotal - existingTotal)
+  const sisaPelunasan = Math.max(0, invoiceTotal - existingTotal)
+  const maxTransferNominal = maxNominalTransfer(sisaPelunasan, currentKontrak)
   const sisaAfterSave = Math.max(0, invoiceTotal - totalAfterSave)
+  const nominalExceedsMax =
+    Number(nominalTransfer) > 0 && Number(nominalTransfer) > maxTransferNominal + 0.5
   const progressPct = paymentProgressPercent(existingTotal, invoiceTotal)
   const afterThisPct = paymentProgressPercent(totalAfterSave, invoiceTotal)
   const willCompleteInvoice = isInvoicePaid(totalAfterSave, invoiceTotal)
@@ -373,6 +377,16 @@ export default function PembayaranPage() {
   }
 
   const savePembayaran = async (data: PembayaranFormData, triggerSuperman: boolean) => {
+    const incoming = effectivePelunasan(data.nominal_transfer, data.is_pph_disetor, currentKontrak)
+    if (existingTotal + incoming > invoiceTotal + 0.5) {
+      const msg =
+        currentKontrak?.is_pph === 'true'
+          ? `Nominal melebihi batas transfer. Maksimal transfer: ${formatCurrency(maxTransferNominal)} (PPh dipotong pembeli dihitung terpisah → pelunasan ${formatCurrency(sisaPelunasan)})`
+          : `Nominal melebihi sisa invoice. Maksimal transfer: ${formatCurrency(maxTransferNominal)}`
+      addNotification(msg, 'error')
+      return
+    }
+
     try {
       const payload: PembayaranInput = {
         no_invoice: data.no_invoice,
@@ -550,8 +564,18 @@ export default function PembayaranPage() {
                   {errors.nominal_transfer && (
                     <p className="text-xs text-red-500 mt-1">{errors.nominal_transfer.message}</p>
                   )}
-                  {selectedInvoice && sisaPembayaran > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">Sisa tersedia: {formatCurrency(sisaPembayaran)}</p>
+                  {selectedInvoice && maxTransferNominal > 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Maks. transfer: {formatCurrency(maxTransferNominal)}
+                      {currentKontrak?.is_pph === 'true' && sisaPelunasan > 0 && (
+                        <> · pelunasan tersisa {formatCurrency(sisaPelunasan)}</>
+                      )}
+                    </p>
+                  )}
+                  {nominalExceedsMax && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Nominal melebihi batas. Maksimal transfer: {formatCurrency(maxTransferNominal)}
+                    </p>
                   )}
                   {currentPphAddon > 0 && (
                     <p className="text-xs text-emerald-700 mt-1">

@@ -38,3 +38,27 @@ export function paymentProgressPercent(paid: number, invoiceTotal: number): numb
   if (isInvoicePaid(paid, invoiceTotal)) return 100
   return Math.min(99.9, Math.round(pct * 10) / 10)
 }
+
+/** Batas nominal transfer agar pelunasan (termasuk PPh dipotong pembeli) tidak melebihi sisa. */
+export function maxNominalTransfer(
+  sisaPelunasan: number,
+  kontrak: Kontrak | null | undefined,
+): number {
+  const target = Math.max(0, Number(sisaPelunasan) || 0)
+  if (target <= 0) return 0
+  if (kontrak?.is_pph !== 'true') return Math.round(target)
+
+  let lo = 0
+  let hi = Math.floor(target)
+  let best = 0
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2)
+    if (effectivePelunasan(mid, null, kontrak) <= target + 0.5) {
+      best = mid
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
+  }
+  return best
+}

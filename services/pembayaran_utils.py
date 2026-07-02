@@ -55,3 +55,26 @@ def pembayaran_paid_total(payments: list["models.Pembayaran"], kontrak: "models.
         effective_pelunasan(p.nominal_transfer, p.is_pph_disetor, kontrak)
         for p in payments
     )
+
+
+def max_nominal_transfer(
+    sisa_pelunasan: float,
+    kontrak: "models.Kontrak | None",
+) -> float:
+    """Batas nominal transfer agar pelunasan (termasuk PPh dipotong pembeli) tidak melebihi sisa."""
+    target = max(0.0, float(sisa_pelunasan or 0))
+    if target <= 0:
+        return 0.0
+    if str(getattr(kontrak, "is_pph", "false") if kontrak else "false").lower() != "true":
+        return round(target)
+
+    lo, hi = 0, int(target)
+    best = 0
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if effective_pelunasan(mid, None, kontrak) <= target + 0.5:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return float(best)

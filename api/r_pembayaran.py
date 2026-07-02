@@ -7,7 +7,7 @@ import models
 import schemas
 from database import get_db
 from services.auth import require_write
-from services.pembayaran_utils import effective_pelunasan, pembayaran_paid_total
+from services.pembayaran_utils import effective_pelunasan, max_nominal_transfer, pembayaran_paid_total
 from services.superman.documents import superman_doc_requirements_for_invoice
 
 router = APIRouter(prefix="/api/pembayaran", tags=["Pembayaran"])
@@ -70,10 +70,18 @@ def _validate_pembayaran_aggregate(
     incoming = effective_pelunasan(nominal, is_pph_disetor, kontrak)
 
     if existing_total + incoming > invoice_total + 0.5:
-        sisa = max(0, round(invoice_total - existing_total))
+        sisa_pelunasan = max(0.0, invoice_total - existing_total)
+        max_transfer = max_nominal_transfer(sisa_pelunasan, kontrak)
         raise HTTPException(
             status_code=400,
-            detail=f"Nominal melebihi sisa invoice. Sisa tersedia: Rp {sisa:,.0f}",
+            detail=(
+                f"Nominal melebihi batas transfer. Maksimal transfer: Rp {max_transfer:,.0f}"
+                + (
+                    f" (PPh dipotong pembeli dihitung terpisah → pelunasan Rp {round(sisa_pelunasan):,.0f})"
+                    if kontrak and str(getattr(kontrak, "is_pph", "false")).lower() == "true"
+                    else f" (sisa pelunasan Rp {round(sisa_pelunasan):,.0f})"
+                )
+            ),
         )
 
 
