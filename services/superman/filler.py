@@ -447,85 +447,119 @@ def _swal_visible(page: Page):
     return page.locator(".swal2-popup.swal2-show, .swal2-popup:visible").first
 
 
-def _dismiss_swal_dialogs(
+def _parse_store_response(resp) -> dict | list | str | None:
+    try:
+        return resp.json()
+    except Exception:
+        try:
+            return resp.text()
+        except Exception:
+            return None
+
+
+def _raise_swal_validation_error(text: str) -> None:
+    lower = text.lower()
+    if "belum terisi" not in lower and "belum lengkap" not in lower:
+        return
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    short = next(
+        (
+            ln
+            for ln in lines
+            if "belum terisi" in ln.lower()
+            or "belum lengkap" in ln.lower()
+            or "wajib" in ln.lower()
+        ),
+        lines[0] if lines else "",
+    )
+    if not short or len(short) > 240:
+        short = "Ada field wajib di form Superman yang belum terisi."
+    raise RuntimeError(f"Validasi Superman gagal: {short}")
+
+
+def _handle_swal_popup(page: Page, *, print_after: bool = False) -> str:
+    """Satu langkah tangani popup Superman. Return: none|waiting|acted."""
+    popup = _swal_visible(page)
+    if popup.count() == 0:
+        return "none"
+
+    text = popup.inner_text()
+    lower = text.lower()
+    _raise_swal_validation_error(text)
+
+    if (
+        popup.locator(".swal2-loading").count()
+        or "mengecek urutan" in lower
+        or "mohon tunggu" in lower
+    ):
+        return "waiting"
+
+    if (
+        "anomali" in lower
+        or "menyimpan dan mencetak" in lower
+        or "simpan saja" in lower
+        or "info urutan" in lower
+    ):
+        if print_after:
+            popup.locator(".swal2-confirm, button:has-text('Simpan dan Cetak')").first.click()
+        else:
+            deny = popup.locator(".swal2-deny, button:has-text('Simpan Saja')")
+            if deny.count():
+                deny.first.click()
+            else:
+                popup.locator(".swal2-confirm").first.click()
+        page.wait_for_timeout(800)
+        return "acted"
+
+    confirm = popup.locator(".swal2-confirm")
+    if confirm.count():
+        confirm.first.click()
+        page.wait_for_timeout(800)
+        return "acted"
+
+    return "waiting"
+
+
+def _wait_for_store_post(
     page: Page,
     *,
+    timeout_ms: int = 150000,
     print_after: bool = False,
-    timeout_ms: int = 180000,
-) -> None:
-    """Tunggu cek anomali + konfirmasi simpan Superman, lalu klik Simpan Saja."""
+    on_progress: ProgressCallback | None = None,
+) -> dict | list | str | None:
+    captured: dict[str, object | None] = {"resp": None}
+
+    def _on_response(resp) -> None:
+        if "/spp/store" in resp.url and resp.request.method == "POST":
+            captured["resp"] = resp
+
+    page.on("response", _on_response)
     elapsed = 0
-    step = 1000
-    idle_no_popup = 0
+    step = 500
+    last_stage = ""
+    try:
+        while elapsed <= timeout_ms:
+            if captured["resp"] is not None:
+                return _parse_store_response(captured["resp"])
 
-    while elapsed <= timeout_ms:
-        popup = _swal_visible(page)
-        if popup.count() == 0:
-            idle_no_popup += 1
-            if idle_no_popup >= 4:
-                return
-            page.wait_for_timeout(step)
-            elapsed += step
-            continue
-
-        idle_no_popup = 0
-        text = popup.inner_text()
-        lower = text.lower()
-        if "belum terisi" in lower or "belum lengkap" in lower:
-            details = popup.locator(".swal2-html-container li").all_inner_texts()
-            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-            short = next(
-                (
-                    ln
-                    for ln in lines
-                    if "belum terisi" in ln.lower()
-                    or "belum lengkap" in ln.lower()
-                    or "wajib" in ln.lower()
-                ),
-                lines[0] if lines else "",
-            )
-            if details:
-                short = f"{short} — {', '.join(details[:5])}"
-            elif not short or len(short) > 240:
-                short = "Ada field wajib di form Superman yang belum terisi."
-            raise RuntimeError(f"Validasi Superman gagal: {short}")
-
-        if (
-            popup.locator(".swal2-loading").count()
-            or "mengecek urutan" in lower
-            or "mohon tunggu" in lower
-        ):
-            page.wait_for_timeout(step)
-            elapsed += step
-            continue
-
-        if (
-            "anomali" in lower
-            or "menyimpan dan mencetak" in lower
-            or "simpan saja" in lower
-            or "info urutan" in lower
-        ):
-            if print_after:
-                popup.locator(".swal2-confirm, button:has-text('Simpan dan Cetak')").first.click()
-            else:
-                deny = popup.locator(".swal2-deny, button:has-text('Simpan Saja')")
-                if deny.count():
-                    deny.first.click()
+            state = _handle_swal_popup(page, print_after=print_after)
+            if state == "waiting" and on_progress:
+                if elapsed < 20000:
+                    stage = "Menunggu cek urutan nomor Superman..."
+                elif elapsed < 60000:
+                    stage = "Menunggu konfirmasi simpan Superman..."
                 else:
-                    popup.locator(".swal2-confirm").first.click()
-            page.wait_for_timeout(1500)
-            elapsed += step
-            continue
+                    stage = "Menunggu respons simpan Superman..."
+                if stage != last_stage:
+                    pct = min(94, 89 + elapsed // 25000)
+                    on_progress(pct, stage)
+                    last_stage = stage
 
-        confirm = popup.locator(".swal2-confirm")
-        if confirm.count():
-            confirm.first.click()
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(step)
             elapsed += step
-            continue
-
-        page.wait_for_timeout(step)
-        elapsed += step
+        return None
+    finally:
+        page.remove_listener("response", _on_response)
 
 
 def submit_sppn_draft(
@@ -534,14 +568,24 @@ def submit_sppn_draft(
     print_after: bool = False,
     on_progress: ProgressCallback | None = None,
 ) -> dict | list | str | None:
-    if on_progress:
-        on_progress(88, "Menyimpan draft ke Superman")
+    def report(percent: int, stage: str) -> None:
+        if on_progress:
+            on_progress(percent, stage)
+
+    report(88, "Menyiapkan simpan draft")
 
     for sel in ("#dokumen_pendukung_sppn", "#dokumen_pendukung_sppb"):
         if page.locator(sel).count():
             attached = _count_uploaded_docs(page, sel)
             if attached == 0:
                 logger.warning("Input %s tidak punya file sebelum simpan", sel)
+
+    sppn_files = _count_uploaded_docs(page, "#dokumen_pendukung_sppn")
+    if sppn_files == 0:
+        raise RuntimeError(
+            "Dokumen pendukung SPPn tidak terlampir di form Superman sebelum simpan. "
+            "Coba upload ulang dokumen di Input Pembayaran."
+        )
 
     simpan = page.locator("#simpan, button:has-text('Simpan')").first
     simpan.wait_for(state="visible", timeout=10000)
@@ -550,23 +594,17 @@ def submit_sppn_draft(
         timeout=30000,
     )
 
-    def _parse_store_response(resp) -> dict | list | str | None:
-        try:
-            return resp.json()
-        except Exception:
-            try:
-                return resp.text()
-            except Exception:
-                return None
-
     def _submit_form_direct() -> dict | list | str | None:
         status_val = "1" if print_after else "0"
         with page.expect_response(
             lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
-            timeout=300000,
+            timeout=120000,
         ) as resp_info:
             page.evaluate(
                 """(statusVal) => {
+                    if (typeof validateForm === 'function' && !validateForm()) {
+                        throw new Error('validateForm gagal');
+                    }
                     const status = document.getElementById('status_btn');
                     if (status) status.value = statusVal;
                     const form = document.getElementById('form_spp');
@@ -577,29 +615,40 @@ def submit_sppn_draft(
         return _parse_store_response(resp_info.value)
 
     store_body: dict | list | str | None = None
-    sppn_files = _count_uploaded_docs(page, "#dokumen_pendukung_sppn")
-    if sppn_files == 0:
-        raise RuntimeError(
-            "Dokumen pendukung SPPn tidak terlampir di form Superman sebelum simpan. "
-            "Coba upload ulang dokumen di Input Pembayaran."
-        )
 
+    report(89, "Mengklik simpan di Superman")
     try:
-        with page.expect_response(
-            lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
-            timeout=90000,
-        ) as resp_info:
-            simpan.click()
-            _dismiss_swal_dialogs(page, print_after=print_after, timeout_ms=75000)
-        store_body = _parse_store_response(resp_info.value)
+        simpan.click()
+        store_body = _wait_for_store_post(
+            page,
+            timeout_ms=120000,
+            print_after=print_after,
+            on_progress=on_progress,
+        )
     except Exception as exc:
-        logger.warning("Simpan via dialog gagal (%s) — coba submit form langsung", exc)
+        logger.warning("Simpan via klik gagal (%s)", exc)
+
+    if store_body is None:
+        report(92, "Mencoba kirim form langsung ke Superman")
         try:
             store_body = _submit_form_direct()
         except Exception as direct_exc:
-            logger.warning("Submit form langsung gagal: %s", direct_exc)
+            logger.warning("Submit form langsung gagal (%s) — ulang klik simpan", direct_exc)
+            try:
+                simpan.click()
+                store_body = _wait_for_store_post(
+                    page,
+                    timeout_ms=90000,
+                    print_after=print_after,
+                    on_progress=on_progress,
+                )
+            except Exception as retry_exc:
+                logger.warning("Ulang klik simpan gagal: %s", retry_exc)
 
-    page.wait_for_load_state("networkidle", timeout=120000)
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
+    except Exception:
+        pass
 
     if store_body is None:
         shot = _screenshot_debug(page, "spp_store_empty")
@@ -607,8 +656,10 @@ def submit_sppn_draft(
             "Superman tidak mengembalikan respons /spp/store — akan cek To Do List. screenshot=%s",
             shot,
         )
+        report(93, "Respons simpan kosong — cek To Do List")
         return None
 
+    report(95, "Draft tersimpan — verifikasi nomor")
     if isinstance(store_body, dict):
         success = store_body.get("success")
         status = str(store_body.get("status") or "").lower()

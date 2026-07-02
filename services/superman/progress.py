@@ -16,6 +16,8 @@ JobStatus = Literal["pending", "running", "completed", "failed"]
 ProgressCallback = Callable[[int, str], None]
 
 TTL_SECONDS = 3600
+# Job running tanpa update progres lebih dari ini dianggap macet (bisa di-retry).
+STALE_RUNNING_SECONDS = 420
 
 
 @dataclass
@@ -103,22 +105,50 @@ def fail_job(
     )
 
 
+def _fail_stale_job(job: SupermanJob) -> None:
+    job.status = "failed"
+    job.error = (
+        "Proses Superman terlalu lama (kemungkinan macet di tahap simpan). "
+        "Tutup dialog ini, tunggu ~1 menit, lalu coba lagi atau gunakan Pulihkan dari To Do List."
+    )
+    job.updated_at = time.time()
+    logger.error(
+        "deklarasi stale job_id=%s invoice=%s percent=%s stage=%s",
+        job.job_id,
+        job.no_invoice,
+        job.percent,
+        job.stage,
+    )
+
+
 def find_active_job_for_invoice(no_invoice: str) -> SupermanJob | None:
     ref = no_invoice.strip()
     if not ref:
         return None
     _cleanup_expired()
+    now = time.time()
     with _lock:
         for job in _jobs.values():
-            if job.no_invoice == ref and job.status in ("pending", "running"):
-                return job
+            if job.no_invoice != ref or job.status not in ("pending", "running"):
+                continue
+            if now - job.updated_at > STALE_RUNNING_SECONDS:
+                _fail_stale_job(job)
+                continue
+            return job
     return None
 
 
 def get_job(job_id: str) -> SupermanJob | None:
     _cleanup_expired()
     with _lock:
-        return _jobs.get(job_id)
+        job = _jobs.get(job_id)
+        if (
+            job
+            and job.status in ("pending", "running")
+            and time.time() - job.updated_at > STALE_RUNNING_SECONDS
+        ):
+            _fail_stale_job(job)
+        return job
 
 
 def make_progress_callback(job_id: str) -> ProgressCallback:
