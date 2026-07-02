@@ -1,7 +1,7 @@
 import type { Kontrak } from '@/types'
 
-/** Selisih pembulatan PPh (senilai backend Superman). */
-export const PAYMENT_LUNAS_TOLERANCE = 1.5
+/** Selisih di bawah Rp 100 dianggap lunas (senilai backend). */
+export const PAYMENT_LUNAS_TOLERANCE = 99
 
 export function isInvoicePaid(paid: number, invoiceTotal: number): boolean {
   return invoiceTotal > 0 && paid >= invoiceTotal - PAYMENT_LUNAS_TOLERANCE

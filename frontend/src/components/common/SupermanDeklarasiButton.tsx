@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore'
 import { client, isSupermanSessionError } from '@/lib/client'
 import { cn } from '@/lib/utils'
 import {
+  checkSupermanDocsReady,
   isSupermanSessionMessage,
   pollSupermanJob,
   recoverSupermanFromTodo,
@@ -136,13 +137,53 @@ export function SupermanDeklarasiButton({
   }
 
   const runDeklarasi = async () => {
+    const invoiceRef = noInvoice || lastInvoice
+    if (invoiceRef) {
+      try {
+        const docCheck = await checkSupermanDocsReady(invoiceRef)
+        if (!docCheck.ready) {
+          addNotification(docCheck.message, 'warning')
+          return
+        }
+      } catch (err) {
+        addNotification(
+          err instanceof Error ? err.message : 'Gagal memuat status dokumen pendukung',
+          'error',
+        )
+        return
+      }
+    } else if (noPembayaran) {
+      try {
+        const res = await client.get<{ ready: boolean; requirements: { required?: boolean; uploaded?: boolean; upload_hint?: string; label: string }[] }>(
+          `/api/superman/doc-requirements?no_pembayaran=${encodeURIComponent(noPembayaran)}`,
+        )
+        if (!res.ready) {
+          const missing = res.requirements
+            .filter((r) => r.required !== false && !r.uploaded)
+            .map((r) => r.upload_hint || r.label)
+            .join('; ')
+          addNotification(
+            missing
+              ? `Dokumen wajib belum lengkap: ${missing}`
+              : 'Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.',
+            'warning',
+          )
+          return
+        }
+      } catch (err) {
+        addNotification(
+          err instanceof Error ? err.message : 'Gagal memuat status dokumen pendukung',
+          'error',
+        )
+        return
+      }
+    }
+
     cancelledRef.current = false
     setLoading(true)
     resetProgressState()
     setProgressOpen(true)
     setOpen(false)
-
-    const invoiceRef = noInvoice || lastInvoice
 
     try {
       const params = new URLSearchParams()
@@ -213,10 +254,6 @@ export function SupermanDeklarasiButton({
   }
 
   const handleConfirm = async () => {
-    if (!docsReady) {
-      addNotification('Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.', 'warning')
-      return
-    }
     setLoading(true)
     try {
       const status = await client.get<SupermanStatus>('/api/superman/status')
@@ -275,8 +312,7 @@ export function SupermanDeklarasiButton({
         variant={compact ? 'outline' : 'secondary'}
         size={compact ? 'sm' : 'default'}
         className={cn(compact ? 'h-8 text-xs gap-1.5' : 'gap-2', className)}
-        disabled={disabled || loading || !(noInvoice || noPembayaran) || !docsReady}
-        title={!docsReady ? 'Upload dokumen wajib terlebih dahulu' : undefined}
+        disabled={disabled || loading || !(noInvoice || noPembayaran)}
         onClick={() => setOpen(true)}
       >
         {loading ? <Loader2 size={compact ? 12 : 14} className="animate-spin" /> : <Send size={compact ? 12 : 14} />}

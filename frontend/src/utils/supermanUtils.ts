@@ -1,5 +1,5 @@
 import { client, ApiError, isSupermanSessionError } from '@/lib/client'
-import type { SupermanDeklarasiProgress, SupermanDeklarasiResult } from '@/types'
+import type { SupermanDeklarasiProgress, SupermanDeklarasiResult, SupermanDocRequirement } from '@/types'
 
 export const POLL_INTERVAL_MS = 1000
 export const POLL_TIMEOUT_MS = 10 * 60 * 1000
@@ -13,6 +13,29 @@ function sleep(ms: number) {
 export interface PollSupermanJobOptions {
   onProgress?: (percent: number, stage: string) => void
   isCancelled?: () => boolean
+}
+
+export function formatMissingSupermanDocs(requirements: SupermanDocRequirement[]): string {
+  const missing = requirements
+    .filter((r) => r.required !== false && !r.uploaded)
+    .map((r) => r.upload_hint || r.label.replace(' (opsional)', ''))
+  if (!missing.length) {
+    return 'Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.'
+  }
+  return `Dokumen wajib belum lengkap: ${missing.join('; ')}`
+}
+
+export async function checkSupermanDocsReady(noInvoice: string): Promise<{
+  ready: boolean
+  message: string
+  requirements: SupermanDocRequirement[]
+}> {
+  const params = new URLSearchParams({ no_invoice: noInvoice })
+  const res = await client.get<{ ready: boolean; requirements: SupermanDocRequirement[] }>(
+    `/api/superman/doc-requirements?${params.toString()}`,
+  )
+  const message = res.ready ? '' : formatMissingSupermanDocs(res.requirements)
+  return { ready: res.ready, message, requirements: res.requirements }
 }
 
 export function isSupermanSessionMessage(message: string): boolean {

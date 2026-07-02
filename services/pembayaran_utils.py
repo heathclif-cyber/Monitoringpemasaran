@@ -7,6 +7,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import models
 
+# Selisih di bawah Rp 100 dianggap lunas (pembulatan PPh/transfer).
+PAYMENT_LUNAS_TOLERANCE = 99
+
+
+def is_invoice_paid(paid_total: float, invoice_total: float) -> bool:
+    return invoice_total > 0 and paid_total >= invoice_total - PAYMENT_LUNAS_TOLERANCE
+
 
 def pph_on_net_transfer(nominal: float, kontrak: "models.Kontrak | None") -> float:
     """PPh yang dipotong pembeli saat transfer bersih."""

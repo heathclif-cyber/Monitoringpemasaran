@@ -32,6 +32,7 @@ import {
 } from '@/utils/pembayaranUtils'
 import { isPayungBA } from '@/utils/kontrakUtils'
 import {
+  checkSupermanDocsReady,
   isSupermanSessionMessage,
   pollSupermanJob,
   recoverSupermanFromTodo,
@@ -238,6 +239,21 @@ export default function PembayaranPage() {
   }
 
   const runSupermanForInvoice = async (noInvoice: string) => {
+    let docCheck: Awaited<ReturnType<typeof checkSupermanDocsReady>>
+    try {
+      docCheck = await checkSupermanDocsReady(noInvoice)
+    } catch (err) {
+      addNotification(
+        err instanceof Error ? err.message : 'Gagal memuat status dokumen pendukung',
+        'error',
+      )
+      return
+    }
+    if (!docCheck.ready) {
+      addNotification(docCheck.message, 'warning')
+      return
+    }
+
     cancelledRef.current = false
     setSupermanRunning(true)
     resetSupermanProgress()
@@ -324,9 +340,11 @@ export default function PembayaranPage() {
   }
 
   const startSupermanFlow = async (noInvoice: string) => {
-    let fresh: Awaited<ReturnType<typeof fetchDocRequirements>>
+    let docCheck: Awaited<ReturnType<typeof checkSupermanDocsReady>>
     try {
-      fresh = await fetchDocRequirements(noInvoice)
+      docCheck = await checkSupermanDocsReady(noInvoice)
+      setDocRequirements(docCheck.requirements)
+      setDocsReady(docCheck.ready)
     } catch (err) {
       addNotification(
         err instanceof Error ? err.message : 'Gagal memuat status dokumen pendukung',
@@ -334,17 +352,8 @@ export default function PembayaranPage() {
       )
       return
     }
-    if (!fresh.ready) {
-      const missing = fresh.requirements
-        .filter((r) => r.required !== false && !r.uploaded)
-        .map((r) => r.label.replace(' (opsional)', ''))
-        .join(', ')
-      addNotification(
-        missing
-          ? `Dokumen wajib belum lengkap: ${missing}`
-          : 'Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.',
-        'warning',
-      )
+    if (!docCheck.ready) {
+      addNotification(docCheck.message, 'warning')
       return
     }
     try {
@@ -376,9 +385,11 @@ export default function PembayaranPage() {
       }
 
       if (triggerSuperman) {
-        let fresh: Awaited<ReturnType<typeof fetchDocRequirements>>
+        let docCheck: Awaited<ReturnType<typeof checkSupermanDocsReady>>
         try {
-          fresh = await fetchDocRequirements(data.no_invoice)
+          docCheck = await checkSupermanDocsReady(data.no_invoice)
+          setDocRequirements(docCheck.requirements)
+          setDocsReady(docCheck.ready)
         } catch (err) {
           addNotification(
             err instanceof Error ? err.message : 'Gagal memuat status dokumen pendukung',
@@ -386,17 +397,8 @@ export default function PembayaranPage() {
           )
           return
         }
-        if (!fresh.ready) {
-          const missing = fresh.requirements
-            .filter((r) => r.required !== false && !r.uploaded)
-            .map((r) => r.label.replace(' (opsional)', ''))
-            .join(', ')
-          addNotification(
-            missing
-              ? `Dokumen wajib belum lengkap: ${missing}`
-              : 'Upload dokumen wajib terlebih dahulu sebelum membuat SPPn Superman.',
-            'warning',
-          )
+        if (!docCheck.ready) {
+          addNotification(docCheck.message, 'warning')
           return
         }
       }
@@ -675,8 +677,8 @@ export default function PembayaranPage() {
                 type="button"
                 variant="secondary"
                 className="gap-2"
-                disabled={!docsReady || supermanRunning || !canEdit()}
-                onClick={() => startSupermanFlow(selectedInvoice)}
+                disabled={supermanRunning || !canEdit()}
+                onClick={() => void startSupermanFlow(selectedInvoice)}
               >
                 {supermanRunning ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 Buat Deklarasi Superman
@@ -710,10 +712,9 @@ export default function PembayaranPage() {
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={actionsBusy || !docsReady}
+                  disabled={actionsBusy}
                   className="gap-2"
                   onClick={() => void onSaveAndSuperman()}
-                  title={!docsReady ? 'Upload dokumen wajib terlebih dahulu' : undefined}
                 >
                   {supermanRunning ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   Catat Pembayaran dan Buat Deklarasi Superman
