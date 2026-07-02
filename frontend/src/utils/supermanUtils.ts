@@ -76,6 +76,11 @@ export async function pollSupermanJob(
       if (err instanceof ApiError && isSupermanSessionError(err)) {
         throw err
       }
+      if (err instanceof ApiError && err.status === 404) {
+        throw new Error(
+          'Sesi job hilang (server restart). Tutup dialog ini, lalu klik "Buat Deklarasi Superman" lagi.',
+        )
+      }
       if (
         err instanceof ApiError
         && RETRYABLE_STATUSES.has(err.status)

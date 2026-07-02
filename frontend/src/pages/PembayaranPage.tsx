@@ -217,7 +217,7 @@ export default function PembayaranPage() {
     invoiceTotal,
   )
   const { surplus: surplusPaidAll } = paymentBalance(paidTotalAll, invoiceTotal)
-  const progressPct = paymentProgressPercent(existingTotal, invoiceTotal)
+  const progressPct = paymentProgressPercent(paidTotalAll, invoiceTotal)
   const afterThisPct = paymentProgressPercent(totalAfterSave, invoiceTotal)
   const willCompleteInvoice = isInvoicePaid(totalAfterSave, invoiceTotal)
   const isInvoiceFullyPaid = isInvoicePaid(paidTotalAll, invoiceTotal)
@@ -477,9 +477,14 @@ export default function PembayaranPage() {
                 )}>
                   {invoiceSuperman || (isInvoiceFullyPaid ? 'Menunggu Superman' : 'Belum lunas')}
                 </p>
-                {!invoiceSuperman && (
+                {!invoiceSuperman && !isInvoiceFullyPaid && (
                   <p className="text-xs text-slate-400 mt-1">
                     Catat pembayaran dulu. Superman dibuat terpisah setelah invoice lunas dan dokumen wajib lengkap.
+                  </p>
+                )}
+                {!invoiceSuperman && isInvoiceFullyPaid && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Invoice sudah lunas — klik Buat Deklarasi Superman setelah dokumen wajib siap.
                   </p>
                 )}
               </div>
@@ -806,6 +811,11 @@ export default function PembayaranPage() {
         }}
         onClose={closeSupermanProgress}
         onRecover={handleRecoverSuperman}
+        onRetry={() => {
+          const noInvoice = supermanInvoice || selectedInvoice
+          closeSupermanProgress()
+          if (noInvoice) void startSupermanFlow(noInvoice)
+        }}
       />
     </div>
   )

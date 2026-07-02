@@ -24,6 +24,7 @@ interface SupermanProgressDialogProps {
   onCancel?: () => void
   onClose?: () => void
   onRecover?: () => void
+  onRetry?: () => void
 }
 
 export function SupermanProgressDialog({
@@ -40,11 +41,13 @@ export function SupermanProgressDialog({
   onCancel,
   onClose,
   onRecover,
+  onRetry,
 }: SupermanProgressDialogProps) {
   const refLabel = noInvoice || noPembayaran || '-'
   const clamped = Math.max(0, Math.min(100, percent))
   const dismissible = failed || partial
   const showRecover = partial && Boolean(noInvoice) && Boolean(onRecover)
+  const showRetry = failed && Boolean(noInvoice) && Boolean(onRetry)
 
   const handleOpenChange = (next: boolean) => {
     if (!next && dismissible) {
@@ -104,6 +107,11 @@ export function SupermanProgressDialog({
               <Button type="button" variant="outline" size="sm" onClick={onCancel}>
                 <X className="h-3.5 w-3.5 mr-1" />
                 Batalkan
+              </Button>
+            )}
+            {showRetry && (
+              <Button type="button" size="sm" onClick={onRetry}>
+                Coba Lagi
               </Button>
             )}
             {showRecover && (
