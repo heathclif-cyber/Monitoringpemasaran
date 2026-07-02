@@ -687,6 +687,7 @@ export interface SupermanDeklarasiProgress {
 
 export interface SupermanDeklarasiResult {
   ok: boolean
+  partial?: boolean
   no_invoice?: string
   no_pembayaran?: string
   no_do?: string

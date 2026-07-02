@@ -1,5 +1,22 @@
 const BASE_URL = import.meta.env.VITE_API_URL || ''
 
+export class ApiError extends Error {
+  status: number
+  code?: string
+
+  constructor(message: string, status: number, code?: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+  }
+}
+
+export function isSupermanSessionError(err: unknown): boolean {
+  return err instanceof ApiError
+    && (err.status === 428 || err.code === 'SUPERMAN_SESSION_REQUIRED')
+}
+
 function getToken(): string | null {
   try { return localStorage.getItem('auth_token') } catch { return null }
 }
@@ -12,6 +29,39 @@ function handleUnauthorized() {
   window.location.href = '/login'
 }
 
+function parseErrorDetail(body: { detail?: unknown }): { message: string; code?: string } {
+  const detail = body?.detail
+  if (typeof detail === 'string') {
+    return { message: detail }
+  }
+  if (detail && typeof detail === 'object') {
+    const record = detail as Record<string, unknown>
+    const message = typeof record.message === 'string'
+      ? record.message
+      : JSON.stringify(detail)
+    const code = typeof record.code === 'string' ? record.code : undefined
+    return { message, code }
+  }
+  return { message: 'Request failed' }
+}
+
+async function handleErrorResponse(res: Response, path: string, method: string): Promise<never> {
+  const body = await res.json().catch(() => ({ detail: res.statusText }))
+  const { message, code } = parseErrorDetail(body)
+  console.error(`[client] ${method} ${path} failed:`, body)
+
+  if (res.status === 428 || code === 'SUPERMAN_SESSION_REQUIRED') {
+    throw new ApiError(message || 'Session Superman belum aktif', 428, code || 'SUPERMAN_SESSION_REQUIRED')
+  }
+
+  if (res.status === 401) {
+    handleUnauthorized()
+    throw new ApiError('Sesi berakhir, silakan login kembali', 401)
+  }
+
+  throw new ApiError(message || `Request failed: ${res.status}`, res.status, code)
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${path}`
   const token = getToken()
@@ -20,15 +70,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   const res = await fetch(url, { headers, ...options })
 
-  if (res.status === 401) {
-    handleUnauthorized()
-    throw new Error('Sesi berakhir, silakan login kembali')
-  }
-
   if (!res.ok) {
-    const detail = await res.json().catch(() => ({ detail: res.statusText }))
-    console.error(`[client] ${options?.method || 'GET'} ${path} failed:`, detail)
-    throw new Error(detail.detail || `Request failed: ${res.status}`)
+    await handleErrorResponse(res, path, options?.method || 'GET')
   }
   return res.json()
 }
@@ -70,14 +113,8 @@ export const client = {
     if (token) headers['Authorization'] = `Bearer ${token}`
 
     const res = await fetch(url, { method: 'POST', body: formData, headers })
-    if (res.status === 401) {
-      handleUnauthorized()
-      throw new Error('Sesi berakhir, silakan login kembali')
-    }
     if (!res.ok) {
-      const detail = await res.json().catch(() => ({ detail: res.statusText }))
-      console.error(`[client] POST ${path} failed:`, detail)
-      throw new Error(detail.detail || `Request failed: ${res.status}`)
+      await handleErrorResponse(res, path, 'POST')
     }
     return res.json()
   },

@@ -51,6 +51,7 @@ from services.superman.progress import (
     complete_job,
     create_job,
     fail_job,
+    find_active_job_for_invoice,
     get_job,
     make_progress_callback,
     update_job,
@@ -722,7 +723,7 @@ def submit_deklarasi_invoice(
         pw.stop()
 
     result: dict[str, Any] = {
-        "ok": True,
+        "ok": False,
         "no_invoice": no_invoice,
         "no_pembayaran": payload.no_pembayaran,
         "no_do": payload.no_do,
@@ -758,12 +759,21 @@ def submit_deklarasi_invoice(
     saved = save_superman_to_invoice(no_invoice, sppb_no, sppn_no)
     if saved:
         result["superman_saved"] = saved
+        result["ok"] = True
     elif sppb_no or sppn_no:
+        result["partial"] = True
+        result["ok"] = False
         result["message"] = (
             f"Draft SPPn/SPPb berhasil, namun nomor belum tersimpan otomatis ke invoice. "
-            f"Salin manual: {format_superman_ref(sppb_no, sppn_no)}"
+            f"Salin manual atau gunakan Pulihkan dari To Do: {format_superman_ref(sppb_no, sppn_no)}"
         )
     else:
+        result["partial"] = True
+        result["ok"] = False
+        result["message"] = (
+            "Draft SPPn/SPPb kemungkinan masuk To Do List, namun nomor belum terdeteksi. "
+            "Coba Pulihkan dari To Do List."
+        )
         result["extract_debug"] = {
             "store_extract": {"sppb": store_sppb, "sppn": store_sppn},
             "store_body_preview": json.dumps(store_body, ensure_ascii=False, default=str)[:2500]
@@ -798,7 +808,7 @@ def _run_deklarasi_job(job_id: str, no_invoice: str) -> None:
         )
         complete_job(job_id, result)
     except Exception as exc:
-        fail_job(job_id, str(exc))
+        fail_job(job_id, str(exc), debug={"no_invoice": no_invoice, "exc_type": type(exc).__name__})
 
 
 def start_deklarasi_job(
@@ -813,6 +823,12 @@ def start_deklarasi_job(
         no_do=no_do,
     )
     assert_invoice_not_submitted(ref)
+    active = find_active_job_for_invoice(ref)
+    if active:
+        raise ValueError(
+            f"Job deklarasi untuk invoice {ref} masih berjalan (job_id={active.job_id}). "
+            "Tunggu selesai atau coba lagi nanti."
+        )
     cfg = _api_config()
     ensure_session(cfg)
     job_id = create_job(ref, no_pembayaran=(no_pembayaran or "").strip())

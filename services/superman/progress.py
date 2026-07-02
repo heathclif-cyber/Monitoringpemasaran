@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
+
+logger = logging.getLogger("superman.job")
 
 JobStatus = Literal["pending", "running", "completed", "failed"]
 
@@ -76,14 +79,40 @@ def complete_job(job_id: str, result: dict[str, Any]) -> None:
         job.updated_at = time.time()
 
 
-def fail_job(job_id: str, error: str) -> None:
+def fail_job(
+    job_id: str,
+    error: str,
+    *,
+    debug: dict[str, Any] | None = None,
+) -> None:
+    invoice_ref = "?"
     with _lock:
         job = _jobs.get(job_id)
         if not job:
             return
+        invoice_ref = job.no_invoice
         job.status = "failed"
         job.error = error
         job.updated_at = time.time()
+    logger.error(
+        "deklarasi failed job_id=%s invoice=%s error=%s debug=%s",
+        job_id,
+        invoice_ref,
+        error,
+        debug or {},
+    )
+
+
+def find_active_job_for_invoice(no_invoice: str) -> SupermanJob | None:
+    ref = no_invoice.strip()
+    if not ref:
+        return None
+    _cleanup_expired()
+    with _lock:
+        for job in _jobs.values():
+            if job.no_invoice == ref and job.status in ("pending", "running"):
+                return job
+    return None
 
 
 def get_job(job_id: str) -> SupermanJob | None:

@@ -207,9 +207,9 @@ def verify_captcha_challenge(challenge_id: str, answer: str) -> dict[str, Any]:
         page.wait_for_timeout(1500)
 
     if not _is_login_page(page):
-        path = Path(cfg.state_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        page.context.storage_state(path=str(path))
+        from services.superman.auth import save_storage_state_atomic
+
+        save_storage_state_atomic(page.context, cfg.state_path)
         _dispose(challenge_id)
         return {"ok": True, "session_valid": True}
 

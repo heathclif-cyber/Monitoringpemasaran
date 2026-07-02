@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import tempfile
+import threading
 from pathlib import Path
 
 from playwright.sync_api import BrowserContext, Page, sync_playwright
@@ -15,6 +17,9 @@ class SupermanCaptchaError(RuntimeError):
 
 class SupermanCaptchaRequired(RuntimeError):
     """Session Superman belum ada — user harus isi captcha lewat UI."""
+
+
+_session_io_lock = threading.Lock()
 
 
 def _is_login_page(page: Page) -> bool:
@@ -88,6 +93,28 @@ def login_manual(page: Page, cfg: SupermanConfig, timeout_ms: int = 300_000) -> 
     return True
 
 
+def _write_storage_state_atomic(context: BrowserContext, state_path: Path) -> None:
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=state_path.parent,
+        prefix=f".{state_path.name}.",
+        suffix=".tmp",
+    )
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+    try:
+        context.storage_state(path=str(tmp_path))
+        os.replace(tmp_path, state_path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def save_storage_state_atomic(context: BrowserContext, state_path: Path | str) -> None:
+    with _session_io_lock:
+        _write_storage_state_atomic(context, Path(state_path))
+
+
 def _save_session(cfg: SupermanConfig, *, manual: bool = False) -> str:
     state_path = Path(cfg.state_path)
     state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,7 +129,7 @@ def _save_session(cfg: SupermanConfig, *, manual: bool = False) -> str:
             login_manual(page, cfg)
         else:
             login(page, cfg)
-        context.storage_state(path=str(state_path))
+        save_storage_state_atomic(context, state_path)
         browser.close()
     return str(state_path)
 

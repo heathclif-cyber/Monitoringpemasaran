@@ -150,13 +150,18 @@ def _map_deklarasi_error(exc: Exception) -> HTTPException:
         message = str(exc)
         if "sudah pernah dibuatkan SPPn/SPPb" in message:
             return HTTPException(status_code=409, detail=message)
+        if "masih berjalan" in message:
+            return HTTPException(status_code=409, detail=message)
         return HTTPException(status_code=404, detail=message)
     if isinstance(exc, FileNotFoundError):
         return HTTPException(status_code=400, detail=str(exc))
     if isinstance(exc, SupermanNotConfiguredError):
         return HTTPException(status_code=503, detail=str(exc))
     if isinstance(exc, SupermanCaptchaRequired):
-        return HTTPException(status_code=401, detail=str(exc))
+        return HTTPException(
+            status_code=428,
+            detail={"code": "SUPERMAN_SESSION_REQUIRED", "message": str(exc)},
+        )
     if isinstance(exc, SupermanCaptchaError):
         return HTTPException(status_code=502, detail=str(exc))
     if isinstance(exc, RuntimeError):

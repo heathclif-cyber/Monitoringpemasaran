@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 
 from playwright.sync_api import Page
@@ -258,6 +260,34 @@ def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) ->
                 break
 
 
+def _screenshot_debug(page: Page, label: str) -> str | None:
+    try:
+        debug_dir = Path(os.getenv("SUPERMAN_DEBUG_DIR", "/tmp/superman_debug"))
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = debug_dir / f"{label}_{ts}.png"
+        page.screenshot(path=str(path), full_page=True)
+        return str(path)
+    except Exception:
+        return None
+
+
+def _wait_doc_list_dom(page: Page, *, timeout_ms: int = 15000) -> None:
+    selectors = [
+        "#list_dokumen_pendukung_sppn",
+        "#list_dokumen_pendukung_sppb",
+        "#dokumen_pendukung_sppn_preview",
+        "#dokumen_pendukung_sppb_preview",
+        ".dz-preview",
+    ]
+    for selector in selectors:
+        try:
+            page.wait_for_selector(selector, state="attached", timeout=timeout_ms)
+            return
+        except Exception:
+            continue
+
+
 def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeout_ms: int = 35000) -> int:
     elapsed = 0
     step = 1000
@@ -298,12 +328,15 @@ def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool
         page.wait_for_timeout(600)
         _upload_files_to_input(page, "#dokumen_pendukung_sppn", paths)
 
+    _wait_doc_list_dom(page)
     uploaded = _wait_uploaded_docs(page, "#dokumen_pendukung_sppn", len(paths))
     if uploaded < len(paths):
+        shot = _screenshot_debug(page, "upload_docs_failed")
+        hint = f" Screenshot: {shot}" if shot else ""
         raise RuntimeError(
             f"Dokumen pendukung Superman belum terlampir ({uploaded}/{len(paths)} file). "
             "Coba upload ulang Kontrak, Invoice, dan Rekening Koran di aplikasi, "
-            "lalu jalankan deklarasi Superman sekali lagi."
+            f"lalu jalankan deklarasi Superman sekali lagi.{hint}"
         )
 
     page.evaluate(
@@ -458,6 +491,26 @@ def submit_sppn_draft(
                 store_body = None
 
     page.wait_for_load_state("networkidle", timeout=120000)
+
+    if store_body is None:
+        shot = _screenshot_debug(page, "spp_store_empty")
+        hint = f" Screenshot: {shot}" if shot else ""
+        raise RuntimeError(f"Superman tidak mengembalikan respons /spp/store.{hint}")
+
+    if isinstance(store_body, dict):
+        success = store_body.get("success")
+        status = str(store_body.get("status") or "").lower()
+        if success is False or status in {"error", "failed", "fail"}:
+            msg = (
+                store_body.get("message")
+                or store_body.get("msg")
+                or store_body.get("error")
+                or str(store_body)
+            )
+            shot = _screenshot_debug(page, "spp_store_error")
+            hint = f" Screenshot: {shot}" if shot else ""
+            raise RuntimeError(f"Gagal menyimpan draft Superman: {msg}{hint}")
+
     return store_body
 
 

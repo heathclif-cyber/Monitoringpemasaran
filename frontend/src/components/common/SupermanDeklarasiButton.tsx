@@ -6,11 +6,15 @@ import { SupermanCaptchaDialog } from '@/components/common/SupermanCaptchaDialog
 import { SupermanProgressDialog } from '@/components/common/SupermanProgressDialog'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
-import { client } from '@/lib/client'
+import { client, isSupermanSessionError } from '@/lib/client'
 import { cn } from '@/lib/utils'
+import {
+  isSupermanSessionMessage,
+  pollSupermanJob,
+  recoverSupermanFromTodo,
+} from '@/utils/supermanUtils'
 import type {
   SupermanDeklarasiJobStart,
-  SupermanDeklarasiProgress,
   SupermanDeklarasiResult,
   SupermanStatus,
 } from '@/types'
@@ -25,12 +29,6 @@ interface SupermanDeklarasiButtonProps {
   disabled?: boolean
   className?: string
   onSuccess?: (result: SupermanDeklarasiResult) => void | Promise<void>
-}
-
-const POLL_INTERVAL_MS = 1000
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export function SupermanDeklarasiButton({
@@ -50,34 +48,71 @@ export function SupermanDeklarasiButton({
   const [captchaOpen, setCaptchaOpen] = useState(false)
   const [progressOpen, setProgressOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [recoverLoading, setRecoverLoading] = useState(false)
   const [percent, setPercent] = useState(0)
   const [stage, setStage] = useState('Memulai...')
+  const [failed, setFailed] = useState(false)
+  const [partial, setPartial] = useState(false)
+  const [failedMessage, setFailedMessage] = useState('')
+  const [lastInvoice, setLastInvoice] = useState<string | undefined>(noInvoice)
   const cancelledRef = useRef(false)
 
   const savedLabel = (existingSuperman || '').trim()
+
+  const resetProgressState = () => {
+    setFailed(false)
+    setPartial(false)
+    setFailedMessage('')
+    setPercent(0)
+    setStage('Memulai...')
+  }
+
+  const closeProgress = () => {
+    setProgressOpen(false)
+    resetProgressState()
+  }
 
   const showResult = async (res: SupermanDeklarasiResult) => {
     const parts = [
       res.sppn_no ? `SPPn ${res.sppn_no}` : null,
       res.sppb_no ? `SPPb ${res.sppb_no}` : null,
     ].filter(Boolean)
+
+    if (res.partial || (!res.ok && parts.length)) {
+      setPartial(true)
+      setStage(res.message || 'Nomor Superman belum tersimpan otomatis')
+      setPercent(100)
+      addNotification(
+        parts.length
+          ? `Superman: ${parts.join(' + ')} dibuat, namun nomor belum tersimpan. Gunakan Pulihkan dari To Do.`
+          : res.message,
+        'warning',
+      )
+      return
+    }
+
     if (parts.length && !res.superman_saved) {
+      setPartial(true)
+      setStage(res.message)
+      setPercent(100)
       addNotification(
         `Superman: ${parts.join(' + ')} dibuat, tetapi nomor belum tersimpan ke kolom Superman. Salin manual.`,
         'warning',
       )
-    } else {
-      addNotification(
-        parts.length
-          ? `Superman: ${parts.join(' + ')} masuk To Do List`
-          : res.message,
-        'success',
-      )
+      return
     }
+
+    addNotification(
+      parts.length
+        ? `Superman: ${parts.join(' + ')} masuk To Do List`
+        : res.message,
+      'success',
+    )
     if (res.superman_url) {
       window.open(res.superman_url, '_blank', 'noopener,noreferrer')
     }
     setOpen(false)
+    closeProgress()
     try {
       await onSuccess?.(res)
     } catch (err) {
@@ -85,34 +120,14 @@ export function SupermanDeklarasiButton({
     }
   }
 
-  const pollJob = async (jobId: string): Promise<SupermanDeklarasiResult> => {
-    while (!cancelledRef.current) {
-      const progress = await client.get<SupermanDeklarasiProgress>(
-        `/api/superman/deklarasi/progress?job_id=${encodeURIComponent(jobId)}`,
-      )
-      setPercent(progress.percent)
-      setStage(progress.stage)
-
-      if (progress.status === 'completed' && progress.result) {
-        setPercent(100)
-        setStage('Selesai')
-        return progress.result
-      }
-      if (progress.status === 'failed') {
-        throw new Error(progress.error || 'Gagal membuat SPPn di Superman')
-      }
-      await sleep(POLL_INTERVAL_MS)
-    }
-    throw new Error('Proses dibatalkan')
-  }
-
   const runDeklarasi = async () => {
     cancelledRef.current = false
     setLoading(true)
-    setPercent(0)
-    setStage('Memulai...')
+    resetProgressState()
     setProgressOpen(true)
     setOpen(false)
+
+    const invoiceRef = noInvoice || lastInvoice
 
     try {
       const params = new URLSearchParams()
@@ -122,19 +137,63 @@ export function SupermanDeklarasiButton({
       const start = await client.post<SupermanDeklarasiJobStart>(
         `/api/superman/deklarasi/start?${params.toString()}`,
       )
-      const result = await pollJob(start.job_id)
+      setLastInvoice(start.no_invoice || noInvoice)
+      const result = await pollSupermanJob(start.job_id, {
+        isCancelled: () => cancelledRef.current,
+        onProgress: (p, s) => {
+          setPercent(p)
+          setStage(s)
+        },
+      })
       await showResult(result)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Gagal membuat SPPn di Superman'
-      if (message.includes('captcha') || message.includes('Session Superman')) {
-        setProgressOpen(false)
+      if (isSupermanSessionError(err) || isSupermanSessionMessage(message)) {
+        closeProgress()
         setCaptchaOpen(true)
         return
       }
+      setFailed(true)
+      setFailedMessage(message)
+      setStage(message)
       addNotification(message, 'error')
     } finally {
       setLoading(false)
-      setProgressOpen(false)
+    }
+  }
+
+  const handleRecover = async () => {
+    const invoiceRef = lastInvoice || noInvoice
+    if (!invoiceRef) return
+    setRecoverLoading(true)
+    try {
+      const res = await recoverSupermanFromTodo(invoiceRef)
+      if (res.ok && res.superman_saved) {
+        addNotification(`Nomor Superman dipulihkan: ${res.superman_saved}`, 'success')
+        closeProgress()
+        setOpen(false)
+        await onSuccess?.({
+          ok: true,
+          no_invoice: invoiceRef,
+          no_kontrak: '',
+          jenis_form: '',
+          pph_nominal: 0,
+          total_sppn: 0,
+          support_doc: '',
+          superman_url: '',
+          message: res.message || 'Dipulihkan dari To Do List',
+          superman_saved: res.superman_saved,
+        })
+      } else {
+        addNotification(res.message || 'Gagal memulihkan nomor dari To Do List', 'error')
+      }
+    } catch (err) {
+      addNotification(
+        err instanceof Error ? err.message : 'Gagal memulihkan nomor Superman',
+        'error',
+      )
+    } finally {
+      setRecoverLoading(false)
     }
   }
 
@@ -153,6 +212,11 @@ export function SupermanDeklarasiButton({
       }
       await runDeklarasi()
     } catch (err) {
+      if (isSupermanSessionError(err)) {
+        setOpen(false)
+        setCaptchaOpen(true)
+        return
+      }
       addNotification(
         err instanceof Error ? err.message : 'Gagal memeriksa session Superman',
         'error',
@@ -223,10 +287,22 @@ export function SupermanDeklarasiButton({
 
       <SupermanProgressDialog
         open={progressOpen}
-        noInvoice={noInvoice}
+        noInvoice={lastInvoice || noInvoice}
         noPembayaran={noPembayaran}
         percent={percent}
         stage={stage}
+        running={loading && !failed && !partial}
+        failed={failed}
+        failedMessage={failedMessage}
+        partial={partial}
+        recoverLoading={recoverLoading}
+        onCancel={() => {
+          cancelledRef.current = true
+          closeProgress()
+          setLoading(false)
+        }}
+        onClose={closeProgress}
+        onRecover={handleRecover}
       />
     </>
   )
