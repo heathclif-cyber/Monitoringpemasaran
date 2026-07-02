@@ -1,5 +1,4 @@
 import { CheckCircle2, CircleAlert } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import type { SupermanDocRequirement } from '@/types'
 
@@ -12,6 +11,8 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
   if (requirements.length === 0) {
     return <span className="text-muted-foreground">-</span>
   }
+
+  const firstMissing = requirements.find((req) => req.required !== false && !req.uploaded)
 
   return (
     <div className="min-w-[7rem] space-y-1">
@@ -68,10 +69,10 @@ export function SupermanDocChecklist({ requirements = [], docsReady = false }: S
           )
         })}
       </ul>
-      {!docsReady && (
-        <Link to="/upload" className="text-[10px] text-primary hover:underline">
-          Upload
-        </Link>
+      {!docsReady && firstMissing?.upload_hint && (
+        <p className="text-[10px] text-amber-800 dark:text-amber-300 leading-snug">
+          {firstMissing.upload_hint}
+        </p>
       )}
     </div>
   )

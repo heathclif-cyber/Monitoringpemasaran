@@ -25,9 +25,12 @@ import { cn, formatCurrency } from '@/lib/utils'
 import { fetchInvoiceDocRequirements, formatInvoiceSelectLabel } from '@/utils/invoiceUtils'
 import {
   effectivePelunasan,
+  isInvoicePaid,
   paymentProgressPercent,
   pphOnNetTransfer,
+  PAYMENT_LUNAS_TOLERANCE,
 } from '@/utils/pembayaranUtils'
+import { isPayungBA } from '@/utils/kontrakUtils'
 import {
   isSupermanSessionMessage,
   pollSupermanJob,
@@ -208,8 +211,10 @@ export default function PembayaranPage() {
   const sisaAfterSave = Math.max(0, invoiceTotal - totalAfterSave)
   const progressPct = paymentProgressPercent(existingTotal, invoiceTotal)
   const afterThisPct = paymentProgressPercent(totalAfterSave, invoiceTotal)
-  const willCompleteInvoice = invoiceTotal > 0 && totalAfterSave >= invoiceTotal - 0.5
-  const isInvoiceFullyPaid = invoiceTotal > 0 && paidTotalAll >= invoiceTotal - 0.5
+  const willCompleteInvoice = isInvoicePaid(totalAfterSave, invoiceTotal)
+  const isInvoiceFullyPaid = isInvoicePaid(paidTotalAll, invoiceTotal)
+  const isPayung = isPayungBA(currentKontrak?.tipe_alur)
+  const baNo = (currentInvoice?.no_ba || '').trim()
   const isInvoiceLocked = Boolean(invoiceSuperman)
 
   const resetSupermanProgress = () => {
@@ -475,19 +480,29 @@ export default function PembayaranPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Dokumen Pendukung Superman</CardTitle>
               <p className="text-xs text-slate-500 mt-1">
-                Wajib: Kontrak, Invoice, dan Rekening Koran Penerimaan. Ketiga file ini dilampirkan ke Superman. Kuitansi opsional.
+                {isPayung
+                  ? 'Wajib: Berita Acara, Invoice, dan Rekening Koran Penerimaan (kontrak payung TBS). Kuitansi opsional.'
+                  : 'Wajib: Kontrak, Invoice, dan Rekening Koran Penerimaan. Kuitansi opsional.'}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                {currentKontrak?.no_kontrak && (
+                {isPayung && baNo ? (
+                  <DocumentUpload
+                    entityType="ba"
+                    entityId={baNo}
+                    docType="berita_acara"
+                    label="Berita Acara"
+                    onUploaded={handleDocumentUploaded}
+                  />
+                ) : currentKontrak?.no_kontrak ? (
                   <DocumentUpload
                     entityType="kontrak"
                     entityId={currentKontrak.no_kontrak}
                     docType="kontrak"
                     onUploaded={handleDocumentUploaded}
                   />
-                )}
+                ) : null}
                 <DocumentUpload
                   entityType="invoice"
                   entityId={currentInvoice.no_invoice}
@@ -633,11 +648,19 @@ export default function PembayaranPage() {
           </fieldset>
         </ReadOnlyFieldset>
 
+        {isPayung && !baNo && selectedInvoice && (
+          <Card>
+            <CardContent className="py-4 text-sm text-amber-800">
+              Invoice payung BA belum terhubung ke Berita Acara. Hubungkan di menu Invoice terlebih dahulu.
+            </CardContent>
+          </Card>
+        )}
+
         {docsReady && !willCompleteInvoice && !isInvoiceFullyPaid && !invoiceSuperman && selectedInvoice && (
           <Card>
             <CardContent className="py-4 text-sm text-amber-800">
               Dokumen sudah lengkap, tetapi invoice belum lunas
-              {sisaAfterSave > 0.5 && <> (sisa {formatCurrency(sisaAfterSave)})</>}.
+              {sisaAfterSave > PAYMENT_LUNAS_TOLERANCE && <> (sisa {formatCurrency(sisaAfterSave)})</>}.
             </CardContent>
           </Card>
         )}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from collections.abc import Callable
@@ -22,6 +23,7 @@ from services.superman.select2_helpers import (
 )
 
 TAMBAH_URL = "/spp/tambah"
+logger = logging.getLogger("superman.filler")
 
 
 def _wait_loaded(page: Page) -> None:
@@ -476,26 +478,33 @@ def submit_sppn_draft(
     )
 
     store_body: dict | list | str | None = None
-    with page.expect_response(
-        lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
-        timeout=120000,
-    ) as resp_info:
-        simpan.click()
-        _dismiss_swal_dialogs(page, print_after=print_after)
-        try:
-            store_body = resp_info.value.json()
-        except Exception:
+    try:
+        with page.expect_response(
+            lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
+            timeout=120000,
+        ) as resp_info:
+            simpan.click()
+            _dismiss_swal_dialogs(page, print_after=print_after)
             try:
-                store_body = resp_info.value.text()
+                store_body = resp_info.value.json()
             except Exception:
-                store_body = None
+                try:
+                    store_body = resp_info.value.text()
+                except Exception:
+                    store_body = None
+    except Exception as exc:
+        _dismiss_swal_dialogs(page, print_after=print_after)
+        logger.warning("Respons /spp/store tidak tertangkap: %s", exc)
 
     page.wait_for_load_state("networkidle", timeout=120000)
 
     if store_body is None:
         shot = _screenshot_debug(page, "spp_store_empty")
-        hint = f" Screenshot: {shot}" if shot else ""
-        raise RuntimeError(f"Superman tidak mengembalikan respons /spp/store.{hint}")
+        logger.warning(
+            "Superman tidak mengembalikan respons /spp/store — akan cek To Do List. screenshot=%s",
+            shot,
+        )
+        return None
 
     if isinstance(store_body, dict):
         success = store_body.get("success")

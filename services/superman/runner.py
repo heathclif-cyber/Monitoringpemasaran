@@ -34,6 +34,7 @@ from services.superman.payload import (
     build_payload_from_invoice,
     build_payload_from_pembayaran,
 )
+from services.superman.preflight import validate_deklarasi_ready
 from services.superman.persist import (
     assert_do_not_submitted,
     assert_invoice_not_submitted,
@@ -667,6 +668,7 @@ def submit_deklarasi_invoice(
     report = on_progress or (lambda _percent, _stage: None)
 
     report(5, "Memuat data invoice dan dokumen")
+    validate_deklarasi_ready(no_invoice)
     cfg = _api_config()
 
     report(10, "Memvalidasi session Superman")
@@ -692,6 +694,8 @@ def submit_deklarasi_invoice(
             on_progress=on_progress,
         )
         store_body = submit_sppn_draft(page, on_progress=on_progress)
+        if store_body is None:
+            report(90, "Respons simpan kosong — memverifikasi To Do List")
         report(95, "Memverifikasi To Do List")
         store_sppb, store_sppn = _extract_numbers_from_store(store_body)
         match = _find_todo_match(
@@ -768,20 +772,30 @@ def submit_deklarasi_invoice(
             f"Salin manual atau gunakan Pulihkan dari To Do: {format_superman_ref(sppb_no, sppn_no)}"
         )
     else:
-        result["partial"] = True
-        result["ok"] = False
-        result["message"] = (
-            "Draft SPPn/SPPb kemungkinan masuk To Do List, namun nomor belum terdeteksi. "
-            "Coba Pulihkan dari To Do List."
-        )
-        result["extract_debug"] = {
-            "store_extract": {"sppb": store_sppb, "sppn": store_sppn},
-            "store_body_preview": json.dumps(store_body, ensure_ascii=False, default=str)[:2500]
-            if store_body is not None
-            else None,
-            "todo_top": todo_debug,
-            "match_found": match is not None,
-        }
+        recovered = recover_superman_from_todo(no_invoice=no_invoice)
+        if recovered.get("ok") and recovered.get("superman_saved"):
+            result["ok"] = True
+            result["partial"] = False
+            result["superman_saved"] = recovered["superman_saved"]
+            result["sppb_no"] = recovered.get("sppb_no")
+            result["sppn_no"] = recovered.get("sppn_no")
+            result["recovered"] = True
+            result["message"] = recovered.get("message") or "Nomor Superman dipulihkan dari To Do List."
+        else:
+            result["partial"] = True
+            result["ok"] = False
+            result["message"] = (
+                "Draft SPPn/SPPb kemungkinan masuk To Do List, namun nomor belum terdeteksi. "
+                "Coba Pulihkan dari To Do List."
+            )
+            result["extract_debug"] = {
+                "store_extract": {"sppb": store_sppb, "sppn": store_sppn},
+                "store_body_preview": json.dumps(store_body, ensure_ascii=False, default=str)[:2500]
+                if store_body is not None
+                else None,
+                "todo_top": todo_debug,
+                "match_found": match is not None,
+            }
 
     report(100, "Selesai")
     return result
@@ -808,6 +822,28 @@ def _run_deklarasi_job(job_id: str, no_invoice: str) -> None:
         )
         complete_job(job_id, result)
     except Exception as exc:
+        try:
+            recovered = recover_superman_from_todo(no_invoice=no_invoice)
+            if recovered.get("ok") and recovered.get("superman_saved"):
+                complete_job(
+                    job_id,
+                    {
+                        "ok": True,
+                        "no_invoice": no_invoice,
+                        "superman_saved": recovered["superman_saved"],
+                        "sppb_no": recovered.get("sppb_no"),
+                        "sppn_no": recovered.get("sppn_no"),
+                        "recovered": True,
+                        "message": (
+                            "Deklarasi bermasalah di tahap simpan, namun nomor berhasil "
+                            f"dipulihkan dari To Do List: {recovered['superman_saved']}"
+                        ),
+                        "warning": str(exc),
+                    },
+                )
+                return
+        except Exception:
+            pass
         fail_job(job_id, str(exc), debug={"no_invoice": no_invoice, "exc_type": type(exc).__name__})
 
 
@@ -823,6 +859,7 @@ def start_deklarasi_job(
         no_do=no_do,
     )
     assert_invoice_not_submitted(ref)
+    validate_deklarasi_ready(ref)
     active = find_active_job_for_invoice(ref)
     if active:
         raise ValueError(

@@ -152,6 +152,8 @@ def _map_deklarasi_error(exc: Exception) -> HTTPException:
             return HTTPException(status_code=409, detail=message)
         if "masih berjalan" in message:
             return HTTPException(status_code=409, detail=message)
+        if "belum lunas" in message or "Dokumen pendukung" in message:
+            return HTTPException(status_code=400, detail=message)
         return HTTPException(status_code=404, detail=message)
     if isinstance(exc, FileNotFoundError):
         return HTTPException(status_code=400, detail=str(exc))

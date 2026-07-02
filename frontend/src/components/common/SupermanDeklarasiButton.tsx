@@ -78,6 +78,21 @@ export function SupermanDeklarasiButton({
       res.sppb_no ? `SPPb ${res.sppb_no}` : null,
     ].filter(Boolean)
 
+    if (res.recovered || (res.ok && res.superman_saved)) {
+      addNotification(`Superman: ${res.superman_saved || parts.join(' + ')}`, 'success')
+      if (res.superman_url) {
+        window.open(res.superman_url, '_blank', 'noopener,noreferrer')
+      }
+      setOpen(false)
+      closeProgress()
+      try {
+        await onSuccess?.(res)
+      } catch (err) {
+        console.error('[SupermanDeklarasiButton.onSuccess]', err)
+      }
+      return
+    }
+
     if (res.partial || (!res.ok && parts.length)) {
       setPartial(true)
       setStage(res.message || 'Nomor Superman belum tersimpan otomatis')
