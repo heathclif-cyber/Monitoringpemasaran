@@ -447,14 +447,28 @@ def _swal_visible(page: Page):
     return page.locator(".swal2-popup.swal2-show, .swal2-popup:visible").first
 
 
-def _dismiss_swal_dialogs(page: Page, *, print_after: bool = False) -> None:
-    for _ in range(12):
-        popup = _swal_visible(page)
-        try:
-            popup.wait_for(state="visible", timeout=5000)
-        except Exception:
-            return
+def _dismiss_swal_dialogs(
+    page: Page,
+    *,
+    print_after: bool = False,
+    timeout_ms: int = 180000,
+) -> None:
+    """Tunggu cek anomali + konfirmasi simpan Superman, lalu klik Simpan Saja."""
+    elapsed = 0
+    step = 1000
+    idle_no_popup = 0
 
+    while elapsed <= timeout_ms:
+        popup = _swal_visible(page)
+        if popup.count() == 0:
+            idle_no_popup += 1
+            if idle_no_popup >= 4:
+                return
+            page.wait_for_timeout(step)
+            elapsed += step
+            continue
+
+        idle_no_popup = 0
         text = popup.inner_text()
         lower = text.lower()
         if "belum terisi" in lower or "belum lengkap" in lower:
@@ -476,11 +490,21 @@ def _dismiss_swal_dialogs(page: Page, *, print_after: bool = False) -> None:
                 short = "Ada field wajib di form Superman yang belum terisi."
             raise RuntimeError(f"Validasi Superman gagal: {short}")
 
-        if popup.locator(".swal2-loading").count():
-            page.wait_for_timeout(800)
+        if (
+            popup.locator(".swal2-loading").count()
+            or "mengecek urutan" in lower
+            or "mohon tunggu" in lower
+        ):
+            page.wait_for_timeout(step)
+            elapsed += step
             continue
 
-        if "anomali" in lower or "menyimpan dan mencetak" in lower or "simpan saja" in lower:
+        if (
+            "anomali" in lower
+            or "menyimpan dan mencetak" in lower
+            or "simpan saja" in lower
+            or "info urutan" in lower
+        ):
             if print_after:
                 popup.locator(".swal2-confirm, button:has-text('Simpan dan Cetak')").first.click()
             else:
@@ -489,13 +513,19 @@ def _dismiss_swal_dialogs(page: Page, *, print_after: bool = False) -> None:
                     deny.first.click()
                 else:
                     popup.locator(".swal2-confirm").first.click()
-        else:
-            confirm = popup.locator(".swal2-confirm")
-            if confirm.count():
-                confirm.first.click()
-            else:
-                return
-        page.wait_for_timeout(1000)
+            page.wait_for_timeout(1500)
+            elapsed += step
+            continue
+
+        confirm = popup.locator(".swal2-confirm")
+        if confirm.count():
+            confirm.first.click()
+            page.wait_for_timeout(1500)
+            elapsed += step
+            continue
+
+        page.wait_for_timeout(step)
+        elapsed += step
 
 
 def submit_sppn_draft(
@@ -524,10 +554,10 @@ def submit_sppn_draft(
     try:
         with page.expect_response(
             lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
-            timeout=240000,
+            timeout=300000,
         ) as resp_info:
             simpan.click()
-            _dismiss_swal_dialogs(page, print_after=print_after)
+            _dismiss_swal_dialogs(page, print_after=print_after, timeout_ms=240000)
             try:
                 store_body = resp_info.value.json()
             except Exception:
@@ -536,7 +566,6 @@ def submit_sppn_draft(
                 except Exception:
                     store_body = None
     except Exception as exc:
-        _dismiss_swal_dialogs(page, print_after=print_after)
         logger.warning("Respons /spp/store tidak tertangkap: %s", exc)
 
     page.wait_for_load_state("networkidle", timeout=120000)
