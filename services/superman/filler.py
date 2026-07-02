@@ -520,12 +520,73 @@ def _handle_swal_popup(page: Page, *, print_after: bool = False) -> str:
     return "waiting"
 
 
+def _install_swal_auto_confirm(page: Page, *, print_after: bool = False) -> None:
+    """Auto-klik dialog Swal (Simpan Saja) — headless sering tidak selesai sendiri."""
+    page.evaluate(
+        """(printAfter) => {
+            if (!window.Swal || window.__swalPatched) return;
+            window.__swalPatched = true;
+            const clickPopup = () => {
+                const popup = document.querySelector('.swal2-popup.swal2-show, .swal2-popup:visible');
+                if (!popup) return;
+                const text = (popup.innerText || '').toLowerCase();
+                if (text.includes('belum terisi') || text.includes('belum lengkap')) return;
+                if (popup.querySelector('.swal2-loading') || text.includes('mengecek urutan') || text.includes('mohon tunggu')) return;
+                if (printAfter) {
+                    const c = popup.querySelector('.swal2-confirm, button.swal2-confirm');
+                    if (c) c.click();
+                    return;
+                }
+                const deny = popup.querySelector('.swal2-deny');
+                if (deny) { deny.click(); return; }
+                const buttons = [...popup.querySelectorAll('button')];
+                const simpanSaja = buttons.find(b => (b.innerText || '').toLowerCase().includes('simpan saja'));
+                if (simpanSaja) { simpanSaja.click(); return; }
+                const confirm = popup.querySelector('.swal2-confirm');
+                if (confirm) confirm.click();
+            };
+            const orig = window.Swal.fire.bind(window.Swal);
+            window.Swal.fire = function() {
+                const result = orig.apply(this, arguments);
+                setTimeout(clickPopup, 400);
+                setTimeout(clickPopup, 1200);
+                setTimeout(clickPopup, 2500);
+                return result;
+            };
+            window.__swalClickInterval = setInterval(clickPopup, 900);
+            setTimeout(() => clearInterval(window.__swalClickInterval), 180000);
+        }""",
+        print_after,
+    )
+
+
+def _progress_heartbeat(
+    on_progress: ProgressCallback | None,
+    elapsed_ms: int,
+    *,
+    base_percent: int,
+    message: str,
+    last_tick: dict[str, int],
+) -> None:
+    if not on_progress:
+        return
+    tick = elapsed_ms // 5000
+    if tick == last_tick.get("v"):
+        return
+    last_tick["v"] = tick
+    secs = elapsed_ms // 1000
+    pct = min(94, base_percent + elapsed_ms // 12000)
+    on_progress(pct, f"{message} ({secs} detik)")
+
+
 def _wait_for_store_post(
     page: Page,
     *,
     timeout_ms: int = 150000,
     print_after: bool = False,
     on_progress: ProgressCallback | None = None,
+    progress_message: str = "Menunggu respons simpan Superman",
+    base_percent: int = 89,
 ) -> dict | list | str | None:
     captured: dict[str, object | None] = {"resp": None}
 
@@ -536,25 +597,93 @@ def _wait_for_store_post(
     page.on("response", _on_response)
     elapsed = 0
     step = 500
-    last_stage = ""
+    last_tick: dict[str, int] = {"v": -1}
     try:
         while elapsed <= timeout_ms:
             if captured["resp"] is not None:
                 return _parse_store_response(captured["resp"])
 
-            state = _handle_swal_popup(page, print_after=print_after)
-            if state == "waiting" and on_progress:
-                if elapsed < 20000:
-                    stage = "Menunggu cek urutan nomor Superman..."
-                elif elapsed < 60000:
-                    stage = "Menunggu konfirmasi simpan Superman..."
-                else:
-                    stage = "Menunggu respons simpan Superman..."
-                if stage != last_stage:
-                    pct = min(94, 89 + elapsed // 25000)
-                    on_progress(pct, stage)
-                    last_stage = stage
+            try:
+                _handle_swal_popup(page, print_after=print_after)
+            except RuntimeError:
+                raise
 
+            _progress_heartbeat(
+                on_progress,
+                elapsed,
+                base_percent=base_percent,
+                message=progress_message,
+                last_tick=last_tick,
+            )
+
+            page.wait_for_timeout(step)
+            elapsed += step
+        return None
+    finally:
+        page.remove_listener("response", _on_response)
+
+
+def _trigger_form_submit(page: Page, *, print_after: bool = False) -> None:
+    status_val = "1" if print_after else "0"
+    page.evaluate(
+        """(statusVal) => {
+            if (typeof validateForm === 'function' && !validateForm()) {
+                throw new Error('validateForm gagal');
+            }
+            const status = document.getElementById('status_btn');
+            if (status) status.value = statusVal;
+            if (typeof simpan_spp === 'function') {
+                simpan_spp();
+                return;
+            }
+            const form = document.getElementById('form_spp');
+            if (form) form.submit();
+        }""",
+        status_val,
+    )
+
+
+def _submit_and_wait_store(
+    page: Page,
+    *,
+    print_after: bool = False,
+    on_progress: ProgressCallback | None = None,
+    timeout_ms: int = 60000,
+    progress_message: str,
+    base_percent: int,
+    use_simpan_click: bool = False,
+    simpan=None,
+) -> dict | list | str | None:
+    captured: dict[str, object | None] = {"resp": None}
+
+    def _on_response(resp) -> None:
+        if "/spp/store" in resp.url and resp.request.method == "POST":
+            captured["resp"] = resp
+
+    page.on("response", _on_response)
+    try:
+        if use_simpan_click and simpan is not None:
+            simpan.click()
+        else:
+            _trigger_form_submit(page, print_after=print_after)
+
+        elapsed = 0
+        step = 500
+        last_tick: dict[str, int] = {"v": -1}
+        while elapsed <= timeout_ms:
+            if captured["resp"] is not None:
+                return _parse_store_response(captured["resp"])
+            try:
+                _handle_swal_popup(page, print_after=print_after)
+            except RuntimeError:
+                raise
+            _progress_heartbeat(
+                on_progress,
+                elapsed,
+                base_percent=base_percent,
+                message=progress_message,
+                last_tick=last_tick,
+            )
             page.wait_for_timeout(step)
             elapsed += step
         return None
@@ -593,57 +722,52 @@ def submit_sppn_draft(
         "() => { const b = document.querySelector('#simpan'); return b && !b.disabled; }",
         timeout=30000,
     )
-
-    def _submit_form_direct() -> dict | list | str | None:
-        status_val = "1" if print_after else "0"
-        with page.expect_response(
-            lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
-            timeout=120000,
-        ) as resp_info:
-            page.evaluate(
-                """(statusVal) => {
-                    if (typeof validateForm === 'function' && !validateForm()) {
-                        throw new Error('validateForm gagal');
-                    }
-                    const status = document.getElementById('status_btn');
-                    if (status) status.value = statusVal;
-                    const form = document.getElementById('form_spp');
-                    if (form) form.submit();
-                }""",
-                status_val,
-            )
-        return _parse_store_response(resp_info.value)
+    _install_swal_auto_confirm(page, print_after=print_after)
 
     store_body: dict | list | str | None = None
 
-    report(89, "Mengklik simpan di Superman")
+    report(89, "Mengirim draft ke Superman")
     try:
-        simpan.click()
-        store_body = _wait_for_store_post(
+        store_body = _submit_and_wait_store(
             page,
-            timeout_ms=120000,
             print_after=print_after,
             on_progress=on_progress,
+            timeout_ms=45000,
+            progress_message="Mengirim draft ke Superman",
+            base_percent=89,
         )
     except Exception as exc:
-        logger.warning("Simpan via klik gagal (%s)", exc)
+        logger.warning("Kirim cepat gagal (%s)", exc)
 
     if store_body is None:
-        report(92, "Mencoba kirim form langsung ke Superman")
+        report(90, "Mengirim via tombol Simpan Superman")
         try:
-            store_body = _submit_form_direct()
-        except Exception as direct_exc:
-            logger.warning("Submit form langsung gagal (%s) — ulang klik simpan", direct_exc)
-            try:
-                simpan.click()
-                store_body = _wait_for_store_post(
-                    page,
-                    timeout_ms=90000,
-                    print_after=print_after,
-                    on_progress=on_progress,
-                )
-            except Exception as retry_exc:
-                logger.warning("Ulang klik simpan gagal: %s", retry_exc)
+            store_body = _submit_and_wait_store(
+                page,
+                print_after=print_after,
+                on_progress=on_progress,
+                timeout_ms=35000,
+                progress_message="Menunggu dialog simpan Superman",
+                base_percent=90,
+                use_simpan_click=True,
+                simpan=simpan,
+            )
+        except Exception as exc:
+            logger.warning("Simpan via tombol gagal (%s)", exc)
+
+    if store_body is None:
+        report(91, "Mencoba ulang kirim form")
+        try:
+            store_body = _submit_and_wait_store(
+                page,
+                print_after=print_after,
+                on_progress=on_progress,
+                timeout_ms=45000,
+                progress_message="Mengulang kirim draft",
+                base_percent=91,
+            )
+        except Exception as exc:
+            logger.warning("Ulang kirim form gagal: %s", exc)
 
     try:
         page.wait_for_load_state("domcontentloaded", timeout=15000)
