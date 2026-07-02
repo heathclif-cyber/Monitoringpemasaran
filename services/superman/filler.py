@@ -165,19 +165,17 @@ def _count_uploaded_docs(page: Page, input_selector: str) -> int:
     )
 
 
-def _notify_fileinput_change(page: Page, input_selector: str) -> None:
-    """Picu handler bootstrap-fileinput setelah Playwright set_input_files."""
-    page.evaluate(
-        """(sel) => {
-            const input = document.querySelector(sel);
-            if (!input) return;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            if (window.jQuery) {
-                jQuery(input).trigger('change');
-            }
-        }""",
-        input_selector,
+def _read_input_file_count(page: Page, input_selector: str) -> int:
+    """Baca jumlah file di input asli — jangan picu event change Superman (jQuery .val() error)."""
+    return int(
+        page.evaluate(
+            """(sel) => {
+                const input = document.querySelector(sel);
+                return input && input.files ? input.files.length : 0;
+            }""",
+            input_selector,
+        )
+        or 0
     )
 
 
@@ -278,8 +276,7 @@ def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) ->
     try:
         expected = len(upload_paths)
         locator.set_input_files(upload_paths)
-        _notify_fileinput_change(page, input_selector)
-        page.wait_for_timeout(1500)
+        page.wait_for_timeout(800)
         for _ in range(30):
             if _count_uploaded_docs(page, input_selector) >= expected:
                 return
