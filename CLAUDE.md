@@ -1,5 +1,7 @@
 # CLAUDE.md — Monitoring Pemasaran PTPN I
 
+> **Agent / debug:** lihat [agent.md](./agent.md) dan log bug [bug.md](./bug.md).
+
 ## Project Overview
 
 Sales Document Automation & Reporting System untuk PT Perkebunan Nusantara I Regional 8. 
