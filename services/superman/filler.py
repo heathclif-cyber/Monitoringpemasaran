@@ -227,28 +227,38 @@ def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None
     page.locator(f"#nominal_sppb_{isi_index}_1").dispatch_event("keyup")
 
 
-def _dispatch_input_change(page: Page, input_selector: str) -> None:
-    page.evaluate(
-        """(sel) => {
-            const input = document.querySelector(sel);
-            if (!input) return;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            if (window.jQuery) window.jQuery(input).trigger('change');
-        }""",
-        input_selector,
-    )
-
-
 def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
+    """Upload dokumen ke input file Superman.
+
+    Jangan trigger change via jQuery — handler Superman memanggil .val() pada
+    file input yang menyebabkan InvalidStateError di browser.
+    Playwright set_input_files sudah memicu event native yang cukup.
+    """
     page.wait_for_selector(input_selector, state="attached", timeout=15000)
+    locator = page.locator(input_selector)
+
+    if len(paths) == 1:
+        locator.set_input_files(paths[0])
+        page.wait_for_timeout(2500)
+        return
+
+    # Batch upload (input accept multiple)
+    locator.set_input_files(paths)
+    page.wait_for_timeout(3500)
+    if _count_uploaded_docs(page, input_selector) >= len(paths):
+        return
+
+    # Fallback: satu file per iterasi, tunggu daftar preview bertambah
     for path in paths:
-        page.set_input_files(input_selector, path)
-        page.wait_for_timeout(1200)
-        _dispatch_input_change(page, input_selector)
-        page.wait_for_timeout(1200)
+        prev = _count_uploaded_docs(page, input_selector)
+        locator.set_input_files(path)
+        for _ in range(20):
+            page.wait_for_timeout(800)
+            if _count_uploaded_docs(page, input_selector) > prev:
+                break
 
 
-def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeout_ms: int = 20000) -> int:
+def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeout_ms: int = 35000) -> int:
     elapsed = 0
     step = 1000
     uploaded = 0
