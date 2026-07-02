@@ -145,38 +145,39 @@ def _parse_id_number(value: str) -> int:
     return int(digits or 0)
 
 
-def _list_selectors_for_input(input_selector: str) -> list[str]:
-    if "sppb" in input_selector:
-        return [
-            "#list_dokumen_pendukung_sppb li",
-            "#dokumen_pendukung_sppb_preview .file-name",
-            "#dokumen_pendukung_sppb_preview img",
-        ]
-    return [
-        "#list_dokumen_pendukung_sppn li",
-        "#dokumen_pendukung_sppn_preview .file-name",
-        "#dokumen_pendukung_sppn_preview img",
-        ".dokumen-pendukung-sppn",
-        ".dz-preview",
-    ]
-
-
 def _count_uploaded_docs(page: Page, input_selector: str) -> int:
-    """Hitung file di daftar preview Superman — jangan pakai input.files (selalu 1)."""
-    selectors = _list_selectors_for_input(input_selector)
+    """Hitung file terlampir di widget bootstrap-fileinput Superman."""
     return int(
         page.evaluate(
-            """(sels) => {
-                let best = 0;
-                for (const sel of sels) {
-                    const count = document.querySelectorAll(sel).length;
-                    if (count > best) best = count;
-                }
-                return best;
+            """(sel) => {
+                const input = document.querySelector(sel);
+                if (!input) return 0;
+                const files = input.files ? input.files.length : 0;
+                const root = input.closest('.file-input');
+                const previews = root
+                    ? root.querySelectorAll('.file-preview-thumbnails .file-preview-frame').length
+                    : 0;
+                return Math.max(files, previews);
             }""",
-            selectors,
+            input_selector,
         )
         or 0
+    )
+
+
+def _notify_fileinput_change(page: Page, input_selector: str) -> None:
+    """Picu handler bootstrap-fileinput setelah Playwright set_input_files."""
+    page.evaluate(
+        """(sel) => {
+            const input = document.querySelector(sel);
+            if (!input) return;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            if (window.jQuery) {
+                jQuery(input).trigger('change');
+            }
+        }""",
+        input_selector,
     )
 
 
@@ -270,30 +271,28 @@ def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None
 
 
 def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
-    """Upload dokumen ke input file Superman — satu per satu, tunggu daftar bertambah."""
+    """Upload dokumen ke input file Superman (bootstrap-fileinput, multiple)."""
     page.wait_for_selector(input_selector, state="attached", timeout=15000)
     locator = page.locator(input_selector)
     upload_paths, tmp = _prepare_unique_upload_paths(paths)
     try:
-        for idx, path in enumerate(upload_paths, start=1):
-            target = idx
-            prev = _count_uploaded_docs(page, input_selector)
-            locator.set_input_files(path)
-            page.wait_for_timeout(1200)
-            for _ in range(40):
-                cur = _count_uploaded_docs(page, input_selector)
-                if cur >= target or cur > prev:
-                    break
-                page.wait_for_timeout(1000)
-            final = _count_uploaded_docs(page, input_selector)
-            if final < target:
-                logger.warning(
-                    "Upload dokumen %s ke %s: daftar %s/%s",
-                    Path(path).name,
-                    input_selector,
-                    final,
-                    target,
-                )
+        expected = len(upload_paths)
+        locator.set_input_files(upload_paths)
+        _notify_fileinput_change(page, input_selector)
+        page.wait_for_timeout(1500)
+        for _ in range(30):
+            if _count_uploaded_docs(page, input_selector) >= expected:
+                return
+            page.wait_for_timeout(1000)
+        final = _count_uploaded_docs(page, input_selector)
+        if final < expected:
+            logger.warning(
+                "Upload dokumen ke %s: daftar %s/%s (%s)",
+                input_selector,
+                final,
+                expected,
+                ", ".join(Path(p).name for p in upload_paths),
+            )
     finally:
         if tmp is not None:
             tmp.cleanup()
@@ -313,11 +312,9 @@ def _screenshot_debug(page: Page, label: str) -> str | None:
 
 def _wait_doc_list_dom(page: Page, *, timeout_ms: int = 15000) -> None:
     selectors = [
-        "#list_dokumen_pendukung_sppn",
-        "#list_dokumen_pendukung_sppb",
-        "#dokumen_pendukung_sppn_preview",
-        "#dokumen_pendukung_sppb_preview",
-        ".dz-preview",
+        "#dokumen_pendukung_sppn",
+        "#dokumen_pendukung_sppb",
+        ".file-preview-thumbnails",
     ]
     for selector in selectors:
         try:
