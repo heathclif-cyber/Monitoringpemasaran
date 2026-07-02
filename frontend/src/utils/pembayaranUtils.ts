@@ -39,6 +39,16 @@ export function paymentProgressPercent(paid: number, invoiceTotal: number): numb
   return Math.min(99.9, Math.round(pct * 10) / 10)
 }
 
+export function paymentBalance(
+  paid: number,
+  invoiceTotal: number,
+): { shortfall: number; surplus: number } {
+  const diff = invoiceTotal - paid
+  if (diff > PAYMENT_LUNAS_TOLERANCE) return { shortfall: diff, surplus: 0 }
+  if (diff < -PAYMENT_LUNAS_TOLERANCE) return { shortfall: 0, surplus: -diff }
+  return { shortfall: 0, surplus: 0 }
+}
+
 /** Batas nominal transfer agar pelunasan (termasuk PPh dipotong pembeli) tidak melebihi sisa. */
 export function maxNominalTransfer(
   sisaPelunasan: number,

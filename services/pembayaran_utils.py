@@ -57,6 +57,25 @@ def pembayaran_paid_total(payments: list["models.Pembayaran"], kontrak: "models.
     )
 
 
+def payment_balance(paid_total: float, invoice_total: float) -> tuple[float, float]:
+    """Return (shortfall, surplus) in pelunasan terms. Tolerance applies to shortfall only."""
+    diff = float(invoice_total or 0) - float(paid_total or 0)
+    if diff > PAYMENT_LUNAS_TOLERANCE:
+        return diff, 0.0
+    if diff < -PAYMENT_LUNAS_TOLERANCE:
+        return 0.0, -diff
+    return 0.0, 0.0
+
+
+def pembayaran_selisih(
+    invoice_total: float,
+    existing_paid: float,
+    incoming_pelunasan: float,
+) -> float:
+    """Sisa invoice setelah termin ini. Negatif = kelebihan pelunasan."""
+    return float(invoice_total or 0) - float(existing_paid or 0) - float(incoming_pelunasan or 0)
+
+
 def max_nominal_transfer(
     sisa_pelunasan: float,
     kontrak: "models.Kontrak | None",

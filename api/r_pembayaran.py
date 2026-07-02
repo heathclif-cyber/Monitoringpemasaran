@@ -7,7 +7,13 @@ import models
 import schemas
 from database import get_db
 from services.auth import require_write
-from services.pembayaran_utils import effective_pelunasan, max_nominal_transfer, pembayaran_paid_total
+from services.pembayaran_utils import (
+    effective_pelunasan,
+    max_nominal_transfer,
+    pembayaran_paid_total,
+    pembayaran_selisih,
+    payment_balance,
+)
 from services.superman.documents import superman_doc_requirements_for_invoice
 
 router = APIRouter(prefix="/api/pembayaran", tags=["Pembayaran"])
@@ -40,49 +46,73 @@ def _generate_pembayaran_no(db: Session, no_invoice: str) -> str:
     return f"{prefix}{max_seq + 1}"
 
 
-def _pembayaran_out(p: models.Pembayaran) -> dict:
+def _pembayaran_out(p: models.Pembayaran, warning: Optional[str] = None) -> dict:
     data = schemas.PembayaranOut.model_validate(p).model_dump()
     if p.invoice and (p.invoice.superman or "").strip():
         data["superman"] = p.invoice.superman
     if p.delivery_order:
         data["no_do"] = p.delivery_order.no_do
+    if warning:
+        data["warning"] = warning
     return data
 
 
-def _validate_pembayaran_aggregate(
+def _kontrak_for_invoice(db: Session, db_invoice: models.Invoice) -> models.Kontrak | None:
+    if not db_invoice.no_kontrak:
+        return None
+    return db.query(models.Kontrak).filter(
+        models.Kontrak.no_kontrak == db_invoice.no_kontrak
+    ).first()
+
+
+def _existing_paid_total(
+    db: Session,
+    no_invoice: str,
+    kontrak: models.Kontrak | None,
+    exclude_no: Optional[str] = None,
+) -> float:
+    q = db.query(models.Pembayaran).filter(models.Pembayaran.no_invoice == no_invoice)
+    if exclude_no:
+        q = q.filter(models.Pembayaran.no_pembayaran != exclude_no)
+    return pembayaran_paid_total(q.all(), kontrak)
+
+
+def _validate_pembayaran_nominal(nominal: float) -> None:
+    if nominal <= 0:
+        raise HTTPException(status_code=400, detail="Nominal transfer harus lebih dari 0")
+
+
+def _compute_pembayaran_selisih(
     db: Session,
     db_invoice: models.Invoice,
     nominal: float,
     is_pph_disetor: Optional[str] = "false",
     exclude_no: Optional[str] = None,
-) -> None:
-    if nominal <= 0:
-        raise HTTPException(status_code=400, detail="Nominal transfer harus lebih dari 0")
-
-    invoice_total = float(db_invoice.jumlah_pembayaran or 0)
-    kontrak = db.query(models.Kontrak).filter(
-        models.Kontrak.no_kontrak == db_invoice.no_kontrak
-    ).first()
-    q = db.query(models.Pembayaran).filter(models.Pembayaran.no_invoice == db_invoice.no_invoice)
-    if exclude_no:
-        q = q.filter(models.Pembayaran.no_pembayaran != exclude_no)
-    existing_total = pembayaran_paid_total(q.all(), kontrak)
+) -> tuple[float, float, float]:
+    """Return (selisih, existing_paid, incoming_pelunasan). Selisih negatif = kelebihan."""
+    kontrak = _kontrak_for_invoice(db, db_invoice)
+    existing_total = _existing_paid_total(db, db_invoice.no_invoice, kontrak, exclude_no)
     incoming = effective_pelunasan(nominal, is_pph_disetor, kontrak)
+    invoice_total = float(db_invoice.jumlah_pembayaran or 0)
+    selisih = pembayaran_selisih(invoice_total, existing_total, incoming)
+    return selisih, existing_total, incoming
 
-    if existing_total + incoming > invoice_total + 0.5:
-        sisa_pelunasan = max(0.0, invoice_total - existing_total)
-        max_transfer = max_nominal_transfer(sisa_pelunasan, kontrak)
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Nominal melebihi batas transfer. Maksimal transfer: Rp {max_transfer:,.0f}"
-                + (
-                    f" (PPh dipotong pembeli dihitung terpisah → pelunasan Rp {round(sisa_pelunasan):,.0f})"
-                    if kontrak and str(getattr(kontrak, "is_pph", "false")).lower() == "true"
-                    else f" (sisa pelunasan Rp {round(sisa_pelunasan):,.0f})"
-                )
-            ),
-        )
+
+def _pembayaran_warning_from_totals(
+    invoice_total: float,
+    existing_total: float,
+    incoming: float,
+    kontrak: models.Kontrak | None,
+) -> Optional[str]:
+    _, surplus = payment_balance(existing_total + incoming, invoice_total)
+    if surplus <= 0:
+        return None
+    sisa_pelunasan = max(0.0, invoice_total - existing_total)
+    exact_transfer = max_nominal_transfer(sisa_pelunasan, kontrak)
+    return (
+        f"Kelebihan pelunasan Rp {surplus:,.0f}. "
+        f"Transfer pas-pasan lunas: Rp {exact_transfer:,.0f}"
+    )
 
 
 def _invoice_paid_total(db: Session, no_invoice: str, exclude_no: Optional[str] = None) -> float:
@@ -118,7 +148,6 @@ def create_pembayaran(
 
     nominal = float(pembayaran.nominal_transfer or 0)
     no_key = (pembayaran.no_pembayaran or "").strip() or None
-    invoice_total = float(db_invoice.jumlah_pembayaran or 0)
 
     if no_key:
         db_pay = db.query(models.Pembayaran).filter(
@@ -126,9 +155,7 @@ def create_pembayaran(
         ).first()
         if not db_pay:
             raise HTTPException(status_code=404, detail="Pembayaran not found")
-        _validate_pembayaran_aggregate(
-            db, db_invoice, nominal, pembayaran.is_pph_disetor, exclude_no=no_key
-        )
+        _validate_pembayaran_nominal(nominal)
         existing_do = db.query(models.DeliveryOrder).filter(
             models.DeliveryOrder.no_pembayaran == no_key
         ).first()
@@ -141,20 +168,33 @@ def create_pembayaran(
         db_pay.tanggal_pembayaran = pembayaran.tanggal_pembayaran
         db_pay.nominal_transfer = nominal
         db_pay.is_pph_disetor = pembayaran.is_pph_disetor
-        db_pay.selisih = invoice_total - nominal
+        selisih, existing_total, incoming = _compute_pembayaran_selisih(
+            db, db_invoice, nominal, pembayaran.is_pph_disetor, exclude_no=no_key
+        )
+        db_pay.selisih = selisih
         saved = db_pay
     else:
-        _validate_pembayaran_aggregate(db, db_invoice, nominal, pembayaran.is_pph_disetor)
+        _validate_pembayaran_nominal(nominal)
         pay_no = _generate_pembayaran_no(db, pembayaran.no_invoice)
+        selisih, existing_total, incoming = _compute_pembayaran_selisih(
+            db, db_invoice, nominal, pembayaran.is_pph_disetor
+        )
         saved = models.Pembayaran(
             no_pembayaran=pay_no,
             no_invoice=pembayaran.no_invoice,
             tanggal_pembayaran=pembayaran.tanggal_pembayaran,
             nominal_transfer=nominal,
             is_pph_disetor=pembayaran.is_pph_disetor,
-            selisih=invoice_total - nominal,
+            selisih=selisih,
         )
         db.add(saved)
+
+    warning = _pembayaran_warning_from_totals(
+        float(db_invoice.jumlah_pembayaran or 0),
+        existing_total,
+        incoming,
+        _kontrak_for_invoice(db, db_invoice),
+    )
 
     db.commit()
     db.refresh(saved)
@@ -165,7 +205,8 @@ def create_pembayaran(
             joinedload(models.Pembayaran.invoice),
         )
         .filter(models.Pembayaran.no_pembayaran == saved.no_pembayaran)
-        .first()
+        .first(),
+        warning=warning,
     )
 
 

@@ -174,6 +174,7 @@ class PembayaranOut(PembayaranBase):
     selisih: float
     superman: Optional[str] = None
     no_do: Optional[str] = None
+    warning: Optional[str] = None
 
     class Config:
         from_attributes = True

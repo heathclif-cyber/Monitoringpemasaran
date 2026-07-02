@@ -27,6 +27,7 @@ import {
   effectivePelunasan,
   isInvoicePaid,
   maxNominalTransfer,
+  paymentBalance,
   paymentProgressPercent,
   pphOnNetTransfer,
   PAYMENT_LUNAS_TOLERANCE,
@@ -210,10 +211,12 @@ export default function PembayaranPage() {
 
   const totalAfterSave = existingTotal + effectiveCurrent
   const sisaPelunasan = Math.max(0, invoiceTotal - existingTotal)
-  const maxTransferNominal = maxNominalTransfer(sisaPelunasan, currentKontrak)
-  const sisaAfterSave = Math.max(0, invoiceTotal - totalAfterSave)
-  const nominalExceedsMax =
-    Number(nominalTransfer) > 0 && Number(nominalTransfer) > maxTransferNominal + 0.5
+  const exactTransferNominal = maxNominalTransfer(sisaPelunasan, currentKontrak)
+  const { shortfall: sisaAfterSave, surplus: surplusAfterSave } = paymentBalance(
+    totalAfterSave,
+    invoiceTotal,
+  )
+  const { surplus: surplusPaidAll } = paymentBalance(paidTotalAll, invoiceTotal)
   const progressPct = paymentProgressPercent(existingTotal, invoiceTotal)
   const afterThisPct = paymentProgressPercent(totalAfterSave, invoiceTotal)
   const willCompleteInvoice = isInvoicePaid(totalAfterSave, invoiceTotal)
@@ -377,16 +380,6 @@ export default function PembayaranPage() {
   }
 
   const savePembayaran = async (data: PembayaranFormData, triggerSuperman: boolean) => {
-    const incoming = effectivePelunasan(data.nominal_transfer, data.is_pph_disetor, currentKontrak)
-    if (existingTotal + incoming > invoiceTotal + 0.5) {
-      const msg =
-        currentKontrak?.is_pph === 'true'
-          ? `Nominal melebihi batas transfer. Maksimal transfer: ${formatCurrency(maxTransferNominal)} (PPh dipotong pembeli dihitung terpisah → pelunasan ${formatCurrency(sisaPelunasan)})`
-          : `Nominal melebihi sisa invoice. Maksimal transfer: ${formatCurrency(maxTransferNominal)}`
-      addNotification(msg, 'error')
-      return
-    }
-
     try {
       const payload: PembayaranInput = {
         no_invoice: data.no_invoice,
@@ -421,6 +414,9 @@ export default function PembayaranPage() {
       setIsExisting(true)
       setSavedNo(saved.no_pembayaran)
       addNotification('Pembayaran berhasil disimpan', 'success')
+      if (saved.warning) {
+        addNotification(saved.warning, 'warning')
+      }
       const updated = await pembayaranStore.fetchByInvoice(data.no_invoice)
       setInvoicePembayaran(updated)
       await fetchInvoiceContext(data.no_invoice)
@@ -564,17 +560,20 @@ export default function PembayaranPage() {
                   {errors.nominal_transfer && (
                     <p className="text-xs text-red-500 mt-1">{errors.nominal_transfer.message}</p>
                   )}
-                  {selectedInvoice && maxTransferNominal > 0 && (
+                  {selectedInvoice && exactTransferNominal > 0 && sisaPelunasan > 0 && (
                     <p className="text-xs text-slate-500 mt-1">
-                      Maks. transfer: {formatCurrency(maxTransferNominal)}
-                      {currentKontrak?.is_pph === 'true' && sisaPelunasan > 0 && (
+                      Transfer pas-pasan lunas: {formatCurrency(exactTransferNominal)}
+                      {currentKontrak?.is_pph === 'true' && (
                         <> · pelunasan tersisa {formatCurrency(sisaPelunasan)}</>
                       )}
                     </p>
                   )}
-                  {nominalExceedsMax && (
-                    <p className="text-xs text-red-500 mt-1">
-                      Nominal melebihi batas. Maksimal transfer: {formatCurrency(maxTransferNominal)}
+                  {surplusAfterSave > 0 && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Kelebihan pelunasan setelah simpan: {formatCurrency(surplusAfterSave)}
+                      {exactTransferNominal > 0 && (
+                        <> · pas-pasan: {formatCurrency(exactTransferNominal)}</>
+                      )}
                     </p>
                   )}
                   {currentPphAddon > 0 && (
@@ -616,8 +615,17 @@ export default function PembayaranPage() {
                     <span className="font-semibold">{formatCurrency(invoiceTotal)}</span>
                     <span className="text-slate-500">Sudah Dibayar:</span>
                     <span className="text-emerald-700 font-medium">{formatCurrency(paidTotalAll)}</span>
-                    <span className="text-slate-500">Sisa:</span>
-                    <span className="font-medium">{formatCurrency(Math.max(0, invoiceTotal - paidTotalAll))}</span>
+                    <span className="text-slate-500">{surplusPaidAll > 0 ? 'Kelebihan:' : 'Sisa:'}</span>
+                    <span
+                      className={cn(
+                        'font-medium',
+                        surplusPaidAll > 0 ? 'text-amber-700' : undefined,
+                      )}
+                    >
+                      {surplusPaidAll > 0
+                        ? formatCurrency(surplusPaidAll)
+                        : formatCurrency(Math.max(0, invoiceTotal - paidTotalAll))}
+                    </span>
                     {currentKontrak && (
                       <>
                         <span className="text-slate-500">Kontrak:</span>
@@ -636,7 +644,10 @@ export default function PembayaranPage() {
                     </div>
                     <p className="text-xs text-slate-400 mt-1 text-right">
                       {progressPct}% terbayar saat ini · {afterThisPct}% setelah simpan
-                      {sisaAfterSave > 0.5 && afterThisPct < 100 && (
+                      {surplusAfterSave > 0 && (
+                        <> · kelebihan {formatCurrency(surplusAfterSave)}</>
+                      )}
+                      {sisaAfterSave > 0.5 && afterThisPct < 100 && surplusAfterSave <= 0 && (
                         <> · sisa {formatCurrency(sisaAfterSave)}</>
                       )}
                     </p>
@@ -645,20 +656,35 @@ export default function PembayaranPage() {
                     <div className="border-t pt-3">
                       <p className="text-xs font-semibold text-slate-600 mb-2">Riwayat Termin</p>
                       <div className="space-y-1">
-                        {invoicePembayaran.map((p) => (
-                          <button
-                            key={p.no_pembayaran}
-                            type="button"
-                            onClick={() => loadPembayaran(p.no_pembayaran)}
-                            className={cn(
-                              'w-full flex justify-between text-xs px-2 py-1 rounded hover:bg-slate-100',
-                              savedNo === p.no_pembayaran && 'bg-slate-100 font-medium',
-                            )}
-                          >
-                            <span className="text-slate-600 font-mono">{p.no_pembayaran}</span>
-                            <span>{formatCurrency(p.nominal_transfer)}</span>
-                          </button>
-                        ))}
+                        {invoicePembayaran.map((p) => {
+                          const pelunasan = pelunasanForPayment(p)
+                          const over = p.selisih < -PAYMENT_LUNAS_TOLERANCE
+                          return (
+                            <button
+                              key={p.no_pembayaran}
+                              type="button"
+                              onClick={() => loadPembayaran(p.no_pembayaran)}
+                              className={cn(
+                                'w-full flex justify-between gap-2 text-xs px-2 py-1 rounded hover:bg-slate-100',
+                                savedNo === p.no_pembayaran && 'bg-slate-100 font-medium',
+                              )}
+                            >
+                              <span className="text-slate-600 font-mono truncate">{p.no_pembayaran}</span>
+                              <span className="shrink-0 text-right">
+                                <span className="block">{formatCurrency(p.nominal_transfer)}</span>
+                                <span className="block text-slate-400">
+                                  pelunasan {formatCurrency(pelunasan)}
+                                  {over && (
+                                    <span className="text-amber-700">
+                                      {' '}
+                                      · +{formatCurrency(-p.selisih)}
+                                    </span>
+                                  )}
+                                </span>
+                              </span>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   )}

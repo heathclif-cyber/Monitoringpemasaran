@@ -121,6 +121,7 @@ export interface Pembayaran {
   selisih: number
   superman?: string | null
   no_do?: string | null
+  warning?: string | null
 }
 
 export interface PembayaranInput {
