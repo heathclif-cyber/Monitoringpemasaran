@@ -208,6 +208,8 @@ def _score_todo_row(
     *,
     no_do: str,
     no_pembayaran: str = "",
+    no_invoice: str = "",
+    referensi: str = "",
     no_kontrak: str,
     mitra_pembeli: str,
     total_sppn: int,
@@ -216,7 +218,9 @@ def _score_todo_row(
 ) -> int:
     blob = _todo_row_blob(row)
     score = 0
-    ref_n = _normalize_match_text(no_pembayaran or no_do)
+    ref_n = _normalize_match_text(
+        no_pembayaran or no_do or referensi or no_invoice
+    )
     no_do_n = _normalize_match_text(no_do)
     no_kontrak_n = _normalize_match_text(no_kontrak)
     mitra_n = _normalize_match_text(mitra_pembeli)
@@ -472,6 +476,8 @@ def _score_all_todo_rows(
             row,
             no_do=payload.no_do,
             no_pembayaran=payload.no_pembayaran,
+            no_invoice=payload.no_invoice,
+            referensi=payload.referensi,
             no_kontrak=payload.no_kontrak,
             mitra_pembeli=payload.mitra_pembeli,
             total_sppn=total_sppn,
@@ -515,6 +521,8 @@ def _find_todo_match(
                     row,
                     no_do=payload.no_do,
                     no_pembayaran=payload.no_pembayaran,
+                    no_invoice=payload.no_invoice,
+                    referensi=payload.referensi,
                     no_kontrak=payload.no_kontrak,
                     mitra_pembeli=payload.mitra_pembeli,
                     total_sppn=total_sppn,

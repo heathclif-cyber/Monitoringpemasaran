@@ -428,6 +428,9 @@ def fill_sppn_draft(
         _fill_isi_sppn_block(page, idx, item)
 
     report(82, "Memvalidasi isian form")
+    if support_docs:
+        _upload_support_docs(page, support_docs, combined=combined)
+
     page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
     page.wait_for_timeout(600)
     referensi_val = page.locator("#referensi_sppn").input_value(timeout=2000).strip()
@@ -503,6 +506,13 @@ def submit_sppn_draft(
 ) -> dict | list | str | None:
     if on_progress:
         on_progress(88, "Menyimpan draft ke Superman")
+
+    for sel in ("#dokumen_pendukung_sppn", "#dokumen_pendukung_sppb"):
+        if page.locator(sel).count():
+            attached = _count_uploaded_docs(page, sel)
+            if attached == 0:
+                logger.warning("Input %s tidak punya file sebelum simpan", sel)
+
     simpan = page.locator("#simpan, button:has-text('Simpan')").first
     simpan.wait_for(state="visible", timeout=10000)
     page.wait_for_function(
@@ -514,7 +524,7 @@ def submit_sppn_draft(
     try:
         with page.expect_response(
             lambda resp: "/spp/store" in resp.url and resp.request.method == "POST",
-            timeout=120000,
+            timeout=240000,
         ) as resp_info:
             simpan.click()
             _dismiss_swal_dialogs(page, print_after=print_after)
