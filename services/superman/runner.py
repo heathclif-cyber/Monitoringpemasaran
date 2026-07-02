@@ -203,6 +203,28 @@ def _todo_row_blob(row: dict[str, Any]) -> str:
     return json.dumps(row, ensure_ascii=False).lower()
 
 
+def _collect_todo_match_refs(
+    *,
+    no_pembayaran: str = "",
+    no_do: str = "",
+    referensi: str = "",
+    no_invoice: str = "",
+    no_kontrak: str = "",
+) -> list[str]:
+    """Kandidat teks untuk cocokkan baris To Do — invoice/referensi diutamakan."""
+    refs: list[str] = []
+    for raw in (referensi, no_invoice, no_kontrak, no_pembayaran, no_do):
+        n = _normalize_match_text(raw)
+        if not n or n in refs:
+            continue
+        refs.append(n)
+        if n.startswith("add-"):
+            short = n[4:]
+            if short not in refs:
+                refs.append(short)
+    return refs
+
+
 def _score_todo_row(
     row: dict[str, Any],
     *,
@@ -218,16 +240,23 @@ def _score_todo_row(
 ) -> int:
     blob = _todo_row_blob(row)
     score = 0
-    ref_n = _normalize_match_text(
-        no_pembayaran or no_do or referensi or no_invoice
+    match_refs = _collect_todo_match_refs(
+        no_pembayaran=no_pembayaran,
+        no_do=no_do,
+        referensi=referensi,
+        no_invoice=no_invoice,
+        no_kontrak=no_kontrak,
     )
+    ref_n = match_refs[0] if match_refs else ""
     no_do_n = _normalize_match_text(no_do)
     no_kontrak_n = _normalize_match_text(no_kontrak)
     mitra_n = _normalize_match_text(mitra_pembeli)
 
-    if ref_n and ref_n in blob:
-        score += 1000
-    if no_do_n and no_do_n in blob and no_do_n != ref_n:
+    for idx, candidate in enumerate(match_refs):
+        if candidate in blob:
+            score += 1000 - min(idx * 15, 120)
+            break
+    if no_do_n and no_do_n in blob and no_do_n not in match_refs:
         score += 500
 
     for field in (
@@ -255,9 +284,13 @@ def _score_todo_row(
         "no_spp",
     ):
         val = _normalize_match_text(row.get(field))
-        if ref_n and val and (ref_n == val or ref_n in val or val in ref_n):
-            score += 800
-        elif no_do_n and val and (no_do_n == val or no_do_n in val or val in no_do_n):
+        matched_ref = False
+        for idx, candidate in enumerate(match_refs):
+            if val and (candidate == val or candidate in val or val in candidate):
+                score += 800 - min(idx * 10, 80)
+                matched_ref = True
+                break
+        if not matched_ref and no_do_n and val and (no_do_n == val or no_do_n in val or val in no_do_n):
             score += 400
 
     if no_kontrak_n and no_kontrak_n in blob:
@@ -315,7 +348,16 @@ def _score_todo_row(
     if amount_matched and mitra_n and mitra_n in blob:
         score += 25
 
-    if tanggal_key and not tanggal_matched and score < 800:
+    # Jangan nol-kan match kuat (referensi/kontrak) hanya karena format tanggal beda.
+    has_strong_ref = any(r in blob for r in match_refs)
+    has_kontrak = bool(no_kontrak_n and no_kontrak_n in blob)
+    if (
+        tanggal_key
+        and not tanggal_matched
+        and score < 800
+        and not has_strong_ref
+        and not has_kontrak
+    ):
         return 0
 
     return score
@@ -618,11 +660,18 @@ def inspect_superman_todo(
         rows = resp.json().get("data") or [] if resp.ok else []
         scored = _score_all_todo_rows(rows, payload, expect_sppb=expect_sppb)
         hits = []
-        ref_n = _normalize_match_text(ref)
+        ref_candidates = _collect_todo_match_refs(
+            referensi=payload.referensi,
+            no_invoice=payload.no_invoice,
+            no_kontrak=payload.no_kontrak,
+            no_pembayaran=payload.no_pembayaran,
+            no_do=payload.no_do,
+        )
         for row in rows:
             if not isinstance(row, dict):
                 continue
-            if ref_n and ref_n in _todo_row_blob(row):
+            blob = _todo_row_blob(row)
+            if any(candidate in blob for candidate in ref_candidates):
                 hits.append(row)
 
         best = scored[0][1] if scored else None
