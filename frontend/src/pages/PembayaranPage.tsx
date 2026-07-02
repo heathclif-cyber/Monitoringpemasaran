@@ -196,7 +196,7 @@ export default function PembayaranPage() {
     currentKontrak,
   )
   const currentPphAddon =
-    String(isPphDisetor || 'false').toLowerCase() === 'true'
+    currentKontrak?.is_pph === 'true'
       ? pphOnNetTransfer(Number(nominalTransfer) || 0, currentKontrak)
       : 0
 
@@ -490,7 +490,7 @@ export default function PembayaranPage() {
                   )}
                   {currentPphAddon > 0 && (
                     <p className="text-xs text-emerald-700 mt-1">
-                      + PPh disetor: {formatCurrency(currentPphAddon)} → pelunasan efektif{' '}
+                      + PPh dipotong pembeli: {formatCurrency(currentPphAddon)} → dianggap lunas{' '}
                       {formatCurrency(effectiveCurrent)}
                     </p>
                   )}
@@ -501,10 +501,9 @@ export default function PembayaranPage() {
                     <option value="false">Belum</option>
                     <option value="true">Sudah</option>
                   </NativeSelect>
-                  {currentKontrak?.is_pph === 'true' && String(isPphDisetor || 'false') !== 'true' && (
-                    <p className="text-xs text-amber-700 mt-1">
-                      Jika pembeli memotong PPh, pilih <strong>Sudah</strong> agar pelunasan dihitung lengkap
-                      dan menu Superman muncul.
+                  {currentKontrak?.is_pph === 'true' && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Status setor PPh ke KPP — tampil di Laporan Digital. Tidak mempengaruhi lunas/Superman.
                     </p>
                   )}
                 </div>
@@ -591,10 +590,6 @@ export default function PembayaranPage() {
             <CardContent className="py-4 text-sm text-amber-800">
               Dokumen sudah lengkap, tetapi invoice belum lunas
               {sisaAfterSave > 0.5 && <> (sisa {formatCurrency(sisaAfterSave)})</>}.
-              {currentKontrak?.is_pph === 'true' && String(isPphDisetor || 'false') !== 'true' && (
-                <> Jika transfer sudah termasuk pemotongan PPh pembeli, ubah <strong>PPh Disetor</strong> ke{' '}
-                <strong>Sudah</strong>.</>
-              )}
             </CardContent>
           </Card>
         )}

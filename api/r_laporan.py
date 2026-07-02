@@ -247,6 +247,8 @@ def _build_laporan_rows(db: Session):
             )
         )
 
+        pph_setor_val = do.is_pph_disetor if do else "false"
+
         # Invoice-first flow: pembayaran + Superman sebelum DO — tampilkan data pembayaran di Laporan
         if not do and inv and inv.pembayaran:
             sorted_pays = sorted(
@@ -261,6 +263,7 @@ def _build_laporan_rows(db: Session):
                 do_nominal = pay_nominal_total
                 pelunasan_do = float(total_do_nominal) if total_do_nominal > 0 else pay_nominal_total
                 no_pembayaran_val = sorted_pays[-1].no_pembayaran or no_pembayaran_val
+                pph_setor_val = sorted_pays[-1].is_pph_disetor or "false"
                 tanggal_transfer_val = sorted_pays[-1].tanggal_pembayaran
                 if tanggal_transfer_val:
                     raw_date_val = tanggal_transfer_val.strftime("%Y-%m-%d")
@@ -312,7 +315,7 @@ def _build_laporan_rows(db: Session):
             "DPP_Pokok": round(dpp_pokok),
             "Pajak_PPN": round(ppn_do),
             "PPh_Nominal": round(pph_do),
-            "PPh_Setor": do.is_pph_disetor if do else "false",
+            "PPh_Setor": pph_setor_val,
             "Kewajiban_Pembayaran": round(pendapatan_setelah_ppn - pph_do),
             "Pelunasan": round(pelunasan_do),
             "Sisa_Pembayaran": sisa_pembayaran,

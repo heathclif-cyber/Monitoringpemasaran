@@ -14,14 +14,14 @@ export function pphOnNetTransfer(nominal: number, kontrak: Kontrak | null | unde
   return Math.round(pokok * pphRate)
 }
 
-/** Pelunasan efektif = transfer + PPh (jika PPh disetor pembeli). */
+/** Pelunasan untuk cek lunas/Superman — PPh dipotong pembeli selalu dihitung jika kontrak kena PPh. */
 export function effectivePelunasan(
   nominal: number,
-  isPphDisetor: string | null | undefined,
+  _isPphDisetor: string | null | undefined,
   kontrak: Kontrak | null | undefined,
 ): number {
   const base = Number(nominal) || 0
-  if (String(isPphDisetor || 'false').toLowerCase() !== 'true') return base
+  if (kontrak?.is_pph !== 'true') return base
   return base + pphOnNetTransfer(base, kontrak)
 }
 

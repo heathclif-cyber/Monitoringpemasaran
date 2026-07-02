@@ -31,8 +31,14 @@ def effective_pelunasan(
     is_pph_disetor: str | None,
     kontrak: "models.Kontrak | None",
 ) -> float:
+    """Pelunasan untuk cek lunas/Superman.
+
+    PPh yang dipotong pembeli selalu dianggap bagian pembayaran jika kontrak
+    kena PPh. Parameter is_pph_disetor hanya untuk pelacakan di Laporan Digital.
+    """
+    _ = is_pph_disetor
     base = float(nominal or 0)
-    if str(is_pph_disetor or "false").lower() != "true":
+    if str(getattr(kontrak, "is_pph", "false") if kontrak else "false").lower() != "true":
         return base
     return base + pph_on_net_transfer(base, kontrak)
 
