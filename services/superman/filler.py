@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import os
 import re
+import shutil
+import tempfile
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -143,30 +145,66 @@ def _parse_id_number(value: str) -> int:
     return int(digits or 0)
 
 
+def _list_selectors_for_input(input_selector: str) -> list[str]:
+    if "sppb" in input_selector:
+        return [
+            "#list_dokumen_pendukung_sppb li",
+            "#dokumen_pendukung_sppb_preview .file-name",
+            "#dokumen_pendukung_sppb_preview img",
+        ]
+    return [
+        "#list_dokumen_pendukung_sppn li",
+        "#dokumen_pendukung_sppn_preview .file-name",
+        "#dokumen_pendukung_sppn_preview img",
+        ".dokumen-pendukung-sppn",
+        ".dz-preview",
+    ]
+
+
 def _count_uploaded_docs(page: Page, input_selector: str) -> int:
+    """Hitung file di daftar preview Superman — jangan pakai input.files (selalu 1)."""
+    selectors = _list_selectors_for_input(input_selector)
     return int(
         page.evaluate(
-            """(inputSel) => {
-                const input = document.querySelector(inputSel);
-                if (input && input.files && input.files.length) return input.files.length;
-                const markers = [
-                    '#list_dokumen_pendukung_sppn li',
-                    '#list_dokumen_pendukung_sppb li',
-                    '#dokumen_pendukung_sppn_preview img',
-                    '#dokumen_pendukung_sppn_preview .file-name',
-                    '.dokumen-pendukung-sppn',
-                    '.dz-preview',
-                ];
-                for (const sel of markers) {
+            """(sels) => {
+                let best = 0;
+                for (const sel of sels) {
                     const count = document.querySelectorAll(sel).length;
-                    if (count > 0) return count;
+                    if (count > best) best = count;
                 }
-                return 0;
+                return best;
             }""",
-            input_selector,
+            selectors,
         )
         or 0
     )
+
+
+def _prepare_unique_upload_paths(paths: list[str]) -> tuple[list[str], tempfile.TemporaryDirectory | None]:
+    """Salin file dengan nama duplikat agar Superman tidak menimpa upload sebelumnya."""
+    seen: dict[str, int] = {}
+    for raw in paths:
+        key = Path(raw).name.lower()
+        seen[key] = seen.get(key, 0) + 1
+
+    if all(count == 1 for count in seen.values()):
+        return paths, None
+
+    tmp = tempfile.TemporaryDirectory(prefix="superman_docs_")
+    out: list[str] = []
+    used: dict[str, int] = {}
+    for raw in paths:
+        src = Path(raw)
+        key = src.name.lower()
+        if used.get(key, 0) == 0:
+            used[key] = 1
+            out.append(str(src))
+            continue
+        used[key] = used.get(key, 0) + 1
+        dest = Path(tmp.name) / f"{used[key]}_{src.name}"
+        shutil.copy2(src, dest)
+        out.append(str(dest))
+    return out, tmp
 
 
 def _assert_line_item_ready(page: Page, isi_index: int, gl_code: str, nominal: int) -> None:
@@ -232,34 +270,33 @@ def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None
 
 
 def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
-    """Upload dokumen ke input file Superman.
-
-    Jangan trigger change via jQuery — handler Superman memanggil .val() pada
-    file input yang menyebabkan InvalidStateError di browser.
-    Playwright set_input_files sudah memicu event native yang cukup.
-    """
+    """Upload dokumen ke input file Superman — satu per satu, tunggu daftar bertambah."""
     page.wait_for_selector(input_selector, state="attached", timeout=15000)
     locator = page.locator(input_selector)
-
-    if len(paths) == 1:
-        locator.set_input_files(paths[0])
-        page.wait_for_timeout(2500)
-        return
-
-    # Batch upload (input accept multiple)
-    locator.set_input_files(paths)
-    page.wait_for_timeout(3500)
-    if _count_uploaded_docs(page, input_selector) >= len(paths):
-        return
-
-    # Fallback: satu file per iterasi, tunggu daftar preview bertambah
-    for path in paths:
-        prev = _count_uploaded_docs(page, input_selector)
-        locator.set_input_files(path)
-        for _ in range(20):
-            page.wait_for_timeout(800)
-            if _count_uploaded_docs(page, input_selector) > prev:
-                break
+    upload_paths, tmp = _prepare_unique_upload_paths(paths)
+    try:
+        for idx, path in enumerate(upload_paths, start=1):
+            target = idx
+            prev = _count_uploaded_docs(page, input_selector)
+            locator.set_input_files(path)
+            page.wait_for_timeout(1200)
+            for _ in range(40):
+                cur = _count_uploaded_docs(page, input_selector)
+                if cur >= target or cur > prev:
+                    break
+                page.wait_for_timeout(1000)
+            final = _count_uploaded_docs(page, input_selector)
+            if final < target:
+                logger.warning(
+                    "Upload dokumen %s ke %s: daftar %s/%s",
+                    Path(path).name,
+                    input_selector,
+                    final,
+                    target,
+                )
+    finally:
+        if tmp is not None:
+            tmp.cleanup()
 
 
 def _screenshot_debug(page: Page, label: str) -> str | None:
@@ -290,7 +327,7 @@ def _wait_doc_list_dom(page: Page, *, timeout_ms: int = 15000) -> None:
             continue
 
 
-def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeout_ms: int = 35000) -> int:
+def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeout_ms: int = 90000) -> int:
     elapsed = 0
     step = 1000
     uploaded = 0
@@ -333,12 +370,14 @@ def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool
     _wait_doc_list_dom(page)
     uploaded = _wait_uploaded_docs(page, "#dokumen_pendukung_sppn", len(paths))
     if uploaded < len(paths):
+        names = ", ".join(Path(p).name for p in paths)
         shot = _screenshot_debug(page, "upload_docs_failed")
         hint = f" Screenshot: {shot}" if shot else ""
         raise RuntimeError(
             f"Dokumen pendukung Superman belum terlampir ({uploaded}/{len(paths)} file). "
-            "Coba upload ulang Kontrak, Invoice, dan Rekening Koran di aplikasi, "
-            f"lalu jalankan deklarasi Superman sekali lagi.{hint}"
+            f"File: {names}. "
+            "Pastikan Kontrak, Invoice, dan Rekening Koran berbeda/valid, lalu upload ulang di aplikasi "
+            f"dan jalankan deklarasi sekali lagi.{hint}"
         )
 
     page.evaluate(
