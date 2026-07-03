@@ -682,6 +682,46 @@ def _trigger_store_after_urutan(page: Page) -> None:
     )
 
 
+def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
+    """Fallback: kirim FormData ke /spp/store via fetch (tanpa navigasi halaman)."""
+    try:
+        result = page.evaluate(
+            """async () => {
+                const form = document.getElementById('form_spp');
+                if (!form) return { ok: false, reason: 'form_spp tidak ada' };
+                const status = document.getElementById('status_btn');
+                if (status) status.value = '0';
+                const body = new FormData(form);
+                const token = document.querySelector('meta[name=csrf-token]')?.content
+                    || document.querySelector('input[name=_token]')?.value
+                    || '';
+                const headers = {};
+                if (token) headers['X-CSRF-TOKEN'] = token;
+                const resp = await fetch('/spp/store', {
+                    method: 'POST',
+                    body,
+                    headers,
+                    credentials: 'same-origin',
+                });
+                const text = await resp.text();
+                try {
+                    return { ok: resp.ok, status: resp.status, json: JSON.parse(text) };
+                } catch (err) {
+                    return { ok: resp.ok, status: resp.status, text: text.slice(0, 5000) };
+                }
+            }"""
+        )
+    except Exception as exc:
+        return {"ok": False, "reason": str(exc)}
+    if not isinstance(result, dict):
+        return None
+    if result.get("json") is not None:
+        return result["json"]  # type: ignore[return-value]
+    if result.get("ok"):
+        return result
+    return result
+
+
 _SPPN_NO_RE = re.compile(
     r"((?:R\d+/R\d+D/SPPn/|\d+(?:\.\d+)?/SPPn/)[^\s\"'<>]+)",
     re.I,
@@ -1005,15 +1045,15 @@ def _submit_and_wait_store(
     page.on("dialog", _on_dialog)
     page.on("response", _on_response)
     try:
-        trigger = _trigger_simpan_via_js(
-            page,
-            print_after=print_after,
-            skip_validate=True,
-        )
+        trigger = _trigger_simpan_via_playwright(page, print_after=print_after)
         if store_debug is not None:
             store_debug["trigger"] = trigger
         if not trigger.get("ok"):
-            trigger = _trigger_simpan_via_playwright(page, print_after=print_after)
+            trigger = _trigger_simpan_via_js(
+                page,
+                print_after=print_after,
+                skip_validate=True,
+            )
             if store_debug is not None:
                 store_debug["trigger_fallback"] = trigger
         if not trigger.get("ok"):
@@ -1053,10 +1093,14 @@ def _submit_and_wait_store(
             if "chrome-error://" in (page.url or ""):
                 if store_debug is not None:
                     store_debug["chrome_error_seen"] = True
-                try:
-                    page.go_back(wait_until="domcontentloaded", timeout=8000)
-                except Exception:
-                    pass
+            elif (
+                loading_seen
+                and captured["resp"] is None
+                and "simpan saja" in (swal_now or "").lower()
+                and elapsed > 5000
+                and elapsed % 10000 < step
+            ):
+                _trigger_store_after_urutan(page)
             page.wait_for_timeout(step)
             elapsed += step
         if store_debug is not None:
@@ -1065,6 +1109,15 @@ def _submit_and_wait_store(
             store_debug["loading_seen"] = loading_seen
             store_debug["page_url"] = page.url
             store_debug["dialog_msgs"] = dialog_msgs[-5:]
+            if captured["resp"] is None and loading_seen:
+                fetch_body = _post_store_via_fetch(page)
+                store_debug["fetch_store_attempt"] = fetch_body
+                if fetch_body is not None and (
+                    fetch_body.get("success") is not False
+                    if isinstance(fetch_body, dict)
+                    else True
+                ):
+                    return fetch_body
         return None
     finally:
         page.remove_listener("response", _on_response)
@@ -1106,17 +1159,6 @@ def submit_sppn_draft(
         timeout=30000,
     )
     _install_swal_auto_confirm(page, print_after=print_after)
-    page.evaluate(
-        """() => {
-            const form = document.getElementById('form_spp');
-            if (!form || form.__submitGuard) return;
-            form.__submitGuard = true;
-            form.addEventListener('submit', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-            }, true);
-        }"""
-    )
 
     store_timeout_ms = 300_000 if combined_form else 180_000
     store_body: dict | list | str | None = None
