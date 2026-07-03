@@ -569,8 +569,9 @@ export default function LaporanPage() {
                     <th className={cn(TH, STICKY_TH, 'text-center min-w-[4.5rem]')}>Satuan</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Billing Date</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Tgl Transfer</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[11rem]')}>Kewajiban Pembayaran (Inc. PPh)</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[11rem]')}>Kewajiban Transfer (Cash In)</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jumlah Transfer</th>
-                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Pelunasan (Inc. PPh)</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[11rem]')}>Mitra Pembeli</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[12rem]')}>Jenis Material</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jml Invoice</th>
@@ -582,7 +583,6 @@ export default function LaporanPage() {
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Pajak PPN</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[8.5rem]')}>PPh</th>
                     <th className={cn(TH, STICKY_TH, 'text-center min-w-[5.5rem]')}>PPh Setor?</th>
-                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Kewajiban (Gross)</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Sisa Bayar</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[8rem]')}>Sisa Volume</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Bulan Buku</th>
@@ -716,8 +716,9 @@ function LaporanTableRow({
       <td className={cn(TD, 'text-center min-w-[4.5rem]')}>{row.Satuan}</td>
       <td className={cn(TD, 'whitespace-nowrap min-w-[8rem]')}>{formatDate(row.Billing_Date)}</td>
       <td className={cn(TD, 'whitespace-nowrap min-w-[8rem]')}>{formatDate(row.Tanggal_Transfer)}</td>
-      <MoneyCell value={row.Jumlah_Transfer} className="text-emerald-600 dark:text-emerald-400 font-medium" />
       <MoneyCell value={row.Pelunasan} className="text-blue-600 dark:text-blue-400 font-medium" />
+      <MoneyCell value={row.Kewajiban_Pembayaran} className="font-semibold" />
+      <MoneyCell value={row.Jumlah_Transfer} className="text-emerald-600 dark:text-emerald-400 font-medium" />
       <td className={cn(TD, 'min-w-[11rem] whitespace-normal break-words')}>{safe(row.Mitra_Pembeli)}</td>
       <td className={cn(TD, 'min-w-[12rem] whitespace-normal break-words')}>{safe(row.Deskripsi_Produk)}</td>
       <td className={TD_MONEY} title={row.Jumlah_Invoice > 0 ? formatCurrency(row.Jumlah_Invoice) : undefined}>
@@ -733,7 +734,6 @@ function LaporanTableRow({
       <td className={cn(TD, 'text-center min-w-[5.5rem]')}>
         {row.PPh_Setor === 'Disetor' ? <span className="text-emerald-600 dark:text-emerald-400">✓ Disetor</span> : '-'}
       </td>
-      <MoneyCell value={row.Kewajiban_Pembayaran} className="font-semibold" />
       <td
         className={cn(
           TD_MONEY,

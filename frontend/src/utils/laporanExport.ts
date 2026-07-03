@@ -22,8 +22,9 @@ const EXPORT_HEADERS = [
   'Satuan',
   'Billing Date',
   'Tgl Transfer',
+  'Kewajiban Pembayaran (Inc. PPh)',
+  'Kewajiban Transfer (Cash In)',
   'Jumlah Transfer',
-  'Pelunasan (Inc. PPh)',
   'Mitra Pembeli',
   'Jenis Material',
   'Jml Invoice',
@@ -37,7 +38,6 @@ const EXPORT_HEADERS = [
   'Pajak PPN',
   'PPh',
   'PPh Setor?',
-  'Kewajiban (Gross)',
   'Sisa Bayar',
   'Sisa Volume',
   'Bulan Buku',
@@ -49,17 +49,18 @@ const EXPORT_HEADERS = [
 ] as const
 
 const COL = {
-  JUMLAH_TRANSFER: colLetter(8),
-  HARGA_SATUAN: colLetter(13),
-  JUMLAH_DO: colLetter(15),
-  PPN_PCT: colLetter(16),
-  PPH_PCT: colLetter(17),
-  PENDAPATAN_POKOK: colLetter(18),
-  SETELAH_PPN: colLetter(19),
-  PAJAK_PPN: colLetter(20),
-  PPH: colLetter(21),
-  PPH_SETOR: colLetter(22),
-  KEWAJIBAN: colLetter(23),
+  PELUNASAN: colLetter(8),
+  KEWAJIBAN: colLetter(9),
+  JUMLAH_TRANSFER: colLetter(10),
+  HARGA_SATUAN: colLetter(14),
+  JUMLAH_DO: colLetter(16),
+  PPN_PCT: colLetter(17),
+  PPH_PCT: colLetter(18),
+  PENDAPATAN_POKOK: colLetter(19),
+  SETELAH_PPN: colLetter(20),
+  PAJAK_PPN: colLetter(21),
+  PPH: colLetter(22),
+  PPH_SETOR: colLetter(23),
 } as const
 
 function num(v: number | null | undefined): number {
@@ -87,8 +88,8 @@ function sisaVolumeLabel(row: LaporanRow): string | number {
  * - Pajak PPN = Pendapatan Pokok × % PPN / 100
  * - Setelah PPN = Pendapatan Pokok + Pajak PPN
  * - PPh = Pendapatan Pokok × % PPh / 100
- * - Kewajiban (Gross) = Setelah PPN − PPh
- * - Pelunasan = Jumlah Transfer (+ PPh jika disetor)
+ * - Kewajiban Transfer (Cash In) = Setelah PPN − PPh
+ * - Kewajiban Pembayaran (Inc. PPh) = Jumlah Transfer (+ PPh jika disetor)
  */
 export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
   const ws: XLSX.WorkSheet = {}
@@ -119,26 +120,37 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
     setStr(5, row.Satuan || 'Kg')
     setStr(6, row.Billing_Date)
     setStr(7, row.Tanggal_Transfer)
-    setNum(8, row.Jumlah_Transfer)
-    setStr(10, row.Mitra_Pembeli)
-    setStr(11, row.Deskripsi_Produk)
-    setNum(12, row.Jumlah_Invoice)
-    setNum(13, row.Harga_Satuan)
-    setNum(14, row.Volume_Invoice)
-    setNum(15, row.Jumlah_DO)
-    setNum(16, row.PPN_Persen ?? 0)
-    setNum(17, row.PPh_Persen ?? 0)
+    setNum(10, row.Jumlah_Transfer)
+    setStr(11, row.Mitra_Pembeli)
+    setStr(12, row.Deskripsi_Produk)
+    setNum(13, row.Jumlah_Invoice)
+    setNum(14, row.Harga_Satuan)
+    setNum(15, row.Volume_Invoice)
+    setNum(16, row.Jumlah_DO)
+    setNum(17, row.PPN_Persen ?? 0)
+    setNum(18, row.PPh_Persen ?? 0)
 
-    const { HARGA_SATUAN, JUMLAH_DO, PPN_PCT, PPH_PCT, PENDAPATAN_POKOK, SETELAH_PPN, PAJAK_PPN, PPH, PPH_SETOR, JUMLAH_TRANSFER } = COL
+    const {
+      HARGA_SATUAN,
+      JUMLAH_DO,
+      PPN_PCT,
+      PPH_PCT,
+      PENDAPATAN_POKOK,
+      SETELAH_PPN,
+      PAJAK_PPN,
+      PPH,
+      PPH_SETOR,
+      JUMLAH_TRANSFER,
+    } = COL
 
-    setFormula(18, `ROUND(${HARGA_SATUAN}${rn}*${JUMLAH_DO}${rn},0)`)
-    setFormula(20, `ROUND(${PENDAPATAN_POKOK}${rn}*${PPN_PCT}${rn}/100,0)`)
-    setFormula(19, `${PENDAPATAN_POKOK}${rn}+${PAJAK_PPN}${rn}`)
-    setFormula(21, `ROUND(${PENDAPATAN_POKOK}${rn}*${PPH_PCT}${rn}/100,0)`)
-    setStr(22, pphSetorLabel(row.PPh_Setor))
-    setFormula(23, `${SETELAH_PPN}${rn}-${PPH}${rn}`)
+    setFormula(19, `ROUND(${HARGA_SATUAN}${rn}*${JUMLAH_DO}${rn},0)`)
+    setFormula(21, `ROUND(${PENDAPATAN_POKOK}${rn}*${PPN_PCT}${rn}/100,0)`)
+    setFormula(20, `${PENDAPATAN_POKOK}${rn}+${PAJAK_PPN}${rn}`)
+    setFormula(22, `ROUND(${PENDAPATAN_POKOK}${rn}*${PPH_PCT}${rn}/100,0)`)
+    setStr(23, pphSetorLabel(row.PPh_Setor))
+    setFormula(9, `${SETELAH_PPN}${rn}-${PPH}${rn}`)
     setFormula(
-      9,
+      8,
       `IF(${PPH_SETOR}${rn}="Disetor",${JUMLAH_TRANSFER}${rn}+${PPH}${rn},${JUMLAH_TRANSFER}${rn})`,
     )
 
