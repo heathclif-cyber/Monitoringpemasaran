@@ -107,6 +107,9 @@ def _fill_shared_informasi(page: Page, payload: DeklarasiPayload, cfg: SupermanC
         page.wait_for_timeout(800)
         page.fill("#nama_diterima_sppn_input", "tertanggu")
         page.fill("#alamat_diterima_sppn_input", "tertanggu")
+        _fill_input(page, "#kwitansi_sppn", payload.mitra_pembeli)
+        if page.locator("#faktur_pajak_sppn_1").count():
+            _fill_input(page, "#faktur_pajak_sppn_1", "-")
         return
 
     _fill_input(page, "#kwitansi_sppn", payload.mitra_pembeli)
@@ -268,6 +271,82 @@ def _fill_isi_sppb_block(page: Page, isi_index: int, item: SppbLineItem) -> None
     )
     page.fill(f"#nominal_sppb_{isi_index}_1", str(item.nominal))
     page.locator(f"#nominal_sppb_{isi_index}_1").dispatch_event("keyup")
+    page.locator(f"#nominal_sppb_{isi_index}_1").dispatch_event("change")
+    _assert_sppb_line_item_ready(page, isi_index, item.gl_code, item.nominal)
+
+
+def _assert_sppb_line_item_ready(page: Page, isi_index: int, gl_code: str, nominal: int) -> None:
+    gl_val = page.locator(f"#sap_gl_sppb_id_{isi_index}").input_value(timeout=2000)
+    if not gl_val:
+        raise RuntimeError(f"GL {gl_code} belum terpilih di baris SPPb {isi_index}")
+    nominal_val = page.locator(f"#nominal_sppb_{isi_index}_1").input_value(timeout=2000)
+    if _parse_id_number(nominal_val) <= 0:
+        raise RuntimeError(f"Nominal baris SPPb {isi_index} belum terisi")
+    if _parse_id_number(nominal_val) != int(nominal):
+        page.fill(f"#nominal_sppb_{isi_index}_1", str(nominal))
+        page.locator(f"#nominal_sppb_{isi_index}_1").dispatch_event("keyup")
+        page.locator(f"#nominal_sppb_{isi_index}_1").dispatch_event("change")
+    uraian_val = page.evaluate(
+        """(editorId) => {
+            if (window.CKEDITOR && CKEDITOR.instances[editorId]) {
+                const text = CKEDITOR.instances[editorId].getData().replace(/<[^>]+>/g, '').trim();
+                if (text) return text;
+            }
+            const el = document.getElementById(editorId);
+            return (el && el.value ? el.value : '').trim();
+        }""",
+        f"ckeditor_{isi_index}_1",
+    )
+    if not uraian_val:
+        raise RuntimeError(f"Uraian baris SPPb {isi_index} belum terisi")
+
+
+def _diagnose_validate_form(page: Page) -> dict[str, object]:
+    return page.evaluate(
+        """() => {
+            const out = {
+                validate_ok: null,
+                error: '',
+                swal: '',
+                alerts: [],
+                invalid_fields: [],
+            };
+            if (typeof validateForm === 'function') {
+                try {
+                    out.validate_ok = !!validateForm();
+                } catch (err) {
+                    out.validate_ok = false;
+                    out.error = err?.message || String(err);
+                }
+            }
+            document
+                .querySelectorAll('.has-error input, .has-error select, .is-invalid, .error')
+                .forEach((el) => {
+                    const id = el.id || el.name || el.tagName;
+                    if (id) out.invalid_fields.push(String(id).slice(0, 80));
+                });
+            const swal = document.querySelector('.swal2-popup.swal2-show, .swal2-popup:visible');
+            if (swal) out.swal = (swal.innerText || '').trim().slice(0, 500);
+            return out;
+        }"""
+    )
+
+
+def _prepare_form_before_save(page: Page, *, combined_form: bool) -> dict[str, object]:
+    if combined_form:
+        page.locator('a[href="#tab-informasi-sppb"]').click(force=True)
+        page.wait_for_timeout(500)
+        page.evaluate(
+            "() => { if (typeof bandingkan_dpp_sisa === 'function') bandingkan_dpp_sisa(); }"
+        )
+        page.wait_for_timeout(400)
+    page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
+    page.wait_for_timeout(500)
+    page.evaluate(
+        "() => { if (typeof bandingkan_dpp_sisa === 'function') bandingkan_dpp_sisa(); }"
+    )
+    page.wait_for_timeout(400)
+    return _diagnose_validate_form(page)
 
 
 def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
@@ -737,7 +816,6 @@ def _trigger_simpan_via_js(
                     return { ok: false, reason: err?.message || 'validateForm error' };
                 }
             }
-            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
             if (typeof simpan_spp === 'function') {
                 try {
                     simpan_spp();
@@ -746,15 +824,35 @@ def _trigger_simpan_via_js(
                     return { ok: false, reason: err?.message || 'simpan_spp error', disabled: !!btn.disabled };
                 }
             }
-            const form = document.getElementById('form_spp');
-            if (form) {
-                form.submit();
-                return { ok: true, method: 'form.submit', disabled: !!btn.disabled };
-            }
-            return { ok: false, reason: 'simpan_spp dan form_spp tidak ditemukan' };
+            btn.click();
+            return { ok: true, method: 'btn.click', disabled: !!btn.disabled };
         }""",
         [status_val, skip_validate],
     )
+
+
+def _trigger_simpan_via_playwright(
+    page: Page,
+    *,
+    print_after: bool = False,
+) -> dict[str, object]:
+    status_val = "1" if print_after else "0"
+    page.evaluate(
+        """(statusVal) => {
+            const status = document.getElementById('status_btn');
+            if (status) status.value = statusVal;
+        }""",
+        status_val,
+    )
+    btn = page.locator("#simpan, button:has-text('Simpan')").first
+    if btn.count() == 0:
+        return {"ok": False, "reason": "tombol #simpan tidak ada"}
+    disabled = btn.is_disabled()
+    if disabled:
+        return {"ok": False, "reason": "tombol #simpan disabled", "disabled": True}
+    btn.scroll_into_view_if_needed(timeout=3000)
+    btn.click(force=True, timeout=10000)
+    return {"ok": True, "method": "playwright_click", "disabled": False}
 
 
 def _trigger_form_submit(
@@ -798,6 +896,17 @@ def _submit_and_wait_store(
     captured: dict[str, object | None] = {"resp": None}
     seen_posts: list[str] = []
     last_swal = ""
+    dialog_msgs: list[str] = []
+
+    def _on_dialog(dialog) -> None:
+        try:
+            dialog_msgs.append(dialog.message[:300])
+        except Exception:
+            pass
+        try:
+            dialog.accept()
+        except Exception:
+            pass
 
     def _on_response(resp) -> None:
         if resp.request.method == "POST":
@@ -807,15 +916,20 @@ def _submit_and_wait_store(
         if _is_store_post_response(resp):
             captured["resp"] = resp
 
+    page.on("dialog", _on_dialog)
     page.on("response", _on_response)
     try:
-        trigger = _trigger_simpan_via_js(
-            page,
-            print_after=print_after,
-            skip_validate=skip_validate or use_simpan_click,
-        )
+        trigger = _trigger_simpan_via_playwright(page, print_after=print_after)
         if store_debug is not None:
             store_debug["trigger"] = trigger
+        if not trigger.get("ok"):
+            trigger = _trigger_simpan_via_js(
+                page,
+                print_after=print_after,
+                skip_validate=skip_validate or use_simpan_click,
+            )
+            if store_debug is not None:
+                store_debug["trigger_fallback"] = trigger
         if not trigger.get("ok"):
             raise RuntimeError(
                 f"Gagal memicu simpan Superman: {trigger.get('reason') or trigger}"
@@ -853,9 +967,11 @@ def _submit_and_wait_store(
             store_debug["last_swal"] = last_swal
             store_debug["loading_seen"] = loading_seen
             store_debug["page_url"] = page.url
+            store_debug["dialog_msgs"] = dialog_msgs[-5:]
         return None
     finally:
         page.remove_listener("response", _on_response)
+        page.remove_listener("dialog", _on_dialog)
 
 
 def submit_sppn_draft(
@@ -903,13 +1019,16 @@ def submit_sppn_draft(
         else "Menunggu respons simpan Superman"
     )
 
-    page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
-    page.wait_for_timeout(400)
-    if combined_form:
-        page.locator('a[href="#tab-informasi-sppb"]').click(force=True)
-        page.wait_for_timeout(400)
-        page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
-        page.wait_for_timeout(400)
+    validation = _prepare_form_before_save(page, combined_form=combined_form)
+    debug["validate_before_save"] = validation
+    if validation.get("validate_ok") is False:
+        detail = (
+            validation.get("swal")
+            or validation.get("error")
+            or ", ".join(str(x) for x in (validation.get("invalid_fields") or [])[:5])
+            or "validateForm mengembalikan false"
+        )
+        raise RuntimeError(f"Validasi form Superman gagal sebelum simpan: {detail}")
 
     report(89, "Mengirim draft ke Superman")
     try:

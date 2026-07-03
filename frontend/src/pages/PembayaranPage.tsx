@@ -27,10 +27,10 @@ import {
   effectivePelunasan,
   isInvoicePaid,
   maxNominalTransfer,
+  PAYMENT_LUNAS_TOLERANCE,
   paymentBalance,
   paymentProgressPercent,
   pphOnNetTransfer,
-  PAYMENT_LUNAS_TOLERANCE,
 } from '@/utils/pembayaranUtils'
 import { isPayungBA } from '@/utils/kontrakUtils'
 import {
@@ -227,6 +227,13 @@ export default function PembayaranPage() {
   const baNo = (currentInvoice?.no_ba || '').trim()
   const isInvoiceLocked = Boolean(invoiceSuperman)
 
+  useEffect(() => {
+    if (!selectedInvoice || isExisting || savedNo) return
+    if (exactTransferNominal > 0 && sisaPelunasan > 0) {
+      setValue('nominal_transfer', exactTransferNominal)
+    }
+  }, [selectedInvoice, exactTransferNominal, sisaPelunasan, isExisting, savedNo, setValue])
+
   const resetSupermanProgress = () => {
     setFailed(false)
     setPartial(false)
@@ -402,10 +409,27 @@ export default function PembayaranPage() {
 
   const savePembayaran = async (data: PembayaranFormData, triggerSuperman: boolean) => {
     try {
+      let nominalTransfer = Number(data.nominal_transfer) || 0
+      if (
+        currentKontrak?.is_pph === 'true' &&
+        exactTransferNominal > 0 &&
+        sisaPelunasan > 0
+      ) {
+        const wouldBe = existingTotal + effectivePelunasan(nominalTransfer, data.is_pph_disetor, currentKontrak)
+        if (wouldBe > invoiceTotal + PAYMENT_LUNAS_TOLERANCE) {
+          nominalTransfer = exactTransferNominal
+          setValue('nominal_transfer', exactTransferNominal)
+          addNotification(
+            'Nominal transfer disesuaikan ke pas-pasan lunas (PPh dipotong pembeli).',
+            'info',
+          )
+        }
+      }
+
       const payload: PembayaranInput = {
         no_invoice: data.no_invoice,
         tanggal_pembayaran: data.tanggal_pembayaran,
-        nominal_transfer: data.nominal_transfer,
+        nominal_transfer: nominalTransfer,
         is_pph_disetor: data.is_pph_disetor,
       }
       if (savedNo && isExisting) {
@@ -587,12 +611,23 @@ export default function PembayaranPage() {
                     <p className="text-xs text-red-500 mt-1">{errors.nominal_transfer.message}</p>
                   )}
                   {selectedInvoice && exactTransferNominal > 0 && sisaPelunasan > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      Transfer pas-pasan lunas: {formatCurrency(exactTransferNominal)}
-                      {currentKontrak?.is_pph === 'true' && (
-                        <> · pelunasan tersisa {formatCurrency(sisaPelunasan)}</>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <p className="text-xs text-slate-500">
+                        Transfer pas-pasan lunas: {formatCurrency(exactTransferNominal)}
+                        {currentKontrak?.is_pph === 'true' && (
+                          <> · pelunasan tersisa {formatCurrency(sisaPelunasan)}</>
+                        )}
+                      </p>
+                      {Number(nominalTransfer) !== exactTransferNominal && canEdit() && (
+                        <button
+                          type="button"
+                          className="text-xs text-primary underline-offset-2 hover:underline"
+                          onClick={() => setValue('nominal_transfer', exactTransferNominal)}
+                        >
+                          Gunakan pas-pasan
+                        </button>
                       )}
-                    </p>
+                    </div>
                   )}
                   {surplusAfterSave > 0 && (
                     <p className="text-xs text-amber-700 mt-1">
