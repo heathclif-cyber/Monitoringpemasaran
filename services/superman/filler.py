@@ -1093,6 +1093,10 @@ def _submit_and_wait_store(
             if "chrome-error://" in (page.url or ""):
                 if store_debug is not None:
                     store_debug["chrome_error_seen"] = True
+                try:
+                    page.go_back(wait_until="domcontentloaded", timeout=8000)
+                except Exception:
+                    pass
             elif (
                 loading_seen
                 and captured["resp"] is None
@@ -1159,6 +1163,17 @@ def submit_sppn_draft(
         timeout=30000,
     )
     _install_swal_auto_confirm(page, print_after=print_after)
+    page.evaluate(
+        """() => {
+            const form = document.getElementById('form_spp');
+            if (!form || form.__submitGuard) return;
+            form.__submitGuard = true;
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            }, true);
+        }"""
+    )
 
     store_timeout_ms = 300_000 if combined_form else 180_000
     store_body: dict | list | str | None = None
