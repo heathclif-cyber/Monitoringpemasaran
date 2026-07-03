@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 import locale
 import calendar
 from typing import List
+import io
 
 import models
 from database import get_db, SessionLocal
@@ -19,6 +21,7 @@ from services.superman.documents import (
     superman_doc_requirements_for_do,
     superman_doc_requirements_for_pembayaran,
 )
+from services.laporan_ho_export import generate_laporan_ho_xlsx, MONTHS_ID
 
 router = APIRouter(prefix="/api/laporan", tags=["Laporan"])
 
@@ -427,6 +430,33 @@ def _build_laporan_rows(db: Session):
         })
 
     return rows
+
+
+@router.post("/export-ho")
+def export_laporan_ho(data: dict):
+    """Export format HO — hanya mengisi bagian Penjualan Lokal."""
+    year = str(data.get("year") or "").strip()
+    month = str(data.get("month") or "").strip().zfill(2)
+    mode = str(data.get("mode_tanggal") or "TRANSFER").upper()
+    rows = data.get("rows")
+
+    if not year or not month.isdigit() or not (1 <= int(month) <= 12):
+        return {"success": False, "message": "Tahun dan bulan laporan wajib diisi"}
+    if not isinstance(rows, list) or len(rows) == 0:
+        return {"success": False, "message": "Tidak ada data laporan untuk diekspor"}
+
+    try:
+        content = generate_laporan_ho_xlsx(rows, year=year, month=month, mode=mode)
+    except FileNotFoundError as exc:
+        return {"success": False, "message": str(exc)}
+
+    month_name = MONTHS_ID[int(month)] if int(month) < len(MONTHS_ID) else month
+    filename = f"Laporan_HO_Penjualan_Lokal_{month_name}_{year}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("")

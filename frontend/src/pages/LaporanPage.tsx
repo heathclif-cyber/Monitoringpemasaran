@@ -48,6 +48,7 @@ import {
 import { formatCurrency, formatNumber, formatDate, safe, cn } from '@/lib/utils'
 import type { LaporanRow } from '@/types'
 import { exportLaporanExcel } from '@/utils/laporanExport'
+import { exportLaporanHO } from '@/utils/laporanHoExport'
 
 /** Kepadatan seimbang — antara padat & lega, nominal penuh tanpa ellipsis */
 const TH = 'px-3 py-2.5 text-[13px] font-semibold whitespace-nowrap'
@@ -83,6 +84,7 @@ export default function LaporanPage() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [isExportingHo, setIsExportingHo] = useState(false)
 
   useEffect(() => { fetch() }, [])
 
@@ -240,6 +242,26 @@ export default function LaporanPage() {
     )
   }
 
+  const handleExportHO = async () => {
+    setIsExportingHo(true)
+    try {
+      const result = await exportLaporanHO(sorted, {
+        year: filters.year,
+        months: filters.months,
+        modeTanggal: filters.modeTanggal,
+      })
+      if (!result.ok) {
+        addNotification(result.message, 'error')
+        return
+      }
+      addNotification('Export format HO berhasil', 'success')
+    } catch {
+      addNotification('Gagal export format HO', 'error')
+    } finally {
+      setIsExportingHo(false)
+    }
+  }
+
   const handleResetFilters = () => setFilters(createDefaultLaporanFilters())
 
   return (
@@ -262,6 +284,9 @@ export default function LaporanPage() {
         <div className="flex shrink-0 gap-2">
           <Button variant="outline" size="sm" onClick={() => void fetch()} disabled={isLoading} className="gap-1.5">
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportHO} disabled={sorted.length === 0 || isExportingHo} className="gap-1.5">
+            <Download size={14} className={isExportingHo ? 'animate-pulse' : ''} /> Export HO
           </Button>
           <Button variant="default" size="sm" onClick={handleExportExcel} disabled={sorted.length === 0} className="gap-1.5">
             <Download size={14} /> Export Excel
