@@ -170,11 +170,49 @@ def _format_bulan_buku(date_val) -> str:
     return f"{date_val.month:02d}-{name}"
 
 
-def _ba_to_ho_row(ba, kontrak) -> dict:
-    """Baris penjualan HO dari Berita Acara — diakui terjual saat barang dikirim."""
+def _find_invoice_for_ba(db, ba) -> object | None:
+    import models
+
+    linked = getattr(ba, "invoice", None)
+    if linked:
+        return linked
+    no_ba = ba.no_ba
+    return (
+        db.query(models.Invoice)
+        .filter(
+            (models.Invoice.no_ba == no_ba) | (models.Invoice.no_kontrak == no_ba)
+        )
+        .first()
+    )
+
+
+def _ba_pendapatan_pokok(ba, kontrak, invoice=None) -> int:
+    """Nilai pokok BA — fallback ke invoice jika harga BA/kontrak payung belum terisi."""
     volume = float(ba.volume_ba or 0)
     harga = ba_effective_harga(ba, kontrak)
     pokok = round(calculate_ba_pokok(kontrak, volume, harga))
+    if pokok > 0:
+        return pokok
+
+    inv = invoice or getattr(ba, "invoice", None)
+    if inv:
+        inv_gross = float(inv.jumlah_pembayaran or 0)
+        if inv_gross > 0:
+            if str(getattr(kontrak, "is_ppn", "true")).lower() != "false":
+                ppn_rate = float(getattr(kontrak, "ppn_persen", 0) or 0) / 100
+                if ppn_rate > 0:
+                    return round(inv_gross / (1 + ppn_rate))
+            return round(inv_gross)
+
+    if volume > 0 and harga > 0:
+        return round(volume * harga)
+    return 0
+
+
+def _ba_to_ho_row(ba, kontrak, invoice=None) -> dict:
+    """Baris penjualan HO dari Berita Acara — diakui terjual saat barang dikirim."""
+    volume = float(ba.volume_ba or 0)
+    pokok = _ba_pendapatan_pokok(ba, kontrak, invoice=invoice)
     buku = ba.bulan_buku or ba.tanggal_ba
     komoditi = ba.komoditi or kontrak.komoditi or ""
     deskripsi = ba.deskripsi or kontrak.jenis_komoditi or kontrak.deskripsi_produk or komoditi
@@ -213,7 +251,10 @@ def fetch_payung_ba_ho_rows(
 
     bas = (
         db.query(models.BeritaAcara)
-        .options(joinedload(models.BeritaAcara.kontrak))
+        .options(
+            joinedload(models.BeritaAcara.kontrak),
+            joinedload(models.BeritaAcara.invoice),
+        )
         .all()
     )
 
@@ -225,7 +266,8 @@ def fetch_payung_ba_ho_rows(
         if float(ba.volume_ba or 0) <= 0:
             continue
 
-        ho_row = _ba_to_ho_row(ba, kontrak)
+        invoice = _find_invoice_for_ba(db, ba)
+        ho_row = _ba_to_ho_row(ba, kontrak, invoice=invoice)
         if unit_set and ho_row.get("Unit") not in unit_set:
             continue
         if komoditi_set and ho_row.get("Komoditi") not in komoditi_set:
