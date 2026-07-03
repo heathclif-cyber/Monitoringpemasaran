@@ -311,9 +311,10 @@ def _diagnose_validate_form(page: Page) -> dict[str, object]:
                 alerts: [],
                 invalid_fields: [],
             };
+            const fakeEvent = { preventDefault() {} };
             if (typeof validateForm === 'function') {
                 try {
-                    out.validate_ok = !!validateForm();
+                    out.validate_ok = !!validateForm(fakeEvent);
                 } catch (err) {
                     out.validate_ok = false;
                     out.error = err?.message || String(err);
@@ -817,9 +818,10 @@ def _trigger_simpan_via_js(
             if (!btn) return { ok: false, reason: 'tombol #simpan tidak ada' };
             const status = document.getElementById('status_btn');
             if (status) status.value = statusVal;
+            const fakeEvent = { preventDefault() {} };
             if (!skipValidate && typeof validateForm === 'function') {
                 try {
-                    if (!validateForm()) return { ok: false, reason: 'validateForm false' };
+                    if (!validateForm(fakeEvent)) return { ok: false, reason: 'validateForm false' };
                 } catch (err) {
                     return { ok: false, reason: err?.message || 'validateForm error' };
                 }
@@ -872,7 +874,8 @@ def _trigger_form_submit(
     status_val = "1" if print_after else "0"
     page.evaluate(
         """([statusVal, skipValidate]) => {
-            if (!skipValidate && typeof validateForm === 'function' && !validateForm()) {
+            const fakeEvent = { preventDefault() {} };
+            if (!skipValidate && typeof validateForm === 'function' && !validateForm(fakeEvent)) {
                 throw new Error('validateForm gagal');
             }
             const status = document.getElementById('status_btn');
@@ -1029,6 +1032,9 @@ def submit_sppn_draft(
 
     validation = _prepare_form_before_save(page, combined_form=combined_form)
     debug["validate_before_save"] = validation
+    debug["simpan_disabled"] = page.evaluate(
+        "() => { const b = document.querySelector('#simpan'); return b ? !!b.disabled : null; }"
+    )
     if validation.get("validate_ok") is False:
         detail = (
             validation.get("swal")
