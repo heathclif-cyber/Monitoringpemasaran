@@ -28,6 +28,9 @@ def _to_superman_date(raw: str) -> str:
     return raw
 
 
+
+
+
 def _fmt_volume(value: float) -> str:
     if abs(value - round(value)) < 0.001:
         return f"{int(round(value)):,}".replace(",", ".")
@@ -507,8 +510,14 @@ def build_payload_from_invoice(no_invoice: str) -> DeklarasiPayload:
             )
 
         latest_pay = pay_rows[-1] if pay_rows else None
-        nominal = inv_gross
-        pay_ratio = 1.0
+        cash_in = sum(float(p.nominal_transfer or 0) for p in pay_rows)
+        if cash_in <= 0:
+            raise ValueError(
+                f"Tidak ada nominal transfer tercatat untuk invoice {no_invoice}. "
+                "Catat pembayaran (cash in) terlebih dahulu."
+            )
+        nominal = cash_in
+        pay_ratio = (cash_in / inv_gross) if inv_gross > 0 else 1.0
 
         kontrak_volume = float(kontrak.volume or 0)
         volume_for_calc = kontrak_volume
@@ -532,10 +541,10 @@ def build_payload_from_invoice(no_invoice: str) -> DeklarasiPayload:
         ppn_full = pokok_full * ppn_rate if is_ppn else 0.0
         nilai_unit_penuh = inv_gross if inv_gross > 0 else (pokok_full + ppn_full)
 
-        if harga > 0 and inv_gross > 0:
-            volume_do = inv_gross / harga
-        elif nilai_unit_penuh > 0 and volume_for_calc > 0:
-            volume_do = volume_for_calc
+        if nilai_unit_penuh > 0 and volume_for_calc > 0 and nominal > 0:
+            volume_do = (nominal / nilai_unit_penuh) * volume_for_calc
+        elif harga > 0 and nominal > 0:
+            volume_do = nominal / harga
         else:
             volume_do = volume_for_calc * pay_ratio
 
@@ -546,9 +555,9 @@ def build_payload_from_invoice(no_invoice: str) -> DeklarasiPayload:
             pokok_inv = inv_gross
             ppn_inv = 0.0
         pph_inv = pokok_inv * pph_rate if is_pph else 0.0
-        pokok_pay = pokok_inv
-        ppn_pay = ppn_inv
-        pph_pay = pph_inv
+        pokok_pay = pokok_inv * pay_ratio
+        ppn_pay = ppn_inv * pay_ratio
+        pph_pay = pph_inv * pay_ratio
 
         dpp = int(round(pokok_pay))
         ppn = int(round(ppn_pay))
