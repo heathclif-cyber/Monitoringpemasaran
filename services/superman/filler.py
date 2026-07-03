@@ -563,6 +563,56 @@ def _swal_is_loading(page: Page) -> bool:
     )
 
 
+def _click_swal_button_js(page: Page, *, print_after: bool = False) -> bool:
+    return bool(
+        page.evaluate(
+            """(printAfter) => {
+                const popup = document.querySelector('.swal2-popup.swal2-show')
+                    || [...document.querySelectorAll('.swal2-popup')].find((el) => {
+                        const style = window.getComputedStyle(el);
+                        return style.display !== 'none' && style.visibility !== 'hidden';
+                    });
+                if (!popup) return false;
+                const text = (popup.innerText || '').toLowerCase();
+                if (
+                    popup.querySelector('.swal2-loading')
+                    || text.includes('mengecek urutan')
+                    || text.includes('mohon tunggu')
+                ) {
+                    return false;
+                }
+                if (printAfter) {
+                    const confirm = popup.querySelector('.swal2-confirm');
+                    if (confirm) {
+                        confirm.click();
+                        return true;
+                    }
+                    return false;
+                }
+                const deny = popup.querySelector('.swal2-deny');
+                if (deny) {
+                    deny.click();
+                    return true;
+                }
+                const simpanSaja = [...popup.querySelectorAll('button')].find((btn) =>
+                    (btn.innerText || '').toLowerCase().includes('simpan saja'),
+                );
+                if (simpanSaja) {
+                    simpanSaja.click();
+                    return true;
+                }
+                const confirm = popup.querySelector('.swal2-confirm');
+                if (confirm) {
+                    confirm.click();
+                    return true;
+                }
+                return false;
+            }""",
+            print_after,
+        )
+    )
+
+
 def _click_swal_action(page: Page, *, print_after: bool = False) -> bool:
     popup = _swal_visible(page)
     if popup.count() == 0:
@@ -572,27 +622,38 @@ def _click_swal_action(page: Page, *, print_after: bool = False) -> bool:
     _raise_swal_validation_error(text)
     if _swal_is_loading(page):
         return False
+    if _click_swal_button_js(page, print_after=print_after):
+        page.wait_for_timeout(800)
+        return True
     if (
         "anomali" in lower
         or "menyimpan dan mencetak" in lower
         or "simpan saja" in lower
         or "info urutan" in lower
     ):
-        if print_after:
-            popup.locator(".swal2-confirm, button:has-text('Simpan dan Cetak')").first.click()
-        else:
-            deny = popup.locator(".swal2-deny, button:has-text('Simpan Saja')")
-            if deny.count():
-                deny.first.click()
+        try:
+            if print_after:
+                popup.locator(".swal2-confirm, button:has-text('Simpan dan Cetak')").first.click(
+                    force=True, timeout=5000
+                )
             else:
-                popup.locator(".swal2-confirm").first.click()
-        page.wait_for_timeout(800)
-        return True
+                deny = popup.locator(".swal2-deny, button:has-text('Simpan Saja')")
+                if deny.count():
+                    deny.first.click(force=True, timeout=5000)
+                else:
+                    popup.locator(".swal2-confirm").first.click(force=True, timeout=5000)
+            page.wait_for_timeout(800)
+            return True
+        except Exception:
+            return _click_swal_button_js(page, print_after=print_after)
     confirm = popup.locator(".swal2-confirm")
     if confirm.count():
-        confirm.first.click()
-        page.wait_for_timeout(800)
-        return True
+        try:
+            confirm.first.click(force=True, timeout=5000)
+            page.wait_for_timeout(800)
+            return True
+        except Exception:
+            return _click_swal_button_js(page, print_after=print_after)
     return False
 
 
@@ -666,8 +727,13 @@ def _handle_swal_popup(page: Page, *, print_after: bool = False) -> str:
         return "none"
     if _swal_is_loading(page):
         return "waiting"
-    if _click_swal_action(page, print_after=print_after):
-        return "acted"
+    try:
+        if _click_swal_action(page, print_after=print_after):
+            return "acted"
+    except Exception as exc:
+        logger.warning("Klik dialog Swal gagal (%s) — coba JS", exc)
+        if _click_swal_button_js(page, print_after=print_after):
+            return "acted"
     return "waiting"
 
 
