@@ -1006,6 +1006,9 @@ def _trigger_form_submit(
     )
 
 
+_URUTAN_CHECK_TIMEOUT_MS = 90_000
+
+
 def _submit_and_wait_store(
     page: Page,
     *,
@@ -1065,6 +1068,7 @@ def _submit_and_wait_store(
         step = 500
         last_tick: dict[str, int] = {"v": -1}
         loading_seen = False
+        loading_since: int | None = None
         while elapsed <= timeout_ms:
             if captured["resp"] is not None:
                 return _parse_store_response(captured["resp"])
@@ -1073,12 +1077,27 @@ def _submit_and_wait_store(
                 last_swal = swal_now[:500]
             if _swal_is_loading(page):
                 loading_seen = True
-            elif loading_seen:
-                swal_now_lower = (swal_now or "").lower()
-                if "simpan saja" in swal_now_lower or "info urutan" in swal_now_lower:
-                    _trigger_store_after_urutan(page)
-                else:
-                    _click_swal_action(page, print_after=print_after)
+                if loading_since is None:
+                    loading_since = elapsed
+                elif elapsed - loading_since >= _URUTAN_CHECK_TIMEOUT_MS:
+                    if store_debug is not None:
+                        store_debug["last_swal"] = last_swal
+                        store_debug["loading_seen"] = True
+                        store_debug["urutan_check_timeout"] = True
+                    raise RuntimeError(
+                        "Superman tidak merespons pengecekan urutan nomor dalam "
+                        f"{_URUTAN_CHECK_TIMEOUT_MS // 1000} detik (normalnya selesai < 1 menit). "
+                        "Ini biasanya menandakan gangguan di sisi Superman — coba deklarasi ulang "
+                        "beberapa saat lagi atau cek manual di portal Superman."
+                    )
+            else:
+                loading_since = None
+                if loading_seen:
+                    swal_now_lower = (swal_now or "").lower()
+                    if "simpan saja" in swal_now_lower or "info urutan" in swal_now_lower:
+                        _trigger_store_after_urutan(page)
+                    else:
+                        _click_swal_action(page, print_after=print_after)
             try:
                 _handle_swal_popup(page, print_after=print_after)
             except RuntimeError:
@@ -1175,7 +1194,7 @@ def submit_sppn_draft(
         }"""
     )
 
-    store_timeout_ms = 300_000 if combined_form else 180_000
+    store_timeout_ms = 420_000 if combined_form else 180_000
     store_body: dict | list | str | None = None
     debug: dict[str, object] = store_debug if store_debug is not None else {}
     wait_msg = (
