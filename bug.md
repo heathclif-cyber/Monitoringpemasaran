@@ -2,7 +2,7 @@
 
 Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini sebelum debug Superman atau Input Pembayaran — lihat juga [agent.md](./agent.md).
 
-**Terakhir diperbarui:** 2026-07-02
+**Terakhir diperbarui:** 2026-07-03
 
 ---
 
@@ -18,7 +18,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-006](#bug-006-superman--job-hilang-saat-railway-redeploy) | Superman | High | Fixed (deploy pending) |
 | [BUG-007](#bug-007-superman--todo-matching-salah-prioritas-referensi) | Superman | High | Fixed |
 | [BUG-008](#bug-008-ui-pembayaran--progress--teks-misleading) | Frontend | Low | Fixed (deploy pending) |
-| [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Open |
+| [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Open (investigasi 2026-07-03) |
 
 ---
 
@@ -138,13 +138,19 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 
 ## BUG-009: Superman — store_body null & recover gagal
 
-**Gejala:** Job `completed` + `partial: true`; invoice tetap *"Menunggu Superman"*; Pulihkan dari To Do gagal; `direct_blob_hits: 0`.
+**Gejala:** Job `completed` + `partial: true`; invoice tetap *"Menunggu Superman"*; Pulihkan dari To Do gagal; `todo_top: []`, `new_todo_ids: []`.
 
-**Invoice terdampak (contoh):** `ADD-TENDER/0353/...`, `ADD-TENDER/0354/...`
+**Invoice terdampak (contoh):** `ADD-TENDER/0353/...`, `ADD-TENDER/0354/...` (form `sppb_sppn` + PPh)
 
-**Penyebab:** POST `/spp/store` tidak tertangkap atau tidak mengembalikan body; draft tidak masuk To Do / tidak ter-match.
+**Penyebab (diperbarui 2026-07-03):**
+1. Form tender `sppb_sppn`: klik Simpan → Swal *"Mengecek urutan..."* bisa 2–7 menit; POST `/spp/store` baru setelah dialog *Simpan Saja*
+2. Kode lama: `validateForm()` via JS gagal diam-diam → retry cuma 60 detik → `store_body: null`
+3. Setelah timeout 300s, retry gagal karena `#simpan` tertutup Swal (`Locator.click timeout`)
+4. To Do API tidak mengembalikan `referensi` di baris — matching nominal saja tidak cukup jika draft tidak tersimpan
 
-**Status:** **Open** — perlu verifikasi manual di [Superman To Do](https://superman.ptpn1.co.id/sppd#tab-to-do-list-petugas) setelah deklarasi ulang.
+**Mitigasi deploy:** `252195e`, `2c2bf88`, `0e2af5e`, `ce1781e` — klik Simpan + tunggu 300s, listener sebelum trigger, tangani selesai Swal urutan, retry via `simpan_spp` JS, `store_debug` di `extract_debug`.
+
+**Status:** **Open** — E2E production invoice 0353 (2026-07-03) masih `ok: false`, `store_body_preview: null` setelah tunggu ~600s. Perlu cek `extract_debug.store_debug` (POST URLs, `last_swal`) pada run berikutnya.
 
 **Langkah debug agent:**
 ```bash
