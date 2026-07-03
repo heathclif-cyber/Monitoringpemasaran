@@ -86,9 +86,7 @@ Detail: [BUG-001](./bug.md#bug-001-pembayaran-pph--validasi-sisa-menyesatkan), [
 
 ## Known open issues
 
-Lihat tabel status di **[bug.md](./bug.md#ringkasan-status)**. Saat ini yang masih **Open**:
-
-- **[BUG-009](./bug.md#bug-009-superman--store_body-null--recover-gagal)** — `store_body: null`, recover & To Do kosong untuk beberapa invoice (0353, 0354)
+Lihat tabel status di **[bug.md](./bug.md#ringkasan-status)**. Saat ini tidak ada yang **Open** — **[BUG-009](./bug.md#bug-009-superman--store_body-null--recover-gagal)** sudah **Mitigated** (2026-07-03 sore): root cause submit-guard yang ter-revert sudah diperbaiki ulang (`7acf96b`) + fail-fast 90s (`951b287`). Pantau apakah masih sering ke-trigger untuk invoice tender (`sppb_sppn`) — kalau ya, kemungkinan ada gangguan sisi Superman yang perlu dicek manual.
 
 ---
 

@@ -18,7 +18,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-006](#bug-006-superman--job-hilang-saat-railway-redeploy) | Superman | High | Fixed (deploy pending) |
 | [BUG-007](#bug-007-superman--todo-matching-salah-prioritas-referensi) | Superman | High | Fixed |
 | [BUG-008](#bug-008-ui-pembayaran--progress--teks-misleading) | Frontend | Low | Fixed (deploy pending) |
-| [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Open (investigasi 2026-07-03) |
+| [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Mitigated (root cause ketemu 2026-07-03 sore) |
 
 ---
 
@@ -142,15 +142,15 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 
 **Invoice terdampak (contoh):** `ADD-TENDER/0353/...`, `ADD-TENDER/0354/...` (form `sppb_sppn` + PPh)
 
-**Penyebab (diperbarui 2026-07-03):**
-1. Form tender `sppb_sppn`: klik Simpan → Swal *"Mengecek urutan..."* bisa 2–7 menit; POST `/spp/store` baru setelah dialog *Simpan Saja*
-2. Kode lama: `validateForm()` via JS gagal diam-diam → retry cuma 60 detik → `store_body: null`
-3. Setelah timeout 300s, retry gagal karena `#simpan` tertutup Swal (`Locator.click timeout`)
-4. To Do API tidak mengembalikan `referensi` di baris — matching nominal saja tidak cukup jika draft tidak tersimpan
+**Root cause ketemu (2026-07-03 sore):** Tombol `#simpan` ada di dalam `<form id="form_spp">` — klik tombol memicu **native form submit** (navigasi halaman penuh) ke `/spp/check-urutan-anomaly` **selain** AJAX `simpan_spp()`. Karena cek urutan di server Superman kadang lambat, navigasi native ini timeout → browser menampilkan `chrome-error://chromewebdata/` → `form_spp` hilang dari halaman → draft SPPb/SPPn gagal total, tidak pernah sampai POST `/spp/store`.
 
-**Mitigasi deploy:** `252195e`, `2c2bf88`, `0e2af5e`, `ce1781e` — klik Simpan + tunggu 300s, listener sebelum trigger, tangani selesai Swal urutan, retry via `simpan_spp` JS, `store_debug` di `extract_debug`.
+Fix ini sempat dibuat (`9a0f807`, submit-guard `preventDefault`/`stopPropagation` pada event `submit`), **tapi ter-revert tanpa sengaja** oleh commit berikutnya (`50515e4`) yang menambahkan fallback fetch. Akibatnya bug kembali muncul di run E2E siang itu (`page_url: "chrome-error://chromewebdata/"`, `store_body_preview: null`).
 
-**Status:** **Open** — E2E production invoice 0353 (2026-07-03) masih `ok: false`, `store_body_preview: null` setelah tunggu ~600s. Perlu cek `extract_debug.store_debug` (POST URLs, `last_swal`) pada run berikutnya.
+**Fix final (2026-07-03 sore, terverifikasi live run invoice 0353):**
+- `7acf96b` — kembalikan submit-guard anti-navigasi + `page.go_back()` best-effort saat chrome-error terdeteksi. **Terverifikasi:** run setelah deploy ini tidak lagi macet di chrome-error; dialog "Mengecek urutan..." akhirnya bisa resolve ke dialog hasil ("Info Urutan Nomor", nomor SPPb/SPPn ditampilkan) alih-alih macet selamanya.
+- `951b287` — gagal cepat (90 detik) kalau dialog "Mengecek urutan..." belum selesai, dengan pesan error jelas. **Catatan operasional dari user:** deklarasi normal selesai **< 1 menit**; kalau > 2 menit itu **sudah pasti** ada gangguan di sisi Superman — jadi sistem tidak lagi menunggu 5-10 menit sebelum menyerah, cukup 90 detik.
+
+**Sisa risiko:** Penyebab cek-urutan lambat di sisi Superman (server pihak ketiga) sendiri belum diketahui — apakah karena beban server, atau ada draft/anomali nyangkut dari percobaan gagal sebelumnya untuk kontrak yang sama. Kalau fail-fast 90s sering ke-trigger, cek manual portal Superman untuk draft SPPb/SPPn duplikat/nyangkut terkait kontrak yang gagal.
 
 **Langkah debug agent:**
 ```bash
@@ -160,6 +160,8 @@ POST /api/superman/recover?no_invoice=...
 POST /api/superman/deklarasi/start?no_invoice=...
 GET /api/superman/deklarasi/progress?job_id=...
 ```
+
+Script lokal terbaru: `scripts/test_superman_0353.py`.
 
 **Screenshot debug:** `SUPERMAN_DEBUG_DIR` (default `/tmp/superman_debug`) — file `spp_store_empty_*.png`
 
@@ -190,6 +192,8 @@ Jangan push/redeploy saat user menunggu dialog Superman 88%+. Tunggu job selesai
 | `edcab3c` | To Do matching referensi invoice |
 | `ee328c9` | Superman simpan cepat + Swal auto + heartbeat |
 | `5236f7c` | Job persist disk + UI retry (mungkin belum di remote) |
+| `7acf96b` | BUG-009: kembalikan submit-guard anti-navigasi form_spp (fix regresi `50515e4`) |
+| `951b287` | BUG-009: gagal cepat 90s kalau cek urutan Superman macet |
 
 ---
 
