@@ -325,7 +325,11 @@ def _diagnose_validate_form(page: Page) -> dict[str, object]:
                     const id = el.id || el.name || el.tagName;
                     if (id) out.invalid_fields.push(String(id).slice(0, 80));
                 });
-            const swal = document.querySelector('.swal2-popup.swal2-show, .swal2-popup:visible');
+            const swal = document.querySelector('.swal2-popup.swal2-show')
+                || [...document.querySelectorAll('.swal2-popup')].find((el) => {
+                    const style = window.getComputedStyle(el);
+                    return style.display !== 'none' && style.visibility !== 'hidden';
+                });
             if (swal) out.swal = (swal.innerText || '').trim().slice(0, 500);
             return out;
         }"""
@@ -681,7 +685,11 @@ def _install_swal_auto_confirm(page: Page, *, print_after: bool = False) -> None
             if (!window.Swal || window.__swalPatched) return;
             window.__swalPatched = true;
             const clickPopup = () => {
-                const popup = document.querySelector('.swal2-popup.swal2-show, .swal2-popup:visible');
+                const popup = document.querySelector('.swal2-popup.swal2-show')
+                    || [...document.querySelectorAll('.swal2-popup')].find((el) => {
+                        const style = window.getComputedStyle(el);
+                        return style.display !== 'none' && style.visibility !== 'hidden';
+                    });
                 if (!popup) return;
                 const text = (popup.innerText || '').toLowerCase();
                 if (text.includes('belum terisi') || text.includes('belum lengkap')) return;
