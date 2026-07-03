@@ -204,6 +204,29 @@ def _todo_row_blob(row: dict[str, Any]) -> str:
     return json.dumps(row, ensure_ascii=False).lower()
 
 
+_TENDER_CODE_RE = re.compile(r"(?:add-)?tender[/-](\d{4})", re.I)
+_PAY_TENDER_RE = re.compile(r"pay-(?:add-)?tender-(\d{4})", re.I)
+
+
+def _append_todo_ref(refs: list[str], value: str) -> None:
+    n = _normalize_match_text(value)
+    if not n or n in refs:
+        return
+    refs.append(n)
+    if n.startswith("add-"):
+        short = n[4:]
+        if short not in refs:
+            refs.append(short)
+    for pattern in (_TENDER_CODE_RE, _PAY_TENDER_RE):
+        match = pattern.search(n)
+        if not match:
+            continue
+        code = match.group(1)
+        for frag in (code, f"tender/{code}", f"add-tender/{code}"):
+            if frag not in refs:
+                refs.append(frag)
+
+
 def _collect_todo_match_refs(
     *,
     no_pembayaran: str = "",
@@ -215,15 +238,31 @@ def _collect_todo_match_refs(
     """Kandidat teks untuk cocokkan baris To Do — invoice/referensi diutamakan."""
     refs: list[str] = []
     for raw in (referensi, no_invoice, no_kontrak, no_pembayaran, no_do):
-        n = _normalize_match_text(raw)
-        if not n or n in refs:
-            continue
-        refs.append(n)
-        if n.startswith("add-"):
-            short = n[4:]
-            if short not in refs:
-                refs.append(short)
+        _append_todo_ref(refs, raw)
     return refs
+
+
+def _todo_row_id(row: dict[str, Any]) -> str:
+    for key in ("sppn_id", "spp_id", "id"):
+        val = row.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    sppn = str(row.get("sppn_no") or "").strip()
+    sppb = str(row.get("sppb_no") or "").strip()
+    if sppn or sppb:
+        return f"{sppn}|{sppb}"
+    return json.dumps(row, sort_keys=True, ensure_ascii=False)
+
+
+def _fetch_todo_rows(page, base_url: str) -> list[dict[str, Any]]:
+    resp = page.request.get(f"{base_url.rstrip('/')}/sppd/getTodo")
+    if not resp.ok:
+        return []
+    return [row for row in (resp.json().get("data") or []) if isinstance(row, dict)]
+
+
+def _snapshot_todo_ids(page, base_url: str) -> set[str]:
+    return {_todo_row_id(row) for row in _fetch_todo_rows(page, base_url)}
 
 
 def _score_todo_row(
@@ -273,6 +312,7 @@ def _score_todo_row(
         "referensi_sppn",
         "referensi_sppb",
         "sp_opl",
+        "sp_opl_sppb",
         "sp_opl_sppn",
         "kwitansi",
         "kwitansi_sppn",
@@ -305,8 +345,6 @@ def _score_todo_row(
     if expect_sppb:
         if row.get("sppb_no"):
             score += 5
-        else:
-            score -= 50
 
     amount_matched = False
     for amount_field in ("sppn_jumlah", "sppb_total", "total", "jumlah", "nominal"):
@@ -349,7 +387,7 @@ def _score_todo_row(
     if amount_matched and mitra_n and mitra_n in blob:
         score += 25
 
-    # Jangan nol-kan match kuat (referensi/kontrak) hanya karena format tanggal beda.
+    # Jangan nol-kan match kuat (referensi/kontrak/nominal) hanya karena format tanggal beda.
     has_strong_ref = any(r in blob for r in match_refs)
     has_kontrak = bool(no_kontrak_n and no_kontrak_n in blob)
     if (
@@ -358,6 +396,7 @@ def _score_todo_row(
         and score < 800
         and not has_strong_ref
         and not has_kontrak
+        and not amount_matched
     ):
         return 0
 
@@ -539,46 +578,91 @@ def _score_all_todo_rows(
     return scored
 
 
+def _score_todo_row_for_payload(row: dict[str, Any], payload, *, expect_sppb: bool) -> int:
+    total_sppn = int(payload.dpp_pokok or 0) + int(payload.pajak_ppn or 0)
+    return _score_todo_row(
+        row,
+        no_do=payload.no_do,
+        no_pembayaran=payload.no_pembayaran,
+        no_invoice=payload.no_invoice,
+        referensi=payload.referensi,
+        no_kontrak=payload.no_kontrak,
+        mitra_pembeli=payload.mitra_pembeli,
+        total_sppn=total_sppn,
+        expect_sppb=expect_sppb,
+        tanggal_transfer=payload.tanggal_transfer,
+    )
+
+
+def _find_new_todo_match(
+    page,
+    base_url: str,
+    payload,
+    *,
+    expect_sppb: bool,
+    before_ids: set[str],
+    retries: int = 10,
+    delay_ms: int = 2000,
+) -> dict[str, Any] | None:
+    """Prioritaskan baris To Do yang baru muncul setelah simpan draft."""
+    best: dict[str, Any] | None = None
+    best_score = 0
+
+    for _attempt in range(retries):
+        rows = _fetch_todo_rows(page, base_url)
+        new_rows = [row for row in rows if _todo_row_id(row) not in before_ids]
+        for row in new_rows:
+            score = _score_todo_row_for_payload(row, payload, expect_sppb=expect_sppb) + 250
+            if score > best_score:
+                best_score = score
+                best = row
+        if best_score >= 120:
+            return best
+        if _attempt < retries - 1:
+            page.wait_for_timeout(delay_ms)
+
+    if best_score >= 60:
+        return best
+    return None
+
+
 def _find_todo_match(
     page,
     base_url: str,
     payload,
     *,
     expect_sppb: bool,
+    before_ids: set[str] | None = None,
     retries: int = 12,
     delay_ms: int = 2000,
 ) -> dict[str, Any] | None:
     best: dict[str, Any] | None = None
     best_score = 0
-    total_sppn = int(payload.dpp_pokok or 0) + int(payload.pajak_ppn or 0)
 
     for _attempt in range(retries):
-        resp = page.request.get(f"{base_url.rstrip('/')}/sppd/getTodo")
-        if resp.ok:
-            body = resp.json()
-            rows = body.get("data") or []
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                score = _score_todo_row(
-                    row,
-                    no_do=payload.no_do,
-                    no_pembayaran=payload.no_pembayaran,
-                    no_invoice=payload.no_invoice,
-                    referensi=payload.referensi,
-                    no_kontrak=payload.no_kontrak,
-                    mitra_pembeli=payload.mitra_pembeli,
-                    total_sppn=total_sppn,
-                    expect_sppb=expect_sppb,
-                    tanggal_transfer=payload.tanggal_transfer,
-                )
-                if score > best_score:
-                    best_score = score
-                    best = row
-            if best_score >= 800:
-                return best
+        rows = _fetch_todo_rows(page, base_url)
+        for row in rows:
+            score = _score_todo_row_for_payload(row, payload, expect_sppb=expect_sppb)
+            if score > best_score:
+                best_score = score
+                best = row
+        if best_score >= 800:
+            return best
         if _attempt < retries - 1:
             page.wait_for_timeout(delay_ms)
+
+    if before_ids:
+        fresh = _find_new_todo_match(
+            page,
+            base_url,
+            payload,
+            expect_sppb=expect_sppb,
+            before_ids=before_ids,
+            retries=6,
+            delay_ms=delay_ms,
+        )
+        if fresh:
+            return fresh
 
     if best_score >= 70:
         return best
@@ -608,19 +692,77 @@ def recover_superman_from_todo(
             "recovered": False,
         }
 
-    inspect = inspect_superman_todo(no_invoice=ref, limit=3)
-    coalesce = inspect.get("coalesce") or {}
-    sppb_no = coalesce.get("sppb_no")
-    sppn_no = coalesce.get("sppn_no")
-    top = inspect.get("top_scores") or []
-    best_score = top[0]["score"] if top else 0
+    cfg = _api_config()
+    ensure_session(cfg)
+    payload = build_payload_from_invoice(ref)
+    expect_sppb = payload.pph_nominal > 0
+    match: dict[str, Any] | None = None
+    best_score = 0
+    inspect: dict[str, Any] = {}
 
-    if best_score < 70 or not (sppb_no or sppn_no):
+    pw, browser, context = open_authenticated_context(cfg)
+    try:
+        page = context.new_page()
+        match = _find_todo_match(
+            page,
+            cfg.base_url,
+            payload,
+            expect_sppb=expect_sppb,
+            retries=18,
+            delay_ms=2000,
+        )
+        rows = _fetch_todo_rows(page, cfg.base_url)
+        scored = _score_all_todo_rows(rows, payload, expect_sppb=expect_sppb)
+        best_score = scored[0][0] if scored else 0
+        if match:
+            best_score = max(
+                best_score,
+                _score_todo_row_for_payload(match, payload, expect_sppb=expect_sppb),
+            )
+        sppb_no, sppn_no = _coalesce_spp_numbers(
+            store_sppb=None,
+            store_sppn=None,
+            match=match,
+            store_body=None,
+        )
+        inspect = {
+            "no_invoice": ref,
+            "todo_rows": len(rows),
+            "top_scores": [
+                {
+                    "score": score,
+                    "sppn_no": row.get("sppn_no"),
+                    "sppb_no": row.get("sppb_no"),
+                    "sppn_id": row.get("sppn_id") or row.get("spp_id"),
+                }
+                for score, row in scored[:5]
+            ],
+            "row_samples": [
+                {
+                    "sppn_id": row.get("sppn_id") or row.get("spp_id"),
+                    "sppn_no": row.get("sppn_no"),
+                    "sppb_no": row.get("sppb_no"),
+                    "sppn_jumlah": row.get("sppn_jumlah"),
+                    "referensi": row.get("referensi") or row.get("referensi_sppn"),
+                    "berita_acara": row.get("berita_acara") or row.get("berita_acara_sppb"),
+                    "sp_opl": row.get("sp_opl") or row.get("sp_opl_sppn"),
+                }
+                for row in rows[:8]
+            ],
+            "coalesce": {"sppb_no": sppb_no, "sppn_no": sppn_no},
+        }
+    finally:
+        context.close()
+        browser.close()
+        pw.stop()
+
+    if not match or best_score < 70 or not (sppb_no or sppn_no):
         return {
             "ok": False,
             "no_invoice": ref,
             "message": "Tidak menemukan SPPn/SPPb yang cocok di To Do List Superman.",
             "inspect": inspect,
+            "best_score": best_score,
         }
 
     saved = save_superman_to_invoice(ref, sppb_no, sppn_no)
@@ -657,10 +799,8 @@ def inspect_superman_todo(
     pw, browser, context = open_authenticated_context(cfg)
     try:
         page = context.new_page()
-        resp = page.request.get(f"{cfg.base_url.rstrip('/')}/sppd/getTodo")
-        rows = resp.json().get("data") or [] if resp.ok else []
+        rows = _fetch_todo_rows(page, cfg.base_url)
         scored = _score_all_todo_rows(rows, payload, expect_sppb=expect_sppb)
-        hits = []
         ref_candidates = _collect_todo_match_refs(
             referensi=payload.referensi,
             no_invoice=payload.no_invoice,
@@ -668,14 +808,20 @@ def inspect_superman_todo(
             no_pembayaran=payload.no_pembayaran,
             no_do=payload.no_do,
         )
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            blob = _todo_row_blob(row)
-            if any(candidate in blob for candidate in ref_candidates):
-                hits.append(row)
-
-        best = scored[0][1] if scored else None
+        hits = [
+            row
+            for row in rows
+            if any(candidate in _todo_row_blob(row) for candidate in ref_candidates)
+        ]
+        match = _find_todo_match(
+            page,
+            cfg.base_url,
+            payload,
+            expect_sppb=expect_sppb,
+            retries=6,
+            delay_ms=1500,
+        )
+        best = match or (scored[0][1] if scored else None)
         sppb_no, sppn_no = _coalesce_spp_numbers(
             store_sppb=None,
             store_sppn=None,
@@ -686,15 +832,29 @@ def inspect_superman_todo(
             "no_invoice": ref,
             "todo_rows": len(rows),
             "direct_blob_hits": len(hits),
+            "match_refs": ref_candidates[:8],
             "top_scores": [
                 {
                     "score": score,
                     "sppn_no": row.get("sppn_no"),
                     "sppb_no": row.get("sppb_no"),
+                    "sppn_id": row.get("sppn_id") or row.get("spp_id"),
                     "keys": list(row.keys()),
                     "row": row,
                 }
                 for score, row in scored[:limit]
+            ],
+            "row_samples": [
+                {
+                    "sppn_id": row.get("sppn_id") or row.get("spp_id"),
+                    "sppn_no": row.get("sppn_no"),
+                    "sppb_no": row.get("sppb_no"),
+                    "sppn_jumlah": row.get("sppn_jumlah"),
+                    "referensi": row.get("referensi") or row.get("referensi_sppn"),
+                    "berita_acara": row.get("berita_acara") or row.get("berita_acara_sppb"),
+                    "sp_opl": row.get("sp_opl") or row.get("sp_opl_sppn"),
+                }
+                for row in rows[:limit]
             ],
             "coalesce": {"sppb_no": sppb_no, "sppn_no": sppn_no},
         }
@@ -751,6 +911,7 @@ def submit_deklarasi_invoice(
             support_docs=[doc.path for doc in supports],
             on_progress=on_progress,
         )
+        before_todo_ids = _snapshot_todo_ids(page, cfg.base_url)
         store_body = submit_sppn_draft(page, on_progress=on_progress)
         if store_body is None:
             report(90, "Respons simpan kosong — memverifikasi To Do List")
@@ -761,6 +922,7 @@ def submit_deklarasi_invoice(
             cfg.base_url,
             payload,
             expect_sppb=payload.pph_nominal > 0,
+            before_ids=before_todo_ids,
         )
         if not (store_sppb or store_sppn) and not match:
             page_sppb, page_sppn = _extract_numbers_from_page(page)
