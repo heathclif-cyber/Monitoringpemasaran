@@ -634,14 +634,16 @@ def _click_swal_action(page: Page, *, print_after: bool = False) -> bool:
         try:
             if print_after:
                 popup.locator(".swal2-confirm, button:has-text('Simpan dan Cetak')").first.click(
-                    force=True, timeout=5000
+                    force=True, timeout=5000, no_wait_after=True
                 )
             else:
                 deny = popup.locator(".swal2-deny, button:has-text('Simpan Saja')")
                 if deny.count():
-                    deny.first.click(force=True, timeout=5000)
+                    deny.first.click(force=True, timeout=5000, no_wait_after=True)
                 else:
-                    popup.locator(".swal2-confirm").first.click(force=True, timeout=5000)
+                    popup.locator(".swal2-confirm").first.click(
+                        force=True, timeout=5000, no_wait_after=True
+                    )
             page.wait_for_timeout(800)
             return True
         except Exception:
@@ -649,12 +651,35 @@ def _click_swal_action(page: Page, *, print_after: bool = False) -> bool:
     confirm = popup.locator(".swal2-confirm")
     if confirm.count():
         try:
-            confirm.first.click(force=True, timeout=5000)
+            confirm.first.click(force=True, timeout=5000, no_wait_after=True)
             page.wait_for_timeout(800)
             return True
         except Exception:
             return _click_swal_button_js(page, print_after=print_after)
     return False
+
+
+def _trigger_store_after_urutan(page: Page) -> None:
+    """Picu POST /spp/store setelah dialog urutan — hindari navigasi penuh."""
+    page.evaluate(
+        """() => {
+            const status = document.getElementById('status_btn');
+            if (status) status.value = '0';
+            const deny = document.querySelector('.swal2-deny');
+            if (deny) {
+                deny.click();
+                return;
+            }
+            const simpanSaja = [...document.querySelectorAll('.swal2-popup button')].find((btn) =>
+                (btn.innerText || '').toLowerCase().includes('simpan saja'),
+            );
+            if (simpanSaja) {
+                simpanSaja.click();
+                return;
+            }
+            if (typeof simpan_spp === 'function') simpan_spp();
+        }"""
+    )
 
 
 _SPPN_NO_RE = re.compile(
@@ -911,7 +936,7 @@ def _trigger_simpan_via_playwright(
     if disabled:
         return {"ok": False, "reason": "tombol #simpan disabled", "disabled": True}
     btn.scroll_into_view_if_needed(timeout=3000)
-    btn.click(force=True, timeout=10000)
+    btn.click(force=True, timeout=10000, no_wait_after=True)
     return {"ok": True, "method": "playwright_click", "disabled": False}
 
 
@@ -1009,7 +1034,11 @@ def _submit_and_wait_store(
             if _swal_is_loading(page):
                 loading_seen = True
             elif loading_seen:
-                _click_swal_action(page, print_after=print_after)
+                swal_now_lower = (swal_now or "").lower()
+                if "simpan saja" in swal_now_lower or "info urutan" in swal_now_lower:
+                    _trigger_store_after_urutan(page)
+                else:
+                    _click_swal_action(page, print_after=print_after)
             try:
                 _handle_swal_popup(page, print_after=print_after)
             except RuntimeError:
