@@ -442,13 +442,26 @@ def export_laporan_ho(data: dict):
 
     if not year or not month.isdigit() or not (1 <= int(month) <= 12):
         return {"success": False, "message": "Tahun dan bulan laporan wajib diisi"}
-    if not isinstance(rows, list) or len(rows) == 0:
-        return {"success": False, "message": "Tidak ada data laporan untuk diekspor"}
+    if not isinstance(rows, list):
+        rows = []
 
+    filters = data.get("filters") if isinstance(data.get("filters"), dict) else {}
+
+    db = SessionLocal()
     try:
-        content = generate_laporan_ho_xlsx(rows, year=year, month=month, mode=mode)
-    except FileNotFoundError as exc:
-        return {"success": False, "message": str(exc)}
+        try:
+            content = generate_laporan_ho_xlsx(
+                rows,
+                year=year,
+                month=month,
+                mode=mode,
+                db=db,
+                filters=filters,
+            )
+        except FileNotFoundError as exc:
+            return {"success": False, "message": str(exc)}
+    finally:
+        db.close()
 
     month_name = MONTHS_ID[int(month)] if int(month) < len(MONTHS_ID) else month
     filename = f"Laporan_HO_Penjualan_Lokal_{month_name}_{year}.xlsx"

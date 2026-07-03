@@ -9,6 +9,8 @@ from typing import Iterable
 
 from openpyxl import load_workbook
 
+from services.ba_utils import ba_effective_harga, calculate_ba_pokok, is_payung_ba
+
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "templates" / "laporan_ho_template.xlsx"
 
 MONTHS_ID = [
@@ -158,8 +160,126 @@ def map_komoditi_to_ho_key(komoditi: str | None, deskripsi: str | None) -> str:
     return "lain_lain"
 
 
+def _format_bulan_buku(date_val) -> str:
+    if not date_val:
+        return ""
+    try:
+        name = MONTHS_ID[date_val.month]
+    except (AttributeError, IndexError, TypeError):
+        return ""
+    return f"{date_val.month:02d}-{name}"
+
+
+def _ba_to_ho_row(ba, kontrak) -> dict:
+    """Baris penjualan HO dari Berita Acara — diakui terjual saat barang dikirim."""
+    volume = float(ba.volume_ba or 0)
+    harga = ba_effective_harga(ba, kontrak)
+    pokok = round(calculate_ba_pokok(kontrak, volume, harga))
+    buku = ba.bulan_buku or ba.tanggal_ba
+    komoditi = ba.komoditi or kontrak.komoditi or ""
+    deskripsi = ba.deskripsi or kontrak.jenis_komoditi or kontrak.deskripsi_produk or komoditi
+    unit = ba.nama_unit or kontrak.kebun_produsen or ""
+
+    return {
+        "Komoditi": komoditi,
+        "Deskripsi_Produk": deskripsi,
+        "Unit": unit,
+        "Jumlah_DO": volume,
+        "DPP_Pokok": pokok,
+        "Pendapatan_Pokok": pokok,
+        "Satuan": kontrak.satuan or "Kg",
+        "No_BA": ba.no_ba,
+        "Tanggal_BA": ba.tanggal_ba.strftime("%Y-%m-%d") if ba.tanggal_ba else "",
+        "Bulan_Buku": _format_bulan_buku(buku),
+        "Rencana_Pengambilan": ba.tanggal_ba.strftime("%Y-%m-%d") if ba.tanggal_ba else "",
+        "Raw_Date": buku.strftime("%Y-%m-%d") if buku else "",
+        "Is_Payung_BA": True,
+    }
+
+
+def fetch_payung_ba_ho_rows(
+    db,
+    *,
+    units: list[str] | None = None,
+    komoditis: list[str] | None = None,
+) -> list[dict]:
+    """Ambil semua BA kontrak payung untuk pengakuan penjualan HO."""
+    from sqlalchemy.orm import joinedload
+
+    import models
+
+    unit_set = set(units or [])
+    komoditi_set = set(komoditis or [])
+
+    bas = (
+        db.query(models.BeritaAcara)
+        .options(joinedload(models.BeritaAcara.kontrak))
+        .all()
+    )
+
+    rows: list[dict] = []
+    for ba in bas:
+        kontrak = ba.kontrak
+        if not kontrak or not is_payung_ba(kontrak):
+            continue
+        if float(ba.volume_ba or 0) <= 0:
+            continue
+
+        ho_row = _ba_to_ho_row(ba, kontrak)
+        if unit_set and ho_row.get("Unit") not in unit_set:
+            continue
+        if komoditi_set and ho_row.get("Komoditi") not in komoditi_set:
+            continue
+        rows.append(ho_row)
+
+    return rows
+
+
+def prepare_ho_export_rows(client_rows: list[dict], ba_supplement: list[dict]) -> list[dict]:
+    """
+    Kontrak payung: penjualan HO mengikuti BA (pengiriman), bukan menunggu DO/transfer.
+    - Jika sudah ada DO dengan volume → pakai baris DO.
+    - Jika belum ada DO → pakai volume/nilai dari BA.
+    """
+    ba_by_no = {r["No_BA"]: r for r in ba_supplement if r.get("No_BA")}
+
+    do_volume_by_ba: dict[str, float] = {}
+    rows_by_ba: dict[str, list[dict]] = {}
+    non_ba_rows: list[dict] = []
+
+    for row in client_rows:
+        no_ba = (row.get("No_BA") or "").strip()
+        if not no_ba:
+            non_ba_rows.append(row)
+            continue
+        rows_by_ba.setdefault(no_ba, []).append(row)
+        do_volume_by_ba[no_ba] = do_volume_by_ba.get(no_ba, 0) + float(row.get("Jumlah_DO") or 0)
+
+    result = list(non_ba_rows)
+
+    for no_ba, grouped in rows_by_ba.items():
+        if do_volume_by_ba.get(no_ba, 0) > 0:
+            for row in grouped:
+                if float(row.get("Jumlah_DO") or 0) > 0:
+                    result.append(row)
+            continue
+        if no_ba in ba_by_no:
+            result.append(ba_by_no[no_ba])
+            continue
+        for row in grouped:
+            result.append(row)
+            break
+
+    for no_ba, ba_row in ba_by_no.items():
+        if no_ba not in rows_by_ba:
+            result.append(ba_row)
+
+    return result
+
+
 def _extract_year_month(row: dict, mode: str) -> tuple[str, str]:
-    if row.get("No_BA"):
+    # Payung BA: periode HO selalu bulan buku BA (pengiriman), bukan tgl transfer
+    if row.get("No_BA") or row.get("Is_Payung_BA"):
         bulan_buku = row.get("Bulan_Buku") or ""
         month = bulan_buku[:2] if len(bulan_buku) >= 2 else ""
         for field in ("Rencana_Pengambilan", "Tanggal_BA", "Raw_Date"):
@@ -268,11 +388,23 @@ def generate_laporan_ho_xlsx(
     year: str,
     month: str,
     mode: str = "TRANSFER",
+    db=None,
+    filters: dict | None = None,
 ) -> bytes:
     if not TEMPLATE_PATH.exists():
         raise FileNotFoundError(f"Template HO tidak ditemukan: {TEMPLATE_PATH}")
 
-    bulan_data, ytd_data = _aggregate_lokal(rows, year=year, month=month, mode=mode)
+    export_rows = list(rows)
+    if db is not None:
+        filter_opts = filters or {}
+        ba_rows = fetch_payung_ba_ho_rows(
+            db,
+            units=filter_opts.get("units") or None,
+            komoditis=filter_opts.get("komoditis") or None,
+        )
+        export_rows = prepare_ho_export_rows(export_rows, ba_rows)
+
+    bulan_data, ytd_data = _aggregate_lokal(export_rows, year=year, month=month, mode=mode)
 
     wb = load_workbook(TEMPLATE_PATH)
     ws = wb.active

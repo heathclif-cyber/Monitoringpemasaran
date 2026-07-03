@@ -249,6 +249,10 @@ export default function LaporanPage() {
         year: filters.year,
         months: filters.months,
         modeTanggal: filters.modeTanggal,
+        filters: {
+          units: filters.unit,
+          komoditis: filters.komoditi,
+        },
       })
       if (!result.ok) {
         addNotification(result.message, 'error')
@@ -285,7 +289,7 @@ export default function LaporanPage() {
           <Button variant="outline" size="sm" onClick={() => void fetch()} disabled={isLoading} className="gap-1.5">
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportHO} disabled={sorted.length === 0 || isExportingHo} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={handleExportHO} disabled={isExportingHo || !filters.year || filters.months.length === 0} className="gap-1.5">
             <Download size={14} className={isExportingHo ? 'animate-pulse' : ''} /> Export HO
           </Button>
           <Button variant="default" size="sm" onClick={handleExportExcel} disabled={sorted.length === 0} className="gap-1.5">

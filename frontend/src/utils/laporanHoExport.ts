@@ -29,9 +29,19 @@ function parseFilename(contentDisposition: string | null): string | null {
   return match?.[1] ?? null
 }
 
+export interface LaporanHoExportOptions {
+  year: string
+  months: string[]
+  modeTanggal: 'TRANSFER' | 'RENCANA'
+  filters?: {
+    units?: string[]
+    komoditis?: string[]
+  }
+}
+
 export async function exportLaporanHO(
   rows: LaporanRow[],
-  options: { year: string; months: string[]; modeTanggal: 'TRANSFER' | 'RENCANA' },
+  options: LaporanHoExportOptions,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const month = pickReportMonth(options.months)
   const year = options.year.trim()
@@ -42,10 +52,6 @@ export async function exportLaporanHO(
   if (!month) {
     return { ok: false, message: 'Pilih minimal satu bulan untuk export format HO' }
   }
-  if (rows.length === 0) {
-    return { ok: false, message: 'Tidak ada data laporan untuk diekspor' }
-  }
-
   const token = localStorage.getItem('auth_token')
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
@@ -58,6 +64,10 @@ export async function exportLaporanHO(
       month,
       mode_tanggal: options.modeTanggal,
       rows: rows.map(toHoPayloadRow),
+      filters: {
+        units: options.filters?.units?.length ? options.filters.units : undefined,
+        komoditis: options.filters?.komoditis?.length ? options.filters.komoditis : undefined,
+      },
     }),
   })
 
