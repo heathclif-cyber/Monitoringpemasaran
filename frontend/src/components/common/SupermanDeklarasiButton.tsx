@@ -55,6 +55,7 @@ export function SupermanDeklarasiButton({
   const [stage, setStage] = useState('Memulai...')
   const [failed, setFailed] = useState(false)
   const [partial, setPartial] = useState(false)
+  const [recoverable, setRecoverable] = useState(true)
   const [failedMessage, setFailedMessage] = useState('')
   const [lastInvoice, setLastInvoice] = useState<string | undefined>(noInvoice)
   const cancelledRef = useRef(false)
@@ -64,6 +65,7 @@ export function SupermanDeklarasiButton({
   const resetProgressState = () => {
     setFailed(false)
     setPartial(false)
+    setRecoverable(true)
     setFailedMessage('')
     setPercent(0)
     setStage('Memulai...')
@@ -97,6 +99,7 @@ export function SupermanDeklarasiButton({
 
     if (res.partial || (!res.ok && parts.length)) {
       setPartial(true)
+      setRecoverable(res.recoverable !== false)
       setStage(res.message || 'Nomor Superman belum tersimpan otomatis')
       setPercent(100)
       addNotification(
@@ -110,6 +113,7 @@ export function SupermanDeklarasiButton({
 
     if (parts.length && !res.superman_saved) {
       setPartial(true)
+      setRecoverable(res.recoverable !== false)
       setStage(res.message)
       setPercent(100)
       addNotification(
@@ -362,6 +366,7 @@ export function SupermanDeklarasiButton({
         failed={failed}
         failedMessage={failedMessage}
         partial={partial}
+        recoverable={recoverable}
         recoverLoading={recoverLoading}
         onCancel={() => {
           cancelledRef.current = true

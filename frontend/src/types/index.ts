@@ -689,6 +689,7 @@ export interface SupermanDeklarasiProgress {
 export interface SupermanDeklarasiResult {
   ok: boolean
   partial?: boolean
+  recoverable?: boolean
   recovered?: boolean
   warning?: string
   no_invoice?: string

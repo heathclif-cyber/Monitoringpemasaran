@@ -77,6 +77,7 @@ export default function PembayaranPage() {
   const [stage, setStage] = useState('Memulai...')
   const [failed, setFailed] = useState(false)
   const [partial, setPartial] = useState(false)
+  const [recoverable, setRecoverable] = useState(true)
   const [failedMessage, setFailedMessage] = useState('')
   const [recoverLoading, setRecoverLoading] = useState(false)
   const [supermanInvoice, setSupermanInvoice] = useState<string | undefined>()
@@ -229,6 +230,7 @@ export default function PembayaranPage() {
   const resetSupermanProgress = () => {
     setFailed(false)
     setPartial(false)
+    setRecoverable(true)
     setFailedMessage('')
     setPercent(0)
     setStage('Memulai...')
@@ -301,6 +303,7 @@ export default function PembayaranPage() {
       const label = (result.superman_saved || '').trim()
       if (result.partial || (!result.ok && (result.sppn_no || result.sppb_no))) {
         setPartial(true)
+        setRecoverable(result.recoverable !== false)
         setPercent(100)
         setStage(result.message || 'Nomor Superman belum tersimpan otomatis')
         addNotification(
@@ -821,6 +824,7 @@ export default function PembayaranPage() {
         failed={failed}
         failedMessage={failedMessage}
         partial={partial}
+        recoverable={recoverable}
         recoverLoading={recoverLoading}
         onCancel={() => {
           cancelledRef.current = true

@@ -20,6 +20,7 @@ interface SupermanProgressDialogProps {
   failed?: boolean
   failedMessage?: string
   partial?: boolean
+  recoverable?: boolean
   recoverLoading?: boolean
   onCancel?: () => void
   onClose?: () => void
@@ -37,6 +38,7 @@ export function SupermanProgressDialog({
   failed = false,
   failedMessage,
   partial = false,
+  recoverable = true,
   recoverLoading = false,
   onCancel,
   onClose,
@@ -46,7 +48,7 @@ export function SupermanProgressDialog({
   const refLabel = noInvoice || noPembayaran || '-'
   const clamped = Math.max(0, Math.min(100, percent))
   const dismissible = failed || partial
-  const showRecover = partial && Boolean(noInvoice) && Boolean(onRecover)
+  const showRecover = partial && recoverable && Boolean(noInvoice) && Boolean(onRecover)
   const showRetry = failed && Boolean(noInvoice) && Boolean(onRetry)
 
   const handleOpenChange = (next: boolean) => {

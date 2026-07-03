@@ -276,6 +276,7 @@ def _score_todo_row(
     mitra_pembeli: str,
     total_sppn: int,
     expect_sppb: bool,
+    pph_nominal: int = 0,
     tanggal_transfer: str = "",
 ) -> int:
     blob = _todo_row_blob(row)
@@ -347,7 +348,9 @@ def _score_todo_row(
             score += 5
 
     amount_matched = False
-    for amount_field in ("sppn_jumlah", "sppb_total", "total", "jumlah", "nominal"):
+    sppn_amount_matched = False
+    sppb_amount_matched = False
+    for amount_field in ("sppn_jumlah", "total", "jumlah", "nominal"):
         raw = row.get(amount_field)
         if raw is None:
             continue
@@ -357,8 +360,25 @@ def _score_todo_row(
             continue
         if total_sppn > 0 and abs(amount - total_sppn) <= 1:
             score += 30
+            sppn_amount_matched = True
             amount_matched = True
             break
+    if expect_sppb and pph_nominal > 0:
+        for amount_field in ("sppb_total", "sppb_jumlah", "total_sppb"):
+            raw = row.get(amount_field)
+            if raw is None:
+                continue
+            try:
+                amount = int(round(float(raw)))
+            except (TypeError, ValueError):
+                continue
+            if abs(amount - pph_nominal) <= 1:
+                score += 30
+                sppb_amount_matched = True
+                amount_matched = True
+                break
+    if sppn_amount_matched and sppb_amount_matched:
+        score += 40
 
     def _norm_date_key(value: str) -> str:
         text = _normalize_match_text(value)
@@ -564,6 +584,7 @@ def _score_all_todo_rows(
             mitra_pembeli=payload.mitra_pembeli,
             total_sppn=total_sppn,
             expect_sppb=expect_sppb,
+            pph_nominal=int(payload.pph_nominal or 0),
             tanggal_transfer=payload.tanggal_transfer,
         )
         if score > 0:
@@ -590,6 +611,7 @@ def _score_todo_row_for_payload(row: dict[str, Any], payload, *, expect_sppb: bo
         mitra_pembeli=payload.mitra_pembeli,
         total_sppn=total_sppn,
         expect_sppb=expect_sppb,
+        pph_nominal=int(payload.pph_nominal or 0),
         tanggal_transfer=payload.tanggal_transfer,
     )
 
@@ -901,6 +923,9 @@ def submit_deklarasi_invoice(
     store_body: Any = None
     match: dict[str, Any] | None = None
     todo_debug: list[dict[str, Any]] = []
+    new_todo_ids: list[str] = []
+    before_todo_ids: set[str] = set()
+    expect_sppb = payload.pph_nominal > 0
     pw, browser, context = open_authenticated_context(cfg)
     try:
         page = context.new_page()
@@ -912,7 +937,11 @@ def submit_deklarasi_invoice(
             on_progress=on_progress,
         )
         before_todo_ids = _snapshot_todo_ids(page, cfg.base_url)
-        store_body = submit_sppn_draft(page, on_progress=on_progress)
+        store_body = submit_sppn_draft(
+            page,
+            on_progress=on_progress,
+            combined_form=payload.jenis_form == "sppb_sppn",
+        )
         if store_body is None:
             report(90, "Respons simpan kosong — memverifikasi To Do List")
         report(95, "Memverifikasi To Do List")
@@ -921,26 +950,32 @@ def submit_deklarasi_invoice(
             page,
             cfg.base_url,
             payload,
-            expect_sppb=payload.pph_nominal > 0,
+            expect_sppb=expect_sppb,
             before_ids=before_todo_ids,
+            retries=18,
+            delay_ms=2000,
         )
         if not (store_sppb or store_sppn) and not match:
             page_sppb, page_sppn = _extract_numbers_from_page(page)
             store_sppb = store_sppb or page_sppb
             store_sppn = store_sppn or page_sppn
-        if not match:
-            resp = page.request.get(f"{cfg.base_url.rstrip('/')}/sppd/getTodo")
-            rows = resp.json().get("data") or [] if resp.ok else []
-            for score, row in _score_all_todo_rows(
-                rows, payload, expect_sppb=payload.pph_nominal > 0
-            )[:5]:
-                todo_debug.append(
-                    {
-                        "score": score,
-                        "sppn_no": row.get("sppn_no"),
-                        "sppb_no": row.get("sppb_no"),
-                    }
-                )
+        after_rows = _fetch_todo_rows(page, cfg.base_url)
+        new_todo_ids = [
+            _todo_row_id(row)
+            for row in after_rows
+            if _todo_row_id(row) not in before_todo_ids
+        ]
+        for score, row in _score_all_todo_rows(
+            after_rows, payload, expect_sppb=expect_sppb
+        )[:5]:
+            todo_debug.append(
+                {
+                    "score": score,
+                    "sppn_no": row.get("sppn_no"),
+                    "sppb_no": row.get("sppb_no"),
+                    "sppn_id": row.get("sppn_id") or row.get("spp_id"),
+                }
+            )
     finally:
         context.close()
         browser.close()
@@ -992,30 +1027,37 @@ def submit_deklarasi_invoice(
             f"Salin manual atau gunakan Pulihkan dari To Do: {format_superman_ref(sppb_no, sppn_no)}"
         )
     else:
-        recovered = recover_superman_from_todo(no_invoice=no_invoice)
-        if recovered.get("ok") and recovered.get("superman_saved"):
-            result["ok"] = True
-            result["partial"] = False
-            result["superman_saved"] = recovered["superman_saved"]
-            result["sppb_no"] = recovered.get("sppb_no")
-            result["sppn_no"] = recovered.get("sppn_no")
-            result["recovered"] = True
-            result["message"] = recovered.get("message") or "Nomor Superman dipulihkan dari To Do List."
-        else:
-            result["partial"] = True
-            result["ok"] = False
+        recoverable = bool(match) or bool(new_todo_ids) or any(
+            item.get("score", 0) >= 70 for item in todo_debug
+        )
+        result["partial"] = True
+        result["ok"] = False
+        result["recoverable"] = recoverable
+        if store_body is None and not new_todo_ids:
+            result["message"] = (
+                "Gagal menyimpan draft ke Superman (respons simpan kosong). "
+                "Cek validasi form di Superman atau coba lagi."
+            )
+        elif recoverable:
             result["message"] = (
                 "Draft SPPn/SPPb kemungkinan masuk To Do List, namun nomor belum terdeteksi. "
                 "Coba Pulihkan dari To Do List."
             )
-            result["extract_debug"] = {
-                "store_extract": {"sppb": store_sppb, "sppn": store_sppn},
-                "store_body_preview": json.dumps(store_body, ensure_ascii=False, default=str)[:2500]
-                if store_body is not None
-                else None,
-                "todo_top": todo_debug,
-                "match_found": match is not None,
-            }
+        else:
+            result["message"] = (
+                "Gagal mendapatkan nomor SPPn/SPPb dari Superman. "
+                "Cek To Do List manual atau coba deklarasi ulang."
+            )
+        result["extract_debug"] = {
+            "store_extract": {"sppb": store_sppb, "sppn": store_sppn},
+            "store_body_preview": json.dumps(store_body, ensure_ascii=False, default=str)[:2500]
+            if store_body is not None
+            else None,
+            "todo_top": todo_debug,
+            "match_found": match is not None,
+            "new_todo_ids": new_todo_ids,
+            "todo_rows_before": len(before_todo_ids),
+        }
 
     report(100, "Selesai")
     return result

@@ -75,8 +75,10 @@ def _fill_input(page: Page, selector: str, value: str) -> None:
 
 def _fill_shared_informasi(page: Page, payload: DeklarasiPayload, cfg: SupermanConfig) -> None:
     if payload.jenis_form == "sppb_sppn":
+        ref = payload.referensi or payload.no_invoice or "-"
         _fill_input(page, "#kwitansi_spp", payload.mitra_pembeli)
-        _fill_input(page, "#referensi_spp", payload.referensi or payload.no_invoice or "-")
+        _fill_input(page, "#referensi_spp", ref)
+        _fill_input(page, "#referensi_sppn", ref)
         _fill_input(page, "#berita_acara_sppb", payload.ba_au58 or payload.no_pembayaran or payload.no_do or "-")
         _fill_input(page, "#sp_opl_sppb", payload.no_kontrak or "-")
         _fill_input(page, "#sp_opl_sppn", payload.no_kontrak or "-")
@@ -353,6 +355,14 @@ def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool
         page.locator('a[href="#tab-informasi-sppb"]').click(force=True)
         page.wait_for_timeout(500)
         _upload_files_to_input(page, "#dokumen_pendukung_sppb", paths)
+        sppb_uploaded = _wait_uploaded_docs(page, "#dokumen_pendukung_sppb", len(paths))
+        if sppb_uploaded < len(paths):
+            shot = _screenshot_debug(page, "upload_sppb_failed")
+            hint = f" Screenshot: {shot}" if shot else ""
+            raise RuntimeError(
+                f"Dokumen pendukung SPPb belum terlampir ({sppb_uploaded}/{len(paths)} file). "
+                f"Upload ulang dokumen di Input Pembayaran.{hint}"
+            )
         page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
         page.wait_for_timeout(500)
         _upload_files_to_input(page, "#dokumen_pendukung_sppn", paths)
@@ -445,6 +455,36 @@ def fill_sppn_draft(
 
 def _swal_visible(page: Page):
     return page.locator(".swal2-popup.swal2-show, .swal2-popup:visible").first
+
+
+_SPPN_NO_RE = re.compile(
+    r"((?:R\d+/R\d+D/SPPn/|\d+(?:\.\d+)?/SPPn/)[^\s\"'<>]+)",
+    re.I,
+)
+_SPPB_NO_RE = re.compile(
+    r"((?:R\d+/R\d+D/SPPb/|\d+(?:\.\d+)?/SPP[BG]/)[^\s\"'<>]+)",
+    re.I,
+)
+
+
+def _is_store_post_response(resp) -> bool:
+    if resp.request.method != "POST":
+        return False
+    url = (resp.url or "").lower()
+    return "/spp/store" in url or ("/sppd/" in url and "store" in url)
+
+
+def _extract_numbers_from_page_content(page: Page) -> tuple[str | None, str | None]:
+    try:
+        blob = f"{page.url or ''}\n{page.content()}"
+    except Exception:
+        return None, None
+    sppb_m = _SPPB_NO_RE.search(blob)
+    sppn_m = _SPPN_NO_RE.search(blob)
+    return (
+        sppb_m.group(1) if sppb_m else None,
+        sppn_m.group(1) if sppn_m else None,
+    )
 
 
 def _parse_store_response(resp) -> dict | list | str | None:
@@ -591,7 +631,7 @@ def _wait_for_store_post(
     captured: dict[str, object | None] = {"resp": None}
 
     def _on_response(resp) -> None:
-        if "/spp/store" in resp.url and resp.request.method == "POST":
+        if _is_store_post_response(resp):
             captured["resp"] = resp
 
     page.on("response", _on_response)
@@ -696,6 +736,7 @@ def submit_sppn_draft(
     *,
     print_after: bool = False,
     on_progress: ProgressCallback | None = None,
+    combined_form: bool = False,
 ) -> dict | list | str | None:
     def report(percent: int, stage: str) -> None:
         if on_progress:
@@ -703,18 +744,19 @@ def submit_sppn_draft(
 
     report(88, "Menyiapkan simpan draft")
 
-    for sel in ("#dokumen_pendukung_sppn", "#dokumen_pendukung_sppb"):
-        if page.locator(sel).count():
-            attached = _count_uploaded_docs(page, sel)
-            if attached == 0:
-                logger.warning("Input %s tidak punya file sebelum simpan", sel)
-
     sppn_files = _count_uploaded_docs(page, "#dokumen_pendukung_sppn")
     if sppn_files == 0:
         raise RuntimeError(
             "Dokumen pendukung SPPn tidak terlampir di form Superman sebelum simpan. "
             "Coba upload ulang dokumen di Input Pembayaran."
         )
+    if combined_form and page.locator("#dokumen_pendukung_sppb").count():
+        sppb_files = _count_uploaded_docs(page, "#dokumen_pendukung_sppb")
+        if sppb_files == 0:
+            raise RuntimeError(
+                "Dokumen pendukung SPPb tidak terlampir di form Superman sebelum simpan. "
+                "Coba upload ulang dokumen di Input Pembayaran."
+            )
 
     simpan = page.locator("#simpan, button:has-text('Simpan')").first
     simpan.wait_for(state="visible", timeout=10000)
@@ -724,50 +766,41 @@ def submit_sppn_draft(
     )
     _install_swal_auto_confirm(page, print_after=print_after)
 
+    store_timeout_ms = 300_000 if combined_form else 180_000
     store_body: dict | list | str | None = None
 
     report(89, "Mengirim draft ke Superman")
     try:
-        store_body = _submit_and_wait_store(
+        _trigger_form_submit(page, print_after=print_after)
+        store_body = _wait_for_store_post(
             page,
+            timeout_ms=store_timeout_ms,
             print_after=print_after,
             on_progress=on_progress,
-            timeout_ms=45000,
-            progress_message="Mengirim draft ke Superman",
+            progress_message="Menunggu respons simpan Superman",
             base_percent=89,
         )
+    except RuntimeError:
+        raise
     except Exception as exc:
-        logger.warning("Kirim cepat gagal (%s)", exc)
+        logger.warning("Kirim draft gagal (%s)", exc)
 
     if store_body is None:
-        report(90, "Mengirim via tombol Simpan Superman")
+        report(90, "Mencoba ulang via tombol Simpan")
         try:
-            store_body = _submit_and_wait_store(
+            simpan.click()
+            store_body = _wait_for_store_post(
                 page,
+                timeout_ms=60_000,
                 print_after=print_after,
                 on_progress=on_progress,
-                timeout_ms=35000,
                 progress_message="Menunggu dialog simpan Superman",
                 base_percent=90,
-                use_simpan_click=True,
-                simpan=simpan,
             )
+        except RuntimeError:
+            raise
         except Exception as exc:
             logger.warning("Simpan via tombol gagal (%s)", exc)
-
-    if store_body is None:
-        report(91, "Mencoba ulang kirim form")
-        try:
-            store_body = _submit_and_wait_store(
-                page,
-                print_after=print_after,
-                on_progress=on_progress,
-                timeout_ms=45000,
-                progress_message="Mengulang kirim draft",
-                base_percent=91,
-            )
-        except Exception as exc:
-            logger.warning("Ulang kirim form gagal: %s", exc)
 
     try:
         page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -775,13 +808,22 @@ def submit_sppn_draft(
         pass
 
     if store_body is None:
-        shot = _screenshot_debug(page, "spp_store_empty")
-        logger.warning(
-            "Superman tidak mengembalikan respons /spp/store — akan cek To Do List. screenshot=%s",
-            shot,
-        )
-        report(93, "Respons simpan kosong — cek To Do List")
-        return None
+        page_sppb, page_sppn = _extract_numbers_from_page_content(page)
+        if page_sppb or page_sppn:
+            store_body = {
+                "success": True,
+                "sppb_no": page_sppb,
+                "sppn_no": page_sppn,
+                "message": "Nomor diekstrak dari halaman Superman",
+            }
+        else:
+            shot = _screenshot_debug(page, "spp_store_empty")
+            logger.warning(
+                "Superman tidak mengembalikan respons /spp/store — screenshot=%s",
+                shot,
+            )
+            report(93, "Respons simpan kosong — cek To Do List")
+            return None
 
     report(95, "Draft tersimpan — verifikasi nomor")
     if isinstance(store_body, dict):
