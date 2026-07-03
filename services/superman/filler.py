@@ -698,6 +698,25 @@ def _wait_for_store_post(
         page.remove_listener("response", _on_response)
 
 
+def _recover_form_before_retry(page: Page) -> None:
+    try:
+        for sel in (".swal2-cancel", ".swal2-close", "button:has-text('Tutup')"):
+            btn = page.locator(sel)
+            if btn.count():
+                btn.first.click(timeout=1500)
+                page.wait_for_timeout(400)
+                break
+    except Exception:
+        pass
+    for tab in ('a[href="#tab-informasi-sppn"]', 'a[href="#tab-isi-sppn"]', 'a[href="#tab-informasi-sppb"]'):
+        try:
+            page.locator(tab).click(force=True, timeout=2000)
+            page.wait_for_timeout(400)
+            break
+        except Exception:
+            continue
+
+
 def _trigger_form_submit(
     page: Page,
     *,
@@ -751,7 +770,12 @@ def _submit_and_wait_store(
     page.on("response", _on_response)
     try:
         if use_simpan_click and simpan is not None:
-            simpan.click(force=True)
+            try:
+                simpan.click(force=True, timeout=10_000)
+            except Exception:
+                _trigger_form_submit(
+                    page, print_after=print_after, skip_validate=True
+                )
         else:
             _trigger_form_submit(page, print_after=print_after, skip_validate=skip_validate)
 
@@ -854,6 +878,7 @@ def submit_sppn_draft(
 
     if store_body is None:
         report(90, "Mencoba ulang simpan draft")
+        _recover_form_before_retry(page)
         retry_timeout_ms = store_timeout_ms if combined_form else 60_000
         retry_msg = (
             "Menunggu dialog simpan Superman (percobaan 2)"
@@ -868,13 +893,15 @@ def submit_sppn_draft(
                 timeout_ms=retry_timeout_ms,
                 progress_message=retry_msg,
                 base_percent=90,
-                use_simpan_click=True,
-                simpan=simpan,
-                skip_validate=combined_form,
+                use_simpan_click=False,
+                skip_validate=True,
                 store_debug=debug,
             )
         except RuntimeError:
             raise
+        except Exception as exc:
+            debug["retry_error"] = str(exc)
+            logger.warning("Retry simpan draft gagal (%s)", exc)
 
     try:
         page.wait_for_load_state("domcontentloaded", timeout=15000)
