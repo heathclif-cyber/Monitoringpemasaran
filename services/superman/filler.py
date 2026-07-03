@@ -717,6 +717,46 @@ def _recover_form_before_retry(page: Page) -> None:
             continue
 
 
+def _trigger_simpan_via_js(
+    page: Page,
+    *,
+    print_after: bool = False,
+    skip_validate: bool = False,
+) -> dict[str, object]:
+    status_val = "1" if print_after else "0"
+    return page.evaluate(
+        """([statusVal, skipValidate]) => {
+            const btn = document.querySelector('#simpan');
+            if (!btn) return { ok: false, reason: 'tombol #simpan tidak ada' };
+            const status = document.getElementById('status_btn');
+            if (status) status.value = statusVal;
+            if (!skipValidate && typeof validateForm === 'function') {
+                try {
+                    if (!validateForm()) return { ok: false, reason: 'validateForm false' };
+                } catch (err) {
+                    return { ok: false, reason: err?.message || 'validateForm error' };
+                }
+            }
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            if (typeof simpan_spp === 'function') {
+                try {
+                    simpan_spp();
+                    return { ok: true, method: 'simpan_spp', disabled: !!btn.disabled };
+                } catch (err) {
+                    return { ok: false, reason: err?.message || 'simpan_spp error', disabled: !!btn.disabled };
+                }
+            }
+            const form = document.getElementById('form_spp');
+            if (form) {
+                form.submit();
+                return { ok: true, method: 'form.submit', disabled: !!btn.disabled };
+            }
+            return { ok: false, reason: 'simpan_spp dan form_spp tidak ditemukan' };
+        }""",
+        [status_val, skip_validate],
+    )
+
+
 def _trigger_form_submit(
     page: Page,
     *,
@@ -769,15 +809,17 @@ def _submit_and_wait_store(
 
     page.on("response", _on_response)
     try:
-        if use_simpan_click and simpan is not None:
-            try:
-                simpan.click(force=True, timeout=10_000)
-            except Exception:
-                _trigger_form_submit(
-                    page, print_after=print_after, skip_validate=True
-                )
-        else:
-            _trigger_form_submit(page, print_after=print_after, skip_validate=skip_validate)
+        trigger = _trigger_simpan_via_js(
+            page,
+            print_after=print_after,
+            skip_validate=skip_validate or use_simpan_click,
+        )
+        if store_debug is not None:
+            store_debug["trigger"] = trigger
+        if not trigger.get("ok"):
+            raise RuntimeError(
+                f"Gagal memicu simpan Superman: {trigger.get('reason') or trigger}"
+            )
 
         elapsed = 0
         step = 500
@@ -860,6 +902,14 @@ def submit_sppn_draft(
         else "Menunggu respons simpan Superman"
     )
 
+    page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
+    page.wait_for_timeout(400)
+    if combined_form:
+        page.locator('a[href="#tab-informasi-sppb"]').click(force=True)
+        page.wait_for_timeout(400)
+        page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
+        page.wait_for_timeout(400)
+
     report(89, "Mengirim draft ke Superman")
     try:
         store_body = _submit_and_wait_store(
@@ -869,8 +919,7 @@ def submit_sppn_draft(
             timeout_ms=store_timeout_ms,
             progress_message=wait_msg,
             base_percent=89,
-            use_simpan_click=combined_form,
-            simpan=simpan if combined_form else None,
+            use_simpan_click=True,
             store_debug=debug,
         )
     except RuntimeError:
@@ -893,7 +942,7 @@ def submit_sppn_draft(
                 timeout_ms=retry_timeout_ms,
                 progress_message=retry_msg,
                 base_percent=90,
-                use_simpan_click=False,
+                use_simpan_click=True,
                 skip_validate=True,
                 store_debug=debug,
             )
