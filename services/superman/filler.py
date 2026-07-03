@@ -1005,15 +1005,15 @@ def _submit_and_wait_store(
     page.on("dialog", _on_dialog)
     page.on("response", _on_response)
     try:
-        trigger = _trigger_simpan_via_playwright(page, print_after=print_after)
+        trigger = _trigger_simpan_via_js(
+            page,
+            print_after=print_after,
+            skip_validate=True,
+        )
         if store_debug is not None:
             store_debug["trigger"] = trigger
         if not trigger.get("ok"):
-            trigger = _trigger_simpan_via_js(
-                page,
-                print_after=print_after,
-                skip_validate=skip_validate or use_simpan_click,
-            )
+            trigger = _trigger_simpan_via_playwright(page, print_after=print_after)
             if store_debug is not None:
                 store_debug["trigger_fallback"] = trigger
         if not trigger.get("ok"):
@@ -1050,6 +1050,13 @@ def _submit_and_wait_store(
                 message=progress_message,
                 last_tick=last_tick,
             )
+            if "chrome-error://" in (page.url or ""):
+                if store_debug is not None:
+                    store_debug["chrome_error_seen"] = True
+                try:
+                    page.go_back(wait_until="domcontentloaded", timeout=8000)
+                except Exception:
+                    pass
             page.wait_for_timeout(step)
             elapsed += step
         if store_debug is not None:
@@ -1099,6 +1106,17 @@ def submit_sppn_draft(
         timeout=30000,
     )
     _install_swal_auto_confirm(page, print_after=print_after)
+    page.evaluate(
+        """() => {
+            const form = document.getElementById('form_spp');
+            if (!form || form.__submitGuard) return;
+            form.__submitGuard = true;
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            }, true);
+        }"""
+    )
 
     store_timeout_ms = 300_000 if combined_form else 180_000
     store_body: dict | list | str | None = None
