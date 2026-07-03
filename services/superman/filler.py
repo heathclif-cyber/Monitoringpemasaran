@@ -852,6 +852,7 @@ def _submit_and_wait_store(
             store_debug["seen_post_urls"] = seen_posts[-20:]
             store_debug["last_swal"] = last_swal
             store_debug["loading_seen"] = loading_seen
+            store_debug["page_url"] = page.url
         return None
     finally:
         page.remove_listener("response", _on_response)
@@ -926,31 +927,43 @@ def submit_sppn_draft(
         raise
 
     if store_body is None:
-        report(90, "Mencoba ulang simpan draft")
-        _recover_form_before_retry(page)
-        retry_timeout_ms = store_timeout_ms if combined_form else 60_000
-        retry_msg = (
-            "Menunggu dialog simpan Superman (percobaan 2)"
-            if combined_form
-            else "Menunggu dialog simpan Superman"
+        has_simpan = bool(
+            page.evaluate("() => !!document.querySelector('#simpan')")
         )
-        try:
-            store_body = _submit_and_wait_store(
-                page,
-                print_after=print_after,
-                on_progress=on_progress,
-                timeout_ms=retry_timeout_ms,
-                progress_message=retry_msg,
-                base_percent=90,
-                use_simpan_click=True,
-                skip_validate=True,
-                store_debug=debug,
+        debug["page_url_before_retry"] = page.url
+        if not has_simpan:
+            debug["retry_skipped"] = "tombol #simpan tidak ada — lanjut cek To Do"
+            logger.warning(
+                "Lewati retry simpan: #simpan tidak ada di %s",
+                page.url,
             )
-        except RuntimeError:
-            raise
-        except Exception as exc:
-            debug["retry_error"] = str(exc)
-            logger.warning("Retry simpan draft gagal (%s)", exc)
+        else:
+            report(90, "Mencoba ulang simpan draft")
+            _recover_form_before_retry(page)
+            retry_timeout_ms = store_timeout_ms if combined_form else 60_000
+            retry_msg = (
+                "Menunggu dialog simpan Superman (percobaan 2)"
+                if combined_form
+                else "Menunggu dialog simpan Superman"
+            )
+            try:
+                store_body = _submit_and_wait_store(
+                    page,
+                    print_after=print_after,
+                    on_progress=on_progress,
+                    timeout_ms=retry_timeout_ms,
+                    progress_message=retry_msg,
+                    base_percent=90,
+                    use_simpan_click=True,
+                    skip_validate=True,
+                    store_debug=debug,
+                )
+            except RuntimeError as exc:
+                debug["retry_error"] = str(exc)
+                logger.warning("Retry simpan draft gagal (%s)", exc)
+            except Exception as exc:
+                debug["retry_error"] = str(exc)
+                logger.warning("Retry simpan draft gagal (%s)", exc)
 
     try:
         page.wait_for_load_state("domcontentloaded", timeout=15000)
