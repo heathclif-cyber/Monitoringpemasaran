@@ -373,13 +373,9 @@ def _ytd_label(month: str, year: str) -> str:
     return f"   S/d. Bulan {name} {year}"
 
 
-def _write_bucket(ws, row_idx: int, bucket: HoBucket, *, col_kuantum: int, col_unit: int, col_nilai: int) -> None:
+def _write_bucket(ws, row_idx: int, bucket: HoBucket, *, col_kuantum: int, col_nilai: int) -> None:
     ws.cell(row=row_idx, column=col_kuantum, value=round(bucket.kuantum, 2) if bucket.kuantum else 0)
     ws.cell(row=row_idx, column=col_nilai, value=round(bucket.nilai, 0) if bucket.nilai else 0)
-    if bucket.kuantum > 0:
-        ws.cell(row=row_idx, column=col_unit, value=round(bucket.per_unit, 2))
-    else:
-        ws.cell(row=row_idx, column=col_unit, value=0)
 
 
 def generate_laporan_ho_xlsx(
@@ -413,12 +409,14 @@ def generate_laporan_ho_xlsx(
     ws["G3"] = _ytd_label(month, year)
 
     for row_idx in LOKAL_DATA_ROWS:
-        for col in (4, 5, 6, 7, 8, 9):
+        for col in (4, 6, 7, 9):
             ws.cell(row=row_idx, column=col, value=0)
+        for col in (5, 8):
+            ws.cell(row=row_idx, column=col, value=None)
 
     for key, row_idx in LOKAL_ROW_BY_KEY.items():
-        _write_bucket(ws, row_idx, bulan_data[key], col_kuantum=4, col_unit=5, col_nilai=6)
-        _write_bucket(ws, row_idx, ytd_data[key], col_kuantum=7, col_unit=8, col_nilai=9)
+        _write_bucket(ws, row_idx, bulan_data[key], col_kuantum=4, col_nilai=6)
+        _write_bucket(ws, row_idx, ytd_data[key], col_kuantum=7, col_nilai=9)
 
     buffer = io.BytesIO()
     wb.save(buffer)
