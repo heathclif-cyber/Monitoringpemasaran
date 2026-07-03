@@ -465,6 +465,61 @@ def _swal_visible(page: Page):
     return page.locator(".swal2-popup.swal2-show, .swal2-popup:visible").first
 
 
+def _swal_text(page: Page) -> str:
+    popup = _swal_visible(page)
+    if popup.count() == 0:
+        return ""
+    try:
+        return popup.inner_text().strip()
+    except Exception:
+        return ""
+
+
+def _swal_is_loading(page: Page) -> bool:
+    popup = _swal_visible(page)
+    if popup.count() == 0:
+        return False
+    text = _swal_text(page).lower()
+    return bool(
+        popup.locator(".swal2-loading").count()
+        or "mengecek urutan" in text
+        or "mohon tunggu" in text
+    )
+
+
+def _click_swal_action(page: Page, *, print_after: bool = False) -> bool:
+    popup = _swal_visible(page)
+    if popup.count() == 0:
+        return False
+    text = _swal_text(page)
+    lower = text.lower()
+    _raise_swal_validation_error(text)
+    if _swal_is_loading(page):
+        return False
+    if (
+        "anomali" in lower
+        or "menyimpan dan mencetak" in lower
+        or "simpan saja" in lower
+        or "info urutan" in lower
+    ):
+        if print_after:
+            popup.locator(".swal2-confirm, button:has-text('Simpan dan Cetak')").first.click()
+        else:
+            deny = popup.locator(".swal2-deny, button:has-text('Simpan Saja')")
+            if deny.count():
+                deny.first.click()
+            else:
+                popup.locator(".swal2-confirm").first.click()
+        page.wait_for_timeout(800)
+        return True
+    confirm = popup.locator(".swal2-confirm")
+    if confirm.count():
+        confirm.first.click()
+        page.wait_for_timeout(800)
+        return True
+    return False
+
+
 _SPPN_NO_RE = re.compile(
     r"((?:R\d+/R\d+D/SPPn/|\d+(?:\.\d+)?/SPPn/)[^\s\"'<>]+)",
     re.I,
@@ -479,7 +534,11 @@ def _is_store_post_response(resp) -> bool:
     if resp.request.method != "POST":
         return False
     url = (resp.url or "").lower()
-    return "/spp/store" in url or ("/sppd/" in url and "store" in url)
+    return (
+        "/spp/store" in url
+        or ("/sppd/" in url and "store" in url)
+        or ("/spp/" in url and url.rstrip("/").endswith("/store"))
+    )
 
 
 def _extract_numbers_from_page_content(page: Page) -> tuple[str | None, str | None]:
@@ -527,44 +586,12 @@ def _raise_swal_validation_error(text: str) -> None:
 
 def _handle_swal_popup(page: Page, *, print_after: bool = False) -> str:
     """Satu langkah tangani popup Superman. Return: none|waiting|acted."""
-    popup = _swal_visible(page)
-    if popup.count() == 0:
+    if _swal_visible(page).count() == 0:
         return "none"
-
-    text = popup.inner_text()
-    lower = text.lower()
-    _raise_swal_validation_error(text)
-
-    if (
-        popup.locator(".swal2-loading").count()
-        or "mengecek urutan" in lower
-        or "mohon tunggu" in lower
-    ):
+    if _swal_is_loading(page):
         return "waiting"
-
-    if (
-        "anomali" in lower
-        or "menyimpan dan mencetak" in lower
-        or "simpan saja" in lower
-        or "info urutan" in lower
-    ):
-        if print_after:
-            popup.locator(".swal2-confirm, button:has-text('Simpan dan Cetak')").first.click()
-        else:
-            deny = popup.locator(".swal2-deny, button:has-text('Simpan Saja')")
-            if deny.count():
-                deny.first.click()
-            else:
-                popup.locator(".swal2-confirm").first.click()
-        page.wait_for_timeout(800)
+    if _click_swal_action(page, print_after=print_after):
         return "acted"
-
-    confirm = popup.locator(".swal2-confirm")
-    if confirm.count():
-        confirm.first.click()
-        page.wait_for_timeout(800)
-        return "acted"
-
     return "waiting"
 
 
@@ -707,26 +734,41 @@ def _submit_and_wait_store(
     use_simpan_click: bool = False,
     simpan=None,
     skip_validate: bool = False,
+    store_debug: dict[str, object] | None = None,
 ) -> dict | list | str | None:
     captured: dict[str, object | None] = {"resp": None}
+    seen_posts: list[str] = []
+    last_swal = ""
 
     def _on_response(resp) -> None:
+        if resp.request.method == "POST":
+            seen_posts.append(resp.url)
+            if len(seen_posts) > 40:
+                del seen_posts[:-40]
         if _is_store_post_response(resp):
             captured["resp"] = resp
 
     page.on("response", _on_response)
     try:
         if use_simpan_click and simpan is not None:
-            simpan.click()
+            simpan.click(force=True)
         else:
             _trigger_form_submit(page, print_after=print_after, skip_validate=skip_validate)
 
         elapsed = 0
         step = 500
         last_tick: dict[str, int] = {"v": -1}
+        loading_seen = False
         while elapsed <= timeout_ms:
             if captured["resp"] is not None:
                 return _parse_store_response(captured["resp"])
+            swal_now = _swal_text(page)
+            if swal_now:
+                last_swal = swal_now[:500]
+            if _swal_is_loading(page):
+                loading_seen = True
+            elif loading_seen:
+                _click_swal_action(page, print_after=print_after)
             try:
                 _handle_swal_popup(page, print_after=print_after)
             except RuntimeError:
@@ -740,6 +782,10 @@ def _submit_and_wait_store(
             )
             page.wait_for_timeout(step)
             elapsed += step
+        if store_debug is not None:
+            store_debug["seen_post_urls"] = seen_posts[-20:]
+            store_debug["last_swal"] = last_swal
+            store_debug["loading_seen"] = loading_seen
         return None
     finally:
         page.remove_listener("response", _on_response)
@@ -751,6 +797,7 @@ def submit_sppn_draft(
     print_after: bool = False,
     on_progress: ProgressCallback | None = None,
     combined_form: bool = False,
+    store_debug: dict[str, object] | None = None,
 ) -> dict | list | str | None:
     def report(percent: int, stage: str) -> None:
         if on_progress:
@@ -782,6 +829,7 @@ def submit_sppn_draft(
 
     store_timeout_ms = 300_000 if combined_form else 180_000
     store_body: dict | list | str | None = None
+    debug: dict[str, object] = store_debug if store_debug is not None else {}
     wait_msg = (
         "Menunggu urutan & respons simpan Superman"
         if combined_form
@@ -799,6 +847,7 @@ def submit_sppn_draft(
             base_percent=89,
             use_simpan_click=combined_form,
             simpan=simpan if combined_form else None,
+            store_debug=debug,
         )
     except RuntimeError:
         raise
@@ -819,9 +868,10 @@ def submit_sppn_draft(
                 timeout_ms=retry_timeout_ms,
                 progress_message=retry_msg,
                 base_percent=90,
-                use_simpan_click=not combined_form,
-                simpan=simpan if not combined_form else None,
+                use_simpan_click=True,
+                simpan=simpan,
                 skip_validate=combined_form,
+                store_debug=debug,
             )
         except RuntimeError:
             raise

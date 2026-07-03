@@ -923,6 +923,7 @@ def submit_deklarasi_invoice(
     store_body: Any = None
     match: dict[str, Any] | None = None
     todo_debug: list[dict[str, Any]] = []
+    store_debug: dict[str, Any] = {}
     new_todo_ids: list[str] = []
     before_todo_ids: set[str] = set()
     expect_sppb = payload.pph_nominal > 0
@@ -941,6 +942,7 @@ def submit_deklarasi_invoice(
             page,
             on_progress=on_progress,
             combined_form=payload.jenis_form == "sppb_sppn",
+            store_debug=store_debug,
         )
         if store_body is None:
             report(90, "Respons simpan kosong — memverifikasi To Do List")
@@ -1053,6 +1055,7 @@ def submit_deklarasi_invoice(
             "store_body_preview": json.dumps(store_body, ensure_ascii=False, default=str)[:2500]
             if store_body is not None
             else None,
+            "store_debug": store_debug,
             "todo_top": todo_debug,
             "match_found": match is not None,
             "new_todo_ids": new_todo_ids,
