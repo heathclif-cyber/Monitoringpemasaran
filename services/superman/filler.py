@@ -301,25 +301,15 @@ def _assert_sppb_line_item_ready(page: Page, isi_index: int, gl_code: str, nomin
         raise RuntimeError(f"Uraian baris SPPb {isi_index} belum terisi")
 
 
-def _diagnose_validate_form(page: Page) -> dict[str, object]:
+def _diagnose_form_state(page: Page) -> dict[str, object]:
+    """Snapshot form — jangan panggil validateForm (memicu dialog urutan async)."""
     return page.evaluate(
         """() => {
             const out = {
-                validate_ok: null,
-                error: '',
                 swal: '',
-                alerts: [],
                 invalid_fields: [],
+                simpan_disabled: null,
             };
-            const fakeEvent = { preventDefault() {} };
-            if (typeof validateForm === 'function') {
-                try {
-                    out.validate_ok = !!validateForm(fakeEvent);
-                } catch (err) {
-                    out.validate_ok = false;
-                    out.error = err?.message || String(err);
-                }
-            }
             document
                 .querySelectorAll('.has-error input, .has-error select, .is-invalid, .error')
                 .forEach((el) => {
@@ -332,6 +322,8 @@ def _diagnose_validate_form(page: Page) -> dict[str, object]:
                     return style.display !== 'none' && style.visibility !== 'hidden';
                 });
             if (swal) out.swal = (swal.innerText || '').trim().slice(0, 500);
+            const btn = document.querySelector('#simpan');
+            out.simpan_disabled = btn ? !!btn.disabled : null;
             return out;
         }"""
     )
@@ -351,7 +343,7 @@ def _prepare_form_before_save(page: Page, *, combined_form: bool) -> dict[str, o
         "() => { if (typeof bandingkan_dpp_sisa === 'function') bandingkan_dpp_sisa(); }"
     )
     page.wait_for_timeout(400)
-    return _diagnose_validate_form(page)
+    return _diagnose_form_state(page)
 
 
 def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) -> None:
@@ -818,14 +810,6 @@ def _trigger_simpan_via_js(
             if (!btn) return { ok: false, reason: 'tombol #simpan tidak ada' };
             const status = document.getElementById('status_btn');
             if (status) status.value = statusVal;
-            const fakeEvent = { preventDefault() {} };
-            if (!skipValidate && typeof validateForm === 'function') {
-                try {
-                    if (!validateForm(fakeEvent)) return { ok: false, reason: 'validateForm false' };
-                } catch (err) {
-                    return { ok: false, reason: err?.message || 'validateForm error' };
-                }
-            }
             if (typeof simpan_spp === 'function') {
                 try {
                     simpan_spp();
@@ -1030,19 +1014,7 @@ def submit_sppn_draft(
         else "Menunggu respons simpan Superman"
     )
 
-    validation = _prepare_form_before_save(page, combined_form=combined_form)
-    debug["validate_before_save"] = validation
-    debug["simpan_disabled"] = page.evaluate(
-        "() => { const b = document.querySelector('#simpan'); return b ? !!b.disabled : null; }"
-    )
-    if validation.get("validate_ok") is False:
-        detail = (
-            validation.get("swal")
-            or validation.get("error")
-            or ", ".join(str(x) for x in (validation.get("invalid_fields") or [])[:5])
-            or "validateForm mengembalikan false"
-        )
-        raise RuntimeError(f"Validasi form Superman gagal sebelum simpan: {detail}")
+    debug["form_before_save"] = _prepare_form_before_save(page, combined_form=combined_form)
 
     report(89, "Mengirim draft ke Superman")
     try:
