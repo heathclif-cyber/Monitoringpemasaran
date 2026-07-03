@@ -65,10 +65,25 @@ def _compute_volume_invoice(k, inv, ba_ref):
     vol_base, nilai_penuh = _invoice_volume_scope(k, inv, ba_ref)
     if not inv:
         return vol_base
+    # Payung BA: satu invoice per BA — volume fisik = volume BA, bukan proporsional nominal
+    if is_payung_ba(k) and ba_ref and (ba_ref.volume_ba or 0) > 0:
+        return float(ba_ref.volume_ba)
     inv_gross = float(inv.jumlah_pembayaran or 0)
     if nilai_penuh > 0 and inv_gross > 0:
         return vol_base * (inv_gross / nilai_penuh)
     return vol_base
+
+
+def _resolve_ba_ref(k, inv, do, ba_by_no: dict):
+    if do and getattr(do, "berita_acara", None):
+        return do.berita_acara
+    if inv and getattr(inv, "berita_acara", None):
+        return inv.berita_acara
+    if inv and getattr(inv, "no_ba", None):
+        return ba_by_no.get(inv.no_ba)
+    if k.no_kontrak:
+        return ba_by_no.get(k.no_kontrak)
+    return None
 
 
 def _build_laporan_rows(db: Session):
@@ -150,8 +165,12 @@ def _build_laporan_rows(db: Session):
             pelunasan_do = do_nominal + pph_do
         else:
             pelunasan_do = do_nominal
-        # Sisa volume = Kontrak volume - sum of ALL DOs volume for this invoice
-        sisa_volume = round(float(k_vol_local) - float(total_do_volume))
+
+        ba_ref = _resolve_ba_ref(k, inv, do, ba_by_no)
+
+        # Sisa volume = volume scope invoice - sum of ALL DOs volume for this invoice
+        vol_scope, _ = _invoice_volume_scope(k, inv, ba_ref)
+        sisa_volume = round(float(vol_scope) - float(total_do_volume))
 
         # DPP (Harga Pokok, excl. PPN/PPh) = harga_satuan * volume_do + premi proporsional
         if k_vol_local > 0 and do:
@@ -161,15 +180,6 @@ def _build_laporan_rows(db: Session):
             dpp_pokok = (k_harga_local * do_volume) + k_premi
         else:
             dpp_pokok = (k_harga_local * k_vol_local) + k_premi
-
-        ba_ref = None
-        if do and getattr(do, "berita_acara", None):
-            ba_ref = do.berita_acara
-        elif inv and getattr(inv, "berita_acara", None):
-            ba_ref = inv.berita_acara
-        elif k.no_kontrak:
-            # Sawit RO: kontrak per-pengiriman sering bernama sama dengan no_ba
-            ba_ref = ba_by_no.get(k.no_kontrak)
 
         ba_date = ba_ref.tanggal_ba if ba_ref else None
         ba_buku_date = ba_ref.bulan_buku if ba_ref else None
