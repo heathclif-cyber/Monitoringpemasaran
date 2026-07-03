@@ -443,12 +443,20 @@ def fill_sppn_draft(
 
     page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
     page.wait_for_timeout(600)
-    referensi_val = page.locator("#referensi_sppn").input_value(timeout=2000).strip()
+    if combined:
+        referensi_val = (
+            page.locator("#referensi_sppn").input_value(timeout=2000).strip()
+            or page.locator("#referensi_spp").input_value(timeout=2000).strip()
+        )
+        kwitansi_sel = "#kwitansi_spp"
+    else:
+        referensi_val = page.locator("#referensi_sppn").input_value(timeout=2000).strip()
+        kwitansi_sel = "#kwitansi_sppn"
     if not referensi_val:
         raise RuntimeError("Field Referensi SPPn kosong — gagal mengisi nomor invoice")
-    kwitansi_val = page.locator("#kwitansi_sppn").input_value(timeout=2000).strip()
+    kwitansi_val = page.locator(kwitansi_sel).input_value(timeout=2000).strip()
     if not kwitansi_val:
-        raise RuntimeError("Field Kwitansi SPPn kosong — gagal mengisi nama pembeli")
+        raise RuntimeError("Field Kwitansi kosong — gagal mengisi nama pembeli")
     page.evaluate("() => { if (typeof bandingkan_dpp_sisa === 'function') bandingkan_dpp_sisa(); }")
     page.wait_for_timeout(500)
 
@@ -663,11 +671,16 @@ def _wait_for_store_post(
         page.remove_listener("response", _on_response)
 
 
-def _trigger_form_submit(page: Page, *, print_after: bool = False) -> None:
+def _trigger_form_submit(
+    page: Page,
+    *,
+    print_after: bool = False,
+    skip_validate: bool = False,
+) -> None:
     status_val = "1" if print_after else "0"
     page.evaluate(
-        """(statusVal) => {
-            if (typeof validateForm === 'function' && !validateForm()) {
+        """([statusVal, skipValidate]) => {
+            if (!skipValidate && typeof validateForm === 'function' && !validateForm()) {
                 throw new Error('validateForm gagal');
             }
             const status = document.getElementById('status_btn');
@@ -679,7 +692,7 @@ def _trigger_form_submit(page: Page, *, print_after: bool = False) -> None:
             const form = document.getElementById('form_spp');
             if (form) form.submit();
         }""",
-        status_val,
+        [status_val, skip_validate],
     )
 
 
@@ -693,11 +706,12 @@ def _submit_and_wait_store(
     base_percent: int,
     use_simpan_click: bool = False,
     simpan=None,
+    skip_validate: bool = False,
 ) -> dict | list | str | None:
     captured: dict[str, object | None] = {"resp": None}
 
     def _on_response(resp) -> None:
-        if "/spp/store" in resp.url and resp.request.method == "POST":
+        if _is_store_post_response(resp):
             captured["resp"] = resp
 
     page.on("response", _on_response)
@@ -705,7 +719,7 @@ def _submit_and_wait_store(
         if use_simpan_click and simpan is not None:
             simpan.click()
         else:
-            _trigger_form_submit(page, print_after=print_after)
+            _trigger_form_submit(page, print_after=print_after, skip_validate=skip_validate)
 
         elapsed = 0
         step = 500
@@ -768,39 +782,49 @@ def submit_sppn_draft(
 
     store_timeout_ms = 300_000 if combined_form else 180_000
     store_body: dict | list | str | None = None
+    wait_msg = (
+        "Menunggu urutan & respons simpan Superman"
+        if combined_form
+        else "Menunggu respons simpan Superman"
+    )
 
     report(89, "Mengirim draft ke Superman")
     try:
-        _trigger_form_submit(page, print_after=print_after)
-        store_body = _wait_for_store_post(
+        store_body = _submit_and_wait_store(
             page,
-            timeout_ms=store_timeout_ms,
             print_after=print_after,
             on_progress=on_progress,
-            progress_message="Menunggu respons simpan Superman",
+            timeout_ms=store_timeout_ms,
+            progress_message=wait_msg,
             base_percent=89,
+            use_simpan_click=combined_form,
+            simpan=simpan if combined_form else None,
         )
     except RuntimeError:
         raise
-    except Exception as exc:
-        logger.warning("Kirim draft gagal (%s)", exc)
 
     if store_body is None:
-        report(90, "Mencoba ulang via tombol Simpan")
+        report(90, "Mencoba ulang simpan draft")
+        retry_timeout_ms = store_timeout_ms if combined_form else 60_000
+        retry_msg = (
+            "Menunggu dialog simpan Superman (percobaan 2)"
+            if combined_form
+            else "Menunggu dialog simpan Superman"
+        )
         try:
-            simpan.click()
-            store_body = _wait_for_store_post(
+            store_body = _submit_and_wait_store(
                 page,
-                timeout_ms=60_000,
                 print_after=print_after,
                 on_progress=on_progress,
-                progress_message="Menunggu dialog simpan Superman",
+                timeout_ms=retry_timeout_ms,
+                progress_message=retry_msg,
                 base_percent=90,
+                use_simpan_click=not combined_form,
+                simpan=simpan if not combined_form else None,
+                skip_validate=combined_form,
             )
         except RuntimeError:
             raise
-        except Exception as exc:
-            logger.warning("Simpan via tombol gagal (%s)", exc)
 
     try:
         page.wait_for_load_state("domcontentloaded", timeout=15000)
