@@ -235,11 +235,23 @@ def fetch_payung_ba_ho_rows(
     return rows
 
 
+def _merge_payung_ba_row(laporan_row: dict, ba_row: dict) -> dict:
+    """Volume dari BA (pengiriman); nilai mengikuti Laporan Digital (Pendapatan_Pokok)."""
+    merged = dict(ba_row)
+    pokok = float(laporan_row.get("Pendapatan_Pokok") or 0)
+    if pokok > 0:
+        merged["Pendapatan_Pokok"] = pokok
+        merged["DPP_Pokok"] = float(laporan_row.get("DPP_Pokok") or pokok)
+    if float(laporan_row.get("Jumlah_DO") or 0) <= 0:
+        merged["Jumlah_DO"] = float(ba_row.get("Jumlah_DO") or 0)
+    return merged
+
+
 def prepare_ho_export_rows(client_rows: list[dict], ba_supplement: list[dict]) -> list[dict]:
     """
     Kontrak payung: penjualan HO mengikuti BA (pengiriman), bukan menunggu DO/transfer.
     - Jika sudah ada DO dengan volume → pakai baris DO.
-    - Jika belum ada DO → pakai volume/nilai dari BA.
+    - Jika belum ada DO → volume dari BA, nilai tetap Pendapatan_Pokok laporan.
     """
     ba_by_no = {r["No_BA"]: r for r in ba_supplement if r.get("No_BA")}
 
@@ -264,7 +276,7 @@ def prepare_ho_export_rows(client_rows: list[dict], ba_supplement: list[dict]) -
                     result.append(row)
             continue
         if no_ba in ba_by_no:
-            result.append(ba_by_no[no_ba])
+            result.append(_merge_payung_ba_row(grouped[0], ba_by_no[no_ba]))
             continue
         for row in grouped:
             result.append(row)
@@ -320,7 +332,8 @@ def _extract_year_month(row: dict, mode: str) -> tuple[str, str]:
 def _row_kuantum_nilai(row: dict) -> tuple[float, float]:
     satuan = _norm(row.get("Satuan") or "kg")
     volume = float(row.get("Jumlah_DO") or 0)
-    nilai = float(row.get("DPP_Pokok") or row.get("Pendapatan_Pokok") or 0)
+    # Selaras Total Pendapatan Laporan Digital (bukan DPP_Pokok)
+    nilai = float(row.get("Pendapatan_Pokok") or row.get("DPP_Pokok") or 0)
     if satuan == "butir":
         return 0.0, nilai
     return volume, nilai
