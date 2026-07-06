@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -754,7 +755,7 @@ def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
                 const headers = {};
                 if (token) headers['X-CSRF-TOKEN'] = token;
                 const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 120000);
+                const timer = setTimeout(() => controller.abort(), 20000);
                 let resp;
                 try {
                     resp = await fetch('/spp/store', {
@@ -1185,7 +1186,9 @@ def _submit_and_wait_store(
                 page.wait_for_timeout(1500)
                 elapsed += 1500
                 if captured["resp"] is None:
+                    fetch_started = time.monotonic()
                     fetch_body = _post_store_via_fetch(page)
+                    elapsed += int((time.monotonic() - fetch_started) * 1000)
                     if store_debug is not None:
                         attempts = store_debug.setdefault("fetch_on_submit", [])
                         if isinstance(attempts, list):
@@ -1275,7 +1278,7 @@ def submit_sppn_draft(
     _install_swal_auto_confirm(page, print_after=print_after)
     _install_form_submit_guard(page)
 
-    store_timeout_ms = 120_000
+    store_timeout_ms = 90_000
     store_body: dict | list | str | None = None
     debug: dict[str, object] = store_debug if store_debug is not None else {}
     wait_msg = (
@@ -1315,7 +1318,7 @@ def submit_sppn_draft(
         else:
             report(90, "Mencoba ulang simpan draft")
             _recover_form_before_retry(page)
-            retry_timeout_ms = 60_000
+            retry_timeout_ms = 20_000
             retry_msg = (
                 "Menunggu dialog simpan Superman (percobaan 2)"
                 if combined_form
