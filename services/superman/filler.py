@@ -682,6 +682,62 @@ def _trigger_store_after_urutan(page: Page) -> None:
     )
 
 
+def _install_form_submit_guard(page: Page) -> None:
+    """Blokir semua jalur submit native form_spp (event & method form.submit()).
+
+    Navigasi penuh POST membuat halaman mati (chrome-error://) kalau server
+    Superman lambat. addEventListener('submit') saja tidak cukup — JS Superman
+    memanggil method native form.submit() yang tidak memicu event submit.
+    Panggilan itu dicatat di window.__storeSubmitRequested supaya Python bisa
+    mengirim store lewat fetch tanpa navigasi.
+    """
+    try:
+        page.evaluate(
+            """() => {
+                const form = document.getElementById('form_spp');
+                if (!form) return;
+                const bump = () => {
+                    window.__storeSubmitRequested = (window.__storeSubmitRequested || 0) + 1;
+                };
+                if (!form.__submitGuard) {
+                    form.__submitGuard = true;
+                    form.addEventListener('submit', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        bump();
+                    }, true);
+                }
+                if (!form.__submitPatched) {
+                    form.__submitPatched = true;
+                    form.submit = bump;
+                }
+            }"""
+        )
+    except Exception:
+        logger.warning("Gagal pasang submit-guard form_spp", exc_info=True)
+
+
+def _consume_submit_requested(page: Page) -> int:
+    try:
+        return int(
+            page.evaluate(
+                "() => { const n = window.__storeSubmitRequested || 0;"
+                " window.__storeSubmitRequested = 0; return n; }"
+            )
+            or 0
+        )
+    except Exception:
+        return 0
+
+
+def _fetch_store_result_ok(body: object) -> bool:
+    if body is None:
+        return False
+    if not isinstance(body, dict):
+        return True
+    return body.get("ok") is not False and body.get("success") is not False
+
+
 def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
     """Fallback: kirim FormData ke /spp/store via fetch (tanpa navigasi halaman)."""
     try:
@@ -697,12 +753,23 @@ def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
                     || '';
                 const headers = {};
                 if (token) headers['X-CSRF-TOKEN'] = token;
-                const resp = await fetch('/spp/store', {
-                    method: 'POST',
-                    body,
-                    headers,
-                    credentials: 'same-origin',
-                });
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 120000);
+                let resp;
+                try {
+                    resp = await fetch('/spp/store', {
+                        method: 'POST',
+                        body,
+                        headers,
+                        credentials: 'same-origin',
+                        signal: controller.signal,
+                    });
+                } catch (err) {
+                    clearTimeout(timer);
+                    const msg = err && err.message ? err.message : String(err);
+                    return { ok: false, reason: 'fetch /spp/store gagal: ' + msg };
+                }
+                clearTimeout(timer);
                 const text = await resp.text();
                 try {
                     return { ok: resp.ok, status: resp.status, json: JSON.parse(text) };
@@ -1024,6 +1091,7 @@ def _submit_and_wait_store(
 ) -> dict | list | str | None:
     captured: dict[str, object | None] = {"resp": None}
     seen_posts: list[str] = []
+    failed_requests: list[str] = []
     last_swal = ""
     dialog_msgs: list[str] = []
 
@@ -1045,8 +1113,19 @@ def _submit_and_wait_store(
         if _is_store_post_response(resp):
             captured["resp"] = resp
 
+    def _on_request_failed(req) -> None:
+        try:
+            if req.method != "POST" and not req.is_navigation_request():
+                return
+            failed_requests.append(f"{req.method} {req.url} -> {req.failure or '?'}")
+            if len(failed_requests) > 10:
+                del failed_requests[:-10]
+        except Exception:
+            pass
+
     page.on("dialog", _on_dialog)
     page.on("response", _on_response)
+    page.on("requestfailed", _on_request_failed)
     try:
         trigger = _trigger_simpan_via_playwright(page, print_after=print_after)
         if store_debug is not None:
@@ -1102,6 +1181,18 @@ def _submit_and_wait_store(
                 _handle_swal_popup(page, print_after=print_after)
             except RuntimeError:
                 raise
+            if _consume_submit_requested(page) and captured["resp"] is None:
+                page.wait_for_timeout(1500)
+                elapsed += 1500
+                if captured["resp"] is None:
+                    fetch_body = _post_store_via_fetch(page)
+                    if store_debug is not None:
+                        attempts = store_debug.setdefault("fetch_on_submit", [])
+                        if isinstance(attempts, list):
+                            attempts.append(fetch_body)
+                            del attempts[:-5]
+                    if _fetch_store_result_ok(fetch_body):
+                        return fetch_body
             _progress_heartbeat(
                 on_progress,
                 elapsed,
@@ -1116,6 +1207,7 @@ def _submit_and_wait_store(
                     page.go_back(wait_until="domcontentloaded", timeout=8000)
                 except Exception:
                     pass
+                _install_form_submit_guard(page)
             elif (
                 loading_seen
                 and captured["resp"] is None
@@ -1135,14 +1227,13 @@ def _submit_and_wait_store(
             if captured["resp"] is None and loading_seen:
                 fetch_body = _post_store_via_fetch(page)
                 store_debug["fetch_store_attempt"] = fetch_body
-                if fetch_body is not None and (
-                    fetch_body.get("success") is not False
-                    if isinstance(fetch_body, dict)
-                    else True
-                ):
+                if _fetch_store_result_ok(fetch_body):
                     return fetch_body
         return None
     finally:
+        if store_debug is not None and failed_requests:
+            store_debug["request_failures"] = failed_requests[-10:]
+        page.remove_listener("requestfailed", _on_request_failed)
         page.remove_listener("response", _on_response)
         page.remove_listener("dialog", _on_dialog)
 
@@ -1182,17 +1273,7 @@ def submit_sppn_draft(
         timeout=30000,
     )
     _install_swal_auto_confirm(page, print_after=print_after)
-    page.evaluate(
-        """() => {
-            const form = document.getElementById('form_spp');
-            if (!form || form.__submitGuard) return;
-            form.__submitGuard = true;
-            form.addEventListener('submit', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-            }, true);
-        }"""
-    )
+    _install_form_submit_guard(page)
 
     store_timeout_ms = 420_000 if combined_form else 180_000
     store_body: dict | list | str | None = None

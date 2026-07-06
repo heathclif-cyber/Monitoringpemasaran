@@ -18,7 +18,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-006](#bug-006-superman--job-hilang-saat-railway-redeploy) | Superman | High | Fixed (deploy pending) |
 | [BUG-007](#bug-007-superman--todo-matching-salah-prioritas-referensi) | Superman | High | Fixed |
 | [BUG-008](#bug-008-ui-pembayaran--progress--teks-misleading) | Frontend | Low | Fixed (deploy pending) |
-| [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Mitigated (root cause ketemu 2026-07-03 sore) |
+| [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Fix v2 2026-07-06 (blokir `form.submit()` native + store via fetch) — belum diverifikasi live |
 
 ---
 
@@ -149,6 +149,17 @@ Fix ini sempat dibuat (`9a0f807`, submit-guard `preventDefault`/`stopPropagation
 **Fix final (2026-07-03 sore, terverifikasi live run invoice 0353):**
 - `7acf96b` — kembalikan submit-guard anti-navigasi + `page.go_back()` best-effort saat chrome-error terdeteksi. **Terverifikasi:** run setelah deploy ini tidak lagi macet di chrome-error; dialog "Mengecek urutan..." akhirnya bisa resolve ke dialog hasil ("Info Urutan Nomor", nomor SPPb/SPPn ditampilkan) alih-alih macet selamanya.
 - `951b287` — gagal cepat (90 detik) kalau dialog "Mengecek urutan..." belum selesai, dengan pesan error jelas. **Catatan operasional dari user:** deklarasi normal selesai **< 1 menit**; kalau > 2 menit itu **sudah pasti** ada gangguan di sisi Superman — jadi sistem tidak lagi menunggu 5-10 menit sebelum menyerah, cukup 90 detik.
+
+**Masih gagal (2026-07-06) — root cause v2:** Tiga run E2E invoice 0353 (`scripts/_test_0353_last.txt`, `_run2`, `_run3`) tetap `chrome_error_seen: true` meski submit-guard `7acf96b` aktif. Penyebab:
+
+1. **Guard hanya menahan *event* `submit`.** Setelah dialog "Info Urutan Nomor" di-klik ("Simpan Saja"), JS Superman memanggil **method native `form.submit()`** — method ini *tidak memicu event submit*, jadi `preventDefault` tidak pernah jalan → navigasi POST penuh (multipart + PDF lampiran) → gagal/timeout jaringan → `chrome-error://chromewebdata/` → `form_spp` hilang. Di run2 halaman berakhir di chrome-error ("form_spp tidak ada"); di run3 dialog urutan sempat tampil (urutan SPPB 29 / SPPN 71) lalu tetap chrome-error.
+2. **Fallback fetch yang gagal dianggap sukses.** `_post_store_via_fetch` yang error (`{"ok": false, "reason": "Failed to fetch"}`) dikembalikan sebagai `store_body` karena kondisi hanya mengecek key `success`, bukan `ok` → retry percobaan-2 dan ekstraksi nomor dari halaman dilewati → pesan akhir "Gagal mendapatkan nomor SPPn/SPPb dari Superman" (run3).
+
+**Fix v2 (2026-07-06, `filler.py`):**
+- `_install_form_submit_guard` — selain event listener, **override `form.submit`** jadi pencatat flag `window.__storeSubmitRequested` (navigasi mustahil terjadi). Dipasang ulang setelah `page.go_back()` dari chrome-error.
+- Loop `_submit_and_wait_store` memantau flag itu: begitu Superman minta submit, tunggu 1,5s (beri kesempatan AJAX asli), lalu kirim POST `/spp/store` via `fetch` (FormData snapshot form pasca-callback dialog, abort timeout 120s) dan pakai respons JSON-nya.
+- `_fetch_store_result_ok` — hasil fetch `ok: false` kini dianggap gagal (lanjut retry/ekstraksi, tidak lagi "sukses palsu").
+- Listener `page.on("requestfailed")` merekam `request_failures` (URL + errorText, mis. `net::ERR_TIMED_OUT`) di `store_debug` — kalau masih gagal, run berikutnya menunjukkan error jaringan persisnya.
 
 **Sisa risiko:** Penyebab cek-urutan lambat di sisi Superman (server pihak ketiga) sendiri belum diketahui — apakah karena beban server, atau ada draft/anomali nyangkut dari percobaan gagal sebelumnya untuk kontrak yang sama. Kalau fail-fast 90s sering ke-trigger, cek manual portal Superman untuk draft SPPb/SPPn duplikat/nyangkut terkait kontrak yang gagal.
 
