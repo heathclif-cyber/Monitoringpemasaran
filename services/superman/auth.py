@@ -165,13 +165,26 @@ matikan HTTP/2 di Chromium supaya TLS jatuh ke HTTP/1.1 saja."""
 
 
 def open_authenticated_context(cfg: SupermanConfig) -> tuple:
-    """Return (playwright_manager, browser, context) — caller must close."""
+    """Return (playwright_manager, browser, context) — caller must close.
+
+    Engine dipilih via SUPERMAN_BROWSER (default chromium). Firefox pakai TLS
+    stack berbeda total (NSS, bukan BoringSSL) — dicoba sebagai mitigasi
+    ERR_ALPN_NEGOTIATION_FAILED yang konsisten muncul di Chromium saat POST
+    besar ke /spp/store, kalau memang bug-nya spesifik ke fingerprint TLS
+    Chromium.
+    """
     state = ensure_session(cfg)
     p = sync_playwright().start()
-    browser = p.chromium.launch(
-        headless=cfg.headless,
-        slow_mo=cfg.slow_mo_ms,
-        args=_HTTP2_DISABLED_ARGS,
-    )
+    engine = cfg.browser_engine
+    if engine == "firefox":
+        browser = p.firefox.launch(headless=cfg.headless, slow_mo=cfg.slow_mo_ms)
+    elif engine == "webkit":
+        browser = p.webkit.launch(headless=cfg.headless, slow_mo=cfg.slow_mo_ms)
+    else:
+        browser = p.chromium.launch(
+            headless=cfg.headless,
+            slow_mo=cfg.slow_mo_ms,
+            args=_HTTP2_DISABLED_ARGS,
+        )
     context: BrowserContext = browser.new_context(storage_state=state)
     return p, browser, context

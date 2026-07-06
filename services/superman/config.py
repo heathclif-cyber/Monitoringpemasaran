@@ -33,6 +33,7 @@ class SupermanConfig:
     state_path: str
     headless: bool
     slow_mo_ms: int
+    browser_engine: str
 
     @classmethod
     def from_env(cls) -> "SupermanConfig":
@@ -54,4 +55,5 @@ class SupermanConfig:
             ),
             headless=os.getenv("SUPERMAN_HEADLESS", "true").lower() == "true",
             slow_mo_ms=int(os.getenv("SUPERMAN_SLOW_MO", "150")),
+            browser_engine=os.getenv("SUPERMAN_BROWSER", "chromium").strip().lower(),
         )
