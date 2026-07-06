@@ -626,7 +626,13 @@ def _find_new_todo_match(
     retries: int = 10,
     delay_ms: int = 2000,
 ) -> dict[str, Any] | None:
-    """Prioritaskan baris To Do yang baru muncul setelah simpan draft."""
+    """Prioritaskan baris To Do yang baru muncul setelah simpan draft.
+
+    Baris baru tanpa bukti konten (nominal/referensi/kontrak) tidak boleh
+    diadopsi — nomor urut Superman dipakai bersama satu regional, jadi baris
+    baru bisa saja SPP milik user lain yang kebetulan tersimpan di window
+    yang sama (kasus invoice 0353: SPPb/29 + SPPn/71 milik op_divisi).
+    """
     best: dict[str, Any] | None = None
     best_score = 0
 
@@ -634,7 +640,10 @@ def _find_new_todo_match(
         rows = _fetch_todo_rows(page, base_url)
         new_rows = [row for row in rows if _todo_row_id(row) not in before_ids]
         for row in new_rows:
-            score = _score_todo_row_for_payload(row, payload, expect_sppb=expect_sppb) + 250
+            base = _score_todo_row_for_payload(row, payload, expect_sppb=expect_sppb)
+            if base < 30:
+                continue
+            score = base + 250
             if score > best_score:
                 best_score = score
                 best = row

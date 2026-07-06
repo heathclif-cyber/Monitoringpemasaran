@@ -19,6 +19,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-007](#bug-007-superman--todo-matching-salah-prioritas-referensi) | Superman | High | Fixed |
 | [BUG-008](#bug-008-ui-pembayaran--progress--teks-misleading) | Frontend | Low | Fixed (deploy pending) |
 | [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Fix v2 2026-07-06 (blokir `form.submit()` native + store via fetch) — belum diverifikasi live |
+| [BUG-010](#bug-010-superman--to-do-match-false-positive-adopsi-spp-user-lain) | Superman | Critical | Fixed 2026-07-06 — data invoice 0353 perlu dibersihkan |
 
 ---
 
@@ -175,6 +176,18 @@ GET /api/superman/deklarasi/progress?job_id=...
 Script lokal terbaru: `scripts/test_superman_0353.py`.
 
 **Screenshot debug:** `SUPERMAN_DEBUG_DIR` (default `/tmp/superman_debug`) — file `spp_store_empty_*.png`
+
+---
+
+## BUG-010: Superman — To Do match false positive (adopsi SPP user lain)
+
+**Gejala (2026-07-06, invoice 0353):** Deklarasi ulang ditolak *"sudah pernah dibuatkan SPPn/SPPb: R8/R08D/SPPb/29/VII/2026 + R8/R08D/SPPn/71/VII/2026 — tidak dapat membuat duplikat"* — padahal nomor itu milik SPP **user lain** (`op_divisi`, Jasa Witnessing KKK SUCOFINDO, Rp 11,1 jt / PPh Rp 200 rb), bukan invoice Karet Lump Rp 473 jt.
+
+**Root cause:** `_find_new_todo_match` di `runner.py` memberi bonus **+250 tanpa syarat** ke setiap baris To Do yang baru muncul setelah simpan draft, dengan ambang terima 120. Nomor urut Superman dipakai bersama satu regional — saat `op_divisi` menyimpan SPP mereka di window yang sama (dan mengambil urutan 29/71 yang tadinya dialokasikan untuk kita), baris asing itu (skor konten hanya ~10) tetap lolos: 10 + 250 = 260 ≥ 120 → dianggap milik kita → `save_superman_to_invoice` menulis nomor salah ke DB → deklarasi ulang terblokir cek duplikat.
+
+**Fix (2026-07-06, `runner.py`):** Baris baru wajib punya bukti konten minimal (skor dasar ≥ 30: nominal SPPn/SPPb cocok, kontrak, atau referensi) sebelum bonus baris-baru diberikan. Baris asing (skor ~10) kini di-skip.
+
+**Pembersihan data:** kolom `superman` di invoice `ADD-TENDER/0353/...` + pembayaran `PAY-ADD-TENDER-0353-...-1` masih berisi label salah `R8/R08D/SPPb/29/VII/2026 + R8/R08D/SPPn/71/VII/2026` — harus di-NULL-kan sebelum deklarasi ulang. (DO terkait tidak ada yang terisi.)
 
 ---
 
