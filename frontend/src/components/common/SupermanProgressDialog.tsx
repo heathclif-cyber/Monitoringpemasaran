@@ -80,7 +80,7 @@ export function SupermanProgressDialog({
           <DialogDescription>
             Invoice {refLabel}
             {running && !failed && !partial
-              ? ' — mohon tunggu, proses berjalan di server (~1–2 menit).'
+              ? ' — mohon tunggu, proses berjalan di server (~1–2 menit). Menyembunyikan dialog ini tidak menghentikan proses di server.'
               : failed
                 ? ` — ${failedMessage || 'Proses gagal.'}`
                 : partial
@@ -106,9 +106,15 @@ export function SupermanProgressDialog({
         {(running || failed || partial) && (
           <DialogFooter className="gap-2 sm:gap-2">
             {running && !failed && !partial && onCancel && (
-              <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onCancel}
+                title="Menyembunyikan dialog — proses di server tetap berjalan sampai selesai/gagal"
+              >
                 <X className="h-3.5 w-3.5 mr-1" />
-                Batalkan
+                Sembunyikan
               </Button>
             )}
             {showRetry && (
