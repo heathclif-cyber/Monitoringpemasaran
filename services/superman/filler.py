@@ -356,7 +356,7 @@ def _upload_files_to_input(page: Page, input_selector: str, paths: list[str]) ->
         expected = len(upload_paths)
         locator.set_input_files(upload_paths)
         page.wait_for_timeout(800)
-        for _ in range(30):
+        for _ in range(15):
             if _count_uploaded_docs(page, input_selector) >= expected:
                 return
             page.wait_for_timeout(1000)
@@ -400,7 +400,7 @@ def _wait_doc_list_dom(page: Page, *, timeout_ms: int = 15000) -> None:
             continue
 
 
-def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeout_ms: int = 90000) -> int:
+def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeout_ms: int = 20000) -> int:
     elapsed = 0
     step = 1000
     uploaded = 0
