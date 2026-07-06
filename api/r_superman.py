@@ -8,6 +8,7 @@ from services.superman.documents import (
     superman_doc_requirements_for_pembayaran,
 )
 from services.superman.auth import SupermanCaptchaError, SupermanCaptchaRequired
+from services.superman.netdiag import run_network_probe
 from services.superman.runner import (
     SupermanNotConfiguredError,
     get_deklarasi_progress,
@@ -34,6 +35,14 @@ router = APIRouter(prefix="/api/superman", tags=["Superman"])
 @router.get("/status")
 def superman_status(_user=Depends(require_write)):
     return get_status()
+
+
+@router.get("/debug/netprobe")
+def superman_netprobe(_user=Depends(require_write)):
+    """Diagnostik: kirim POST data sampah (bukan data asli) ke Superman dengan
+    berbagai ukuran, dari proses Python murni (bukan Playwright), untuk cari
+    ambang ukuran yang memicu gagal koneksi. Endpoint sementara utk debug."""
+    return run_network_probe()
 
 
 @router.get("/captcha")
