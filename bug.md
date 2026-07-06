@@ -200,6 +200,14 @@ Dari jaringan lokal, kombinasi ALPN standar browser tidak memicu bug itu. Artiny
 
 **Langkah selanjutnya:** tambahkan env var `SUPERMAN_BROWSER=firefox` di Railway, redeploy, lalu uji deklarasi ulang invoice 0353 — kalau `ERR_ALPN_NEGOTIATION_FAILED` hilang dengan Firefox, itu konfirmasi bug spesifik ke TLS fingerprint Chromium. Kalau masih gagal sama, kemungkinan besar ini soal jaringan/IP Railway (bukan browser), dan opsi berikutnya adalah proxy/VPS jalur keluar berbeda (tanpa IT) — lihat diskusi opsi di percakapan.
 
+**Hasil Firefox (2026-07-06):** TIDAK menyelesaikan masalah — error berubah bentuk jadi `NS_BINDING_ABORTED` (kode Firefox), tapi gejalanya SAMA: POST `/spp/store` tidak pernah direspons, sampai timer abort kita sendiri yang membunuhnya. Beda dari Chromium (`ERR_ALPN_NEGOTIATION_FAILED`, ditolak cepat) — Firefox malah menggantung total tanpa respons apa pun. Kesimpulan: bukan soal implementasi TLS browser tertentu, koneksinya memang tidak pernah selesai dari Railway, apapun browsernya.
+
+**Bukti definitif (2026-07-06) — deklarasi sungguhan invoice 0353 dari jaringan lokal:** kode, data bisnis, dan 3 dokumen PDF yang PERSIS SAMA (diunduh dari Railway) dijalankan via Playwright (Firefox) langsung dari komputer lokal (bukan Railway) — **berhasil sempurna, tahap submit selesai 0 detik** (`ok: true`, SPPb `R8/R08D/SPPb/30/VI/2026`, SPPn `R8/R08D/SPPn/72/VI/2026`, tersimpan ke DB). Ini membuktikan 100%: masalahnya di jaringan Railway, bukan kode/dokumen/browser.
+
+**Percobaan pindah region Amsterdam → Singapore (2026-07-06):** hipotesis: Superman (`ip-99-jak.ptpn1.co.id`, cPanel, hosting di Jakarta — dikonfirmasi lewat DNS, **tidak ada AAAA/IPv6 record**) jauh dari Amsterdam (EU West), jadi transfer besar rentan gagal karena latensi/rute panjang; Singapore jauh lebih dekat ke Jakarta. **Hasil: TIDAK membantu** — job Singapore dengan dokumen full-PDF (invoice `R08D-RO/INV/2026.07.03-1`) tetap gagal identik (`NS_BINDING_ABORTED` di `/spp/store`, retry 2x, semua gagal). Ini **menyingkirkan teori jarak/latensi geografis** sebagai penyebab utama — Singapore-ke-Jakarta jauh lebih dekat dari Amsterdam-ke-Jakarta, tapi hasilnya sama persis.
+
+**Kesimpulan sementara (belum bisa dipastikan 100% tanpa akses WAF/log Superman, dan user tidak mau melibatkan IT):** kemungkinan besar bukan soal region Railway MANA yang dipakai, tapi Railway sebagai penyedia (IP datacenter/cloud) itu sendiri yang diperlakukan berbeda oleh server Superman — di region manapun. Solusi paling realistis saat ini: jalankan deklarasi dari jaringan non-datacenter (komputer lokal/kantor — sudah terbukti berhasil), atau proxy/VPS residential sebagai jalur keluar Railway (belum dicoba).
+
 **Nomor urut ke-generate saat gagal:** SPPb 30 (max bersih 29), SPPn 72 (max bersih 71) — draft **tidak tersimpan** (todo_rows tidak bertambah, `new_todo_ids: []`), jadi aman dicoba lagi tanpa membersihkan draft nyangkut.
 
 **Langkah debug agent:**
