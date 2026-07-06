@@ -1275,7 +1275,7 @@ def submit_sppn_draft(
     _install_swal_auto_confirm(page, print_after=print_after)
     _install_form_submit_guard(page)
 
-    store_timeout_ms = 420_000 if combined_form else 180_000
+    store_timeout_ms = 120_000
     store_body: dict | list | str | None = None
     debug: dict[str, object] = store_debug if store_debug is not None else {}
     wait_msg = (
@@ -1315,7 +1315,7 @@ def submit_sppn_draft(
         else:
             report(90, "Mencoba ulang simpan draft")
             _recover_form_before_retry(page)
-            retry_timeout_ms = store_timeout_ms if combined_form else 60_000
+            retry_timeout_ms = 60_000
             retry_msg = (
                 "Menunggu dialog simpan Superman (percobaan 2)"
                 if combined_form
