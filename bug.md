@@ -20,6 +20,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-008](#bug-008-ui-pembayaran--progress--teks-misleading) | Frontend | Low | Fixed (deploy pending) |
 | [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Fix v2 2026-07-06 (blokir `form.submit()` native + store via fetch) — belum diverifikasi live |
 | [BUG-010](#bug-010-superman--to-do-match-false-positive-adopsi-spp-user-lain) | Superman | Critical | Fixed 2026-07-06 — data invoice 0353 perlu dibersihkan |
+| [BUG-011](#bug-011-dokumen-non-pdf-docx-bikin-upload-superman-gagal-23-file) | Documents/Superman | Medium | Fixed 2026-07-06 (`07fba36`) — batasi upload PDF only |
 
 ---
 
@@ -225,6 +226,18 @@ Script lokal terbaru: `scripts/test_superman_0353.py`.
 **Fix (2026-07-06, `runner.py`):** Baris baru wajib punya bukti konten minimal (skor dasar ≥ 30: nominal SPPn/SPPb cocok, kontrak, atau referensi) sebelum bonus baris-baru diberikan. Baris asing (skor ~10) kini di-skip.
 
 **Pembersihan data:** kolom `superman` di invoice `ADD-TENDER/0353/...` + pembayaran `PAY-ADD-TENDER-0353-...-1` masih berisi label salah `R8/R08D/SPPb/29/VII/2026 + R8/R08D/SPPn/71/VII/2026` — harus di-NULL-kan sebelum deklarasi ulang. (DO terkait tidak ada yang terisi.)
+
+---
+
+## BUG-011: Dokumen non-PDF (.docx) bikin upload Superman gagal "2/3 file"
+
+**Gejala (2026-07-06, invoice `R08D-RO/INV/2026.07.03-1`):** "Dokumen pendukung SPPb belum terlampir (2/3 file)" — konsisten muncul baik di region Railway Amsterdam maupun Singapore, walau ukuran file kecil (<250KB) dan jaringan tidak jadi masalah (beda dari BUG-009).
+
+**Root cause:** Dokumen "Invoice" untuk invoice ini ter-upload ke sistem kita sebagai **`.docx`** (Word), bukan PDF — semua invoice lain yang berhasil selalu pakai PDF. Widget upload bootstrap-fileinput di Superman kemungkinan besar menolak/tidak mendaftarkan file non-PDF, sehingga selalu persis 1 dari 3 file gagal terhitung.
+
+**Fix (2026-07-06, commit `07fba36`):** Upload dokumen (Kontrak, Invoice, Kuitansi, Rekening Koran, DO, Deklarasi, Berita Acara) sekarang dibatasi PDF saja — `accept=".pdf"` di 3 titik input file (`DocumentUpload.tsx` x2, `UploadPage.tsx`) + validasi klien (tolak sebelum upload) + validasi server di `/api/documents/upload` (400 kalau bukan `.pdf`, tidak bisa di-bypass dari sisi klien).
+
+**Tindak lanjut user:** upload ulang dokumen "Invoice" untuk `R08D-RO/INV/2026.07.03-1` dalam format PDF sebelum deklarasi ulang.
 
 ---
 
