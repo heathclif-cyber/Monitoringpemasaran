@@ -184,7 +184,20 @@ Kalau pin versi ini TIDAK menyelesaikan masalah, itu berarti hipotesis version-d
 
 Ini artinya **drift-nya dua lapis**: bukan cuma versi Playwright yang tidak di-pin, base image OS-nya (`FROM python:3.12-slim` tanpa tag Debian spesifik) juga ikut bergeser dari waktu ke waktu. Playwright versi terbaru (unpinned) sudah mengenali trixie dengan benar — jadi kombinasi (Playwright terbaru + trixie) itulah yang sekarang berjalan di production, dan sudah terbukti bisa build sukses berkali-kali malam ini.
 
-**Keputusan:** requirements.txt dikembalikan ke `playwright>=1.49.0` / `ddddocr>=1.4.0` (unpinned, seperti semula) supaya build sukses lagi. Hipotesis version-drift Chromium sebagai penyebab `ERR_ALPN_NEGOTIATION_FAILED` **tidak jadi terverifikasi** — untuk menguji ini dengan benar butuh pin base image ke digest/tag Debian spesifik SEKALIGUS versi Playwright yang kompatibel dengannya (bukan asal downgrade Playwright), yang berarti "membekukan" seluruh environment ke snapshot lama — trade-off besar (kehilangan patch keamanan OS terbaru) untuk sebuah hipotesis yang belum pasti benar. **Tidak direkomendasikan dilanjutkan** kecuali opsi non-kode (test jaringan kantor, lapor IT Superman, pindah eksekusi keluar Railway) sudah dicoba dan mengarah kembali ke sini.
+**Keputusan:** requirements.txt dikembalikan ke `playwright>=1.49.0` / `ddddocr>=1.4.0` (unpinned, seperti semula) supaya build sukses lagi. Hipotesis version-drift Chromium sebagai penyebab `ERR_ALPN_NEGOTIATION_FAILED` **tidak jadi terverifikasi** — untuk menguji ini dengan benar butuh pin base image ke digest/tag Debian spesifik SEKALIGUS versi Playwright yang kompatibel dengannya (bukan asal downgrade Playwright), yang berarti "membekukan" seluruh environment ke snapshot lama — trade-off besar (kehilangan patch keamanan OS terbaru) untuk sebuah hipotesis yang belum pasti benar.
+
+**Klarifikasi penting (2026-07-06):** teori "IP Railway diblokir WAF Superman" tidak cukup menjelaskan "dulu jalan normal, sekarang tidak" — kalau IP Railway memang diblokir/dicurigai, harusnya SELALU gagal sejak fitur ini pertama dibuat (juga jalan di Railway). Jadi sesuatu yang BERUBAH, entah IP egress Railway, konfigurasi server Superman, atau versi Chromium — bukan "Railway inherently diblokir".
+
+**Tes TLS mentah dari jaringan lokal (2026-07-06, `openssl s_client`):** langsung ke `superman.ptpn1.co.id:443`:
+- ALPN hanya `h2` → **gagal** (`SSL routines:tls_parse_stoc_alpn:bad extension`) — bug nyata di server/WAF Superman kalau client tidak menawarkan fallback.
+- ALPN `http/1.1` saja → sukses.
+- ALPN `h2,http/1.1` (persis perilaku browser normal) → **sukses**, server pilih `http/1.1`.
+
+Dari jaringan lokal, kombinasi ALPN standar browser tidak memicu bug itu. Artinya server Superman TIDAK rusak secara universal — kemungkinan ada sesuatu yang beda di jalur/fingerprint Railway/Chromium yang memicu bug ALPN itu di sana tapi tidak di jaringan lokal biasa.
+
+**Mitigasi v5 (2026-07-06, commit `946e444`) — dicoba, belum terverifikasi live:** User menegaskan **tidak ingin melibatkan IT Superman/PTPN sama sekali** — solusi harus murni teknis dari sisi kita. Ditambahkan opsi ganti engine browser Playwright dari Chromium ke **Firefox** (TLS stack total berbeda: NSS vs BoringSSL Chromium) via env var `SUPERMAN_BROWSER=firefox` (default tetap `chromium`, tidak ada perubahan kalau env var tidak diset). Dockerfile diupdate install firefox juga. **Diverifikasi lokal:** Firefox berhasil load session tersimpan, buka form `/spp/tambah`, jQuery & tombol simpan terdeteksi normal — kompatibel dengan UI Superman.
+
+**Langkah selanjutnya:** tambahkan env var `SUPERMAN_BROWSER=firefox` di Railway, redeploy, lalu uji deklarasi ulang invoice 0353 — kalau `ERR_ALPN_NEGOTIATION_FAILED` hilang dengan Firefox, itu konfirmasi bug spesifik ke TLS fingerprint Chromium. Kalau masih gagal sama, kemungkinan besar ini soal jaringan/IP Railway (bukan browser), dan opsi berikutnya adalah proxy/VPS jalur keluar berbeda (tanpa IT) — lihat diskusi opsi di percakapan.
 
 **Nomor urut ke-generate saat gagal:** SPPb 30 (max bersih 29), SPPn 72 (max bersih 71) — draft **tidak tersimpan** (todo_rows tidak bertambah, `new_todo_ids: []`), jadi aman dicoba lagi tanpa membersihkan draft nyangkut.
 
