@@ -157,10 +157,21 @@ def ensure_session(cfg: SupermanConfig, *, auto_login: bool | None = None) -> st
     return _save_session(cfg, manual=False)
 
 
+_HTTP2_DISABLED_ARGS = ["--disable-http2"]
+"""ERR_ALPN_NEGOTIATION_FAILED terlihat konsisten pada POST /spp/store (payload
+besar, multipart+lampiran) — endpoint kecil (check-urutan-anomaly) selalu lolos.
+Pola ini khas proxy/WAF pihak ketiga yang salah menangani ALPN untuk HTTP/2;
+matikan HTTP/2 di Chromium supaya TLS jatuh ke HTTP/1.1 saja."""
+
+
 def open_authenticated_context(cfg: SupermanConfig) -> tuple:
     """Return (playwright_manager, browser, context) — caller must close."""
     state = ensure_session(cfg)
     p = sync_playwright().start()
-    browser = p.chromium.launch(headless=cfg.headless, slow_mo=cfg.slow_mo_ms)
+    browser = p.chromium.launch(
+        headless=cfg.headless,
+        slow_mo=cfg.slow_mo_ms,
+        args=_HTTP2_DISABLED_ARGS,
+    )
     context: BrowserContext = browser.new_context(storage_state=state)
     return p, browser, context

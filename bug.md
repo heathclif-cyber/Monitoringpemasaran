@@ -164,6 +164,16 @@ Fix ini sempat dibuat (`9a0f807`, submit-guard `preventDefault`/`stopPropagation
 
 **Sisa risiko:** Penyebab cek-urutan lambat di sisi Superman (server pihak ketiga) sendiri belum diketahui — apakah karena beban server, atau ada draft/anomali nyangkut dari percobaan gagal sebelumnya untuk kontrak yang sama. Kalau fail-fast 90s sering ke-trigger, cek manual portal Superman untuk draft SPPb/SPPn duplikat/nyangkut terkait kontrak yang gagal.
 
+**Root cause v3 ketemu (2026-07-06, live run production invoice 0353 job `5408942c`):** Berkat `request_failures` dari fix v2, sekarang penyebabnya presisi: setiap POST ke `https://superman.ptpn1.co.id/spp/store` (baik lewat native click maupun fallback `fetch`) gagal dengan **`net::ERR_ALPN_NEGOTIATION_FAILED`** — kegagalan TLS/ALPN negotiation di level jaringan, bukan lagi soal navigasi Playwright. `seen_post_urls` cuma pernah berisi `check-urutan-anomaly` (endpoint kecil, non-upload) — POST `/spp/store` (multipart, bawa 3 lampiran PDF) **tidak pernah berhasil membuka koneksi TLS**, 2x percobaan fetch berturut-turut gagal identik.
+
+Ini kemungkinan besar **bukan bug di kode kita** — ini masalah infrastruktur/jaringan antara Railway (tempat Playwright browser jalan) dan server Superman, khusus untuk endpoint `/spp/store` (kemungkinan WAF/reverse-proxy Superman menolak/reset koneksi saat body multipart besar, atau ada middlebox yang salah menangani ALPN untuk rute upload). Endpoint `check-urutan-anomaly` (payload kecil) selalu berhasil; `/spp/store` (payload besar dengan lampiran) yang selalu gagal — pola ini konsisten mengarah ke masalah ukuran payload atau kebijakan WAF sisi Superman, bukan client.
+
+**Fix dicoba (2026-07-06, `auth.py`):** `fetch()` di level JS halaman memang tidak bisa memaksa versi TLS/HTTP, tapi **launch argument Chromium bisa** — ini di kendali kita, bukan di kendali server Superman. `open_authenticated_context` sekarang meluncurkan Chromium dengan `args=["--disable-http2"]`, memaksa semua koneksi (termasuk POST besar ke `/spp/store`) jatuh ke HTTP/1.1 sehingga tidak pernah mencoba negosiasi ALPN untuk h2. Ini mitigasi standar untuk `ERR_ALPN_NEGOTIATION_FAILED` yang disebabkan proxy/WAF pihak ketiga yang salah menangani HTTP/2 — **belum diverifikasi live**, perlu run E2E lagi untuk konfirmasi.
+
+Kalau ini tidak menyelesaikan masalah, kemungkinan mitigasi lain: (a) kompres/kecilkan ukuran lampiran sebelum upload, (b) laporkan ke tim IT Superman/PTPN1 soal error `ERR_ALPN_NEGOTIATION_FAILED` yang konsisten dari IP Railway saat POST besar ke `/spp/store`, (c) coba declare manual via portal Superman langsung dari browser biasa (non-headless, jaringan kantor) untuk isolasi apakah ini spesifik ke jaringan Railway.
+
+**Nomor urut ke-generate saat gagal:** SPPb 30 (max bersih 29), SPPn 72 (max bersih 71) — draft **tidak tersimpan** (todo_rows tidak bertambah, `new_todo_ids: []`), jadi aman dicoba lagi tanpa membersihkan draft nyangkut.
+
 **Langkah debug agent:**
 ```bash
 # Production (perlu token admin)
