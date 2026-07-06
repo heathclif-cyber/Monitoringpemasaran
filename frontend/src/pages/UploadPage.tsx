@@ -116,6 +116,11 @@ function SlotRow({
 
   const handleFile = async (file: File | null) => {
     if (!file || !useAuthStore.getState().canEdit()) return
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      addNotification('Hanya file PDF yang diizinkan untuk dokumen ini', 'error')
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
     const formData = new FormData()
     formData.append('entity_type', entityType)
     formData.append('entity_id', entityId)
@@ -199,7 +204,7 @@ function SlotRow({
                 ref={inputRef}
                 type="file"
                 className="hidden"
-                accept=".docx,.pdf,.jpg,.jpeg,.png,.xlsx,.xls"
+                accept=".pdf"
                 onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
               />
               <Button

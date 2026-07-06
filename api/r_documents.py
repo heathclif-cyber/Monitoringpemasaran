@@ -732,6 +732,8 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="doc_type tidak valid")
     if not file.filename:
         raise HTTPException(status_code=400, detail="Nama file wajib ada")
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Hanya file PDF yang diizinkan")
 
     _validate_entity(db, entity_type, entity_id)
 
