@@ -1045,10 +1045,18 @@ def submit_deklarasi_invoice(
         result["ok"] = False
         result["recoverable"] = recoverable
         if store_body is None and not new_todo_ids:
-            result["message"] = (
-                "Gagal menyimpan draft ke Superman (respons simpan kosong). "
-                "Cek validasi form di Superman atau coba lagi."
-            )
+            network_failures = store_debug.get("request_failures")
+            invalid_fields = (store_debug.get("form_before_save") or {}).get("invalid_fields")
+            if network_failures and not invalid_fields:
+                result["message"] = (
+                    "Gagal menyimpan draft — koneksi ke server Superman terputus/tidak merespons "
+                    f"(bukan soal isian form). Detail: {network_failures[0]}. Coba lagi beberapa saat."
+                )
+            else:
+                result["message"] = (
+                    "Gagal menyimpan draft ke Superman (respons simpan kosong). "
+                    "Cek validasi form di Superman atau coba lagi."
+                )
         elif recoverable:
             result["message"] = (
                 "Draft SPPn/SPPb kemungkinan masuk To Do List, namun nomor belum terdeteksi. "
