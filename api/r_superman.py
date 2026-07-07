@@ -8,7 +8,7 @@ from services.superman.documents import (
     superman_doc_requirements_for_pembayaran,
 )
 from services.superman.auth import SupermanCaptchaError, SupermanCaptchaRequired
-from services.superman.netdiag import run_network_probe
+from services.superman.netdiag import check_waf_signature, run_network_probe
 from services.superman.runner import (
     SupermanNotConfiguredError,
     get_deklarasi_progress,
@@ -38,11 +38,22 @@ def superman_status(_user=Depends(require_write)):
 
 
 @router.get("/debug/netprobe")
-def superman_netprobe(_user=Depends(require_write)):
+def superman_netprobe(
+    authenticated: bool = Query(False),
+    _user=Depends(require_write),
+):
     """Diagnostik: kirim POST data sampah (bukan data asli) ke Superman dengan
     berbagai ukuran, dari proses Python murni (bukan Playwright), untuk cari
     ambang ukuran yang memicu gagal koneksi. Endpoint sementara utk debug."""
-    return run_network_probe()
+    return run_network_probe(authenticated=authenticated)
+
+
+@router.get("/debug/waf-check")
+def superman_waf_check(_user=Depends(require_write)):
+    """Diagnostik: GET halaman dashboard Superman (aman) dan cek header/body
+    respons untuk tanda WAF/anti-bot/DDoS-protection (Cloudflare, Sucuri,
+    ModSecurity, dll). Endpoint sementara utk debug."""
+    return check_waf_signature()
 
 
 @router.get("/captcha")
