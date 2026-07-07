@@ -20,10 +20,14 @@ ProgressCallback = Callable[[int, str], None]
 
 TTL_SECONDS = 3600
 STALE_RUNNING_SECONDS = 420
+STALE_ZERO_PERCENT_SECONDS = 90
+_SYNC_INTERVAL_SECONDS = 1.5
+_PERSIST_DEBOUNCE_SECONDS = 0.35
 _INTERRUPTED_MSG = (
     "Proses terputus (server restart). Tutup dialog ini, lalu klik "
     "'Buat Deklarasi Superman' lagi."
 )
+
 
 def _default_jobs_path() -> Path:
     state_path = os.getenv(
@@ -51,8 +55,11 @@ class SupermanJob:
 
 
 _jobs: dict[str, SupermanJob] = {}
-_lock = threading.Lock()
+_lock = threading.RLock()
 _loaded = False
+_last_disk_sync = 0.0
+_persist_scheduled = False
+_persist_dirty = False
 
 
 def _job_from_dict(data: dict[str, Any]) -> SupermanJob:
@@ -70,10 +77,20 @@ def _job_from_dict(data: dict[str, Any]) -> SupermanJob:
     )
 
 
-def _persist_jobs_locked() -> None:
+def _read_jobs_file() -> dict[str, Any] | None:
+    if not _JOBS_FILE.exists():
+        return None
+    try:
+        raw = json.loads(_JOBS_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("gagal baca superman jobs: %s", exc)
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def _write_jobs_file(payload: dict[str, Any]) -> None:
     try:
         _JOBS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        payload = {job_id: asdict(job) for job_id, job in _jobs.items()}
         tmp = _JOBS_FILE.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         tmp.replace(_JOBS_FILE)
@@ -93,20 +110,56 @@ def _merge_job_from_disk(data: dict[str, Any], job_id: str, *, mark_interrupted:
     _jobs[job.job_id] = job
 
 
-def _sync_from_disk(*, mark_interrupted: bool = False) -> None:
-    """Muat ulang job dari disk — penting untuk multi-instance Railway."""
-    if not _JOBS_FILE.exists():
-        return
-    try:
-        raw = json.loads(_JOBS_FILE.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict):
+def _merge_jobs_from_raw(raw: dict[str, Any], *, mark_interrupted: bool = False) -> None:
+    for job_id, data in raw.items():
+        if isinstance(data, dict):
+            _merge_job_from_disk(data, job_id, mark_interrupted=mark_interrupted)
+
+
+def _persist_jobs_now() -> None:
+    global _persist_dirty
+    with _lock:
+        payload = {job_id: asdict(job) for job_id, job in _jobs.items()}
+        _persist_dirty = False
+    _write_jobs_file(payload)
+
+
+def _schedule_persist() -> None:
+    global _persist_scheduled, _persist_dirty
+    _persist_dirty = True
+    with _lock:
+        if _persist_scheduled:
             return
+        _persist_scheduled = True
+
+    def _flush_later() -> None:
+        global _persist_scheduled
+        time.sleep(_PERSIST_DEBOUNCE_SECONDS)
         with _lock:
-            for job_id, data in raw.items():
-                if isinstance(data, dict):
-                    _merge_job_from_disk(data, job_id, mark_interrupted=mark_interrupted)
-    except Exception as exc:
-        logger.warning("gagal sync superman jobs dari disk: %s", exc)
+            dirty = _persist_dirty
+            _persist_scheduled = False
+        if dirty:
+            _persist_jobs_now()
+
+    threading.Thread(target=_flush_later, daemon=True, name="superman-jobs-persist").start()
+
+
+def _sync_from_disk(*, mark_interrupted: bool = False, force: bool = False) -> None:
+    """Muat ulang job dari disk — penting untuk multi-instance Railway."""
+    global _last_disk_sync
+    now = time.time()
+    if not force and now - _last_disk_sync < _SYNC_INTERVAL_SECONDS:
+        return
+
+    raw = _read_jobs_file()
+    if raw is None:
+        with _lock:
+            _last_disk_sync = now
+        return
+
+    with _lock:
+        _merge_jobs_from_raw(raw, mark_interrupted=mark_interrupted)
+        _last_disk_sync = now
 
 
 def _ensure_loaded() -> None:
@@ -116,13 +169,17 @@ def _ensure_loaded() -> None:
     with _lock:
         if _loaded:
             return
-        _sync_from_disk(mark_interrupted=True)
+        raw = _read_jobs_file()
+        if raw is not None:
+            _merge_jobs_from_raw(raw, mark_interrupted=True)
         _loaded = True
+        _last_disk_sync = time.time()
 
 
 def _cleanup_expired() -> None:
     _ensure_loaded()
     now = time.time()
+    expired: list[str] = []
     with _lock:
         expired = [
             job_id
@@ -131,8 +188,8 @@ def _cleanup_expired() -> None:
         ]
         for job_id in expired:
             _jobs.pop(job_id, None)
-        if expired:
-            _persist_jobs_locked()
+    if expired:
+        _schedule_persist()
 
 
 def create_job(no_invoice: str, no_pembayaran: str = "") -> str:
@@ -144,7 +201,7 @@ def create_job(no_invoice: str, no_pembayaran: str = "") -> str:
             no_invoice=no_invoice.strip(),
             no_pembayaran=no_pembayaran.strip(),
         )
-        _persist_jobs_locked()
+    _schedule_persist()
     return job_id
 
 
@@ -158,7 +215,7 @@ def update_job(job_id: str, percent: int, stage: str) -> None:
         job.percent = max(0, min(100, percent))
         job.stage = stage
         job.updated_at = time.time()
-        _persist_jobs_locked()
+    _schedule_persist()
 
 
 def complete_job(job_id: str, result: dict[str, Any]) -> None:
@@ -172,7 +229,7 @@ def complete_job(job_id: str, result: dict[str, Any]) -> None:
         job.stage = "Selesai"
         job.result = result
         job.updated_at = time.time()
-        _persist_jobs_locked()
+    _persist_jobs_now()
 
 
 def fail_job(
@@ -191,7 +248,7 @@ def fail_job(
         job.status = "failed"
         job.error = error
         job.updated_at = time.time()
-        _persist_jobs_locked()
+    _persist_jobs_now()
     logger.error(
         "deklarasi failed job_id=%s invoice=%s error=%s debug=%s",
         job_id,
@@ -218,6 +275,13 @@ def _fail_stale_job(job: SupermanJob) -> None:
     )
 
 
+def _is_stale_running(job: SupermanJob, now: float) -> bool:
+    age = now - job.updated_at
+    if job.percent <= 0 and age > STALE_ZERO_PERCENT_SECONDS:
+        return True
+    return age > STALE_RUNNING_SECONDS
+
+
 def find_latest_job_for_invoice(no_invoice: str) -> SupermanJob | None:
     ref = no_invoice.strip()
     if not ref:
@@ -238,31 +302,38 @@ def find_active_job_for_invoice(no_invoice: str) -> SupermanJob | None:
     _cleanup_expired()
     _sync_from_disk()
     now = time.time()
+    stale = False
     with _lock:
         for job in _jobs.values():
             if job.no_invoice != ref or job.status not in ("pending", "running"):
                 continue
-            if now - job.updated_at > STALE_RUNNING_SECONDS:
+            if _is_stale_running(job, now):
                 _fail_stale_job(job)
-                _persist_jobs_locked()
+                stale = True
                 continue
             return job
+    if stale:
+        _persist_jobs_now()
     return None
 
 
 def get_job(job_id: str) -> SupermanJob | None:
     _cleanup_expired()
     _sync_from_disk()
+    stale = False
     with _lock:
         job = _jobs.get(job_id.strip())
         if (
             job
             and job.status in ("pending", "running")
-            and time.time() - job.updated_at > STALE_RUNNING_SECONDS
+            and _is_stale_running(job, time.time())
         ):
             _fail_stale_job(job)
-            _persist_jobs_locked()
-        return job
+            stale = True
+    if stale:
+        _persist_jobs_now()
+    with _lock:
+        return _jobs.get(job_id.strip())
 
 
 def make_progress_callback(job_id: str) -> ProgressCallback:
