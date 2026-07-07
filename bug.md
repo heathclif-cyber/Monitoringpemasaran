@@ -2,7 +2,7 @@
 
 Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini sebelum debug Superman atau Input Pembayaran — lihat juga [agent.md](./agent.md).
 
-**Terakhir diperbarui:** 2026-07-03
+**Terakhir diperbarui:** 2026-07-07
 
 ---
 
@@ -21,6 +21,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-009](#bug-009-superman--store_body-null--recover-gagal) | Superman | Critical | Fix v2 2026-07-06 (blokir `form.submit()` native + store via fetch) — belum diverifikasi live |
 | [BUG-010](#bug-010-superman--to-do-match-false-positive-adopsi-spp-user-lain) | Superman | Critical | Fixed 2026-07-06 — data invoice 0353 perlu dibersihkan |
 | [BUG-011](#bug-011-dokumen-non-pdf-docx-bikin-upload-superman-gagal-23-file) | Documents/Superman | Medium | Fixed 2026-07-06 (`07fba36`) — batasi upload PDF only |
+| [BUG-012](#bug-012-superman--gagal-intermittent-di-railway-lalu-tiba-tiba-berhasil) | Superman / Railway | Critical | Mitigated 2026-07-07 — infra fix + perilaku intermittent `/spp/store` |
 
 ---
 
@@ -249,6 +250,98 @@ Script lokal terbaru: `scripts/test_superman_0353.py`.
 
 ---
 
+## BUG-012: Superman — gagal intermittent di Railway, lalu tiba-tiba berhasil
+
+**Tanggal log:** 2026-07-07 (malam, sesi debug Railway CLI + retry deklarasi production)
+
+**Invoice uji utama:** `R08D-RO/INV/2026.07.03-1` (form `sppb_sppn`, DPP ~24 jt, 3 dokumen PDF)
+
+### Gejala
+
+- Dua kali deklarasi otomatis dari Railway **gagal identik** di tahap 88–94% (*Menunggu urutan & respons simpan Superman*), lalu retry percobaan 2 — `partial: true`, `ok: false`
+- Error konsisten: `POST https://superman.ptpn1.co.id/spp/store -> NS_BINDING_ABORTED` (2x per run)
+- Form sudah benar (validasi OK, `#simpan` tidak disabled, dialog urutan SPPb/SPPn muncul) — bukan masalah isian
+- Beberapa jam kemudian, **pembuatan Superman tiba-tiba berhasil** (dilaporkan user; diverifikasi agent di production)
+
+### Hasil verifikasi production (2026-07-07)
+
+```
+GET /api/superman/status
+  session_valid: true
+  session_path: /data/.superman_state.json
+
+GET /api/invoice/R08D-RO/INV/2026.07.03-1
+  superman: R8/R08D/SPPb/30/VII/2026 + R8/R08D/SPPn/72/VII/2026
+```
+
+Nomor bulan **VII/2026** (Juli) — deklarasi baru, bukan label lama dari invoice lain.
+
+### Yang sudah disingkirkan sebagai penyebab (sesi malam ini)
+
+| Hipotesis | Hasil investigasi |
+|-----------|-------------------|
+| Jaringan Railway tidak bisa kirim data besar | Disingkirkan — netprobe authenticated 2,5 MB sukses ~0,2 detik |
+| WAF / DDoS / captcha memblokir | Disingkirkan — dashboard Superman 200 OK, tidak ada challenge |
+| Region Railway (Amsterdam vs Singapore) | Disingkirkan sebelumnya (BUG-009) + netprobe Singapore sama |
+| Sesi login tidak valid | Disingkirkan setelah fix path + re-login OCR |
+| Isian form / dokumen salah | Disingkirkan — `doc-requirements ready: true`, validasi pre-save OK |
+| Serverless / cold start Railway | Disingkirkan — `sleepApplication: false` |
+| OOM / memori habis | Tidak terlihat — plan Hobby 8 GB, satu job |
+
+### Perbaikan infrastruktur yang dilakukan malam ini (bukan penyebab langsung sukses, tapi wajib)
+
+1. **`SUPERMAN_STATE_PATH`** — dari `/app/data/.superman_state.json` (ephemeral, hilang tiap redeploy) ke **`/data/.superman_state.json`** (volume Railway persisten). User ubah manual di dashboard Railway.
+2. **Restart service** Railway — bersihkan state thread pool rusak.
+3. **Fix captcha 500** — commit `4701fdb`: Playwright sync API dijalankan lewat `sync_executor.py` (dedicated thread, bukan anyio worker asyncio). Endpoint `/api/superman/captcha` tidak lagi intermittent 500.
+4. **Re-login Superman** via OCR setelah deploy — `session_valid: true` tersimpan di volume.
+
+Tanpa (1) dan (3), operasi malam ini tidak bisa dilanjutkan sama sekali — tapi keduanya **bukan** yang membuat `/spp/store` tiba-tiba lolos; mereka memperbaiki login dan stabilitas API.
+
+### Kenapa bisa gagal berkali-kali lalu tiba-tiba berhasil?
+
+**Kesimpulan utama:** kegagalan di `/spp/store` dari Railway bersifat **intermittent** (tidak deterministik 100% gagal / 100% sukses), selaras dengan temuan BUG-009 sejak 2026-07-06.
+
+**Faktor yang menjelaskan pola "gagal → gagal → tiba-tiba OK":**
+
+1. **Bukan bug kode isian form** — dua run agent gagal dengan debug identik (`request_failures: NS_BINDING_ABORTED`, `fetch_on_submit` aborted, `store_body_preview: null`). Run berikutnya (user atau retry ke-3) lolos ke To Do dan menulis nomor ke DB.
+
+2. **Endpoint kecil vs upload nyata** — `check-urutan-anomaly` selalu sukses; hanya `POST /spp/store` (multipart + lampiran PDF) yang putus. Netprobe ke path dummy 404 tidak merefleksikan beban proses upload server Superman.
+
+3. **Jalur datacenter Railway vs jaringan lokal** — deklarasi identik dari komputer lokal (invoice 0353, 2026-07-06) sukses 0 detik di tahap submit. Dari Railway, submit yang sama kadang `ERR_ALPN_NEGOTIATION_FAILED` (Chromium) atau `NS_BINDING_ABORTED` (Firefox). Ini menunjukkan perlakuan berbeda terhadap traffic cloud, bukan data bisnis yang salah.
+
+4. **Retry memang bagian dari desain** — kode sudah punya percobaan 2 di simpan draft; kegagalan agent = kedua percobaan dalam satu job habis tanpa respons. Percobaan job **baru** (atau klik ulang user) = kesempatan independen — dan inilah yang kemungkinan berhasil.
+
+5. **Kondisi sisi Superman / jaringan perantara** — tidak bisa diobservasi tanpa log IT. Kemungkinan: beban server, timeout proxy cPanel, atau reset koneksi saat body multipart besar — **bukan selalu aktif**, sehingga terasa "tiba-tiba" berhasil tanpa perubahan kode aplikasi.
+
+6. **Bukan karena TENDER/0353 "sukses di Railway"** — klaim sukses 0353 malam ini salah interpretasi; deklarasi 0353 yang terbukti end-to-end adalah dari **jaringan lokal** (BUG-009, 2026-07-06). Sukses R08D inilah **bukti live pertama** deklarasi penuh dari Railway setelah rangkaian fix infra malam ini.
+
+### Timeline singkat sesi 2026-07-07
+
+| Waktu (kira-kira) | Kejadian |
+|-------------------|----------|
+| Awal sesi | Netprobe + WAF check: jaringan Railway ke Superman OK untuk request anonim/kecil |
+| | Login OCR + sesi valid |
+| | Temuan `SUPERMAN_STATE_PATH` salah → user perbaiki ke `/data/...` |
+| Setelah redeploy | Captcha intermittent 500 (`Playwright Sync API inside asyncio loop`) |
+| | Restart Railway + deploy `4701fdb` (sync_executor) |
+| | Re-login OCR berhasil |
+| Retry 1–2 R08D (agent) | Job gagal — `NS_BINDING_ABORTED` di `/spp/store`, `invoice.superman` tetap null |
+| Beberapa saat kemudian | User lapor tiba-tiba berhasil |
+| Verifikasi agent | `R08D-RO/INV/2026.07.03-1` → `SPPb/30/VII/2026 + SPPn/72/VII/2026` |
+
+### Status & rekomendasi operasional
+
+- **Status:** Mitigated — Railway **bisa** menyelesaikan deklarasi, tapi **tidak boleh dianggap 100% reliable** untuk `/spp/store`
+- **Jika gagal lagi:** tunggu 1–2 menit, **Coba Lagi** sekali (jangan paralel 2 job); jangan redeploy saat job di 88%+
+- **Pantau:** apakah kegagalan >50% per minggu — kalau ya, pertimbangkan server Windows kantor (`DEPLOY_GUIDE.md`) atau VPS worker non-datacenter
+- **Jangan** anggap masalah selesai permanen hanya karena satu run sukses
+
+**File terkait:** `services/superman/sync_executor.py` (`4701fdb`), `services/superman/filler.py`, `services/superman/netdiag.py`, `api/r_superman.py`
+
+**Commit malam ini:** `4701fdb` (Playwright thread pool), `61ef516` (netprobe authenticated + waf-check)
+
+---
+
 ## Pola operasional (bukan bug, sering disalahartikan)
 
 ### PPh dipotong pembeli
@@ -276,6 +369,8 @@ Jangan push/redeploy saat user menunggu dialog Superman 88%+. Tunggu job selesai
 | `5236f7c` | Job persist disk + UI retry (mungkin belum di remote) |
 | `7acf96b` | BUG-009: kembalikan submit-guard anti-navigasi form_spp (fix regresi `50515e4`) |
 | `951b287` | BUG-009: gagal cepat 90s kalau cek urutan Superman macet |
+| `4701fdb` | BUG-012: Playwright sync di dedicated thread (fix captcha 500 asyncio) |
+| `61ef516` | Debug netprobe authenticated + waf-check |
 
 ---
 
