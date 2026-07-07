@@ -88,9 +88,13 @@ def _api_config() -> SupermanConfig:
 
 
 def get_status() -> dict[str, Any]:
+    from services.superman.sync_executor import run_playwright_sync
+
     cfg = SupermanConfig.from_env()
     state = Path(cfg.state_path)
-    session_valid = is_session_valid(cfg, state) if state.is_file() else False
+    session_valid = (
+        run_playwright_sync(is_session_valid, cfg, state) if state.is_file() else False
+    )
     using_b64 = bool(os.getenv("SUPERMAN_PASSWORD_B64", "").strip())
     return {
         "configured": is_configured(),
@@ -896,15 +900,23 @@ def inspect_superman_todo(
 
 
 def request_captcha() -> dict[str, Any]:
-    return start_captcha_challenge(_api_config())
+    from services.superman.sync_executor import run_playwright_sync
+
+    return run_playwright_sync(start_captcha_challenge, _api_config())
 
 
 def refresh_captcha(challenge_id: str) -> dict[str, Any]:
-    return refresh_captcha_challenge(challenge_id.strip())
+    from services.superman.sync_executor import run_playwright_sync
+
+    return run_playwright_sync(refresh_captcha_challenge, challenge_id.strip())
 
 
 def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
-    return verify_captcha_challenge(challenge_id.strip(), answer.strip())
+    from services.superman.sync_executor import run_playwright_sync
+
+    return run_playwright_sync(
+        verify_captcha_challenge, challenge_id.strip(), answer.strip()
+    )
 
 
 def submit_deklarasi_invoice(

@@ -54,6 +54,13 @@ def _cleanup_expired() -> None:
         _dispose(key)
 
 
+def _dispose_all() -> None:
+    with _lock:
+        ids = list(_store.keys())
+    for challenge_id in ids:
+        _dispose(challenge_id)
+
+
 def _get_entry(challenge_id: str) -> PendingCaptcha:
     _cleanup_expired()
     with _lock:
@@ -166,6 +173,7 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
         raise RuntimeError("Set SUPERMAN_USER dan SUPERMAN_PASSWORD di environment.")
 
     _cleanup_expired()
+    _dispose_all()
     pw = sync_playwright().start()
     browser = pw.chromium.launch(headless=True)
     page = browser.new_page()
