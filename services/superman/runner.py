@@ -1161,7 +1161,9 @@ def start_deklarasi_job(
             "Tunggu selesai atau coba lagi nanti."
         )
     cfg = _api_config()
-    ensure_session(cfg)
+    from services.superman.sync_executor import run_playwright_sync
+
+    run_playwright_sync(ensure_session, cfg)
     job_id = create_job(ref, no_pembayaran=(no_pembayaran or "").strip())
     update_job(job_id, 0, "Memulai proses...")
     thread = threading.Thread(target=_run_deklarasi_job, args=(job_id, ref), daemon=True)
