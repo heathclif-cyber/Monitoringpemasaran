@@ -1161,9 +1161,12 @@ def start_deklarasi_job(
             "Tunggu selesai atau coba lagi nanti."
         )
     cfg = _api_config()
-    from services.superman.sync_executor import run_playwright_sync
-
-    run_playwright_sync(ensure_session, cfg)
+    # Jangan buka Playwright di request HTTP — cukup cek file sesi ada.
+    # Validasi live + login dilakukan di thread job (_run_deklarasi_job).
+    if not Path(cfg.state_path).is_file():
+        raise SupermanCaptchaRequired(
+            "Session Superman belum aktif. Isi captcha login Superman terlebih dahulu."
+        )
     job_id = create_job(ref, no_pembayaran=(no_pembayaran or "").strip())
     update_job(job_id, 0, "Memulai proses...")
     thread = threading.Thread(target=_run_deklarasi_job, args=(job_id, ref), daemon=True)
