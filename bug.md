@@ -22,6 +22,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-010](#bug-010-superman--to-do-match-false-positive-adopsi-spp-user-lain) | Superman | Critical | Fixed 2026-07-06 — data invoice 0353 perlu dibersihkan |
 | [BUG-011](#bug-011-dokumen-non-pdf-docx-bikin-upload-superman-gagal-23-file) | Documents/Superman | Medium | Fixed 2026-07-06 (`07fba36`) — batasi upload PDF only |
 | [BUG-012](#bug-012-superman--gagal-intermittent-di-railway-lalu-tiba-tiba-berhasil) | Superman / Railway | Critical | Mitigated 2026-07-07 — infra fix + perilaku intermittent `/spp/store` |
+| [BUG-013](#bug-013-superman--dialog-0-memulai-deadlock-progresspy) | Superman / Railway | Critical | Fixed 2026-07-07 (`73d974d`) — deadlock lock di `progress.py` |
 
 ---
 
@@ -342,6 +343,26 @@ Tanpa (1) dan (3), operasi malam ini tidak bisa dilanjutkan sama sekali — tapi
 
 ---
 
+## BUG-013: Superman — dialog 0% "Memulai..." (deadlock progress.py)
+
+**Tanggal log:** 2026-07-07
+
+**Gejala:** Dialog Superman stuck **0% / "Memulai..."** tanpa error. `POST /deklarasi/start` dan `GET /deklarasi/progress` **timeout** (15–25s); endpoint lain (`preview`, `doc-requirements`) tetap 200 cepat.
+
+**Penyebab:** `_ensure_loaded()` memegang `threading.Lock` lalu memanggil `_sync_from_disk()` yang mencoba lock yang sama — **self-deadlock** saat file `superman_jobs.json` sudah ada di volume Railway (setelah restart + job pertama). Worker HTTP terkunci selamanya; semua request progress/start ikut hang.
+
+**Fix (`73d974d`):**
+- Baca/merge disk **tanpa nested lock**; pakai `RLock` + persist di luar lock
+- Debounce tulis disk (tidak setiap `update_job`)
+- Throttle `_sync_from_disk` pada poll
+- Fail cepat job `running` di 0% > 90 detik
+
+**Verifikasi:** Invoice `0757/HO-SUPCO/WASTE-L/N-I/V/2026` — `start` 0.21s, progress naik normal, selesai `SPPb/31/V/2026 + SPPn/73/V/2026`.
+
+**File:** `services/superman/progress.py`
+
+---
+
 ## Pola operasional (bukan bug, sering disalahartikan)
 
 ### PPh dipotong pembeli
@@ -371,6 +392,7 @@ Jangan push/redeploy saat user menunggu dialog Superman 88%+. Tunggu job selesai
 | `951b287` | BUG-009: gagal cepat 90s kalau cek urutan Superman macet |
 | `4701fdb` | BUG-012: Playwright sync di dedicated thread (fix captcha 500 asyncio) |
 | `61ef516` | Debug netprobe authenticated + waf-check |
+| `73d974d` | BUG-013: deadlock `progress.py` — fix dialog 0% Memulai |
 
 ---
 
