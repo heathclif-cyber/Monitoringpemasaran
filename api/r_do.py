@@ -10,6 +10,7 @@ from database import get_db
 from services.auth import require_write
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba, get_ba_for_entity
+from services.volume_utils import compute_volume_for_transfer, resolve_volume_scope
 from services.stok_utils import (
     record_stok_keluar_do,
     resolve_do_stock_context,
@@ -66,7 +67,6 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
         .filter(models.Kontrak.no_kontrak == db_invoice.no_kontrak)
         .first()
     )
-    kontrak_volume = float(db_kontrak.volume or 0) if db_kontrak else 0
     invoice_total = float(db_invoice.jumlah_pembayaran or 0)
     nominal = float(db_pay.nominal_transfer or 0)
     payung_ba = is_payung_ba(db_kontrak)
@@ -74,46 +74,27 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     no_ba = do.no_ba or db_invoice.no_ba
     db_ba = get_ba_for_entity(db, no_ba) if payung_ba else None
 
-    volume_for_calc = kontrak_volume
-    nilai_unit_penuh = invoice_total
-
     if payung_ba:
         if not db_ba:
             raise HTTPException(status_code=400, detail="Kontrak payung wajib memilih Berita Acara (no_ba)")
         if db_ba.no_kontrak != db_invoice.no_kontrak:
             raise HTTPException(status_code=400, detail="BA tidak sesuai dengan kontrak invoice")
-        volume_for_calc = float(db_ba.volume_ba or 0)
-        nilai_unit_penuh = invoice_total
         rencana_pengambilan = db_ba.tanggal_ba
     else:
         if do.no_ba:
             raise HTTPException(status_code=400, detail="no_ba hanya untuk kontrak PAYUNG_BA")
-
-        if db_invoice.nama_unit and db_kontrak:
-            unit = next((u for u in db_kontrak.units if u.nama_unit == db_invoice.nama_unit), None)
-            if unit and (unit.volume or 0) > 0:
-                volume_for_calc = float(unit.volume)
-
-        harga_satuan = float(db_kontrak.harga_satuan or 0) if db_kontrak else 0
-        premi = float(db_kontrak.premi or 0) if db_kontrak else 0
-        is_ppn = str(getattr(db_kontrak, 'is_ppn', 'true')).lower() == 'true' if db_kontrak else False
-        ppn_persen = float(db_kontrak.ppn_persen or 0) / 100 if db_kontrak else 0
-
-        unit_ratio = (volume_for_calc / kontrak_volume) if kontrak_volume > 0 else 1.0
-        pokok_full = (kontrak_volume * harga_satuan) + premi
-        ppn_full = pokok_full * ppn_persen if is_ppn else 0.0
-        nilai_unit_penuh = (pokok_full + ppn_full) * unit_ratio
         rencana_pengambilan = do.rencana_pengambilan
+
+    volume_for_calc, _nilai_scope = resolve_volume_scope(db_kontrak, db_invoice, db_ba)
 
     user_volume = float(do.volume_do or 0) if do.volume_do is not None else 0.0
     if user_volume > 0:
         volume_do = user_volume
-    elif nilai_unit_penuh > 0 and volume_for_calc > 0 and nominal > 0:
-        volume_do = (nominal / nilai_unit_penuh) * volume_for_calc
-    elif nominal <= 0:
-        volume_do = 0.0
     else:
-        volume_do = volume_for_calc
+        # Rumus tunggal — sama dengan estimasi Laporan sebelum DO terbit
+        volume_do = compute_volume_for_transfer(
+            db_kontrak, db_invoice, db_ba, nominal, round_result=False
+        )
 
     max_volume = volume_for_calc
     if max_volume > 0 and volume_do > max_volume + 0.5:

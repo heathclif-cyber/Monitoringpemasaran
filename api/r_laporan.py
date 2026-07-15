@@ -17,6 +17,11 @@ from services.ba_utils import (
     calculate_ba_invoice_amount,
     kontrak_nilai_maksimum,
 )
+from services.volume_utils import (
+    compute_volume_for_invoice,
+    compute_volume_for_transfer,
+    resolve_volume_scope,
+)
 from services.superman.documents import (
     superman_doc_requirements_for_do,
     superman_doc_requirements_for_pembayaran,
@@ -37,41 +42,11 @@ def get_bulan_buku(d):
 
 
 def _invoice_volume_scope(k, inv, ba_ref):
-    k_vol = float(k.volume or 0)
-    vol_base = k_vol
-    nilai_penuh = kontrak_nilai_maksimum(k)
-
-    if is_payung_ba(k) and ba_ref and (ba_ref.volume_ba or 0) > 0:
-        vol_base = float(ba_ref.volume_ba)
-        nilai_penuh = float(
-            calculate_ba_invoice_amount(k, vol_base, ba_effective_harga(ba_ref, k))
-        )
-    elif inv and inv.nama_unit and hasattr(k, "units") and k.units:
-        matched = next((u for u in k.units if u.nama_unit == inv.nama_unit), None)
-        if matched and (matched.volume or 0) > 0:
-            vol_base = float(matched.volume)
-            if k_vol > 0:
-                unit_ratio = vol_base / k_vol
-                pokok_full = (k_vol * float(k.harga_satuan or 0)) + float(k.premi or 0)
-                ppn_full = 0.0
-                if str(getattr(k, "is_ppn", "true")).lower() == "true":
-                    ppn_full = pokok_full * (float(k.ppn_persen or 0) / 100)
-                nilai_penuh = (pokok_full + ppn_full) * unit_ratio
-
-    return vol_base, nilai_penuh
+    return resolve_volume_scope(k, inv, ba_ref)
 
 
 def _compute_volume_invoice(k, inv, ba_ref):
-    vol_base, nilai_penuh = _invoice_volume_scope(k, inv, ba_ref)
-    if not inv:
-        return vol_base
-    # Payung BA: satu invoice per BA — volume fisik = volume BA, bukan proporsional nominal
-    if is_payung_ba(k) and ba_ref and (ba_ref.volume_ba or 0) > 0:
-        return float(ba_ref.volume_ba)
-    inv_gross = float(inv.jumlah_pembayaran or 0)
-    if nilai_penuh > 0 and inv_gross > 0:
-        return vol_base * (inv_gross / nilai_penuh)
-    return vol_base
+    return compute_volume_for_invoice(k, inv, ba_ref)
 
 
 def _resolve_ba_ref(k, inv, do, ba_by_no: dict):
@@ -281,17 +256,11 @@ def _build_laporan_rows(db: Session):
                 if tanggal_transfer_val:
                     raw_date_val = tanggal_transfer_val.strftime("%Y-%m-%d")
 
-                vol_base = k_vol_local
-                if is_payung_ba(k) and ba_ref and (ba_ref.volume_ba or 0) > 0:
-                    vol_base = float(ba_ref.volume_ba)
-                elif inv.nama_unit and hasattr(k, "units") and k.units:
-                    matched = next((u for u in k.units if u.nama_unit == inv.nama_unit), None)
-                    if matched and (matched.volume or 0) > 0:
-                        vol_base = float(matched.volume)
-                if k_harga_local > 0:
-                    do_volume = pay_nominal_total / k_harga_local
-                elif inv_gross > 0 and vol_base > 0:
-                    do_volume = vol_base * (pay_nominal_total / inv_gross)
+                # Estimasi volume = rumus DO (bukan transfer/harga — itu mengabaikan PPN).
+                # Setelah DO terbit, kolom Jumlah DO pakai do.volume_do (angka final).
+                do_volume = compute_volume_for_transfer(
+                    k, inv, ba_ref, pay_nominal_total, round_result=True
+                )
                 if inv_gross > 0:
                     pay_ratio = pay_nominal_total / inv_gross
                     pendapatan_do = pokok_inv * pay_ratio
@@ -390,7 +359,20 @@ def _build_laporan_rows(db: Session):
                         total_pelunasan += nom
                 
                 if not inv.delivery_orders:
-                    rows.append(build_row(k, inv, None, inv_total, k_vol, total_pelunasan, total_do_volume))
+                    # Belum DO: sisa volume pakai estimasi volume dari transfer
+                    # (rumus sama DO), supaya laporan cepat tidak "seolah belum terkirim 0".
+                    ba_for_est = _resolve_ba_ref(k, inv, None, ba_by_no)
+                    pay_nom = sum(float(p.nominal_transfer or 0) for p in (inv.pembayaran or []))
+                    est_vol = (
+                        compute_volume_for_transfer(
+                            k, inv, ba_for_est, pay_nom, round_result=True
+                        )
+                        if pay_nom > 0
+                        else 0.0
+                    )
+                    rows.append(
+                        build_row(k, inv, None, inv_total, k_vol, total_pelunasan, est_vol)
+                    )
                 else:
                     for do in inv.delivery_orders:
                         rows.append(build_row(k, inv, do, inv_total, k_vol, total_pelunasan, total_do_volume))
