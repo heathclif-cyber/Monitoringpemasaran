@@ -39,6 +39,7 @@ from services.superman.persist import (
     assert_do_not_submitted,
     assert_invoice_not_submitted,
     assert_pembayaran_not_submitted,
+    find_invoices_with_superman_label,
     format_superman_ref,
     get_do_superman,
     get_invoice_superman,
@@ -58,6 +59,7 @@ from services.superman.progress import (
     make_progress_callback,
     update_job,
 )
+from services.superman import agent_registry
 
 
 class SupermanNotConfiguredError(RuntimeError):
@@ -239,11 +241,60 @@ def _collect_todo_match_refs(
     no_invoice: str = "",
     no_kontrak: str = "",
 ) -> list[str]:
-    """Kandidat teks untuk cocokkan baris To Do — invoice/referensi diutamakan."""
+    """Kandidat identitas kuat untuk To Do — per invoice, BUKAN kontrak.
+
+    Multi-invoice sekontrak sering nominal/mitra sama; `no_kontrak` hanya soft
+    signal di `_score_todo_row` (jangan dipakai sebagai strong ref).
+    Parameter `no_kontrak` tetap diterima agar call-site lama tidak putus, diabaikan.
+    """
+    del no_kontrak  # bukan identity match — multi-invoice sekontrak bentrok
     refs: list[str] = []
-    for raw in (referensi, no_invoice, no_kontrak, no_pembayaran, no_do):
+    for raw in (referensi, no_invoice, no_pembayaran, no_do):
         _append_todo_ref(refs, raw)
     return refs
+
+
+def _todo_row_matches_identity(
+    row: dict[str, Any],
+    *,
+    no_invoice: str = "",
+    referensi: str = "",
+    no_pembayaran: str = "",
+    no_do: str = "",
+) -> bool:
+    """True hanya jika baris To Do memuat identitas invoice/pembayaran/DO ini."""
+    identity_refs = _collect_todo_match_refs(
+        referensi=referensi,
+        no_invoice=no_invoice,
+        no_pembayaran=no_pembayaran,
+        no_do=no_do,
+    )
+    if not identity_refs:
+        return False
+    blob = _todo_row_blob(row)
+    for candidate in identity_refs:
+        if candidate and candidate in blob:
+            return True
+    for field in (
+        "referensi",
+        "referensi_sppn",
+        "referensi_sppb",
+        "au58",
+        "au58_sppn",
+        "au58_sppb",
+        "ba_au58",
+        "berita_acara",
+        "berita_acara_sppb",
+        "berita_acara_sppn",
+        "no_ba",
+    ):
+        val = _normalize_match_text(row.get(field))
+        if not val:
+            continue
+        for candidate in identity_refs:
+            if candidate and (candidate == val or candidate in val or val in candidate):
+                return True
+    return False
 
 
 def _todo_row_id(row: dict[str, Any]) -> str:
@@ -290,9 +341,14 @@ def _score_todo_row(
         no_do=no_do,
         referensi=referensi,
         no_invoice=no_invoice,
-        no_kontrak=no_kontrak,
     )
-    ref_n = match_refs[0] if match_refs else ""
+    identity_ok = _todo_row_matches_identity(
+        row,
+        no_invoice=no_invoice,
+        referensi=referensi,
+        no_pembayaran=no_pembayaran,
+        no_do=no_do,
+    )
     no_do_n = _normalize_match_text(no_do)
     no_kontrak_n = _normalize_match_text(no_kontrak)
     mitra_n = _normalize_match_text(mitra_pembeli)
@@ -304,6 +360,7 @@ def _score_todo_row(
     if no_do_n and no_do_n in blob and no_do_n not in match_refs:
         score += 500
 
+    # Field kuat: identitas invoice saja (jangan sp_opl/kontrak — multi-invoice sekontrak).
     for field in (
         "berita_acara",
         "au58",
@@ -316,9 +373,6 @@ def _score_todo_row(
         "referensi",
         "referensi_sppn",
         "referensi_sppb",
-        "sp_opl",
-        "sp_opl_sppb",
-        "sp_opl_sppn",
         "kwitansi",
         "kwitansi_sppn",
         "keterangan",
@@ -339,8 +393,14 @@ def _score_todo_row(
         if not matched_ref and no_do_n and val and (no_do_n == val or no_do_n in val or val in no_do_n):
             score += 400
 
+    # Soft signal only — kontrak sama ≠ SPP sama (multi-invoice).
     if no_kontrak_n and no_kontrak_n in blob:
-        score += 100
+        score += 15
+    for field in ("sp_opl", "sp_opl_sppb", "sp_opl_sppn"):
+        val = _normalize_match_text(row.get(field))
+        if no_kontrak_n and val and (no_kontrak_n == val or no_kontrak_n in val or val in no_kontrak_n):
+            score += 10
+            break
 
     if mitra_n and mitra_n in blob:
         score += 20
@@ -411,17 +471,21 @@ def _score_todo_row(
     if amount_matched and mitra_n and mitra_n in blob:
         score += 25
 
-    # Jangan nol-kan match kuat (referensi/kontrak/nominal) hanya karena format tanggal beda.
+    # Jangan nol-kan match kuat (referensi invoice/nominal) hanya karena format tanggal beda.
     has_strong_ref = any(r in blob for r in match_refs)
-    has_kontrak = bool(no_kontrak_n and no_kontrak_n in blob)
     if (
         tanggal_key
         and not tanggal_matched
         and score < 800
         and not has_strong_ref
-        and not has_kontrak
         and not amount_matched
     ):
+        return 0
+
+    # Tanpa identitas invoice/pembayaran/DO → tidak boleh diadopsi (BUG-014).
+    # Soft signals (kontrak/mitra/nominal) tetap dihitung di atas untuk debug skor,
+    # tapi skor final 0 agar ambang recover/deklarasi tidak lolos.
+    if score > 0 and not identity_ok:
         return 0
 
     return score
@@ -464,30 +528,33 @@ def _coalesce_spp_numbers(
     match: dict[str, Any] | None,
     store_body: Any,
 ) -> tuple[str | None, str | None]:
+    """Gabungkan nomor SPP. Respons /spp/store menang atas To Do match.
+
+    Match To Do hanya melengkapi field yang kosong — mencegah SPP invoice
+    saudara menimpa nomor yang sudah diekstrak dari store response kita.
+    """
     sppb_no = store_sppb
     sppn_no = store_sppn
-
-    if match:
-        sppb_no = (
-            match.get("sppb_no")
-            or match.get("no_sppb")
-            or match.get("nomor_sppb")
-            or sppb_no
-        )
-        sppn_no = (
-            match.get("sppn_no")
-            or match.get("no_sppn")
-            or match.get("nomor_sppn")
-            or sppn_no
-        )
-        blob_sppb, blob_sppn = _extract_numbers_from_blob(_todo_row_blob(match))
-        sppb_no = sppb_no or blob_sppb
-        sppn_no = sppn_no or blob_sppn
 
     if store_body is not None and (not sppb_no or not sppn_no):
         body_sppb, body_sppn = _extract_numbers_from_store(store_body)
         sppb_no = sppb_no or body_sppb
         sppn_no = sppn_no or body_sppn
+
+    if match and (not sppb_no or not sppn_no):
+        match_sppb = (
+            match.get("sppb_no")
+            or match.get("no_sppb")
+            or match.get("nomor_sppb")
+        )
+        match_sppn = (
+            match.get("sppn_no")
+            or match.get("no_sppn")
+            or match.get("nomor_sppn")
+        )
+        blob_sppb, blob_sppn = _extract_numbers_from_blob(_todo_row_blob(match))
+        sppb_no = sppb_no or match_sppb or blob_sppb
+        sppn_no = sppn_no or match_sppn or blob_sppn
 
     if not sppb_no or not sppn_no:
         combined = json.dumps(
@@ -791,16 +858,56 @@ def recover_superman_from_todo(
         browser.close()
         pw.stop()
 
-    if not match or best_score < 70 or not (sppb_no or sppn_no):
+    identity_ok = bool(
+        match
+        and _todo_row_matches_identity(
+            match,
+            no_invoice=payload.no_invoice,
+            referensi=payload.referensi,
+            no_pembayaran=payload.no_pembayaran,
+            no_do=payload.no_do,
+        )
+    )
+    if not match or not identity_ok or best_score < 70 or not (sppb_no or sppn_no):
         return {
             "ok": False,
             "no_invoice": ref,
-            "message": "Tidak menemukan SPPn/SPPb yang cocok di To Do List Superman.",
+            "message": (
+                "Tidak menemukan SPPn/SPPb yang cocok di To Do List Superman "
+                "(wajib cocok nomor invoice/referensi — tidak cukup kontrak/nominal sama)."
+            ),
             "inspect": inspect,
             "best_score": best_score,
+            "identity_ok": identity_ok,
         }
 
-    saved = save_superman_to_invoice(ref, sppb_no, sppn_no)
+    label_preview = format_superman_ref(sppb_no, sppn_no)
+    clashes = find_invoices_with_superman_label(label_preview, exclude_no_invoice=ref)
+    if clashes:
+        return {
+            "ok": False,
+            "no_invoice": ref,
+            "sppb_no": sppb_no,
+            "sppn_no": sppn_no,
+            "best_score": best_score,
+            "message": (
+                f"Nomor {label_preview} sudah dipakai invoice lain: {', '.join(clashes[:5])}. "
+                "Jangan pulihkan ke invoice ini — deklarasikan SPP baru untuk invoice ini."
+            ),
+            "clash_invoices": clashes,
+        }
+
+    try:
+        saved = save_superman_to_invoice(ref, sppb_no, sppn_no)
+    except ValueError as exc:
+        return {
+            "ok": False,
+            "no_invoice": ref,
+            "sppb_no": sppb_no,
+            "sppn_no": sppn_no,
+            "best_score": best_score,
+            "message": str(exc),
+        }
     return {
         "ok": bool(saved),
         "no_invoice": ref,
@@ -922,6 +1029,9 @@ def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
 def submit_deklarasi_invoice(
     no_invoice: str,
     on_progress: ProgressCallback | None = None,
+    *,
+    support_doc_paths: list[Path] | None = None,
+    skip_preflight: bool = False,
 ) -> dict[str, Any]:
     no_invoice = no_invoice.strip()
     assert_invoice_not_submitted(no_invoice)
@@ -929,14 +1039,23 @@ def submit_deklarasi_invoice(
     report = on_progress or (lambda _percent, _stage: None)
 
     report(5, "Memuat data invoice dan dokumen")
-    validate_deklarasi_ready(no_invoice)
+    if not skip_preflight:
+        validate_deklarasi_ready(no_invoice)
     cfg = _api_config()
 
     report(10, "Memvalidasi session Superman")
     ensure_session(cfg)
 
     payload = build_payload_from_invoice(no_invoice)
-    supports = resolve_support_doc_from_invoice(no_invoice)
+    if support_doc_paths:
+        support_paths = [Path(p) for p in support_doc_paths if Path(p).is_file()]
+        if not support_paths:
+            raise FileNotFoundError(
+                "Daftar dokumen pendukung agent kosong atau file tidak ditemukan di disk lokal."
+            )
+    else:
+        supports = resolve_support_doc_from_invoice(no_invoice)
+        support_paths = [doc.path for doc in supports]
 
     report(20, "Membuka browser Superman")
     store_sppb: str | None = None
@@ -955,7 +1074,7 @@ def submit_deklarasi_invoice(
             page,
             cfg,
             payload,
-            support_docs=[doc.path for doc in supports],
+            support_docs=support_paths,
             on_progress=on_progress,
         )
         before_todo_ids = _snapshot_todo_ids(page, cfg.base_url)
@@ -1038,7 +1157,18 @@ def submit_deklarasi_invoice(
     elif sppb_no or sppn_no:
         result.update({"sppb_no": sppb_no, "sppn_no": sppn_no, "todo_matched": False})
 
-    saved = save_superman_to_invoice(no_invoice, sppb_no, sppn_no)
+    try:
+        saved = save_superman_to_invoice(no_invoice, sppb_no, sppn_no)
+    except ValueError as save_exc:
+        result["partial"] = True
+        result["ok"] = False
+        result["sppb_no"] = sppb_no
+        result["sppn_no"] = sppn_no
+        result["message"] = str(save_exc)
+        result["todo_matched"] = bool(match)
+        report(100, "Selesai (nomor bentrok invoice lain)")
+        return result
+
     if saved:
         result["superman_saved"] = saved
         result["ok"] = True
@@ -1141,11 +1271,34 @@ def _run_deklarasi_job(job_id: str, no_invoice: str) -> None:
         fail_job(job_id, str(exc), debug={"no_invoice": no_invoice, "exc_type": type(exc).__name__})
 
 
+def _resolve_executor(
+    executor: str | None,
+    *,
+    user_id: int = 0,
+) -> str:
+    """server | agent | auto (agent milik user ini online)."""
+    raw = (executor or os.getenv("SUPERMAN_DEFAULT_EXECUTOR", "auto") or "auto").strip().lower()
+    if raw in ("server", "railway", "cloud"):
+        return "server"
+    if raw in ("agent", "local", "pc"):
+        return "agent"
+    # auto: hanya agent user yang login (bukan agent orang lain)
+    uid = int(user_id or 0)
+    if uid > 0 and agent_registry.any_online(user_id=uid):
+        return "agent"
+    if uid <= 0 and agent_registry.any_online():
+        return "agent"
+    return "server"
+
+
 def start_deklarasi_job(
     *,
     no_invoice: str | None = None,
     no_pembayaran: str | None = None,
     no_do: str | None = None,
+    executor: str | None = None,
+    user_id: int = 0,
+    username: str = "",
 ) -> dict[str, Any]:
     ref = resolve_no_invoice(
         no_invoice=no_invoice,
@@ -1160,18 +1313,65 @@ def start_deklarasi_job(
             f"Job deklarasi untuk invoice {ref} masih berjalan (job_id={active.job_id}). "
             "Tunggu selesai atau coba lagi nanti."
         )
+
+    uid = int(user_id or 0)
+    uname = (username or "").strip()
+    exec_mode = _resolve_executor(executor, user_id=uid)
+
+    if exec_mode == "agent":
+        if uid > 0 and not agent_registry.any_online(user_id=uid):
+            # Explicit agent diminta tapi agent user offline
+            if (executor or "").strip().lower() in ("agent", "local", "pc"):
+                raise ValueError(
+                    "Agent lokal Anda offline. Jalankan di PC login: "
+                    "python scripts/superman_agent.py watch --api <URL> "
+                    f"--username {uname or '<user>'} --password <pass>"
+                )
+        # Session Superman di PC agent user — Railway tidak menjalankan Playwright.
+        job_id = create_job(
+            ref,
+            no_pembayaran=(no_pembayaran or "").strip(),
+            executor="agent",
+            user_id=uid,
+            username=uname,
+        )
+        return {
+            "job_id": job_id,
+            "no_invoice": ref,
+            "no_pembayaran": (no_pembayaran or "").strip(),
+            "executor": "agent",
+            "user_id": uid,
+            "message": (
+                f"Job menunggu agent lokal Anda ({uname or 'user'}). "
+                "Pastikan `superman_agent.py watch` berjalan di PC yang dipakai login."
+            ),
+        }
+
     cfg = _api_config()
     # Jangan buka Playwright di request HTTP — cukup cek file sesi ada.
     # Validasi live + login dilakukan di thread job (_run_deklarasi_job).
     if not Path(cfg.state_path).is_file():
         raise SupermanCaptchaRequired(
-            "Session Superman belum aktif. Isi captcha login Superman terlebih dahulu."
+            "Session Superman belum aktif di server. Jalankan agent lokal di PC Anda, "
+            "atau isi captcha login Superman (mode server Railway)."
         )
-    job_id = create_job(ref, no_pembayaran=(no_pembayaran or "").strip())
+    job_id = create_job(
+        ref,
+        no_pembayaran=(no_pembayaran or "").strip(),
+        executor="server",
+        user_id=uid,
+        username=uname,
+    )
     update_job(job_id, 0, "Memulai proses...")
     thread = threading.Thread(target=_run_deklarasi_job, args=(job_id, ref), daemon=True)
     thread.start()
-    return {"job_id": job_id, "no_invoice": ref, "no_pembayaran": (no_pembayaran or "").strip()}
+    return {
+        "job_id": job_id,
+        "no_invoice": ref,
+        "no_pembayaran": (no_pembayaran or "").strip(),
+        "executor": "server",
+        "user_id": uid,
+    }
 
 
 def get_deklarasi_progress(
@@ -1196,6 +1396,8 @@ def get_deklarasi_progress(
         "status": job.status,
         "percent": job.percent,
         "stage": job.stage,
+        "executor": job.executor or "server",
+        "agent_id": job.agent_id or "",
     }
     if job.status == "completed" and job.result:
         payload["result"] = job.result

@@ -14,6 +14,7 @@ import {
   isSupermanSessionMessage,
   pollSupermanJob,
   recoverSupermanFromTodo,
+  resolveSupermanExecutor,
 } from '@/utils/supermanUtils'
 import type {
   SupermanDeklarasiJobStart,
@@ -191,10 +192,19 @@ export function SupermanDeklarasiButton({
     setOpen(false)
 
     try {
+      const exec = await resolveSupermanExecutor()
+      if (exec.executor === 'agent') {
+        setStage('Menunggu agent lokal di PC...')
+        addNotification(exec.hint, 'info')
+      } else {
+        addNotification(exec.hint, 'warning')
+      }
+
       const params = new URLSearchParams()
       if (noInvoice) params.set('no_invoice', noInvoice)
       else if (noPembayaran) params.set('no_pembayaran', noPembayaran)
       if (noDo) params.set('no_do', noDo)
+      params.set('executor', exec.executor)
       let jobId: string
       const invoiceRef = noInvoice || ''
       try {
@@ -203,6 +213,9 @@ export function SupermanDeklarasiButton({
         )
         setLastInvoice(start.no_invoice || noInvoice)
         jobId = start.job_id
+        if (start.executor === 'agent') {
+          setStage(start.message || 'Menunggu agent lokal di PC...')
+        }
       } catch (startErr: unknown) {
         const detail = startErr instanceof ApiError ? startErr.message : ''
         const resumeId =
@@ -276,11 +289,15 @@ export function SupermanDeklarasiButton({
   const handleConfirm = async () => {
     setLoading(true)
     try {
-      const status = await client.get<SupermanStatus>('/api/superman/status')
-      if (!status.session_valid) {
-        setOpen(false)
-        setCaptchaOpen(true)
-        return
+      const exec = await resolveSupermanExecutor()
+      // Mode agent: session Superman ada di PC agent, skip captcha server Railway.
+      if (exec.executor === 'server') {
+        const status = await client.get<SupermanStatus>('/api/superman/status')
+        if (!status.session_valid) {
+          setOpen(false)
+          setCaptchaOpen(true)
+          return
+        }
       }
       await runDeklarasi()
     } catch (err) {
@@ -344,7 +361,7 @@ export function SupermanDeklarasiButton({
         open={open}
         onOpenChange={setOpen}
         title="Buat SPPn di Superman"
-        description={`Draft masuk To Do List Superman untuk invoice ${noInvoice || noPembayaran}. Nomor invoice dipakai sebagai referensi Superman (AU58). Wajib upload Kontrak, Invoice, dan Rekening Koran Penerimaan; kuitansi opsional. Jika kontrak kena PPh, sistem otomatis membuat SPPb + SPPn.`}
+        description={`Draft masuk To Do List Superman untuk invoice ${noInvoice || noPembayaran}. Nomor invoice = referensi Superman. Wajib Kontrak, Invoice, Rekening Koran; kuitansi opsional. Jika agent lokal (scripts/superman_agent.py watch) online, Playwright jalan di PC — lebih andal daripada Railway.`}
         confirmLabel={loading ? 'Memproses...' : 'Buat di Superman'}
         isLoading={loading}
         onConfirm={handleConfirm}

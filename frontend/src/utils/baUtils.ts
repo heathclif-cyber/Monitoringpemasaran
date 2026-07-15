@@ -13,6 +13,11 @@ export function calculateBAPokok(
   return pokok
 }
 
+/** Bulat ke sen (2 desimal) — bukan ke rupiah utuh. Tampilan pakai formatCurrency. */
+function asMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
 export function calculateBAInvoiceAmount(
   volumeBa: number,
   hargaSatuan: number,
@@ -24,5 +29,5 @@ export function calculateBAInvoiceAmount(
   const pokok = calculateBAPokok(volumeBa, hargaSatuan, premi, kontrakVolume)
   const ppn =
     String(isPpn).toLowerCase() !== 'false' ? pokok * (ppnPersen / 100) : 0
-  return Math.round(pokok + ppn)
+  return asMoney(pokok + ppn)
 }

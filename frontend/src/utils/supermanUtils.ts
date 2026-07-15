@@ -1,5 +1,10 @@
 import { client, ApiError, isSupermanSessionError } from '@/lib/client'
-import type { SupermanDeklarasiProgress, SupermanDeklarasiResult, SupermanDocRequirement } from '@/types'
+import type {
+  SupermanAgentStatus,
+  SupermanDeklarasiProgress,
+  SupermanDeklarasiResult,
+  SupermanDocRequirement,
+} from '@/types'
 
 export const POLL_INTERVAL_MS = 1000
 export const POLL_TIMEOUT_MS = 10 * 60 * 1000
@@ -45,6 +50,48 @@ export async function checkSupermanDocsReady(noInvoice: string): Promise<{
   )
   const message = res.ready ? '' : formatMissingSupermanDocs(res.requirements)
   return { ready: res.ready, message, requirements: res.requirements }
+}
+
+export async function fetchSupermanAgentStatus(): Promise<SupermanAgentStatus> {
+  return client.get<SupermanAgentStatus>('/api/superman/agent/status')
+}
+
+/**
+ * Prefer agent di PC user yang login (mine_online).
+ * App tetap di Railway; Playwright di device user yang menjalankan agent.
+ */
+export async function resolveSupermanExecutor(): Promise<{
+  executor: 'agent' | 'server'
+  agentOnline: boolean
+  hint: string
+}> {
+  try {
+    const st = await fetchSupermanAgentStatus()
+    const mine = st.mine_online ?? st.online
+    if (mine) {
+      const names = (st.agents || []).map((a) => a.name || a.hostname || a.agent_id.slice(0, 8)).join(', ')
+      return {
+        executor: 'agent',
+        agentOnline: true,
+        hint: names
+          ? `Agent Anda online (${names}) — Superman dijalankan di PC ini/device agent Anda.`
+          : 'Agent Anda online — Superman dijalankan di PC agent Anda.',
+      }
+    }
+    return {
+      executor: 'server',
+      agentOnline: false,
+      hint:
+        st.hint ||
+        'Agent Anda offline. Jalankan di PC: python scripts/superman_agent.py watch — fallback Railway sering gagal.',
+    }
+  } catch {
+    return {
+      executor: 'server',
+      agentOnline: false,
+      hint: 'Status agent tidak terbaca — fallback server Railway.',
+    }
+  }
 }
 
 export function isSupermanSessionMessage(message: string): boolean {

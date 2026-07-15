@@ -2,7 +2,7 @@
 
 Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini sebelum debug Superman atau Input Pembayaran — lihat juga [agent.md](./agent.md).
 
-**Terakhir diperbarui:** 2026-07-07
+**Terakhir diperbarui:** 2026-07-14
 
 ---
 
@@ -23,6 +23,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-011](#bug-011-dokumen-non-pdf-docx-bikin-upload-superman-gagal-23-file) | Documents/Superman | Medium | Fixed 2026-07-06 (`07fba36`) — batasi upload PDF only |
 | [BUG-012](#bug-012-superman--gagal-intermittent-di-railway-lalu-tiba-tiba-berhasil) | Superman / Railway | Critical | Mitigated 2026-07-07 — infra fix + perilaku intermittent `/spp/store` |
 | [BUG-013](#bug-013-superman--dialog-0-memulai-deadlock-progresspy) | Superman / Railway | Critical | Fixed 2026-07-07 (`73d974d`) — deadlock lock di `progress.py` |
+| [BUG-014](#bug-014-superman--nomor-spp-sama-di-multi-invoice-sekontrak) | Superman | Critical | Fixed 2026-07-14 — data 26.041 dibersihkan |
 
 ---
 
@@ -360,6 +361,29 @@ Tanpa (1) dan (3), operasi malam ini tidak bisa dilanjutkan sama sekali — tapi
 **Verifikasi:** Invoice `0757/HO-SUPCO/WASTE-L/N-I/V/2026` — `start` 0.21s, progress naik normal, selesai `SPPb/31/V/2026 + SPPn/73/V/2026`.
 
 **File:** `services/superman/progress.py`
+
+---
+
+## BUG-014: Superman — nomor SPP sama di multi-invoice sekontrak
+
+**Tanggal log:** 2026-07-14
+
+**Gejala:** Dua invoice beda nomor (`26.040/...` dan `26.041/...`) pada kontrak yang sama (`033/SGN/SPJB/BO/GKP-N1/VII/2026`), nominal mirip (Rp 750 jt), di Laporan menampilkan **Superman sama**: `R8/R08D/SPPn/73/VII/2026`. Padahal Superman harus per invoice.
+
+**Root cause:** To Do matching di `runner.py` memasukkan `no_kontrak` sebagai strong match_ref (+~970 jika `sp_opl` berisi kontrak) + soft kontrak +100 + nominal/mitra. Invoice saudara sekontrak (tanpa match nomor invoice) lolos ambang recover (≥70) → `save_superman_to_invoice` menulis nomor SPP invoice A ke invoice B. Tidak ada guard unik antar-invoice.
+
+**Fix (2026-07-14):**
+1. `_collect_todo_match_refs` — **tanpa** `no_kontrak` (hanya referensi/invoice/pembayaran/DO)
+2. `_todo_row_matches_identity` — wajib identitas invoice; skor final 0 jika tidak
+3. Kontrak/`sp_opl` hanya soft signal kecil
+4. `_coalesce_spp_numbers` — respons `/spp/store` menang atas To Do match
+5. `save_superman_to_invoice` + recover — tolak jika nomor SPP sudah dipakai invoice lain
+
+**Pembersihan data (2026-07-14):**
+- **Dipertahankan:** `26.040/GKP-N1/BO/NJM/VII/2026` → `R8/R08D/SPPn/73/VII/2026` (lebih dulu)
+- **Dikosongkan:** `26.041/GKP-N1/BO/NJM/VII/2026` + pembayaran terkait — deklarasi ulang setelah deploy fix
+
+**File:** `services/superman/runner.py`, `services/superman/persist.py`
 
 ---
 

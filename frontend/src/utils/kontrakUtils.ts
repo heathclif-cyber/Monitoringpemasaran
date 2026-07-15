@@ -13,6 +13,11 @@ export interface PricingResult {
   totalTagihan: number
 }
 
+/** Bulat ke sen (2 desimal). Tampilan UI (formatCurrency) yang membulatkan ke rupiah. */
+function asMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
 export function calculateKontrakPricing(
   volume: number,
   hargaSatuan: number,
@@ -22,11 +27,15 @@ export function calculateKontrakPricing(
   isPph: string,
   pphPersen: number,
 ): PricingResult {
-  const pokok = volume * hargaSatuan + premi
-  const nominalPpn = isPpn === 'true' ? pokok * (ppnPersen / 100) : 0
-  const nominalPph = isPph === 'true' ? pokok * (pphPersen / 100) : 0
-  const nilaiTransaksi = pokok + nominalPpn
-  const totalTagihan = nilaiTransaksi - nominalPph
+  // Hitungan penuh dulu, baru simpan sen — jangan Math.round ke rupiah utuh di tengah.
+  const pokokRaw = volume * hargaSatuan + premi
+  const nominalPpnRaw = isPpn === 'true' ? pokokRaw * (ppnPersen / 100) : 0
+  const nominalPphRaw = isPph === 'true' ? pokokRaw * (pphPersen / 100) : 0
+  const pokok = asMoney(pokokRaw)
+  const nominalPpn = asMoney(nominalPpnRaw)
+  const nominalPph = asMoney(nominalPphRaw)
+  const nilaiTransaksi = asMoney(pokok + nominalPpn)
+  const totalTagihan = asMoney(nilaiTransaksi - nominalPph)
 
   return { pokok, nominalPpn, nominalPph, nilaiTransaksi, totalTagihan }
 }

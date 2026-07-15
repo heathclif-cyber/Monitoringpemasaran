@@ -1,0 +1,57 @@
+# Stack kantor gratis — akses via IP LAN, tanpa Railway / domain berbayar.
+# URL: http://<IP-PC>:8000
+#
+#   docker compose up -d --build
+#   docker compose ps
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: monpem-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ptpn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-PtpnKantor_Local_ChangeMe}
+      POSTGRES_DB: ${POSTGRES_DB:-monitoringpemasaran}
+    volumes:
+      - monpem_pgdata:/var/lib/postgresql/data
+    ports:
+      # Hanya bind localhost di host — app di container pakai hostname "db"
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ptpn} -d ${POSTGRES_DB:-monitoringpemasaran}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build: .
+    container_name: monpem-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ptpn}:${POSTGRES_PASSWORD:-PtpnKantor_Local_ChangeMe}@db:5432/${POSTGRES_DB:-monitoringpemasaran}
+      SECRET_KEY: ${SECRET_KEY:-change-me-office-local-secret}
+      RUN_DB_MIGRATE: "true"
+      PORT: "8000"
+      UPLOAD_DIR: /data/uploads
+      SUPERMAN_STATE_PATH: /data/.superman_state.json
+      SUPERMAN_JOBS_PATH: /data/superman_jobs.json
+      SUPERMAN_AGENTS_PATH: /data/superman_agents.json
+      SUPERMAN_URL: ${SUPERMAN_URL:-https://superman.ptpn1.co.id/}
+      SUPERMAN_USER: ${SUPERMAN_USER:-}
+      SUPERMAN_PASSWORD: ${SUPERMAN_PASSWORD:-}
+      SUPERMAN_HEADLESS: ${SUPERMAN_HEADLESS:-true}
+      SUPERMAN_DEFAULT_EXECUTOR: ${SUPERMAN_DEFAULT_EXECUTOR:-server}
+    volumes:
+      - monpem_data:/data
+      - ./uploads:/data/uploads
+    ports:
+      # Dengarkan semua interface → http://IP-LAN:8000 dari device lain
+      - "8000:8000"
+
+volumes:
+  monpem_pgdata:
+  monpem_data:

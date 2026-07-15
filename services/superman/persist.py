@@ -16,6 +16,49 @@ def format_superman_ref(sppb_no: str | None, sppn_no: str | None) -> str:
     return " + ".join(parts)
 
 
+def _label_tokens(label: str) -> set[str]:
+    """Pecah label 'SPPb + SPPn' / single nomor jadi token unik."""
+    tokens: set[str] = set()
+    for part in (label or "").replace("+", " ").split():
+        t = part.strip()
+        if t:
+            tokens.add(t.lower())
+    return tokens
+
+
+def find_invoices_with_superman_label(
+    label: str,
+    *,
+    exclude_no_invoice: str | None = None,
+) -> list[str]:
+    """Invoice lain yang sudah memakai token nomor SPP yang sama (BUG-014)."""
+    want = _label_tokens(label)
+    if not want:
+        return []
+    exclude = (exclude_no_invoice or "").strip()
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(models.Invoice.no_invoice, models.Invoice.superman)
+            .filter(
+                models.Invoice.superman.isnot(None),
+                models.Invoice.superman != "",
+            )
+            .all()
+        )
+        clashes: list[str] = []
+        for no_inv, existing in rows:
+            if not no_inv:
+                continue
+            if exclude and str(no_inv).strip() == exclude:
+                continue
+            if want & _label_tokens(existing or ""):
+                clashes.append(str(no_inv))
+        return clashes
+    finally:
+        db.close()
+
+
 def get_invoice_superman(no_invoice: str) -> str | None:
     db = SessionLocal()
     try:
@@ -139,10 +182,18 @@ def save_superman_to_invoice(
     if not label:
         return None
 
+    no_inv = no_invoice.strip()
+    clashes = find_invoices_with_superman_label(label, exclude_no_invoice=no_inv)
+    if clashes:
+        raise ValueError(
+            f"Nomor Superman {label} sudah dipakai invoice lain: {', '.join(clashes[:5])}. "
+            "Superman per invoice — tidak boleh diduplikasi (multi-invoice sekontrak)."
+        )
+
     db = SessionLocal()
     try:
         inv = db.query(models.Invoice).filter(
-            models.Invoice.no_invoice == no_invoice.strip()
+            models.Invoice.no_invoice == no_inv
         ).first()
         if not inv:
             raise ValueError(f"Invoice tidak ditemukan: {no_invoice}")

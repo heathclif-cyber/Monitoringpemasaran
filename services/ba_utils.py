@@ -22,12 +22,15 @@ def ba_effective_harga(ba: models.BeritaAcara | None, kontrak: models.Kontrak) -
 
 
 def kontrak_nilai_maksimum(kontrak: models.Kontrak) -> float:
+    """Nilai maks invoice (pokok + PPN). Desimal dipertahankan (sen)."""
+    from services.money_utils import as_money
+
     kontrak_volume = float(kontrak.volume or 0.0)
     pokok = (kontrak_volume * float(kontrak.harga_satuan or 0.0)) + float(kontrak.premi or 0.0)
     ppn_val = 0.0
     if str(getattr(kontrak, "is_ppn", "true")).lower() == "true":
         ppn_val = pokok * (float(kontrak.ppn_persen or 0.0) / 100)
-    return pokok + ppn_val
+    return as_money(pokok + ppn_val)
 
 
 def calculate_ba_pokok(
@@ -51,12 +54,15 @@ def calculate_ba_invoice_amount(
     kontrak: models.Kontrak,
     volume_ba: float,
     harga_satuan_ba: float | None = None,
-) -> int:
+) -> float:
+    """Nilai invoice BA (pokok + PPN). Pertahankan desimal; tampilan UI yang membulatkan."""
+    from services.money_utils import as_money
+
     pokok_ba = calculate_ba_pokok(kontrak, volume_ba, harga_satuan_ba)
     ppn_val = 0.0
     if str(getattr(kontrak, "is_ppn", "true")).lower() == "true":
         ppn_val = pokok_ba * (float(kontrak.ppn_persen or 0.0) / 100)
-    return round(pokok_ba + ppn_val)
+    return as_money(pokok_ba + ppn_val)
 
 
 def get_total_ba_volume(db: Session, no_kontrak: str, exclude_no_ba: str | None = None) -> float:

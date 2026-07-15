@@ -12,6 +12,7 @@ from services.auth import require_write
 from services.utils import terbilang_rupiah
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba
+from services.money_utils import as_money
 
 router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 
@@ -43,14 +44,18 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
         else:
             volume_for_calc = kontrak.volume or 0.0
 
-        pokok = (volume_for_calc * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
-        nominal_ppn = 0.0
+        # Hitung desimal penuh dulu; simpan sen (2 desimal). Tampilan UI membulatkan.
+        pokok_raw = (volume_for_calc * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
+        nominal_ppn_raw = 0.0
         if str(kontrak.is_ppn).lower() == 'true':
-            nominal_ppn = pokok * ((kontrak.ppn_persen or 0.0) / 100)
-        nilai_transaksi = pokok + nominal_ppn
+            nominal_ppn_raw = pokok_raw * ((kontrak.ppn_persen or 0.0) / 100)
+        pokok = as_money(pokok_raw)
+        nominal_ppn = as_money(nominal_ppn_raw)
+        nilai_transaksi = as_money(pokok_raw + nominal_ppn_raw)
 
     jatuh_tempo_pembayaran = kontrak.tanggal_kontrak + timedelta(days=kontrak.lama_pembayaran_hari or 0)
-    terbilang = terbilang_rupiah(math.floor(nilai_transaksi))
+    # Terbilang dari nilai tampilan (bulat); DB tetap desimal.
+    terbilang = terbilang_rupiah(math.floor(nilai_transaksi + 1e-9))
 
     if db_kontrak:
         for key, value in kontrak_data.items():

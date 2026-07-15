@@ -10,6 +10,7 @@ import schemas
 from database import get_db
 from services.auth import require_write
 from services.utils import terbilang_rupiah
+from services.money_utils import as_money
 
 router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 
@@ -18,11 +19,17 @@ router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == kontrak.no_kontrak).first()
 
-    # Calculate fields
-    nilai_transaksi = ((kontrak.volume or 0.0) * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
-    nominal_ppn = nilai_transaksi * ((kontrak.ppn_persen or 0.0) / 100)
+    # Hitung desimal penuh; simpan sen. (Legacy router — production pakai endpoints/kontrak.py)
+    pokok_raw = ((kontrak.volume or 0.0) * (kontrak.harga_satuan or 0.0)) + (kontrak.premi or 0.0)
+    nominal_ppn_raw = 0.0
+    if str(kontrak.is_ppn or 'true').lower() == 'true':
+        nominal_ppn_raw = pokok_raw * ((kontrak.ppn_persen or 0.0) / 100)
+    pokok = as_money(pokok_raw)
+    nominal_ppn = as_money(nominal_ppn_raw)
+    # Selaras endpoints/kontrak: nilai_transaksi = pokok + PPN
+    nilai_transaksi = as_money(pokok_raw + nominal_ppn_raw)
     jatuh_tempo_pembayaran = kontrak.tanggal_kontrak + timedelta(days=kontrak.lama_pembayaran_hari or 0)
-    terbilang = terbilang_rupiah(math.floor(nilai_transaksi))
+    terbilang = terbilang_rupiah(math.floor(nilai_transaksi + 1e-9))
 
     if db_kontrak:
         for key, value in kontrak.model_dump().items():
@@ -34,15 +41,12 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
         db.flush()  # write kontrak first so child queries see updated values
 
         # ── Cascade: recalculate all linked Invoices & their DOs ──────────────
-        pokok = nilai_transaksi  # (vol * harga) + premi
-        ppn_val = 0.0
-        if str(kontrak.is_ppn or 'true').lower() == 'true':
-            ppn_val = pokok * ((kontrak.ppn_persen or 0.0) / 100)
-        new_jumlah = pokok + ppn_val
+        # Invoice amount = pokok + PPN (desimal), tanpa PPh
+        new_jumlah = nilai_transaksi
 
         for inv in db_kontrak.invoices:
             inv.jumlah_pembayaran = new_jumlah
-            inv.terbilang_invoice = terbilang_rupiah(math.floor(new_jumlah))
+            inv.terbilang_invoice = terbilang_rupiah(math.floor(new_jumlah + 1e-9))
 
             # Recalculate each DO: volume_do = (nominal_transfer / new_jumlah) * new_volume
             new_vol = float(kontrak.volume or 0)

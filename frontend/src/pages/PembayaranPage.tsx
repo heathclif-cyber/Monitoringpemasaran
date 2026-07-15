@@ -39,6 +39,7 @@ import {
   extractJobIdFromConflict,
   pollSupermanJob,
   recoverSupermanFromTodo,
+  resolveSupermanExecutor,
 } from '@/utils/supermanUtils'
 import type {
   Pembayaran,
@@ -278,13 +279,26 @@ export default function PembayaranPage() {
     setProgressOpen(true)
 
     try {
-      const params = new URLSearchParams({ no_invoice: noInvoice })
+      const exec = await resolveSupermanExecutor()
+      if (exec.executor === 'agent') {
+        setStage('Menunggu agent lokal di PC...')
+        addNotification(exec.hint, 'info')
+      } else {
+        addNotification(exec.hint, 'warning')
+      }
+      const params = new URLSearchParams({
+        no_invoice: noInvoice,
+        executor: exec.executor,
+      })
       let jobId: string
       try {
         const start = await client.post<SupermanDeklarasiJobStart>(
           `/api/superman/deklarasi/start?${params.toString()}`,
         )
         jobId = start.job_id
+        if (start.executor === 'agent') {
+          setStage(start.message || 'Menunggu agent lokal di PC...')
+        }
       } catch (startErr: unknown) {
         const detail = startErr instanceof ApiError ? startErr.message : ''
         const resumeId =

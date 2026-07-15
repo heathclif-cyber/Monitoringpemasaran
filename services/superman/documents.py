@@ -23,6 +23,7 @@ class ResolvedSupportDoc:
     doc_type: str
     file_name: str
     label: str
+    document_id: int | None = None
 
     def describe(self) -> str:
         return f"{self.label} ({self.entity_type}/{self.entity_id}, {self.file_name})"
@@ -90,6 +91,7 @@ def _resolve_upload(
                     doc_type=doc_type,
                     file_name=upload.file_name,
                     label=label,
+                    document_id=int(upload.id) if upload.id is not None else None,
                 )
         except StorageError:
             pass
@@ -103,6 +105,7 @@ def _resolve_upload(
             doc_type=doc_type,
             file_name=scanned.name,
             label=label,
+            document_id=int(upload.id) if upload and upload.id is not None else None,
         )
 
     raise FileNotFoundError(
@@ -550,6 +553,30 @@ def resolve_support_docs_from_invoice(no_invoice: str) -> list[ResolvedSupportDo
         return resolve_support_docs_for_invoice(db, no_invoice)
     finally:
         db.close()
+
+
+def support_doc_download_manifest(no_invoice: str) -> list[dict]:
+    """Manifest unduhan dokumen untuk agent lokal (document_id + meta)."""
+    docs = resolve_support_docs_from_invoice(no_invoice)
+    out: list[dict] = []
+    for doc in docs:
+        if not doc.document_id:
+            raise FileNotFoundError(
+                f"Dokumen {doc.label} tidak punya document_id untuk diunduh agent. "
+                "Upload ulang di aplikasi Monitoring Pemasaran."
+            )
+        out.append(
+            {
+                "document_id": doc.document_id,
+                "label": doc.label,
+                "doc_type": doc.doc_type,
+                "entity_type": doc.entity_type,
+                "entity_id": doc.entity_id,
+                "file_name": doc.file_name,
+                "download_path": f"/api/documents/download/{doc.document_id}",
+            }
+        )
+    return out
 
 
 # Alias kompatibilitas skrip lama

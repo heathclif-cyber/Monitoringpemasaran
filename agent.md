@@ -1,93 +1,181 @@
-# Agent Guide — Monitoring Pemasaran PTPN I
+# agent.md — Panduan AI Agent (hemat token)
 
-Panduan untuk AI agent / developer yang mendebug atau mengembangkan proyek ini.
+> **Baca file ini dulu.** Jangan baca seluruh repo. CLAUDE.md = detail lengkap (baca hanya jika perlu). bug.md = log bug (baca **ringkasan status** + 1 entri BUG saja).
 
-## Dokumen terkait
+---
 
+## 1. Routing cepat (task → baca apa)
+
+| Task user | Baca (urutan) | Jangan baca dulu |
+|-----------|---------------|------------------|
+| Superman gagal / macet / partial | `bug.md` ringkasan + BUG-005/009/012 | Seluruh `filler.py` |
+| Superman 502 di 0% | BUG-012 + `runner.py` `start_deklarasi_job` | Netprobe, WAF |
+| Pembayaran ditolak / PPh | BUG-001, BUG-002 + `pembayaran_utils.py` | Superman |
+| Captcha / login Superman | `sync_executor.py`, `captcha_challenge.py` | `runner.py` penuh |
+| Fitur UI baru | `CLAUDE.md` konvensi frontend + 1 page terkait | Backend |
+| Agent lokal Superman (Playwright di PC user, app di Railway) | [SUPERMAN_AGENT.md](./SUPERMAN_AGENT.md) + `scripts/superman_agent.py watch` — job terikat `user_id` | Server Railway Playwright |
+| Deploy Railway | `DEPLOY_GUIDE.md` fase yang diminta saja | — |
+| Deploy server Windows kantor | `DEPLOY_GUIDE.md` Phase 1–7 | Railway |
+
+**Aturan emas:** 1 task = maks **3–5 file** dibuka. Pakai `Grep` / `Read` dengan `offset`+`limit`, bukan baca file utuh.
+
+---
+
+## 2. Peta file (satu baris = cukup)
+
+### Backend — entry & API
 | File | Isi |
 |------|-----|
-| [CLAUDE.md](./CLAUDE.md) | Overview proyek, stack, konvensi kode, struktur direktori |
-| **[bug.md](./bug.md)** | **Log bug known issues — baca ini dulu sebelum debug Superman / Pembayaran** |
-| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | Deploy Railway |
+| `main.py` | Router mount, middleware tamu |
+| `api/r_superman.py` | Endpoint Superman (+ mapping error HTTP) |
+| `api/r_pembayaran.py` | CRUD pembayaran, doc-requirements |
+| `api/r_invoice.py` | Invoice CRUD |
+| `models.py` | ORM — cari class dulu via Grep |
+| `schemas.py` | Pydantic — jangan ubah response tanpa diskusi |
+
+### Superman (otomatisasi Playwright)
+| File | Isi |
+|------|-----|
+| `services/superman/runner.py` | Job deklarasi, preview, recover, **start_deklarasi_job** |
+| `services/superman/filler.py` | Isi form, upload, simpan `/spp/store` — **file besar, Grep saja** |
+| `services/superman/progress.py` | Job state + `superman_jobs.json` di volume |
+| `services/superman/auth.py` | Session, `ensure_session`, `open_authenticated_context` |
+| `services/superman/sync_executor.py` | **Wajib** untuk Playwright dari HTTP (hindari asyncio 500) |
+| `services/superman/captcha_challenge.py` | Flow captcha login |
+| `services/superman/payload.py` | Invoice → data form Superman |
+| `services/superman/preflight.py` | `validate_deklarasi_ready` |
+| `services/superman/persist.py` | Simpan nomor SPP ke DB |
+
+### Frontend (React)
+| File | Isi |
+|------|-----|
+| `frontend/src/types/index.ts` | **Semua** interface TS |
+| `frontend/src/pages/PembayaranPage.tsx` | Input pembayaran + tombol Superman |
+| `frontend/src/components/common/SupermanDeklarasiButton.tsx` | Dialog progress deklarasi |
+| `frontend/src/utils/supermanUtils.ts` | Poll job, retry 502/503 |
+| `frontend/src/lib/client.ts` | API client + pesan error |
+
+### Script debug (jalankan, jangan rewrite)
+| Script | Pakai untuk |
+|--------|-------------|
+| `scripts/superman_agent.py watch` | **Agent lokal** — Playwright di PC, job dari Railway |
+| `scripts/test_superman_0353.py` | E2E deklarasi production (ganti `NO_INV`) |
+| `scripts/test_superman_26035.py` | Template sama, invoice lain |
+
+---
+
+## 3. Konstanta production (jangan Grep ulang)
+
+```
+URL:     https://monitoringpemasaran-production.up.railway.app
+Volume:  /data  (mount Railway)
+Sesi:    SUPERMAN_STATE_PATH=/data/.superman_state.json
+Upload:  UPLOAD_DIR=/data/uploads
+Jobs:    /data/superman_jobs.json
+Region:  asia-southeast1 (Singapore)
+```
+
+Login app: `POST /api/auth/login` → Bearer token untuk semua `/api/*`.
+
+---
+
+## 4. Gejala error → arti (tanpa baca log panjang)
+
+| Gejala UI / API | Bukan ini | Kemungkinan penyebab |
+|-----------------|-----------|----------------------|
+| **502, progress 0%** | Gagal upload Superman | `deklarasi/start` hang/timeout — cek `runner.py` start, restart Railway, hapus `superman_jobs.json` jika stuck |
+| **428** + captcha | Bug form | Sesi Superman habis — login captcha |
+| **409** duplikat | Error jaringan | Invoice sudah punya nomor SPP — cek `invoice.superman` |
+| **88–94% lama lalu gagal** | Isian salah | `NS_BINDING_ABORTED` / ALPN di `/spp/store` — intermittent Railway (BUG-009/012) |
+| **Job tidak ditemukan** | Bug kode | Redeploy saat job jalan (BUG-006) atau job kedaluwarsa |
+| **2/3 file upload** | Jaringan | Dokumen bukan PDF (BUG-011) |
+
+---
+
+## 5. Pola hemat token untuk Composer / Claude
+
+### Lakukan
+- `Grep "fungsi"` di folder spesifik (`services/superman/`) sebelum `Read`
+- `Read` dengan `offset`+`limit` (50–80 baris sekitar match)
+- Satu pertanyaan user = satu hipotesis = satu batch tool call paralel
+- Verifikasi production via **1 script** atau 2–3 `curl`/PowerShell, bukan eksplorasi dashboard
+- Setelah investigasi bug Superman/pembayaran: update **1 entri** di `bug.md`, bukan dokumen baru
+- Untuk fix: ubah **hanya** file di tabel routing §2
+
+### Jangan
+- Baca `filler.py` / `runner.py` utuh (~1000+ baris)
+- Baca `bug.md` utuh (~300 baris) — cukup ringkasan + 1 BUG
+- Baca `CLAUDE.md` utuh jika task sudah jelas dari agent.md
+- `railway variables --json` (cetak secret ke transcript)
+- Redeploy/restart production tanpa konfirmasi user
+- Jalankan 2 deklarasi Superman paralel di Railway
+- Ulangi netprobe/WAF jika BUG-012 sudah menyingkirkan hipotesis itu
+
+### Ukuran respons
+- Jawaban user: ringkas, tabel jika membandingkan
+- Code citation: `startLine:endLine:path` — potong bagian tidak relevan dengan `...`
+- Jangan ulang isi CLAUDE.md ke chat
+
+---
+
+## 6. API Superman — urutan debug (copy-paste)
+
+```http
+POST /api/auth/login
+GET  /api/superman/status
+GET  /api/superman/doc-requirements?no_invoice={URL_ENCODED}
+GET  /api/superman/preview?no_invoice={URL_ENCODED}
+POST /api/superman/deklarasi/start?no_invoice={URL_ENCODED}
+GET  /api/superman/deklarasi/progress?job_id={uuid}
+POST /api/superman/recover?no_invoice={URL_ENCODED}   # jika partial
+```
+
+**Progress normal:** 25% → 45–82% isi → 88–94% simpan (1–3 menit) → 95% To Do → 100%
+
+**Invoice di URL:** encode `/` → `%2F` (contoh `0757%2FHO-SUPCO%2F...`).
+
+---
+
+## 7. Grep siap pakai
+
+```bash
+# Cari simbol di area Superman
+rg "def start_deklarasi" services/superman/
+rg "NS_BINDING|spp/store|ensure_session" services/superman/
+rg "502|428|409" api/r_superman.py frontend/src/
+
+# Cari BUG terkait
+rg "BUG-00[59]|BUG-012" bug.md
+```
+
+---
+
+## 8. Aturan agent (tetap berlaku)
+
+1. **Jangan ubah format API** request/response tanpa diskusi.
+2. **Jangan redeploy/restart** production hanya untuk observasi — pakai API/log dulu.
+3. Redeploy **memutus** job Superman aktif (BUG-006).
+4. Setelah fix bug: update `bug.md` (status + commit).
+5. Playwright dari HTTP **harus** lewat `sync_executor` atau thread terpisah.
+6. `deklarasi/start` **tidak** boleh blokir Playwright — validasi sesi di thread job (`bd4b736`).
+
+---
+
+## 9. Dokumen panjang — kapan dibuka
+
+| File | Kapan |
+|------|-------|
+| [CLAUDE.md](./CLAUDE.md) | Konvensi kode, struktur direktori, bisnis logic kontrak/invoice |
+| [bug.md](./bug.md) | Detail root cause historis — 1 BUG per sesi |
+| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | Setup Windows server / migrasi DB |
 | [ANALYSIS_MULTI_INVOICE.md](./ANALYSIS_MULTI_INVOICE.md) | Multi-invoice per kontrak |
 
 ---
 
-## Prioritas baca berdasarkan task
+## 10. Changelog agent.md
 
-| Task user | Baca |
-|-----------|------|
-| Superman macet / gagal / partial | [bug.md](./bug.md) → BUG-005, BUG-006, BUG-009 |
-| Pembayaran ditolak / kelebihan transfer | [bug.md](./bug.md) → BUG-001, BUG-002 |
-| Pulihkan To Do gagal | [bug.md](./bug.md) → BUG-007, BUG-009 |
-| Umum / fitur baru | [CLAUDE.md](./CLAUDE.md) |
+| Tanggal | Perubahan |
+|---------|-----------|
+| 2026-07-07 | Rewrite fokus hemat token; perbaiki session path `/data/`; tambah BUG-012, 502@0%, sync_executor |
 
----
-
-## Aturan agent
-
-1. **Jangan ubah format API** request/response tanpa diskusi ([CLAUDE.md](./CLAUDE.md)).
-2. **Jangan redeploy** hanya untuk observasi — cek production dulu dengan script/API.
-3. **Superman job in-memory** — redeploy Railway memutus job aktif ([BUG-006](./bug.md#bug-006-superman--job-hilang-saat-railway-redeploy)).
-4. Setelah fix Superman/pembayaran, **update [bug.md](./bug.md)** (status + commit).
-5. Production URL: `https://monitoringpemasaran-production.up.railway.app`
-6. Session Superman: `/app/data/.superman_state.json` di Railway volume.
-
----
-
-## Debug cepat — Superman deklarasi
-
-```bash
-# Login + status
-POST /api/auth/login  {"username":"...","password":"..."}
-GET  /api/superman/status
-
-# Sebelum deklarasi
-GET /api/superman/doc-requirements?no_invoice=...
-GET /api/superman/todo-inspect?no_invoice=...
-
-# Jalankan job
-POST /api/superman/deklarasi/start?no_invoice=...
-GET  /api/superman/deklarasi/progress?job_id=...
-
-# Recovery
-POST /api/superman/recover?no_invoice=...
-```
-
-Script lokal: `scripts/test_superman_26035.py` (ganti `NO_INV`).
-
-**Tahap progress yang normal:**
-`25%` form → `45–82%` upload/isi → `88–94%` simpan (bisa 1–3 menit) → `95%` To Do → `100%`
-
-Jika stuck &gt; 5 menit di 88–89% tanpa angka detik → deploy belum masuk atau [BUG-005](./bug.md#bug-005-superman--simpan-draft-macet-di-8895).
-
----
-
-## Debug cepat — Input Pembayaran + PPh
-
-- Pelunasan efektif = `nominal_transfer + pph_on_net_transfer` jika kontrak `is_pph=true`
-- Transfer pas-pasan lunas: `max_nominal_transfer(sisa_pelunasan, kontrak)` — lihat `services/pembayaran_utils.py`
-- Kelebihan transfer: `selisih < 0` pada record `Pembayaran`
-
-Detail: [BUG-001](./bug.md#bug-001-pembayaran-pph--validasi-sisa-menyesatkan), [BUG-002](./bug.md#bug-002-pembayaran--kelebihan-transfer-tidak-tercatat)
-
----
-
-## File kunci per area
-
-| Area | Backend | Frontend |
-|------|---------|----------|
-| Superman fill/submit | `services/superman/filler.py` | `PembayaranPage.tsx`, `supermanUtils.ts` |
-| Superman job/progress | `services/superman/progress.py`, `runner.py` | `SupermanProgressDialog.tsx` |
-| Pembayaran | `api/r_pembayaran.py`, `pembayaran_utils.py` | `PembayaranPage.tsx`, `pembayaranUtils.ts` |
-| Payload invoice→SPPn | `services/superman/payload.py` | — |
-
----
-
-## Known open issues
-
-Lihat tabel status di **[bug.md](./bug.md#ringkasan-status)**. Saat ini tidak ada yang **Open** — **[BUG-009](./bug.md#bug-009-superman--store_body-null--recover-gagal)** sudah **Mitigated** (2026-07-03 sore): root cause submit-guard yang ter-revert sudah diperbaiki ulang (`7acf96b`) + fail-fast 90s (`951b287`). Pantau apakah masih sering ke-trigger untuk invoice tender (`sppb_sppn`) — kalau ya, kemungkinan ada gangguan sisi Superman yang perlu dicek manual.
-
----
-
-*Maintainer: update bug.md setiap selesai investigasi bug baru.*
+*Maintainer: update §4 dan §10 saat ada pola error baru; detail teknis tetap di bug.md.*

@@ -57,7 +57,11 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
   const nomPpn = fullPpn * ratio
   const estTotal = actualPayment
   const lamaStr = k.lama_pembayaran_hari ? `${k.lama_pembayaran_hari} hari` : '-'
-  const fmtNum = (v: number) => v > 0 ? Math.round(v).toLocaleString('id-ID') : '-'
+  // Tampilan dibulatkan; nilai hitung di atas tetap desimal (ratio/pokok/ppn).
+  const fmtNum = (v: number) =>
+    v > 0
+      ? Math.round(v).toLocaleString('id-ID')
+      : '-'
 
   const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '9pt', fontFamily: '"Calibri", Arial, sans-serif', color: '#000', border: '1px solid #000', backgroundColor: '#fff' }
   const tdStyle: React.CSSProperties = { border: '1px solid #000', padding: '4px 6px', verticalAlign: 'top' }

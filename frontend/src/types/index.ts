@@ -669,10 +669,34 @@ export interface SupermanCaptchaVerifyResult {
   mime_type?: string
 }
 
+export interface SupermanAgentInfo {
+  agent_id: string
+  name: string
+  username?: string
+  user_id?: number
+  hostname?: string
+  last_seen?: number
+  age_seconds?: number
+  version?: string
+}
+
+export interface SupermanAgentStatus {
+  online: boolean
+  online_count: number
+  mine_online?: boolean
+  user_id?: number | null
+  ttl_seconds: number
+  agents: SupermanAgentInfo[]
+  all_online_count?: number
+  hint?: string
+}
+
 export interface SupermanDeklarasiJobStart {
   job_id: string
   no_invoice?: string
   no_pembayaran?: string
+  executor?: 'server' | 'agent'
+  message?: string
 }
 
 export interface SupermanDeklarasiProgress {
@@ -682,6 +706,8 @@ export interface SupermanDeklarasiProgress {
   status: 'pending' | 'running' | 'completed' | 'failed'
   percent: number
   stage: string
+  executor?: 'server' | 'agent'
+  agent_id?: string
   result?: SupermanDeklarasiResult
   error?: string
 }

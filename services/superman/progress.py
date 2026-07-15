@@ -15,12 +15,16 @@ from typing import Any, Callable, Literal
 logger = logging.getLogger("superman.job")
 
 JobStatus = Literal["pending", "running", "completed", "failed"]
+JobExecutor = Literal["server", "agent"]
 
 ProgressCallback = Callable[[int, str], None]
 
 TTL_SECONDS = 3600
 STALE_RUNNING_SECONDS = 420
 STALE_ZERO_PERCENT_SECONDS = 90
+# Job executor=agent menunggu claim: lebih longgar (agent bisa sebentar offline).
+STALE_AGENT_PENDING_SECONDS = 600
+STALE_AGENT_ZERO_PERCENT_SECONDS = 180
 _SYNC_INTERVAL_SECONDS = 1.5
 _PERSIST_DEBOUNCE_SECONDS = 0.35
 _INTERRUPTED_MSG = (
@@ -50,6 +54,12 @@ class SupermanJob:
     stage: str = "Menunggu..."
     result: dict[str, Any] | None = None
     error: str | None = None
+    executor: str = "server"  # server | agent
+    agent_id: str = ""
+    # User app yang memulai job — agent claim harus user_id sama
+    user_id: int = 0
+    username: str = ""
+    claimed_at: float | None = None
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -63,6 +73,11 @@ _persist_dirty = False
 
 
 def _job_from_dict(data: dict[str, Any]) -> SupermanJob:
+    claimed = data.get("claimed_at")
+    try:
+        uid = int(data.get("user_id") or 0)
+    except (TypeError, ValueError):
+        uid = 0
     return SupermanJob(
         job_id=str(data.get("job_id") or ""),
         no_invoice=str(data.get("no_invoice") or ""),
@@ -72,6 +87,11 @@ def _job_from_dict(data: dict[str, Any]) -> SupermanJob:
         stage=str(data.get("stage") or "Menunggu..."),
         result=data.get("result"),
         error=data.get("error"),
+        executor=str(data.get("executor") or "server"),
+        agent_id=str(data.get("agent_id") or ""),
+        user_id=uid,
+        username=str(data.get("username") or ""),
+        claimed_at=float(claimed) if claimed is not None else None,
         created_at=float(data.get("created_at") or time.time()),
         updated_at=float(data.get("updated_at") or time.time()),
     )
@@ -192,14 +212,39 @@ def _cleanup_expired() -> None:
         _schedule_persist()
 
 
-def create_job(no_invoice: str, no_pembayaran: str = "") -> str:
+def create_job(
+    no_invoice: str,
+    no_pembayaran: str = "",
+    *,
+    executor: str = "server",
+    user_id: int = 0,
+    username: str = "",
+) -> str:
     _cleanup_expired()
     job_id = str(uuid.uuid4())
+    exec_mode = (executor or "server").strip().lower()
+    if exec_mode not in ("server", "agent"):
+        exec_mode = "server"
+    try:
+        uid = int(user_id or 0)
+    except (TypeError, ValueError):
+        uid = 0
+    uname = (username or "").strip()
+    stage = (
+        f"Menunggu agent lokal ({uname or 'user'}) di PC..."
+        if exec_mode == "agent"
+        else "Menunggu..."
+    )
     with _lock:
         _jobs[job_id] = SupermanJob(
             job_id=job_id,
             no_invoice=no_invoice.strip(),
             no_pembayaran=no_pembayaran.strip(),
+            executor=exec_mode,
+            status="pending",
+            stage=stage,
+            user_id=uid,
+            username=uname,
         )
     _schedule_persist()
     return job_id
@@ -211,7 +256,8 @@ def update_job(job_id: str, percent: int, stage: str) -> None:
         job = _jobs.get(job_id)
         if not job:
             return
-        job.status = "running"
+        if job.status not in ("completed", "failed"):
+            job.status = "running"
         job.percent = max(0, min(100, percent))
         job.stage = stage
         job.updated_at = time.time()
@@ -277,9 +323,115 @@ def _fail_stale_job(job: SupermanJob) -> None:
 
 def _is_stale_running(job: SupermanJob, now: float) -> bool:
     age = now - job.updated_at
-    if job.percent <= 0 and age > STALE_ZERO_PERCENT_SECONDS:
+    is_agent = (job.executor or "server") == "agent"
+    # Menunggu claim agent — jangan gagal di 90 detik.
+    if is_agent and job.status == "pending" and not (job.agent_id or "").strip():
+        return age > STALE_AGENT_PENDING_SECONDS
+    if job.percent <= 0 and age > (
+        STALE_AGENT_ZERO_PERCENT_SECONDS if is_agent else STALE_ZERO_PERCENT_SECONDS
+    ):
         return True
     return age > STALE_RUNNING_SECONDS
+
+
+def claim_agent_job(
+    agent_id: str,
+    *,
+    job_id: str | None = None,
+    user_id: int = 0,
+) -> SupermanJob | None:
+    """Ambil 1 job executor=agent milik user_id yang sama (atau job_id spesifik)."""
+    _cleanup_expired()
+    _sync_from_disk(force=True)
+    aid = (agent_id or "").strip()
+    if not aid:
+        return None
+    try:
+        uid = int(user_id or 0)
+    except (TypeError, ValueError):
+        uid = 0
+    if uid <= 0:
+        return None
+    want = (job_id or "").strip() or None
+    now = time.time()
+    claimed: SupermanJob | None = None
+    with _lock:
+        candidates: list[SupermanJob] = []
+        for job in _jobs.values():
+            if (job.executor or "server") != "agent":
+                continue
+            if job.status != "pending":
+                continue
+            if (job.agent_id or "").strip():
+                continue
+            # Hanya job milik user yang sama (agent user A tidak ambil job user B)
+            if int(job.user_id or 0) != uid:
+                continue
+            if want and job.job_id != want:
+                continue
+            if _is_stale_running(job, now):
+                _fail_stale_job(job)
+                continue
+            candidates.append(job)
+        if not candidates:
+            if want:
+                existing = _jobs.get(want)
+                if (
+                    existing
+                    and (existing.executor or "") == "agent"
+                    and existing.status in ("pending", "running")
+                    and (existing.agent_id or "").strip() == aid
+                    and int(existing.user_id or 0) == uid
+                ):
+                    return existing
+            return None
+        candidates.sort(key=lambda j: j.created_at)
+        job = candidates[0]
+        job.agent_id = aid
+        job.claimed_at = now
+        job.status = "running"
+        job.percent = max(job.percent, 1)
+        job.stage = f"Agent {aid[:8]} (user {uid}) mengambil job..."
+        job.updated_at = now
+        claimed = job
+    _persist_jobs_now()
+    return claimed
+
+
+def list_waiting_agent_jobs(*, user_id: int | None = None) -> list[dict[str, Any]]:
+    _cleanup_expired()
+    _sync_from_disk()
+    now = time.time()
+    want_uid: int | None = None
+    if user_id is not None:
+        try:
+            want_uid = int(user_id)
+        except (TypeError, ValueError):
+            want_uid = None
+    with _lock:
+        rows = []
+        for job in _jobs.values():
+            if (job.executor or "server") != "agent":
+                continue
+            if job.status != "pending" or (job.agent_id or "").strip():
+                continue
+            if want_uid is not None and int(job.user_id or 0) != want_uid:
+                continue
+            if _is_stale_running(job, now):
+                continue
+            rows.append(
+                {
+                    "job_id": job.job_id,
+                    "no_invoice": job.no_invoice,
+                    "no_pembayaran": job.no_pembayaran,
+                    "user_id": int(job.user_id or 0),
+                    "username": job.username or "",
+                    "created_at": job.created_at,
+                    "stage": job.stage,
+                }
+            )
+    rows.sort(key=lambda r: r["created_at"])
+    return rows
 
 
 def find_latest_job_for_invoice(no_invoice: str) -> SupermanJob | None:
