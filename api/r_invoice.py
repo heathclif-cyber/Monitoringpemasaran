@@ -12,6 +12,7 @@ from services.cache import api_cache
 from services.utils import terbilang_rupiah
 from services.ba_utils import is_payung_ba, calculate_ba_invoice_amount, kontrak_nilai_maksimum, ba_effective_harga
 from services.money_utils import as_money, money_gt, money_remaining
+from services.volume_utils import resolve_volume_scope, compute_proportional_volume
 
 router = APIRouter(prefix="/api/invoice", tags=["Invoice"])
 
@@ -133,6 +134,73 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
     if jumlah_pembayaran <= 0:
         raise HTTPException(status_code=400, detail="Jumlah pembayaran harus > 0")
 
+    # Volume fisik mengacu volume kontrak/unit/BA (isi manual, default = sisa scope).
+    vol_scope, nilai_scope = resolve_volume_scope(db_kontrak, invoice, db_ba)
+    if payung_ba and db_ba and float(db_ba.volume_ba or 0) > 0:
+        vol_scope = float(db_ba.volume_ba or 0)
+
+    user_volume = float(invoice.volume or 0) if invoice.volume is not None else 0.0
+    if user_volume > 0:
+        volume_invoice = user_volume
+    elif vol_scope > 0:
+        # Default: sisa volume scope setelah invoice lain di unit/kontrak yang sama
+        q_others = db.query(models.Invoice).filter(
+            models.Invoice.no_kontrak == invoice.no_kontrak,
+            models.Invoice.no_invoice != invoice.no_invoice,
+        )
+        if nama_unit:
+            q_others = q_others.filter(models.Invoice.nama_unit == nama_unit)
+        if payung_ba and invoice.no_ba:
+            q_others = q_others.filter(models.Invoice.no_ba == invoice.no_ba)
+        used_vol = sum(float(i.volume or 0) for i in q_others.all())
+        sisa_vol = max(0.0, vol_scope - used_vol)
+        volume_invoice = sisa_vol if sisa_vol > 0 else vol_scope
+    else:
+        volume_invoice = compute_proportional_volume(
+            jumlah_pembayaran,
+            volume_scope=vol_scope,
+            nilai_penuh=nilai_scope,
+            round_result=False,
+        )
+
+    if volume_invoice <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Volume invoice wajib diisi (mengacu volume kontrak/unit/BA).",
+        )
+
+    # Jangan melebihi volume scope kontrak/unit/BA
+    if vol_scope > 0 and volume_invoice > vol_scope + 0.5:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Volume invoice ({volume_invoice:,.2f}) melebihi volume "
+                f"{'BA' if payung_ba else ('unit ' + nama_unit if nama_unit else 'kontrak')} "
+                f"({vol_scope:,.2f})."
+            ),
+        )
+
+    # Total volume multi-invoice di scope yang sama ≤ volume kontrak/unit
+    if vol_scope > 0:
+        q_vol = db.query(models.Invoice).filter(
+            models.Invoice.no_kontrak == invoice.no_kontrak,
+            models.Invoice.no_invoice != invoice.no_invoice,
+        )
+        if nama_unit:
+            q_vol = q_vol.filter(models.Invoice.nama_unit == nama_unit)
+        if payung_ba and invoice.no_ba:
+            q_vol = q_vol.filter(models.Invoice.no_ba == invoice.no_ba)
+        total_vol_other = sum(float(i.volume or 0) for i in q_vol.all())
+        if total_vol_other + volume_invoice > vol_scope + 0.5:
+            sisa = max(0.0, vol_scope - total_vol_other)
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Total volume invoice ({total_vol_other + volume_invoice:,.2f}) melebihi "
+                    f"volume scope ({vol_scope:,.2f}). Sisa volume: {sisa:,.2f}."
+                ),
+            )
+
     # Terbilang dari nilai bulat tampilan; nilai tersimpan tetap desimal.
     terbilang_invoice = terbilang_rupiah(math.floor(jumlah_pembayaran + 1e-9))
 
@@ -141,6 +209,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
         for key, value in invoice.model_dump().items():
             setattr(db_invoice, key, value)
         db_invoice.jumlah_pembayaran = jumlah_pembayaran
+        db_invoice.volume = volume_invoice
         db_invoice.terbilang_invoice = terbilang_invoice
         if payung_ba and db_ba:
             db_ba.status = "Ter-invoice"
@@ -150,8 +219,9 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
         return db_invoice
     else:
         new_invoice = models.Invoice(
-            **invoice.model_dump(exclude={'jumlah_pembayaran', 'terbilang_invoice'}),
+            **invoice.model_dump(exclude={'jumlah_pembayaran', 'terbilang_invoice', 'volume'}),
             jumlah_pembayaran=jumlah_pembayaran,
+            volume=volume_invoice,
             terbilang_invoice=terbilang_invoice
         )
         db.add(new_invoice)

@@ -141,6 +141,8 @@ class InvoiceBase(BaseModel):
     status_invoice: Optional[str] = "Unpaid"
     pph_22_persen: Optional[float] = 0.0
     jumlah_pembayaran: Optional[float] = None  # None = auto (full/unit value), set value = partial
+    # Volume fisik (manual). DO dan laporan pakai ini agar selalu klop.
+    volume: Optional[float] = None
     nama_unit: Optional[str] = None  # unit yang di-invoice; None = invoice kontrak keseluruhan
     no_ba: Optional[str] = None  # wajib untuk kontrak PAYUNG_BA
 
@@ -149,6 +151,7 @@ class InvoiceCreate(InvoiceBase):
 
 class InvoiceOut(InvoiceBase):
     jumlah_pembayaran: float
+    volume: Optional[float] = None
     terbilang_invoice: Optional[str]
     nama_unit: Optional[str] = None
     no_ba: Optional[str] = None

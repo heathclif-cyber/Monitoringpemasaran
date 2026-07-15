@@ -167,6 +167,7 @@ const invoiceSchema = z.object({
   status_invoice: z.string().optional(),
   pph_22_persen: z.coerce.number().min(0),
   jumlah_pembayaran: z.coerce.number().min(0).optional(),
+  volume: z.coerce.number().min(0).optional(),
   no_ba: z.string().optional(),
 })
 
@@ -193,6 +194,7 @@ export default function InvoicePage() {
       status_invoice: 'Unpaid',
       pph_22_persen: 0,
       jumlah_pembayaran: 0,
+      volume: 0,
       no_ba: '',
     },
   })
@@ -235,6 +237,9 @@ export default function InvoicePage() {
       setValue('nama_unit', data.nama_unit || '')
       setValue('no_ba', data.no_ba || '')
       setValue('tanggal_transaksi', data.tanggal_transaksi)
+      setValue('volume', data.volume || 0)
+      setValue('jumlah_pembayaran', data.jumlah_pembayaran || 0)
+      setLiveJumlah(data.jumlah_pembayaran || 0)
     } else {
       setIsExisting(false)
       setExportNo(null)
@@ -366,6 +371,34 @@ export default function InvoicePage() {
   const sisaKontrak = Math.max(0, maxForProgress - totalInvoiced)
   const progressPct = maxForProgress > 0 ? Math.round((totalInvoiced / maxForProgress) * 100) : 0
 
+  /** Volume scope dari kontrak / unit / BA — acuan utama volume invoice. */
+  const scopeVolume = useMemo(() => {
+    if (isPayungBA && selectedBAObj?.volume_ba) return Number(selectedBAObj.volume_ba) || 0
+    if (selectedUnitObj && (selectedUnitObj.volume || 0) > 0) return Number(selectedUnitObj.volume) || 0
+    return Number(k?.volume) || 0
+  }, [isPayungBA, selectedBAObj, selectedUnitObj, k])
+
+  /** Volume yang sudah dipakai invoice lain di scope yang sama (unit/BA/kontrak). */
+  const usedVolumeOther = useMemo(
+    () =>
+      invoicesForProgress.reduce((sum, inv) => sum + (Number(inv.volume) || 0), 0),
+    [invoicesForProgress],
+  )
+
+  /** Sisa volume kontrak/unit yang belum di-invoice — default isi form. */
+  const sisaVolumeScope = useMemo(
+    () => Math.max(0, scopeVolume - usedVolumeOther),
+    [scopeVolume, usedVolumeOther],
+  )
+
+  const suggestedVolume = sisaVolumeScope > 0 ? sisaVolumeScope : scopeVolume
+
+  // Saat pilih kontrak/unit/BA: volume menunjuk sisa volume kontrak (bukan angka lepas)
+  useEffect(() => {
+    if (isExisting) return
+    if (suggestedVolume > 0) setValue('volume', suggestedVolume)
+  }, [suggestedVolume, isExisting, setValue, selectedKontrak, selectedUnit, selectedBA])
+
   const onSubmit = async (data: InvoiceFormData) => {
     try {
       const payload: any = { ...data }
@@ -385,6 +418,15 @@ export default function InvoicePage() {
         payload.jumlah_pembayaran = data.jumlah_pembayaran
       } else {
         delete payload.jumlah_pembayaran // backend will use full/unit value
+      }
+      // Volume fisik — wajib untuk klop dengan DO/laporan
+      if (data.volume && data.volume > 0) {
+        payload.volume = data.volume
+      } else if (suggestedVolume > 0) {
+        payload.volume = suggestedVolume
+      } else {
+        addNotification('Isi volume invoice (kg/satuan fisik) terlebih dahulu', 'error')
+        return
       }
       await invoiceStore.save(payload)
       setExportNo(data.no_invoice)
@@ -585,6 +627,45 @@ export default function InvoicePage() {
                     </div>
                   </div>
                 )}
+
+                {/* Volume mengacu volume kontrak/unit/BA; boleh dipecah multi-invoice */}
+                <div className="border-t pt-3">
+                  <Label className="text-xs">Volume Invoice ({k.satuan || 'Kg'}) *</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    className="mt-1"
+                    {...register('volume')}
+                    placeholder={
+                      scopeVolume > 0
+                        ? scopeVolume.toLocaleString('id-ID')
+                        : 'Volume dari kontrak'
+                    }
+                  />
+                  <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                    <p>
+                      Mengacu volume{' '}
+                      {isPayungBA ? 'BA' : selectedUnit ? `unit ${selectedUnit}` : 'kontrak'}:{' '}
+                      <strong>
+                        {scopeVolume > 0
+                          ? `${scopeVolume.toLocaleString('id-ID')} ${k.satuan || 'Kg'}`
+                          : '—'}
+                      </strong>
+                    </p>
+                    {usedVolumeOther > 0 && (
+                      <p>
+                        Sudah terpakai invoice lain: {usedVolumeOther.toLocaleString('id-ID')} · Sisa:{' '}
+                        <strong className="text-brand-600">
+                          {sisaVolumeScope.toLocaleString('id-ID')} {k.satuan || 'Kg'}
+                        </strong>
+                      </p>
+                    )}
+                    <p className="text-slate-400">
+                      Default = sisa volume kontrak/unit. Boleh dipecah multi-invoice; DO ambil dari volume
+                      invoice ini.
+                    </p>
+                  </div>
+                </div>
 
                 {/* Jumlah Pembayaran input */}
                 <div className="border-t pt-3">

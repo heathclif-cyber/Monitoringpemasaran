@@ -87,11 +87,12 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
 
     volume_for_calc, _nilai_scope = resolve_volume_scope(db_kontrak, db_invoice, db_ba)
 
+    # Volume DO: default dari invoice.volume (manual di invoice).
+    # Override hanya jika user sengaja isi volume_do di form.
     user_volume = float(do.volume_do or 0) if do.volume_do is not None else 0.0
     if user_volume > 0:
         volume_do = user_volume
     else:
-        # Rumus tunggal — sama dengan estimasi Laporan sebelum DO terbit
         volume_do = compute_volume_for_transfer(
             db_kontrak, db_invoice, db_ba, nominal, round_result=False
         )

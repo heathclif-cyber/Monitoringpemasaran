@@ -95,13 +95,17 @@ def compute_proportional_volume(
 
 
 def compute_volume_for_invoice(kontrak, invoice, ba=None) -> float:
-    """Volume yang 'tertagih' invoice (scope × proporsi jumlah_pembayaran).
+    """Volume invoice: utamakan field manual invoice.volume.
 
-    Payung: volume BA utuh (satu invoice per BA).
+    Fallback (data lama): proporsi jumlah_pembayaran / scope, atau volume BA payung.
     """
     if not invoice:
         vol_base, _ = resolve_volume_scope(kontrak, None, ba)
         return vol_base
+
+    stored = float(getattr(invoice, "volume", 0) or 0)
+    if stored > 0:
+        return stored
 
     if is_payung_ba(kontrak) and ba is not None and float(getattr(ba, "volume_ba", 0) or 0) > 0:
         return float(ba.volume_ba or 0)
@@ -117,27 +121,34 @@ def compute_volume_for_invoice(kontrak, invoice, ba=None) -> float:
 
 
 def compute_volume_for_transfer(kontrak, invoice, ba, nominal: float, *, round_result: bool = True) -> float:
-    """Volume yang akan / seharusnya tercatat di DO dari nominal transfer.
+    """Volume DO / estimasi pra-DO: **langsung dari invoice.volume**.
 
-    Dipakai create DO dan estimasi laporan sebelum DO terbit.
+    Transfer bisa lebih kecil dari jumlah_pembayaran (PPh dipotong pembeli) —
+    volume fisik tetap mengikuti invoice, bukan proporsi transfer, agar
+    Volume Invoice = Volume DO selalu klop.
+
+    Override manual di form DO tetap dimungkinkan di API (jika volume_do diisi).
     """
-    vol_base, nilai_penuh = resolve_volume_scope(kontrak, invoice, ba)
+    inv_vol = compute_volume_for_invoice(kontrak, invoice, ba)
+    nom = float(nominal or 0)
 
-    # Non-payung: pembagi DO = nilai penuh unit/kontrak (sama create DO lama).
-    # Payung: resolve_volume_scope sudah set nilai_penuh = invoice.jumlah_pembayaran.
-    if not is_payung_ba(kontrak):
-        # Jika invoice partial, proporsi transfer vs nilai scope penuh
-        # tetap (nominal / nilai_penuh_scope) * vol — sama r_do historis.
-        pass
+    if inv_vol > 0:
+        result = inv_vol
+    elif nom <= 0:
+        result = 0.0
     else:
-        # Payung: (nominal / invoice_total) * volume_BA
+        # Fallback data lama tanpa invoice.volume
+        vol_base, nilai_penuh = resolve_volume_scope(kontrak, invoice, ba)
         inv_gross = float(getattr(invoice, "jumlah_pembayaran", 0) or 0) if invoice else 0
-        if inv_gross > 0:
+        if is_payung_ba(kontrak) and inv_gross > 0:
             nilai_penuh = inv_gross
+        result = compute_proportional_volume(
+            nom,
+            volume_scope=vol_base,
+            nilai_penuh=nilai_penuh,
+            round_result=False,
+        )
 
-    return compute_proportional_volume(
-        nominal,
-        volume_scope=vol_base,
-        nilai_penuh=nilai_penuh,
-        round_result=round_result,
-    )
+    if round_result:
+        return float(round(result))
+    return float(result)

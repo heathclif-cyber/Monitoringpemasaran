@@ -306,15 +306,18 @@ export default function DOPage() {
     return Math.round((pokokFull + ppnFull) * ratio)
   }, [currentKontrak, isPayungBA, invoiceTotal, maxVolume])
 
-  const volumeProporsional = useMemo(
-    () => calculateProportionalVolume(Number(nominalTransfer) || 0, nilaiUnitPenuh, maxVolume),
-    [nominalTransfer, nilaiUnitPenuh, maxVolume],
-  )
+  // Volume DO default = volume invoice (manual), selalu klop — bukan proporsi transfer/PPh.
+  const volumeFromInvoice = useMemo(() => {
+    const invVol = Number(currentInvoice?.volume) || 0
+    if (invVol > 0) return Math.round(invVol)
+    // Fallback data lama
+    return calculateProportionalVolume(Number(nominalTransfer) || 0, nilaiUnitPenuh, maxVolume)
+  }, [currentInvoice?.volume, nominalTransfer, nilaiUnitPenuh, maxVolume])
 
   useEffect(() => {
     if (volumeManualRef.current || isExisting) return
-    setValue('volume_keluar', volumeProporsional)
-  }, [volumeProporsional, isExisting, setValue])
+    setValue('volume_keluar', volumeFromInvoice)
+  }, [volumeFromInvoice, isExisting, setValue])
 
   useEffect(() => {
     if (!selectedPembayaran) {
@@ -536,12 +539,14 @@ export default function DOPage() {
                     })}
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    Proporsional dari pembayaran:{' '}
-                    <strong>{formatNumber(volumeProporsional)} {currentKontrak?.satuan || 'Kg'}</strong>
-                    {nilaiUnitPenuh > 0 && nominalTransfer > 0 && (
-                      <> ({Math.round((Number(nominalTransfer) / nilaiUnitPenuh) * 100)}% dari invoice)</>
+                    Default dari <strong>volume invoice</strong>:{' '}
+                    <strong>{formatNumber(volumeFromInvoice)} {currentKontrak?.satuan || 'Kg'}</strong>
+                    {(currentInvoice?.volume || 0) > 0 ? (
+                      <> (invoice: {formatNumber(currentInvoice?.volume || 0)})</>
+                    ) : (
+                      <> (invoice belum isi volume — fallback proporsi)</>
                     )}
-                    {maxVolume > 0 && <> — maks {formatNumber(maxVolume)} {currentKontrak?.satuan || 'Kg'}</>}
+                    {maxVolume > 0 && <> — maks scope {formatNumber(maxVolume)} {currentKontrak?.satuan || 'Kg'}</>}
                   </p>
                   {volumeDo > maxVolume && maxVolume > 0 && (
                     <p className="text-xs text-red-600 mt-1">Volume melebihi maksimum ({formatNumber(maxVolume)})</p>

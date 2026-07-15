@@ -108,11 +108,33 @@ def run_migrations() -> None:
         add_column_safely(db, "delivery_order", "no_pembayaran", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "pembayaran", "superman", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "invoice", "superman", "VARCHAR DEFAULT NULL")
+        add_column_safely(db, "invoice", "volume", "FLOAT DEFAULT NULL")
         add_column_safely(db, "invoice", "kontrak_sap", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "invoice", "so_sap", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "invoice", "do_sap", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "invoice", "billing_sap", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "invoice", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
+
+        # Backfill volume invoice: utamakan total volume_do; fallback proporsi nilai
+        try:
+            db.execute(text(
+                """
+                UPDATE invoice i
+                SET volume = sub.total_vol
+                FROM (
+                  SELECT no_invoice, SUM(COALESCE(volume_do, 0)) AS total_vol
+                  FROM delivery_order
+                  GROUP BY no_invoice
+                ) sub
+                WHERE i.no_invoice = sub.no_invoice
+                  AND (i.volume IS NULL OR i.volume = 0)
+                  AND sub.total_vol > 0
+                """
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.warning("backfill invoice.volume dari DO gagal / dilewati", exc_info=True)
 
         db.execute(text(
             "UPDATE invoice i SET superman = sub.superman "

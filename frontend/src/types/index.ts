@@ -106,6 +106,8 @@ export interface Invoice {
   no_ba?: string | null
   // Computed
   jumlah_pembayaran: number
+  /** Volume fisik invoice (manual) — acuan laporan & default volume DO */
+  volume?: number | null
   terbilang_invoice: string | null
   superman?: string | null
   // Joined relation
@@ -462,6 +464,7 @@ export interface InvoiceInput {
   pph_22_persen?: number
   no_ba?: string
   jumlah_pembayaran?: number
+  volume?: number
   nama_unit?: string
 }
 

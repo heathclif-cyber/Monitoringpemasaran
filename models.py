@@ -116,6 +116,8 @@ class Invoice(Base):
 
     # Calculated Fields
     jumlah_pembayaran = Column(Float, default=0.0)
+    # Volume fisik invoice (isi manual) — acuan Volume Invoice & default volume DO
+    volume = Column(Float, nullable=True)
     terbilang_invoice = Column(String)
     superman = Column(String, nullable=True)
 
