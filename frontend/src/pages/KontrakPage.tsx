@@ -782,25 +782,52 @@ export default function KontrakPage() {
                 </>
               ) : (
                 <>
-                  <div className="text-slate-500">Nilai Pokok:</div>
-                  <div className="text-right font-semibold">{formatCurrency(pricing.pokok)}</div>
+                  {/* Rincian komponen */}
+                  <div className="text-slate-500">Volume × Harga + Premi:</div>
+                  <div className="text-right text-slate-600 text-xs">
+                    {(Number(watchedFields.volume) || 0).toLocaleString('id-ID')}
+                    {' × '}
+                    {formatCurrency(Number(watchedFields.harga_satuan) || 0)}
+                    {(Number(watchedFields.premi) || 0) > 0 && (
+                      <> + {formatCurrency(Number(watchedFields.premi) || 0)}</>
+                    )}
+                  </div>
                   {watchedFields.is_ppn !== 'false' && (
                     <>
-                      <div className="text-slate-500">Nominal PPN ({watchedFields.ppn_persen || 11}%):</div>
+                      <div className="text-slate-500">PPN ({watchedFields.ppn_persen || 11}%):</div>
                       <div className="text-right">{formatCurrency(pricing.nominalPpn)}</div>
                     </>
                   )}
                   {watchedFields.is_pph === 'true' && (
                     <>
-                      <div className="text-slate-500">Potongan PPh ({watchedFields.pph_persen || 0}%):</div>
+                      <div className="text-slate-500">PPh ({watchedFields.pph_persen || 0}%):</div>
                       <div className="text-right text-red-600">-{formatCurrency(pricing.nominalPph)}</div>
                     </>
                   )}
-                  <div className="text-slate-700 font-semibold border-t pt-1">Total Tagihan:</div>
-                  <div className="text-right font-bold text-brand-600 border-t pt-1">{formatCurrency(pricing.totalTagihan)}</div>
+
+                  {/* Tiga total utama */}
+                  <div className="col-span-2 border-t mt-1 pt-2 grid grid-cols-2 gap-2">
+                    <div className="text-slate-600">1. Pokok</div>
+                    <div className="text-right font-semibold">{formatCurrency(pricing.pokok)}</div>
+                    <div className="text-slate-600">
+                      2. Pokok + PPN
+                      {watchedFields.is_ppn === 'false' && (
+                        <span className="text-xs text-slate-400"> (tanpa PPN)</span>
+                      )}
+                    </div>
+                    <div className="text-right font-semibold">{formatCurrency(pricing.nilaiTransaksi)}</div>
+                    <div className="text-slate-800 font-semibold">
+                      3. Total setelah PPh
+                      {watchedFields.is_pph !== 'true' && (
+                        <span className="text-xs font-normal text-slate-400"> (tanpa PPh)</span>
+                      )}
+                    </div>
+                    <div className="text-right font-bold text-brand-600">{formatCurrency(pricing.totalTagihan)}</div>
+                  </div>
+
                   {pricing.totalTagihan > 0 && (
                     <>
-                      <div className="text-slate-400 text-xs">Terbilang:</div>
+                      <div className="text-slate-400 text-xs">Terbilang (total #3):</div>
                       <div className="text-right text-xs text-slate-500">{terbilangRupiah(pricing.totalTagihan)}</div>
                     </>
                   )}

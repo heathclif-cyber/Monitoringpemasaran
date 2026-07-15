@@ -87,7 +87,6 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
   }
 
   const isPpn = is_ppn !== 'false'
-  const isPph = is_pph === 'true'
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '9pt', color: '#000', padding: '14px', background: 'white' }}>
@@ -220,11 +219,7 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
           {payungMode ? (
             <RowS label="Jumlah Pembayaran" value="Sesuai Berita Acara" />
           ) : (
-            <>
-              <RowS label="Jumlah (Pokok)" value={fmtRpFull(pricing.pokok)} />
-              {isPph && <RowS label="PPh" value={`Potongan PPh 22 (${pph_persen || 0}%) : -${fmtRpLocal(pricing.nominalPph)}`} />}
-              {isPph && <RowS label="Total Tagihan" value={fmtRpFull(pricing.totalTagihan)} bold />}
-            </>
+            <RowS label="Jumlah (Pokok)" value={fmtRpFull(pricing.pokok)} bold />
           )}
           <RowS label="Catatan" value="-" />
         </tbody>

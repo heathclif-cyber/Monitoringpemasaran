@@ -98,12 +98,18 @@ def generate_contract_docx(k) -> io.BytesIO:
     premi = 0 if payung else (k.premi or 0)
     ppn = k.ppn_persen or 11
     sat = _s(k.satuan, 'Unit')
-    nilai = 0 if payung else (k.nilai_transaksi or 0)
+    # Draf kontrak: tampilkan pokok saja (bukan PPN / PPh).
+    pokok = 0.0 if payung else float(vol or 0) * float(harga or 0) + float(premi or 0)
 
     vol_str = 'Sesuai Berita Acara' if payung else (_id_fmt(vol) + ' ' + sat if vol else '-')
     harga_str = 'Sesuai harga pasar / Berita Acara' if payung else (_rp_full(harga) + ' per ' + sat if harga else '-')
     premi_str = _rp(premi)
-    jml_str = 'Sesuai Berita Acara' if payung else (_rp_full(nilai) + (f" ({_s(k.terbilang)} Rupiah)" if k.terbilang else ""))
+    if payung:
+        jml_str = 'Sesuai Berita Acara'
+    else:
+        from services.utils import terbilang_rupiah
+        terbilang_pokok = terbilang_rupiah(int(pokok + 1e-9))
+        jml_str = _rp_full(pokok) + (f" ({terbilang_pokok} Rupiah)" if terbilang_pokok else "")
     lama = k.lama_pembayaran_hari or 15
 
     pjl_lines = _s(k.penjual).replace('\\n', '\n').split('\n')
@@ -240,7 +246,7 @@ def generate_contract_docx(k) -> io.BytesIO:
         _run(p, f"{letter}.    {clean}")
 
     RS('Dasar Ketentuan', dasar)
-    RS('Jumlah Pembayaran', jml_str)
+    RS('Jumlah (Pokok)', jml_str)
     RS('Catatan', '-')
 
     # Signatures (Buyer only)
