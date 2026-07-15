@@ -121,6 +121,84 @@ def run_network_probe(
     }
 
 
+def _extract_csrf_token(html: str) -> str | None:
+    import re
+
+    m = re.search(r'name=["\']csrf-token["\']\s+content=["\']([^"\']+)', html)
+    if m:
+        return m.group(1)
+    m = re.search(r'name=["\']_token["\']\s+value=["\']([^"\']+)', html)
+    if m:
+        return m.group(1)
+    return None
+
+
+def probe_real_store_endpoint() -> dict[str, object]:
+    """Tes SATU kali POST nyata (sesi asli + CSRF token asli) ke /spp/store —
+    endpoint yang sesungguhnya dipakai deklarasi, bukan path aman seperti
+    run_network_probe(). Data form sengaja minimal/tidak lengkap (bukan
+    data invoice asli) supaya kemungkinan besar ditolak validasi Superman
+    kalau memang berhasil terkirim — yang diuji di sini murni apakah
+    KONEKSI ke endpoint yang benar-benar memproses upload ini bisa selesai
+    dari proses Python (bukan browser), bukan untuk membuat deklarasi sungguhan.
+    """
+    cfg = SupermanConfig.from_env()
+    cookies = _load_cookies(cfg.state_path)
+    form_url = cfg.base_url.rstrip("/") + "/spp/tambah"
+    store_url = cfg.base_url.rstrip("/") + "/spp/store"
+
+    with httpx.Client(http2=False, verify=True, cookies=cookies, timeout=30.0) as client:
+        try:
+            form_resp = client.get(form_url)
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "stage": "load_form",
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:300],
+            }
+
+        token = _extract_csrf_token(form_resp.text)
+        if not token:
+            return {
+                "ok": False,
+                "stage": "extract_csrf",
+                "error": "CSRF token tidak ditemukan di halaman /spp/tambah",
+                "form_status_code": form_resp.status_code,
+                "is_login_page": "signin-username" in form_resp.text.lower(),
+            }
+
+        dummy_pdf = b"%PDF-1.4\n%netdiag-probe-dummy\n" + b"x" * (200 * 1024)
+        data = {
+            "_token": token,
+            "status_btn": "0",
+        }
+        files = {
+            "dokumen_pendukung_sppn[]": ("probe.pdf", dummy_pdf, "application/pdf"),
+        }
+        started = time.monotonic()
+        try:
+            resp = client.post(store_url, data=data, files=files)
+            elapsed = time.monotonic() - started
+            return {
+                "ok": True,
+                "stage": "post_store",
+                "status_code": resp.status_code,
+                "elapsed_s": round(elapsed, 2),
+                "response_preview": resp.text[:1000],
+                "waf_headers": _inspect_headers(resp.headers),
+            }
+        except Exception as exc:  # noqa: BLE001
+            elapsed = time.monotonic() - started
+            return {
+                "ok": False,
+                "stage": "post_store",
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:300],
+                "elapsed_s": round(elapsed, 2),
+            }
+
+
 def check_waf_signature() -> dict[str, object]:
     """GET halaman dashboard Superman (aman, cuma load halaman) dan periksa
     header respons untuk tanda-tanda WAF/anti-bot/rate-limit (Cloudflare,
