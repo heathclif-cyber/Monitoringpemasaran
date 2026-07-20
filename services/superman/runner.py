@@ -333,6 +333,7 @@ def _score_todo_row(
     expect_sppb: bool,
     pph_nominal: int = 0,
     tanggal_transfer: str = "",
+    require_identity: bool = True,
 ) -> int:
     blob = _todo_row_blob(row)
     score = 0
@@ -482,11 +483,17 @@ def _score_todo_row(
     ):
         return 0
 
-    # Tanpa identitas invoice/pembayaran/DO → tidak boleh diadopsi (BUG-014).
-    # Soft signals (kontrak/mitra/nominal) tetap dihitung di atas untuk debug skor,
-    # tapi skor final 0 agar ambang recover/deklarasi tidak lolos.
+    # Tanpa identitas invoice/pembayaran/DO → default tolak (BUG-014 multi-invoice).
+    # Pengecualian: require_identity=False untuk (1) baris BARU setelah /spp/store
+    # dan (2) recover soft — getTodo sering tidak mengembalikan field referensi/au58
+    # meski form sudah diisi, sehingga skor selalu 0 dan nomor tidak terekam di app.
     if score > 0 and not identity_ok:
-        return 0
+        if require_identity:
+            return 0
+        # Soft mode: wajib nominal SPPn cocok agar tidak ambil SPP random sekontrak.
+        if not amount_matched:
+            return 0
+        return score
 
     return score
 
@@ -639,6 +646,7 @@ def _score_all_todo_rows(
     payload,
     *,
     expect_sppb: bool,
+    require_identity: bool = True,
 ) -> list[tuple[int, dict[str, Any]]]:
     total_sppn = int(payload.dpp_pokok or 0) + int(payload.pajak_ppn or 0)
     scored: list[tuple[int, dict[str, Any]]] = []
@@ -657,6 +665,7 @@ def _score_all_todo_rows(
             expect_sppb=expect_sppb,
             pph_nominal=int(payload.pph_nominal or 0),
             tanggal_transfer=payload.tanggal_transfer,
+            require_identity=require_identity,
         )
         if score > 0:
             scored.append((score, row))
@@ -670,7 +679,13 @@ def _score_all_todo_rows(
     return scored
 
 
-def _score_todo_row_for_payload(row: dict[str, Any], payload, *, expect_sppb: bool) -> int:
+def _score_todo_row_for_payload(
+    row: dict[str, Any],
+    payload,
+    *,
+    expect_sppb: bool,
+    require_identity: bool = True,
+) -> int:
     total_sppn = int(payload.dpp_pokok or 0) + int(payload.pajak_ppn or 0)
     return _score_todo_row(
         row,
@@ -684,6 +699,7 @@ def _score_todo_row_for_payload(row: dict[str, Any], payload, *, expect_sppb: bo
         expect_sppb=expect_sppb,
         pph_nominal=int(payload.pph_nominal or 0),
         tanggal_transfer=payload.tanggal_transfer,
+        require_identity=require_identity,
     )
 
 
@@ -699,10 +715,9 @@ def _find_new_todo_match(
 ) -> dict[str, Any] | None:
     """Prioritaskan baris To Do yang baru muncul setelah simpan draft.
 
-    Baris baru tanpa bukti konten (nominal/referensi/kontrak) tidak boleh
-    diadopsi — nomor urut Superman dipakai bersama satu regional, jadi baris
-    baru bisa saja SPP milik user lain yang kebetulan tersimpan di window
-    yang sama (kasus invoice 0353: SPPb/29 + SPPn/71 milik op_divisi).
+    Soft-score (tanpa identity ketat): API getTodo sering tidak mengembalikan
+    referensi/au58 meski sudah diisi di form. Nominal wajib cocok (lihat
+    require_identity=False). Baris baru tanpa bukti konten tetap ditolak.
     """
     best: dict[str, Any] | None = None
     best_score = 0
@@ -711,7 +726,10 @@ def _find_new_todo_match(
         rows = _fetch_todo_rows(page, base_url)
         new_rows = [row for row in rows if _todo_row_id(row) not in before_ids]
         for row in new_rows:
-            base = _score_todo_row_for_payload(row, payload, expect_sppb=expect_sppb)
+            # Soft: getTodo tanpa field referensi — pakai nominal+mitra+uraian.
+            base = _score_todo_row_for_payload(
+                row, payload, expect_sppb=expect_sppb, require_identity=False
+            )
             if base < 30:
                 continue
             score = base + 250
@@ -801,6 +819,9 @@ def recover_superman_from_todo(
     match: dict[str, Any] | None = None
     best_score = 0
     inspect: dict[str, Any] = {}
+    rows: list[dict[str, Any]] = []
+    sppb_no: str | None = None
+    sppn_no: str | None = None
 
     pw, browser, context = open_authenticated_context(cfg)
     try:
@@ -868,7 +889,72 @@ def recover_superman_from_todo(
             no_do=payload.no_do,
         )
     )
-    if not match or not identity_ok or best_score < 70 or not (sppb_no or sppn_no):
+
+    soft_used = False
+    # Soft recover: getTodo sering tanpa referensi/au58. Ambil kandidat dengan
+    # nominal(+mitra/kontrak) yang BELUM dipakai invoice lain; jika >1 pilih
+    # sppn_id terbaru (draft tanggal 17 yang gagal terekam biasanya kasus ini).
+    if (not match or not identity_ok or best_score < 70) or not (sppb_no or sppn_no):
+        soft = _score_all_todo_rows(rows, payload, expect_sppb=expect_sppb, require_identity=False)
+        soft_candidates: list[tuple[int, dict[str, Any]]] = []
+        for score, row in soft:
+            if score < 50:
+                continue
+            cand_sppb = str(row.get("sppb_no") or "").strip() or None
+            cand_sppn = str(row.get("sppn_no") or "").strip() or None
+            label = format_superman_ref(cand_sppb, cand_sppn)
+            if not label:
+                continue
+            if find_invoices_with_superman_label(label, exclude_no_invoice=ref):
+                continue
+            soft_candidates.append((score, row))
+        soft_candidates.sort(
+            key=lambda item: (
+                item[0],
+                int(item[1].get("sppn_id") or item[1].get("spp_id") or 0),
+            ),
+            reverse=True,
+        )
+        if soft_candidates:
+            # Prefer unique top score; if several same soft fingerprint, newest id.
+            top_score = soft_candidates[0][0]
+            top_tier = [r for s, r in soft_candidates if s >= top_score - 5]
+            top_tier.sort(
+                key=lambda r: int(r.get("sppn_id") or r.get("spp_id") or 0),
+                reverse=True,
+            )
+            match = top_tier[0]
+            best_score = max(best_score, top_score)
+            sppb_no = str(match.get("sppb_no") or "").strip() or None
+            sppn_no = str(match.get("sppn_no") or "").strip() or None
+            soft_used = True
+            identity_ok = _todo_row_matches_identity(
+                match,
+                no_invoice=payload.no_invoice,
+                referensi=payload.referensi,
+                no_pembayaran=payload.no_pembayaran,
+                no_do=payload.no_do,
+            )
+            inspect["soft_recover"] = {
+                "used": True,
+                "candidates": len(soft_candidates),
+                "picked": {"sppn_no": sppn_no, "sppb_no": sppb_no, "score": top_score},
+            }
+
+    if not match or best_score < 50 or not (sppb_no or sppn_no):
+        return {
+            "ok": False,
+            "no_invoice": ref,
+            "message": (
+                "Tidak menemukan SPPn/SPPb yang cocok di To Do List Superman "
+                "(cari baris nominal+mitra sama, atau salin nomor manual)."
+            ),
+            "inspect": inspect,
+            "best_score": best_score,
+            "identity_ok": identity_ok,
+            "soft_used": soft_used,
+        }
+    if not identity_ok and not soft_used:
         return {
             "ok": False,
             "no_invoice": ref,
@@ -916,7 +1002,14 @@ def recover_superman_from_todo(
         "superman_saved": saved,
         "best_score": best_score,
         "recovered": True,
-        "message": f"Nomor Superman dipulihkan dari To Do List: {saved}" if saved else "Gagal menyimpan",
+        "soft_used": soft_used,
+        "identity_ok": identity_ok,
+        "message": (
+            f"Nomor Superman dipulihkan dari To Do List: {saved}"
+            + (" (soft-match nominal/mitra — verifikasi di Superman)" if soft_used and not identity_ok else "")
+            if saved
+            else "Gagal menyimpan"
+        ),
     }
 
 

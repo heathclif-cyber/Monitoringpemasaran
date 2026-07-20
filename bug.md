@@ -2,7 +2,7 @@
 
 Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini sebelum debug Superman atau Input Pembayaran — lihat juga [agent.md](./agent.md).
 
-**Terakhir diperbarui:** 2026-07-14
+**Terakhir diperbarui:** 2026-07-20
 
 ---
 
@@ -24,6 +24,7 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-012](#bug-012-superman--gagal-intermittent-di-railway-lalu-tiba-tiba-berhasil) | Superman / Railway | Critical | Mitigated 2026-07-07 — infra fix + perilaku intermittent `/spp/store` |
 | [BUG-013](#bug-013-superman--dialog-0-memulai-deadlock-progresspy) | Superman / Railway | Critical | Fixed 2026-07-07 (`73d974d`) — deadlock lock di `progress.py` |
 | [BUG-014](#bug-014-superman--nomor-spp-sama-di-multi-invoice-sekontrak) | Superman | Critical | Fixed 2026-07-14 — data 26.041 dibersihkan |
+| [BUG-015](#bug-015-superman--draft-sukses-tapi-nomor-tidak-terekam-di-app) | Superman | Critical | Fixed 2026-07-20 — soft match + agent supports |
 
 ---
 
@@ -384,6 +385,27 @@ Tanpa (1) dan (3), operasi malam ini tidak bisa dilanjutkan sama sekali — tapi
 - **Dikosongkan:** `26.041/GKP-N1/BO/NJM/VII/2026` + pembayaran terkait — deklarasi ulang setelah deploy fix
 
 **File:** `services/superman/runner.py`, `services/superman/persist.py`
+
+---
+
+## BUG-015: Superman — draft sukses tapi nomor tidak terekam di app
+
+**Tanggal log:** 2026-07-20
+
+**Gejala:** Deklarasi lewat app (agent lokal) berhasil isi form + simpan draft di portal Superman (To Do muncul, tgl 17/VII/2026), tetapi kolom `invoice.superman` kosong. Tombol recover juga gagal.
+
+**Root cause (dua lapis):**
+1. **Agent path crash:** `submit_deklarasi_invoice` hanya set `supports` jika `support_doc_paths` kosong. Agent selalu kirim path unduhan → `UnboundLocalError: supports` **setelah** `/spp/store` sukses → nomor tidak sempat `save_superman_to_invoice`.
+2. **To Do match skor 0:** API `getTodo` sering **tidak** mengembalikan `referensi`/`au58` meski form terisi. Gate BUG-014 (`require identity`) men-zero semua skor soft (nominal+mitra+kontrak) → match/recover gagal; user melihat “bisa buat di Superman, tidak terekam di app”.
+
+**Fix (2026-07-20):**
+1. `supports` selalu di-resolve (agent + server) — `e311645`
+2. Soft score pasca-store: `_find_new_todo_match` pakai `require_identity=False` (wajib nominal cocok)
+3. Soft recover: kandidat unassigned nominal+mitra; jika >1 ambil `sppn_id` terbaru; label clash tetap ditolak
+
+**Data invoice contoh:** `R08D-RO/INV/2026.07.15-1` → dipulihkan ke `R8/R08D/SPPn/78/VII/2026` (76/77 soft-match duplikat di portal — cek manual).
+
+**File:** `services/superman/runner.py`
 
 ---
 
