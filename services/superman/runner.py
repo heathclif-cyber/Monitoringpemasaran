@@ -1047,6 +1047,8 @@ def submit_deklarasi_invoice(
     ensure_session(cfg)
 
     payload = build_payload_from_invoice(no_invoice)
+    # Always define supports for result payload (agent path passes local paths only).
+    supports = resolve_support_doc_from_invoice(no_invoice)
     if support_doc_paths:
         support_paths = [Path(p) for p in support_doc_paths if Path(p).is_file()]
         if not support_paths:
@@ -1054,7 +1056,6 @@ def submit_deklarasi_invoice(
                 "Daftar dokumen pendukung agent kosong atau file tidak ditemukan di disk lokal."
             )
     else:
-        supports = resolve_support_doc_from_invoice(no_invoice)
         support_paths = [doc.path for doc in supports]
 
     report(20, "Membuka browser Superman")
