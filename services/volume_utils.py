@@ -1,8 +1,9 @@
-"""Hitung volume proporsional — selaras antara Laporan (pra-DO) dan pembuatan DO.
+"""Hitung volume proporsional — dipakai saat buat DO dan Volume Invoice.
 
-Volume DO yang tersimpan adalah acuan operasional. Sebelum DO terbit, laporan
-memakai rumus yang sama dari nominal transfer / nilai invoice / scope volume,
-bukan `nominal / harga_satuan` (itu mengabaikan PPN dan salah).
+Volume DO yang tersimpan adalah acuan operasional di Laporan (Jumlah_DO).
+Sebelum DO terbit, Jumlah_DO = 0 dan Sisa_Volume = Volume_Invoice.
+Rumus transfer memakai proporsi nilai invoice/scope, bukan `nominal / harga_satuan`
+(itu mengabaikan PPN dan salah).
 """
 
 from __future__ import annotations

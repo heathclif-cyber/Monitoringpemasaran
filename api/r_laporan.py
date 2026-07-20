@@ -17,11 +17,7 @@ from services.ba_utils import (
     calculate_ba_invoice_amount,
     kontrak_nilai_maksimum,
 )
-from services.volume_utils import (
-    compute_volume_for_invoice,
-    compute_volume_for_transfer,
-    resolve_volume_scope,
-)
+from services.volume_utils import compute_volume_for_invoice
 from services.superman.documents import (
     superman_doc_requirements_for_do,
     superman_doc_requirements_for_pembayaran,
@@ -39,10 +35,6 @@ def get_bulan_buku(d):
     months = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
               "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     return f"{d.month:02d}-{months[d.month]}"
-
-
-def _invoice_volume_scope(k, inv, ba_ref):
-    return resolve_volume_scope(k, inv, ba_ref)
 
 
 def _compute_volume_invoice(k, inv, ba_ref):
@@ -143,9 +135,15 @@ def _build_laporan_rows(db: Session):
 
         ba_ref = _resolve_ba_ref(k, inv, do, ba_by_no)
 
-        # Sisa volume = volume scope invoice - sum of ALL DOs volume for this invoice
-        vol_scope, _ = _invoice_volume_scope(k, inv, ba_ref)
-        sisa_volume = round(float(vol_scope) - float(total_do_volume))
+        if is_payung_ba(k) and ba_ref:
+            k_harga_local = ba_effective_harga(ba_ref, k)
+            k_premi = 0.0
+
+        # Volume Invoice = acuan sisa volume (bukan estimasi transfer pra-DO)
+        volume_invoice = _compute_volume_invoice(k, inv, ba_ref)
+
+        # Sisa volume = volume invoice − sum volume DO aktual (0 jika DO belum terbit)
+        sisa_volume = round(float(volume_invoice) - float(total_do_volume))
 
         # DPP (Harga Pokok, excl. PPN/PPh) = harga_satuan * volume_do + premi proporsional
         if k_vol_local > 0 and do:
@@ -154,16 +152,13 @@ def _build_laporan_rows(db: Session):
         elif do:
             dpp_pokok = (k_harga_local * do_volume) + k_premi
         else:
-            dpp_pokok = (k_harga_local * k_vol_local) + k_premi
+            # Belum DO: DPP finansial mengikuti proporsi invoice, bukan volume DO palsu
+            dpp_pokok = (k_harga_local * float(volume_invoice or 0)) + (
+                k_premi * (float(volume_invoice or 0) / k_vol_local) if k_vol_local > 0 else k_premi
+            )
 
         ba_date = ba_ref.tanggal_ba if ba_ref else None
         ba_buku_date = ba_ref.bulan_buku if ba_ref else None
-
-        if is_payung_ba(k) and ba_ref:
-            k_harga_local = ba_effective_harga(ba_ref, k)
-            k_premi = 0.0
-
-        volume_invoice = _compute_volume_invoice(k, inv, ba_ref)
 
         ppn_persen_val = (
             float(getattr(k, "ppn_persen", 0) or 0)
@@ -237,7 +232,8 @@ def _build_laporan_rows(db: Session):
 
         pph_setor_val = do.is_pph_disetor if do else "false"
 
-        # Invoice-first flow: pembayaran + Superman sebelum DO — tampilkan data pembayaran di Laporan
+        # Invoice-first flow: pembayaran + Superman sebelum DO — tampilkan cash-in di Laporan.
+        # Jumlah_DO tetap 0 sampai DO benar-benar terbit (jangan estimasi volume dari transfer).
         if not do and inv and inv.pembayaran:
             sorted_pays = sorted(
                 inv.pembayaran,
@@ -256,22 +252,13 @@ def _build_laporan_rows(db: Session):
                 if tanggal_transfer_val:
                     raw_date_val = tanggal_transfer_val.strftime("%Y-%m-%d")
 
-                # Estimasi volume = rumus DO (bukan transfer/harga — itu mengabaikan PPN).
-                # Setelah DO terbit, kolom Jumlah DO pakai do.volume_do (angka final).
-                do_volume = compute_volume_for_transfer(
-                    k, inv, ba_ref, pay_nominal_total, round_result=True
-                )
                 if inv_gross > 0:
                     pay_ratio = pay_nominal_total / inv_gross
                     pendapatan_do = pokok_inv * pay_ratio
                     ppn_do = ppn_inv * pay_ratio
                     pph_do = pph_inv * pay_ratio
                     pendapatan_setelah_ppn = round(pendapatan_do + ppn_do)
-                    if k_vol_local > 0:
-                        ratio_premi = do_volume / k_vol_local
-                        dpp_pokok = (k_harga_local * do_volume) + (k_premi * ratio_premi)
-                    else:
-                        dpp_pokok = (k_harga_local * do_volume) + k_premi
+                    dpp_pokok = pendapatan_do
 
         return {
             "No_DO": do.no_do if do else "",
@@ -359,19 +346,9 @@ def _build_laporan_rows(db: Session):
                         total_pelunasan += nom
                 
                 if not inv.delivery_orders:
-                    # Belum DO: sisa volume pakai estimasi volume dari transfer
-                    # (rumus sama DO), supaya laporan cepat tidak "seolah belum terkirim 0".
-                    ba_for_est = _resolve_ba_ref(k, inv, None, ba_by_no)
-                    pay_nom = sum(float(p.nominal_transfer or 0) for p in (inv.pembayaran or []))
-                    est_vol = (
-                        compute_volume_for_transfer(
-                            k, inv, ba_for_est, pay_nom, round_result=True
-                        )
-                        if pay_nom > 0
-                        else 0.0
-                    )
+                    # Belum DO: Jumlah_DO = 0, Sisa_Volume = Volume_Invoice (total_do_volume=0)
                     rows.append(
-                        build_row(k, inv, None, inv_total, k_vol, total_pelunasan, est_vol)
+                        build_row(k, inv, None, inv_total, k_vol, total_pelunasan, 0)
                     )
                 else:
                     for do in inv.delivery_orders:
