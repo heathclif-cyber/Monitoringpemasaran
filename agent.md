@@ -14,8 +14,9 @@
 | Captcha / login Superman | `sync_executor.py`, `captcha_challenge.py` | `runner.py` penuh |
 | Fitur UI baru | `CLAUDE.md` konvensi frontend + 1 page terkait | Backend |
 | Agent lokal Superman (Playwright di PC user, app di Railway) | [SUPERMAN_AGENT.md](./SUPERMAN_AGENT.md) + `scripts/superman_agent.py watch` — job terikat `user_id` | Server Railway Playwright |
-| Deploy Railway | `DEPLOY_GUIDE.md` fase yang diminta saja | — |
-| Deploy server Windows kantor | `DEPLOY_GUIDE.md` Phase 1–7 | Railway |
+| Deploy / setup **PC kantor** + tunnel internet | **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** penuh (Phase 0–8) + `scripts/office/*` | Contabo, Railway redeploy |
+| Ringkas LAN-only kantor | [OFFICE_IP_DEPLOY.md](./OFFICE_IP_DEPLOY.md) | Tunnel detail |
+| Deploy Railway (legacy cloud) | Catatan production di §3; migrasi keluar lewat DEPLOY_GUIDE Phase 2+7 | — |
 
 **Aturan emas:** 1 task = maks **3–5 file** dibuka. Pakai `Grep` / `Read` dengan `offset`+`limit`, bukan baca file utuh.
 
@@ -167,7 +168,8 @@ rg "BUG-00[59]|BUG-012" bug.md
 |------|-------|
 | [CLAUDE.md](./CLAUDE.md) | Konvensi kode, struktur direktori, bisnis logic kontrak/invoice |
 | [bug.md](./bug.md) | Detail root cause historis — 1 BUG per sesi |
-| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | Setup Windows server / migrasi DB |
+| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | **PC Windows 24 jam + Cloudflare Tunnel + migrasi Railway** (playbook agent) |
+| [OFFICE_IP_DEPLOY.md](./OFFICE_IP_DEPLOY.md) | Ringkas akses LAN; full steps di DEPLOY_GUIDE |
 | [ANALYSIS_MULTI_INVOICE.md](./ANALYSIS_MULTI_INVOICE.md) | Multi-invoice per kontrak |
 
 ---
@@ -177,5 +179,6 @@ rg "BUG-00[59]|BUG-012" bug.md
 | Tanggal | Perubahan |
 |---------|-----------|
 | 2026-07-07 | Rewrite fokus hemat token; perbaiki session path `/data/`; tambah BUG-012, 502@0%, sync_executor |
+| 2026-07-20 | Routing deploy: PC kantor + tunnel → DEPLOY_GUIDE.md Phase 0–8 + scripts/office |
 
 *Maintainer: update §4 dan §10 saat ada pola error baru; detail teknis tetap di bug.md.*

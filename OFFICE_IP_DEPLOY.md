@@ -1,126 +1,79 @@
-# Deploy PC Kantor — URL IP, **gratis total**
+# Deploy PC Kantor — ringkasan cepat
 
-Target: lepas Railway. User buka app dari **device masing-masing** lewat **IP PC server**.
-
-```
-http://192.168.x.x:8000
-```
-
-Tidak pakai: Railway, domain berbayar, Cloudflare berbayar, VPS berbayar.
+> **Playbook lengkap (AI agent / VS Code):** lihat **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)**  
+> Isi: Phase 0–8, Cloudflare Tunnel (internet luar), migrasi Railway, backup, cutover, script `scripts/office/*`.
 
 ---
 
-## Arsitektur
+## Target
+
+| Mode | URL | Dokumen |
+|------|-----|---------|
+| **LAN saja** | `http://192.168.x.x:8000` | Bagian singkat di bawah |
+| **LAN + internet** | `https://monitoring.domain.com` | **Wajib** ikuti [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) Phase 0–4 |
+
+Stack: PC Windows **24 jam** + Docker (`docker-compose.yml`) + Postgres lokal.  
+**Lepas Railway** setelah cutover (checklist di DEPLOY_GUIDE Phase 7).
+
+---
+
+## Arsitektur (singkat)
 
 | Komponen | Di mana |
 |----------|---------|
-| App (FastAPI + React dist) | PC kantor 24 jam |
-| PostgreSQL | PC kantor (Docker **atau** Postgres Windows) |
-| Playwright / Superman | PC kantor (jaringan kantor) |
-| Browser user | Laptop/HP masing-masing di **Wi‑Fi/LAN yang sama** |
-
-Batasan gratis IP LAN:
-
-- Hanya device **satu jaringan** (Wi‑Fi kantor) yang bisa akses.
-- Dari rumah / internet luar **tidak** bisa tanpa tunnel gratis terpisah (opsional nanti).
+| App (FastAPI + React dist) | PC kantor Docker `monpem-app` **:8000** |
+| PostgreSQL | Docker `monpem-db` (hanya `127.0.0.1:5432`) |
+| Playwright / Superman | PC kantor (`SUPERMAN_DEFAULT_EXECUTOR=server`) |
+| Internet luar | Cloudflare Tunnel → `http://127.0.0.1:8000` |
 
 ---
 
-## Opsi A — Docker (disarankan jika Docker Desktop terpasang)
-
-Docker Desktop **gratis** untuk penggunaan kecil/kantor non-enterprise besar.
+## Quick start LAN (Docker)
 
 ```powershell
 cd D:\Apps-Dev\Monitoringpemasaran
 
-# 1) Password DB lokal
-copy .env.office.example .env.office
+# 1) Env
+copy .env.office.example .env
 # edit POSTGRES_PASSWORD + SECRET_KEY + SUPERMAN_*
+# atau: scripts\office\setup_env.ps1 -PostgresPassword "..." -SecretKey "..."
 
 # 2) Build & jalan
-docker compose --env-file .env.office up -d --build
+docker compose up -d --build
 
 # 3) Cek
+curl.exe -sS http://127.0.0.1:8000/health
 docker compose ps
-# Buka di PC: http://localhost:8000
-# Dari laptop lain: http://<IP-PC>:8000
 ```
 
-Cek IP PC:
+IP LAN:
 
 ```powershell
 Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' }
 ```
 
----
-
-## Opsi B — Native Windows (tanpa Docker)
-
-### 1. PostgreSQL lokal (gratis)
-
-- Install [PostgreSQL Windows](https://www.postgresql.org/download/windows/) atau `winget install PostgreSQL.PostgreSQL.16`
-- Buat DB + user, contoh:
-
-```sql
-CREATE USER ptpn WITH PASSWORD 'PtpnKantor_Local_ChangeMe';
-CREATE DATABASE monitoringpemasaran OWNER ptpn;
-```
-
-### 2. .env (bukan Railway)
-
-```env
-DATABASE_URL=postgresql://ptpn:PtpnKantor_Local_ChangeMe@127.0.0.1:5432/monitoringpemasaran
-SECRET_KEY=ganti-secret-panjang
-RUN_DB_MIGRATE=true
-SUPERMAN_USER=...
-SUPERMAN_PASSWORD=...
-SUPERMAN_DEFAULT_EXECUTOR=server
-```
-
-### 3. Dependensi + frontend
-
-```powershell
-cd D:\Apps-Dev\Monitoringpemasaran
-pip install -r requirements.txt
-playwright install chromium
-powershell -File scripts\build_office_frontend.ps1
-```
-
-### 4. Migrasi data dari Railway (sekali)
-
-Butuh `pg_dump` / `psql` (ikut install Postgres) dan URL Railway lama:
-
-```powershell
-# Export (di PC yang bisa jangkau Railway)
-pg_dump "postgresql://..." --no-owner --no-acl -n public -f backup_db.sql
-
-# Import ke lokal
-psql "postgresql://ptpn:PtpnKantor_Local_ChangeMe@127.0.0.1:5432/monitoringpemasaran" -f backup_db.sql
-```
-
-### 5. Jalankan server
-
-```powershell
-powershell -File scripts\start_office_server.ps1
-```
-
-Akses:
-
-- Di server: `http://localhost:8000`
-- Di laptop lain (LAN): `http://192.168.xxx.xxx:8000`
-
-### 6. Autostart (gratis)
-
-Task Scheduler → Create Task → At logon / at startup →  
-Action: `powershell.exe -File D:\Apps-Dev\Monitoringpemasaran\scripts\start_office_server.ps1`
-
-Power options: **Never sleep**.
+Rekan di Wi‑Fi yang sama: `http://<IP-PC>:8000`
 
 ---
 
-## Firewall Windows
+## Internet luar
 
-Buka port **8000** inbound (script start mencoba menambah rule). Manual:
+Tidak cukup IP LAN. Pasang **Cloudflare Tunnel** (gratis) — langkah lengkap:
+
+→ [DEPLOY_GUIDE.md Phase 4](./DEPLOY_GUIDE.md#phase-4--cloudflare-tunnel-akses-internet)
+
+Butuh domain di akun Cloudflare untuk URL permanen. Tanpa domain: quick tunnel (sementara saja).
+
+---
+
+## Opsi native Windows (tanpa Docker)
+
+Hanya jika Docker tidak tersedia. Lihat `scripts/start_office_server.ps1` + Postgres Windows.  
+Untuk production kantor + tunnel, **Docker tetap disarankan** (satu perintah, selaras compose).
+
+---
+
+## Firewall
 
 ```powershell
 New-NetFirewallRule -DisplayName "Monitoring Pemasaran 8000" `
@@ -131,36 +84,47 @@ New-NetFirewallRule -DisplayName "Monitoring Pemasaran 8000" `
 
 ## Superman
 
-Setelah app di PC kantor, biarkan:
-
 ```env
 SUPERMAN_DEFAULT_EXECUTOR=server
 ```
 
-Tidak perlu agent di tiap laptop. Login session Superman di PC server sekali (`scripts/superman_login.py` jika captcha).
+Login session di PC server. Tidak perlu agent di tiap laptop untuk mode ini.
 
 ---
 
 ## Checklist lepas Railway
 
-1. [ ] Postgres lokal jalan + data di-import  
-2. [ ] `.env` `DATABASE_URL` sudah lokal  
-3. [ ] App listen `0.0.0.0:8000`  
-4. [ ] Laptop lain buka `http://IP:8000` OK  
-5. [ ] Login app + dashboard OK  
-6. [ ] Superman test 1 invoice OK  
-7. [ ] Autostart + never sleep  
-8. [ ] Matikan / hapus project Railway (setelah yakin)  
+Gunakan checklist resmi di [DEPLOY_GUIDE.md Phase 7](./DEPLOY_GUIDE.md#phase-7--backup-db-harian--cutover-railway).
+
+Ringkas:
+
+1. [ ] Health + login OK di PC  
+2. [ ] Data migrasi OK  
+3. [ ] Tunnel HTTPS OK (jika butuh luar)  
+4. [ ] Backup DB jalan  
+5. [ ] User setuju → stop Railway  
+
+---
+
+## Script helper
+
+| Script | Fungsi |
+|--------|--------|
+| `scripts/office/setup_env.ps1` | Buat `.env` |
+| `scripts/office/import_sql.ps1` | Restore dump Railway |
+| `scripts/office/ensure_up.ps1` | Up setelah reboot |
+| `scripts/office/backup_db.ps1` | Backup harian |
+| `scripts/office/auto_deploy.ps1` | Auto git pull + rebuild |
 
 ---
 
 ## FAQ
 
-**Q: Bisa URL cantik tanpa bayar?**  
-A: IP LAN sudah cukup. Domain custom biasanya berbayar. Subdomain gratis (mis. freenom) tidak stabil.
+**Q: Akses dari luar kantor?**  
+A: Cloudflare Tunnel — lihat DEPLOY_GUIDE Phase 4.
 
-**Q: Akses dari luar kantor gratis?**  
-A: Butuh tunnel (Cloudflare Tunnel **gratis** + domain, atau Tailscale **gratis**). Bukan pure IP host publik tanpa risiko.
+**Q: PC harus nyala?**  
+A: Ya, 24 jam; sleep/hibernate off (Phase 0).
 
-**Q: IP berubah tiap restart Wi‑Fi?**  
-A: Set IP statis di router untuk PC server, atau cek IP lagi dengan perintah di atas.
+**Q: Beda dengan Contabo VPS?**  
+A: PC kantor = LAN bagus + Superman lebih stabil; Contabo = online tanpa PC. Keputusan product: PC + tunnel.
