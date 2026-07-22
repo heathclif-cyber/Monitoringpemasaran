@@ -666,7 +666,7 @@ function buildInvoicePreview() {
             <tr>
                 <td style="${tdStyle}" colspan="10">
                     <strong>Terbilang:</strong><br>
-                    <i>${k.terbilang || '-'} Rupiah</i>
+                    <i>${(function(){ var t=(k.terbilang||'').trim(); if(!t) return '-'; while(/\s*rupiah$/i.test(t)) t=t.replace(/\s*rupiah$/i,'').trim(); return t ? t+' Rupiah' : '-'; })()}</i>
                 </td>
             </tr>
             <tr>

@@ -100,7 +100,8 @@ def generate_contract_docx(k) -> io.BytesIO:
     vol_str = _id_fmt(vol, 2) + ' ' + sat if vol else '-'
     harga_str = _rp_full(harga) + ' per ' + sat if harga else '-'
     premi_str = _rp(premi)
-    jml_str = _rp_full(nilai) + (f" ({_s(k.terbilang)} Rupiah)" if k.terbilang else "")
+    # k.terbilang already ends with "Rupiah" when set via terbilang_rupiah()
+    jml_str = _rp_full(nilai) + (f" ({_s(k.terbilang)})" if k.terbilang else "")
     lama = k.lama_pembayaran_hari or 15
 
     pjl_lines = _s(k.penjual).replace('\\n', '\n').split('\n')
@@ -441,7 +442,8 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_terb = rows[14].cells[0]
     c_terb.merge(rows[14].cells[9])
     _run(c_terb.paragraphs[0], "Terbilang:\n", bold=True)
-    _run(c_terb.paragraphs[0], f"{invoice.terbilang_invoice or _s(k.terbilang, '')} Rupiah", italic=True)
+    # DB terbilang already includes "Rupiah" — do not append again
+    _run(c_terb.paragraphs[0], f"{invoice.terbilang_invoice or _s(k.terbilang, '-')}", italic=True)
 
     # Row 15 (Transfer Ke)
     c_trans = rows[15].cells[0]

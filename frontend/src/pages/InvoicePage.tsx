@@ -143,7 +143,8 @@ function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayar
           <tr>
             <td style={tdStyle} colSpan={10}>
               <strong>Terbilang:</strong><br />
-              <i>{k.terbilang || '-'} Rupiah</i>
+              {/* Match export: terbilang of actual payment amount; already includes "Rupiah" */}
+              <i>{estTotal > 0 ? terbilangRupiah(Math.floor(estTotal)) : '-'}</i>
             </td>
           </tr>
           <tr>

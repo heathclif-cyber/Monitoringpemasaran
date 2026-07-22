@@ -53,3 +53,13 @@ export function terbilangRupiah(angka: number): string {
   if (angka === 0) return 'Nol Rupiah'
   return `${angkaTerbilang(angka)} Rupiah`
 }
+
+/** Ensure terbilang text ends with exactly one "Rupiah" (no "Rupiah Rupiah"). */
+export function ensureSingleRupiah(teks: string | null | undefined): string {
+  if (!teks?.trim()) return ''
+  let t = teks.trim().replace(/\s+/g, ' ')
+  while (/rupiah$/i.test(t)) {
+    t = t.replace(/\s*rupiah$/i, '').trim()
+  }
+  return t ? `${t} Rupiah` : ''
+}

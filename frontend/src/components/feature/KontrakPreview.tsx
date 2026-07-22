@@ -219,7 +219,16 @@ export function KontrakPreview({ data }: KontrakPreviewProps) {
           {payungMode ? (
             <RowS label="Jumlah Pembayaran" value="Sesuai Berita Acara" />
           ) : (
-            <RowS label="Jumlah (Pokok)" value={fmtRpFull(pricing.pokok)} bold />
+            // Match export docx: Rp… (… Rupiah) — terbilangRupiah already ends with "Rupiah"
+            <RowS
+              label="Jumlah (Pokok)"
+              value={
+                pricing.pokok > 0
+                  ? `${fmtRpFull(pricing.pokok)} (${terbilangRupiah(Math.floor(pricing.pokok))})`
+                  : fmtRpFull(pricing.pokok)
+              }
+              bold
+            />
           )}
           <RowS label="Catatan" value="-" />
         </tbody>

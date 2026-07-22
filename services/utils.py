@@ -35,3 +35,21 @@ def terbilang_rupiah(angka):
         return "Nol Rupiah"
     teks = angka_terbilang(angka).strip()
     return teks + " Rupiah"
+
+
+def ensure_single_rupiah(teks):
+    """Normalize terbilang so 'Rupiah' appears exactly once at the end.
+
+    Handles DB/legacy values that already end with Rupiah, and call sites that
+    previously appended ' Rupiah' again (producing 'Rupiah Rupiah').
+    """
+    if teks is None:
+        return ""
+    t = " ".join(str(teks).strip().split())
+    if not t:
+        return ""
+    while t.lower().endswith("rupiah"):
+        t = t[:-6].rstrip()
+    if not t:
+        return "Nol Rupiah"
+    return t + " Rupiah"

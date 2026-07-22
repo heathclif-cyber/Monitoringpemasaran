@@ -108,8 +108,9 @@ def generate_contract_docx(k) -> io.BytesIO:
         jml_str = 'Sesuai Berita Acara'
     else:
         from services.utils import terbilang_rupiah
+        # terbilang_rupiah() already ends with "Rupiah" — do not append again
         terbilang_pokok = terbilang_rupiah(int(pokok + 1e-9))
-        jml_str = _rp_full(pokok) + (f" ({terbilang_pokok} Rupiah)" if terbilang_pokok else "")
+        jml_str = _rp_full(pokok) + (f" ({terbilang_pokok})" if terbilang_pokok else "")
     lama = k.lama_pembayaran_hari or 15
 
     pjl_lines = _s(k.penjual).replace('\\n', '\n').split('\n')
@@ -498,7 +499,10 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     c_terb = rows[14].cells[0]
     c_terb.merge(rows[14].cells[9])
     _run(c_terb.paragraphs[0], "Terbilang:\n", bold=True)
-    _run(c_terb.paragraphs[0], f"{invoice.terbilang_invoice or _s(k.terbilang, '')} Rupiah", italic=True)
+    # DB terbilang already includes "Rupiah" (via terbilang_rupiah); normalize legacy doubles
+    from services.utils import ensure_single_rupiah
+    terb_raw = invoice.terbilang_invoice or _s(k.terbilang, '')
+    _run(c_terb.paragraphs[0], ensure_single_rupiah(terb_raw) or '-', italic=True)
 
     # Row 15 (Transfer Ke)
     c_trans = rows[15].cells[0]
