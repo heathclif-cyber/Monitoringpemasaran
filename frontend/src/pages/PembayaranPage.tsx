@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, RotateCcw, Save, Send } from 'lucide-react'
+import { Loader2, RotateCcw, Save, Send, Trash2 } from 'lucide-react'
 import { usePembayaranStore } from '@/store/pembayaranStore'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useKontrakStore } from '@/store/kontrakStore'
@@ -15,6 +15,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { SupermanDocChecklist } from '@/components/common/SupermanDocChecklist'
@@ -68,6 +69,8 @@ export default function PembayaranPage() {
   const canEdit = useAuthStore((s) => s.canEdit)
   const [isExisting, setIsExisting] = useState(false)
   const [savedNo, setSavedNo] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [docRequirements, setDocRequirements] = useState<SupermanDocRequirement[]>([])
   const [docsReady, setDocsReady] = useState(false)
   const [invoicePembayaran, setInvoicePembayaran] = useState<Pembayaran[]>([])
@@ -499,6 +502,34 @@ export default function PembayaranPage() {
     setSavedNo(null)
   }
 
+  const canDeletePembayaran = (p: Pembayaran) =>
+    canEdit() && !invoiceSuperman && !(p.no_do || '').trim()
+
+  const handleDeletePembayaran = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await pembayaranStore.remove(deleteTarget)
+      addNotification('Pembayaran dihapus', 'success')
+      if (savedNo === deleteTarget) {
+        setIsExisting(false)
+        setSavedNo(null)
+        setValue('nominal_transfer', 0)
+      }
+      if (selectedInvoice) {
+        const updated = await pembayaranStore.fetchByInvoice(selectedInvoice)
+        setInvoicePembayaran(updated)
+        await fetchInvoiceContext(selectedInvoice)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Gagal menghapus pembayaran'
+      addNotification(message, 'error')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
+    }
+  }
+
   const saveOnlyLabel = (() => {
     if (!canEdit()) return 'Read-Only (Tamu)'
     if (isSubmitting || supermanRunning) return 'Memproses...'
@@ -734,33 +765,63 @@ export default function PembayaranPage() {
                         {invoicePembayaran.map((p) => {
                           const pelunasan = pelunasanForPayment(p)
                           const over = p.selisih < -PAYMENT_LUNAS_TOLERANCE
+                          const allowDelete = canDeletePembayaran(p)
                           return (
-                            <button
+                            <div
                               key={p.no_pembayaran}
-                              type="button"
-                              onClick={() => loadPembayaran(p.no_pembayaran)}
                               className={cn(
-                                'w-full flex justify-between gap-2 text-xs px-2 py-1 rounded hover:bg-slate-100',
+                                'flex items-center gap-1 rounded hover:bg-slate-100',
                                 savedNo === p.no_pembayaran && 'bg-slate-100 font-medium',
                               )}
                             >
-                              <span className="text-slate-600 font-mono truncate">{p.no_pembayaran}</span>
-                              <span className="shrink-0 text-right">
-                                <span className="block">{formatCurrency(p.nominal_transfer)}</span>
-                                <span className="block text-slate-400">
-                                  pelunasan {formatCurrency(pelunasan)}
-                                  {over && (
-                                    <span className="text-amber-700">
-                                      {' '}
-                                      · +{formatCurrency(-p.selisih)}
-                                    </span>
-                                  )}
+                              <button
+                                type="button"
+                                onClick={() => loadPembayaran(p.no_pembayaran)}
+                                className="min-w-0 flex-1 flex justify-between gap-2 text-xs px-2 py-1 text-left rounded"
+                              >
+                                <span className="text-slate-600 font-mono truncate">{p.no_pembayaran}</span>
+                                <span className="shrink-0 text-right">
+                                  <span className="block">{formatCurrency(p.nominal_transfer)}</span>
+                                  <span className="block text-slate-400">
+                                    pelunasan {formatCurrency(pelunasan)}
+                                    {over && (
+                                      <span className="text-amber-700">
+                                        {' '}
+                                        · +{formatCurrency(-p.selisih)}
+                                      </span>
+                                    )}
+                                  </span>
                                 </span>
-                              </span>
-                            </button>
+                              </button>
+                              {allowDelete && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  title="Hapus termin dobel / salah input"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setDeleteTarget(p.no_pembayaran)
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              )}
+                            </div>
                           )
                         })}
                       </div>
+                      {canEdit() && !invoiceSuperman && (
+                        <p className="text-[11px] text-slate-400 mt-2">
+                          Klik ikon sampah untuk hapus termin salah input (belum boleh jika sudah ada nomor Superman / DO).
+                        </p>
+                      )}
+                      {invoiceSuperman && (
+                        <p className="text-[11px] text-amber-700 mt-2">
+                          Invoice sudah punya nomor Superman — termin tidak bisa dihapus dari aplikasi.
+                        </p>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -887,6 +948,23 @@ export default function PembayaranPage() {
           closeSupermanProgress()
           if (noInvoice) void startSupermanFlow(noInvoice)
         }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null)
+        }}
+        title="Hapus Termin Pembayaran?"
+        description={
+          deleteTarget
+            ? `Hapus ${deleteTarget}? Gunakan untuk koreksi input dobel. Tidak bisa dihapus jika sudah terhubung DO atau invoice sudah punya nomor Superman.`
+            : undefined
+        }
+        confirmLabel="Hapus"
+        isDestructive
+        isLoading={deleting}
+        onConfirm={() => void handleDeletePembayaran()}
       />
     </div>
   )
