@@ -361,7 +361,7 @@ export function SupermanDeklarasiButton({
         open={open}
         onOpenChange={setOpen}
         title="Buat SPPn di Superman"
-        description={`Draft masuk To Do List Superman untuk invoice ${noInvoice || noPembayaran}. Nomor invoice = referensi Superman. Wajib Kontrak, Invoice, Rekening Koran; kuitansi opsional. Jika agent lokal (scripts/superman_agent.py watch) online, Playwright jalan di PC — lebih andal daripada Railway.`}
+        description={`Draft masuk To Do List Superman untuk invoice ${noInvoice || noPembayaran}. Nomor invoice = referensi Superman. Wajib Kontrak, Invoice, Rekening Koran; kuitansi opsional. Railway menjalankan Chromium Playwright dan menyimpan sesi Superman pada volume persistent.`}
         confirmLabel={loading ? 'Memproses...' : 'Buat di Superman'}
         isLoading={loading}
         onConfirm={handleConfirm}

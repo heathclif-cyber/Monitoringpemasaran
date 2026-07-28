@@ -95,7 +95,9 @@ def get_status() -> dict[str, Any]:
     cfg = SupermanConfig.from_env()
     state = Path(cfg.state_path)
     session_valid = (
-        run_playwright_sync(is_session_valid, cfg, state) if state.is_file() else False
+        run_playwright_sync(is_session_valid, cfg, state, timeout=90)
+        if state.is_file()
+        else False
     )
     using_b64 = bool(os.getenv("SUPERMAN_PASSWORD_B64", "").strip())
     return {
@@ -104,6 +106,7 @@ def get_status() -> dict[str, Any]:
         "session_valid": session_valid,
         "session_path": str(state),
         "base_url": cfg.base_url.rstrip("/"),
+        "browser_engine": cfg.browser_engine,
         "headless": cfg.headless,
         "credential_hint": {
             "username": cfg.username,
@@ -1115,16 +1118,26 @@ def inspect_superman_todo(
 
 
 def request_captcha() -> dict[str, Any]:
-    # HTTP murni (tanpa Playwright) — cepat & stabil di Railway.
-    return start_captcha_challenge(_api_config())
+    from services.superman.sync_executor import run_playwright_sync
+
+    return run_playwright_sync(start_captcha_challenge, _api_config(), timeout=180)
 
 
 def refresh_captcha(challenge_id: str) -> dict[str, Any]:
-    return refresh_captcha_challenge(challenge_id.strip())
+    from services.superman.sync_executor import run_playwright_sync
+
+    return run_playwright_sync(refresh_captcha_challenge, challenge_id.strip(), timeout=90)
 
 
 def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
-    return verify_captcha_challenge(challenge_id.strip(), answer.strip())
+    from services.superman.sync_executor import run_playwright_sync
+
+    return run_playwright_sync(
+        verify_captcha_challenge,
+        challenge_id.strip(),
+        answer.strip(),
+        timeout=120,
+    )
 
 
 def submit_deklarasi_invoice(
