@@ -115,6 +115,22 @@ def superman_store_probe(_user=Depends(require_write)):
     return probe_real_store_endpoint()
 
 
+def _captcha_http_error(exc: Exception) -> HTTPException:
+    """Map error captcha ke HTTP yang UI bisa tampilkan (bukan 500 generik)."""
+    msg = str(exc).strip() or type(exc).__name__
+    # Playwright timeout / goto gagal → 502 (upstream Superman / jaringan Railway)
+    lower = msg.lower()
+    if "timeout" in lower or "network" in lower or "superman" in lower:
+        return HTTPException(
+            status_code=502,
+            detail=msg if len(msg) < 500 else msg[:500],
+        )
+    return HTTPException(
+        status_code=502,
+        detail=f"Gagal memuat captcha Superman: {msg[:400]}",
+    )
+
+
 @router.get("/captcha")
 def superman_captcha(_user=Depends(require_write)):
     """Ambil gambar captcha login Superman untuk diisi user."""
@@ -122,8 +138,13 @@ def superman_captcha(_user=Depends(require_write)):
         return request_captcha()
     except SupermanNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _captcha_http_error(exc) from exc
+    except Exception as exc:
+        # Playwright Error/TimeoutError dll — jangan biarkan jadi 500 Internal Server Error
+        raise _captcha_http_error(exc) from exc
 
 
 @router.post("/captcha/refresh")
@@ -136,7 +157,9 @@ def superman_captcha_refresh(
     except ValueError as exc:
         raise HTTPException(status_code=410, detail=str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _captcha_http_error(exc) from exc
+    except Exception as exc:
+        raise _captcha_http_error(exc) from exc
 
 
 @router.post("/captcha/verify")
@@ -146,7 +169,9 @@ def superman_captcha_verify(body: SupermanCaptchaVerifyBody, _user=Depends(requi
     except ValueError as exc:
         raise HTTPException(status_code=410, detail=str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _captcha_http_error(exc) from exc
+    except Exception as exc:
+        raise _captcha_http_error(exc) from exc
 
 
 @router.post("/recover")

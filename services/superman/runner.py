@@ -1117,20 +1117,26 @@ def inspect_superman_todo(
 def request_captcha() -> dict[str, Any]:
     from services.superman.sync_executor import run_playwright_sync
 
-    return run_playwright_sync(start_captcha_challenge, _api_config())
+    # Batas 90s agar dialog captcha tidak loading tanpa pesan error.
+    return run_playwright_sync(start_captcha_challenge, _api_config(), timeout=90)
 
 
 def refresh_captcha(challenge_id: str) -> dict[str, Any]:
     from services.superman.sync_executor import run_playwright_sync
 
-    return run_playwright_sync(refresh_captcha_challenge, challenge_id.strip())
+    return run_playwright_sync(
+        refresh_captcha_challenge, challenge_id.strip(), timeout=60
+    )
 
 
 def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
     from services.superman.sync_executor import run_playwright_sync
 
     return run_playwright_sync(
-        verify_captcha_challenge, challenge_id.strip(), answer.strip()
+        verify_captcha_challenge,
+        challenge_id.strip(),
+        answer.strip(),
+        timeout=90,
     )
 
 

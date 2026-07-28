@@ -163,9 +163,43 @@ def _submit_login(page: Page, cfg: SupermanConfig, answer: str) -> None:
     _fill_credentials(page, cfg)
     page.locator("#captcha").fill("")
     page.fill("#captcha", answer.strip())
-    with page.expect_navigation(wait_until="networkidle", timeout=30000):
+    # domcontentloaded: networkidle sering hang di Railway ke portal Superman.
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=45000):
         page.locator("form.form-auth-small button[type='submit']").click()
     page.wait_for_timeout(1500)
+
+
+def _open_login_page(page: Page, cfg: SupermanConfig) -> None:
+    """Buka halaman login Superman dengan wait yang tahan di Railway."""
+    last_err: Exception | None = None
+    for wait_until in ("domcontentloaded", "commit"):
+        try:
+            page.goto(
+                cfg.base_url,
+                wait_until=wait_until,  # type: ignore[arg-type]
+                timeout=45_000,
+            )
+            last_err = None
+            break
+        except Exception as exc:
+            last_err = exc
+    if last_err is not None:
+        raise RuntimeError(
+            "Tidak bisa membuka portal Superman dari Railway (timeout). "
+            "Coba lagi sebentar, atau jalankan agent lokal di PC. "
+            f"Detail: {last_err}"
+        ) from last_err
+
+    try:
+        page.wait_for_selector(
+            "#signin-username, .captcha img, form.form-auth-small",
+            timeout=20_000,
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "Portal Superman terbuka tetapi form login/captcha tidak muncul. "
+            f"Detail: {exc}"
+        ) from exc
 
 
 def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
@@ -175,11 +209,29 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
     _cleanup_expired()
     _dispose_all()
     pw = sync_playwright().start()
-    browser = pw.chromium.launch(headless=True)
-    page = browser.new_page()
-    page.goto(cfg.base_url, wait_until="networkidle", timeout=60000)
-    _fill_credentials(page, cfg)
-    body = _captcha_image(page)
+    browser = None
+    try:
+        browser = pw.chromium.launch(
+            headless=True,
+            args=["--disable-http2", "--disable-dev-shm-usage"],
+        )
+        page = browser.new_page()
+        page.set_default_timeout(45_000)
+        _open_login_page(page, cfg)
+        _fill_credentials(page, cfg)
+        body = _captcha_image(page)
+    except Exception:
+        try:
+            if browser is not None:
+                browser.close()
+        except Exception:
+            pass
+        try:
+            pw.stop()
+        except Exception:
+            pass
+        raise
+
     challenge_id = str(uuid.uuid4())
     with _lock:
         _store[challenge_id] = PendingCaptcha(
