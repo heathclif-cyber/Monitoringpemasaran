@@ -310,14 +310,29 @@ def _todo_row_id(row: dict[str, Any]) -> str:
 
 
 def _fetch_todo_rows(page, base_url: str) -> list[dict[str, Any]]:
-    resp = page.request.get(f"{base_url.rstrip('/')}/sppd/getTodo")
-    if not resp.ok:
+    """Ambil baris To Do. Timeout/jaringan Railway tidak boleh merobohkan job."""
+    try:
+        resp = page.request.get(
+            f"{base_url.rstrip('/')}/sppd/getTodo",
+            timeout=20_000,
+        )
+    except Exception as exc:
+        logger.warning("getTodo gagal (jaringan/timeout): %s", exc)
         return []
-    return [row for row in (resp.json().get("data") or []) if isinstance(row, dict)]
+    try:
+        if not resp.ok:
+            return []
+        return [row for row in (resp.json().get("data") or []) if isinstance(row, dict)]
+    except Exception as exc:
+        logger.warning("getTodo parse gagal: %s", exc)
+        return []
 
 
 def _snapshot_todo_ids(page, base_url: str) -> set[str]:
-    return {_todo_row_id(row) for row in _fetch_todo_rows(page, base_url)}
+    try:
+        return {_todo_row_id(row) for row in _fetch_todo_rows(page, base_url)}
+    except Exception:
+        return set()
 
 
 def _score_todo_row(
