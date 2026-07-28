@@ -1150,15 +1150,28 @@ def submit_deklarasi_invoice(
     ensure_session(cfg)
 
     payload = build_payload_from_invoice(no_invoice)
-    # Always define supports for result payload (agent path passes local paths only).
-    supports = resolve_support_doc_from_invoice(no_invoice)
+    # Agent path: dokumen sudah diunduh ke disk lokal — jangan resolve path Railway/volume.
     if support_doc_paths:
         support_paths = [Path(p) for p in support_doc_paths if Path(p).is_file()]
         if not support_paths:
             raise FileNotFoundError(
                 "Daftar dokumen pendukung agent kosong atau file tidak ditemukan di disk lokal."
             )
+        from services.superman.documents import ResolvedSupportDoc
+
+        supports = [
+            ResolvedSupportDoc(
+                path=p,
+                entity_type="agent",
+                entity_id=no_invoice,
+                doc_type="support",
+                file_name=p.name,
+                label=f"Dokumen agent ({p.name})",
+            )
+            for p in support_paths
+        ]
     else:
+        supports = resolve_support_doc_from_invoice(no_invoice)
         support_paths = [doc.path for doc in supports]
 
     report(20, "Membuka browser Superman")
