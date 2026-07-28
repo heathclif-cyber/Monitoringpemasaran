@@ -831,8 +831,8 @@ def recover_superman_from_todo(
             cfg.base_url,
             payload,
             expect_sppb=expect_sppb,
-            retries=18,
-            delay_ms=2000,
+            retries=6,
+            delay_ms=1500,
         )
         rows = _fetch_todo_rows(page, cfg.base_url)
         scored = _score_all_todo_rows(rows, payload, expect_sppb=expect_sppb)
