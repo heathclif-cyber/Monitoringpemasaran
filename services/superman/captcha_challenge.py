@@ -68,10 +68,11 @@ def _entry(challenge_id: str) -> PendingCaptcha:
 
 
 def _client(cookies: dict[str, str] | None = None) -> httpx.Client:
+    # Connect pendek: kalau Railway diblokir, gagal cepat (jangan loading 50–80s).
     return httpx.Client(
         http2=False,
         follow_redirects=True,
-        timeout=httpx.Timeout(45.0, connect=15.0),
+        timeout=httpx.Timeout(20.0, connect=8.0),
         cookies=cookies or {},
         headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
@@ -134,7 +135,8 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
     _cleanup()
     entry = PendingCaptcha(cfg=cfg, created_at=time.time(), base_url=cfg.base_url.rstrip("/"))
     last_error: Exception | None = None
-    for attempt in range(1, 4):
+    # 2 percobaan singkat saja — ConnectTimeout berulang tidak membantu user.
+    for attempt in range(1, 3):
         try:
             image = _load_login(entry)
             challenge_id = str(uuid.uuid4())
@@ -151,14 +153,15 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
                 type(exc).__name__,
                 exc,
             )
-            time.sleep(attempt)
+            time.sleep(0.8 * attempt)
     detail = f"{type(last_error).__name__}: {last_error}" if last_error else "unknown"
     msg = (
-        "Tidak dapat memuat captcha Superman setelah 3 percobaan "
-        f"(portal {entry.base_url}). Detail: {detail[:240]}. "
-        "Ini biasanya ConnectTimeout dari jaringan Railway ke Superman — "
-        "bukan bug UI. Coba lagi nanti, atau login session dari PC "
-        "(scripts/superman/commands/login.py --manual / agent lokal)."
+        "Captcha tidak bisa dimuat dari server Railway "
+        f"(portal {entry.base_url}). Detail: {detail[:200]}. "
+        "Jaringan datacenter Railway ke Superman putus (ConnectTimeout) — "
+        "bukan bug form. Solusi: jalankan agent di PC "
+        "`python scripts/superman/commands/agent.py watch --api <URL> --username ...` "
+        "lalu klik Buat Deklarasi lagi (captcha diisi di PC, bukan di Railway)."
     )
     try:
         from services.superman.error_log import log_superman_error
@@ -171,7 +174,7 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
                 "base_url": entry.base_url,
                 "last_error_type": type(last_error).__name__ if last_error else None,
                 "last_error": str(last_error)[:500] if last_error else None,
-                "attempts": 3,
+                "attempts": 2,
             },
         )
     except Exception:

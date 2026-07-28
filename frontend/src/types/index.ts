@@ -655,6 +655,19 @@ export interface SupermanStatus {
   captcha_hint?: string | null
 }
 
+/** Hasil GET /api/superman/debug/connectivity */
+export interface SupermanConnectivity {
+  ok: boolean
+  stage?: string
+  url?: string
+  error_type?: string
+  error?: string
+  elapsed_s?: number
+  hint?: string
+  has_login_form?: boolean
+  has_captcha_img?: boolean
+}
+
 export interface SupermanCaptchaChallenge {
   challenge_id: string
   image_base64: string
