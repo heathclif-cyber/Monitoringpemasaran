@@ -14,6 +14,7 @@ from services.superman.documents import (
 from services.superman.auth import SupermanCaptchaError, SupermanCaptchaRequired
 from services.superman.netdiag import (
     check_waf_signature,
+    probe_connectivity,
     probe_real_store_endpoint,
     run_network_probe,
 )
@@ -100,6 +101,12 @@ def superman_error_log(
         "count": len(events),
         "events": events,
     }
+
+
+@router.get("/debug/connectivity")
+def superman_connectivity(_user=Depends(require_write)):
+    """Cek cepat: Railway bisa buka halaman login Superman? (debug captcha blank)."""
+    return probe_connectivity()
 
 
 @router.get("/debug/netprobe")

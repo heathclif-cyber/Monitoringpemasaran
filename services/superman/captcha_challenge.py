@@ -145,9 +145,38 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
             return _payload(image, challenge_id)
         except (httpx.HTTPError, RuntimeError) as exc:
             last_error = exc
-            logger.warning("captcha HTTP attempt %s gagal: %s", attempt, exc)
+            logger.warning(
+                "captcha HTTP attempt %s gagal: %s: %s",
+                attempt,
+                type(exc).__name__,
+                exc,
+            )
             time.sleep(attempt)
-    raise RuntimeError("Tidak dapat memuat captcha Superman setelah 3 percobaan. Coba lagi 1-2 menit.") from last_error
+    detail = f"{type(last_error).__name__}: {last_error}" if last_error else "unknown"
+    msg = (
+        "Tidak dapat memuat captcha Superman setelah 3 percobaan "
+        f"(portal {entry.base_url}). Detail: {detail[:240]}. "
+        "Ini biasanya ConnectTimeout dari jaringan Railway ke Superman — "
+        "bukan bug UI. Coba lagi nanti, atau login session dari PC "
+        "(scripts/superman/commands/login.py --manual / agent lokal)."
+    )
+    try:
+        from services.superman.error_log import log_superman_error
+
+        log_superman_error(
+            source="captcha_start",
+            message=msg,
+            kind="captcha_network_timeout",
+            context={
+                "base_url": entry.base_url,
+                "last_error_type": type(last_error).__name__ if last_error else None,
+                "last_error": str(last_error)[:500] if last_error else None,
+                "attempts": 3,
+            },
+        )
+    except Exception:
+        pass
+    raise RuntimeError(msg) from last_error
 
 
 def refresh_captcha_challenge(challenge_id: str) -> dict[str, Any]:

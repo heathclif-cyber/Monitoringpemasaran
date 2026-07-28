@@ -9,6 +9,7 @@ tanpa noise dari mesin browser.
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -197,6 +198,48 @@ def probe_real_store_endpoint() -> dict[str, object]:
                 "error": str(exc)[:300],
                 "elapsed_s": round(elapsed, 2),
             }
+
+
+def probe_connectivity(*, timeout_s: float = 12.0) -> dict[str, object]:
+    """Cek cepat: bisakah process Railway membuka portal Superman (login page).
+
+    Dipakai debug captcha yang tidak muncul — bedakan jaringan vs bug form.
+    """
+    cfg = SupermanConfig.from_env()
+    base = cfg.base_url.rstrip("/")
+    url = base + "/"
+    started = time.monotonic()
+    try:
+        with httpx.Client(http2=False, verify=True, timeout=timeout_s, follow_redirects=True) as client:
+            resp = client.get(url)
+        elapsed = time.monotonic() - started
+        html = resp.text or ""
+        return {
+            "ok": resp.status_code < 400 and (
+                "signin-username" in html.lower() or "captcha" in html.lower()
+            ),
+            "stage": "get_login",
+            "url": url,
+            "status_code": resp.status_code,
+            "elapsed_s": round(elapsed, 2),
+            "has_login_form": "signin-username" in html.lower(),
+            "has_captcha_img": bool(re.search(r"captcha", html, re.I)),
+            "body_len": len(html),
+        }
+    except Exception as exc:  # noqa: BLE001
+        elapsed = time.monotonic() - started
+        return {
+            "ok": False,
+            "stage": "get_login",
+            "url": url,
+            "error_type": type(exc).__name__,
+            "error": str(exc)[:300],
+            "elapsed_s": round(elapsed, 2),
+            "hint": (
+                "ConnectTimeout/ReadTimeout dari Railway ke Superman = jaringan datacenter, "
+                "bukan bug UI captcha. Pakai agent lokal atau coba lagi saat rute pulih."
+            ),
+        }
 
 
 def check_waf_signature() -> dict[str, object]:
