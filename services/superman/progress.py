@@ -20,8 +20,13 @@ JobExecutor = Literal["server", "agent"]
 ProgressCallback = Callable[[int, str], None]
 
 TTL_SECONDS = 3600
-STALE_RUNNING_SECONDS = 420
+# Idle tanpa update progress (detik) — job macet total.
+STALE_RUNNING_SECONDS = 90
 STALE_ZERO_PERCENT_SECONDS = 90
+# Batas wall-clock total job (detik) — meski progress masih update.
+# Server Railway: max 3 menit; agent lokal: 5 menit (jaringan user lebih lambat).
+MAX_SERVER_WALL_SECONDS = 180
+MAX_AGENT_WALL_SECONDS = 300
 # Job executor=agent menunggu claim: lebih longgar (agent bisa sebentar offline).
 STALE_AGENT_PENDING_SECONDS = 600
 STALE_AGENT_ZERO_PERCENT_SECONDS = 180
@@ -305,28 +310,37 @@ def fail_job(
 
 
 def _fail_stale_job(job: SupermanJob) -> None:
+    is_agent = (job.executor or "server") == "agent"
+    limit_m = (MAX_AGENT_WALL_SECONDS if is_agent else MAX_SERVER_WALL_SECONDS) // 60
     job.status = "failed"
     job.error = (
-        "Proses Superman terlalu lama (kemungkinan macet di tahap simpan). "
-        "Tutup dialog ini, lalu klik 'Buat Deklarasi Superman' lagi atau "
-        "gunakan Pulihkan dari To Do List."
+        f"Timeout: proses Superman melebihi {limit_m} menit "
+        "(kemungkinan macet di tahap simpan ke portal). "
+        "Tutup dialog, coba lagi, atau pulihkan dari To Do List. "
+        "Untuk Railway yang sering gagal, jalankan agent lokal di PC."
     )
     job.updated_at = time.time()
     logger.error(
-        "deklarasi stale job_id=%s invoice=%s percent=%s stage=%s",
+        "deklarasi stale job_id=%s invoice=%s percent=%s stage=%s wall=%.0fs",
         job.job_id,
         job.no_invoice,
         job.percent,
         job.stage,
+        time.time() - float(job.created_at or time.time()),
     )
 
 
 def _is_stale_running(job: SupermanJob, now: float) -> bool:
     age = now - job.updated_at
+    wall = now - float(job.created_at or now)
     is_agent = (job.executor or "server") == "agent"
     # Menunggu claim agent — jangan gagal di 90 detik.
     if is_agent and job.status == "pending" and not (job.agent_id or "").strip():
         return age > STALE_AGENT_PENDING_SECONDS
+    # Hard limit total lama job (progress update tidak memperpanjang).
+    max_wall = MAX_AGENT_WALL_SECONDS if is_agent else MAX_SERVER_WALL_SECONDS
+    if wall > max_wall:
+        return True
     if job.percent <= 0 and age > (
         STALE_AGENT_ZERO_PERCENT_SECONDS if is_agent else STALE_ZERO_PERCENT_SECONDS
     ):

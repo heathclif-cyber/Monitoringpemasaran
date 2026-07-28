@@ -785,7 +785,7 @@ def _post_store_via_httpx(
     *,
     support_docs: list[Path] | None = None,
     combined_form: bool = False,
-    timeout_s: float = 120.0,
+    timeout_s: float = 40.0,
 ) -> dict[str, object] | None:
     """Fallback Railway: POST /spp/store lewat Python httpx (HTTP/1.1, tanpa TLS browser).
 
@@ -943,7 +943,7 @@ def _try_store_fallbacks(
                 page,
                 support_docs=support_docs,
                 combined_form=combined_form,
-                timeout_s=120.0,
+                timeout_s=40.0,
             )
             if store_debug is not None:
                 attempts = store_debug.setdefault("httpx_on_submit", [])
@@ -972,7 +972,8 @@ def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
                 const headers = {};
                 if (token) headers['X-CSRF-TOKEN'] = token;
                 const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 120000);
+                // Max ~40s — selaras batas job 3 menit; jangan hang 2 menit di fetch.
+                const timer = setTimeout(() => controller.abort(), 40000);
                 let resp;
                 try {
                     resp = await fetch('/spp/store', {
@@ -1291,7 +1292,7 @@ def _trigger_form_submit(
     )
 
 
-_URUTAN_CHECK_TIMEOUT_MS = 90_000
+_URUTAN_CHECK_TIMEOUT_MS = 45_000
 
 
 def _submit_and_wait_store(
@@ -1514,7 +1515,8 @@ def submit_sppn_draft(
     _install_swal_auto_confirm(page, print_after=print_after)
     _install_form_submit_guard(page)
 
-    store_timeout_ms = 120_000
+    # Total simpan harus muat dalam job 3 menit (isi form ~1 menit).
+    store_timeout_ms = 50_000
     store_body: dict | list | str | None = None
     debug: dict[str, object] = store_debug if store_debug is not None else {}
     wait_msg = (
@@ -1543,7 +1545,7 @@ def submit_sppn_draft(
         raise
 
     if store_body is None:
-        # Langsung coba httpx sekali lagi sebelum retry click (lebih andal di Railway).
+        # Satu jalur httpx cepat; jangan rantai retry panjang yang melewati 3 menit.
         report(90, "Mencoba simpan lewat jalur server (httpx)")
         direct = _try_store_fallbacks(
             page,
@@ -1569,7 +1571,7 @@ def submit_sppn_draft(
         else:
             report(90, "Mencoba ulang simpan draft")
             _recover_form_before_retry(page)
-            retry_timeout_ms = 90_000
+            retry_timeout_ms = 25_000
             retry_msg = (
                 "Menunggu dialog simpan Superman (percobaan 2)"
                 if combined_form
@@ -1595,18 +1597,6 @@ def submit_sppn_draft(
             except Exception as exc:
                 debug["retry_error"] = str(exc)
                 logger.warning("Retry simpan draft gagal (%s)", exc)
-
-            if store_body is None:
-                report(91, "Percobaan terakhir simpan (httpx)")
-                last_try = _try_store_fallbacks(
-                    page,
-                    support_docs=support_docs,
-                    combined_form=combined_form,
-                    store_debug=debug,
-                    prefer_httpx_first=True,
-                )
-                if last_try is not None:
-                    store_body = last_try
 
     try:
         page.wait_for_load_state("domcontentloaded", timeout=15000)

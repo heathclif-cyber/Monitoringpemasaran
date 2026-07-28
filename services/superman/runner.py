@@ -1189,8 +1189,8 @@ def submit_deklarasi_invoice(
             payload,
             expect_sppb=expect_sppb,
             before_ids=before_todo_ids,
-            retries=18,
-            delay_ms=2000,
+            retries=6,
+            delay_ms=1500,
         )
         if not (store_sppb or store_sppn) and not match:
             page_sppb, page_sppn = _extract_numbers_from_page(page)

@@ -7,7 +7,8 @@ import type {
 } from '@/types'
 
 export const POLL_INTERVAL_MS = 1000
-export const POLL_TIMEOUT_MS = 10 * 60 * 1000
+/** Batas tunggu dialog UI — gagal cepat, jangan 10 menit. */
+export const POLL_TIMEOUT_MS = 3 * 60 * 1000
 const RETRYABLE_STATUSES = new Set([502, 503, 504])
 const MAX_TRANSIENT_RETRIES = 5
 
@@ -111,7 +112,9 @@ export async function pollSupermanJob(
       throw new Error('Proses dibatalkan')
     }
     if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
-      throw new Error('Timeout: proses Superman melebihi 10 menit. Coba lagi atau pulihkan dari To Do List.')
+      throw new Error(
+        'Timeout: proses Superman melebihi 3 menit. Coba lagi, atau gunakan agent lokal / pulihkan dari To Do List.',
+      )
     }
 
     try {
