@@ -94,8 +94,10 @@ def _image_payload(body: bytes, challenge_id: str) -> dict[str, Any]:
 
 
 def _client(cookies: dict[str, str] | None = None) -> httpx.Client:
+    # HTTP/1.1 only — HTTP/2/ALPN sering bermasalah ke Superman dari Railway.
     return httpx.Client(
-        timeout=httpx.Timeout(40.0, connect=15.0),
+        http2=False,
+        timeout=httpx.Timeout(60.0, connect=25.0),
         follow_redirects=True,
         cookies=cookies or {},
         headers={
@@ -257,32 +259,56 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
     _dispose_all()
 
     base = cfg.base_url.rstrip("/")
-    try:
-        with _client() as client:
-            resp = client.get(base + "/")
-            if resp.status_code >= 400:
-                raise RuntimeError(
-                    f"Portal Superman merespons HTTP {resp.status_code} saat buka login."
-                )
-            html = resp.text or ""
-            token = _extract_token(html)
-            captcha_src = _extract_captcha_src(html, base)
-            if not token:
-                raise RuntimeError(
-                    "CSRF token login Superman tidak ditemukan. Halaman login mungkin berubah."
-                )
-            if not captcha_src:
-                raise RuntimeError(
-                    "Gambar captcha tidak ditemukan di halaman login Superman."
-                )
-            body = _fetch_image(client, captcha_src)
-            cookies = _cookie_dict(client)
-    except httpx.TimeoutException as exc:
-        raise RuntimeError(
-            "Timeout menghubungi portal Superman dari Railway. Coba lagi sebentar."
-        ) from exc
-    except httpx.HTTPError as exc:
-        raise RuntimeError(f"Gagal menghubungi portal Superman: {exc}") from exc
+    last_err: Exception | None = None
+    body = b""
+    cookies: dict[str, str] = {}
+    token = ""
+    captcha_src = ""
+
+    # Retry: koneksi Railway → Superman intermittent (connect hang).
+    for attempt in range(1, 4):
+        try:
+            with _client() as client:
+                resp = client.get(base + "/")
+                if resp.status_code >= 400:
+                    raise RuntimeError(
+                        f"Portal Superman merespons HTTP {resp.status_code} saat buka login."
+                    )
+                html = resp.text or ""
+                token = _extract_token(html)
+                captcha_src = _extract_captcha_src(html, base)
+                if not token:
+                    raise RuntimeError(
+                        "CSRF token login Superman tidak ditemukan. Halaman login mungkin berubah."
+                    )
+                if not captcha_src:
+                    raise RuntimeError(
+                        "Gambar captcha tidak ditemukan di halaman login Superman."
+                    )
+                body = _fetch_image(client, captcha_src)
+                cookies = _cookie_dict(client)
+            last_err = None
+            break
+        except httpx.TimeoutException as exc:
+            last_err = exc
+            logger.warning("captcha attempt %s timeout: %s", attempt, exc)
+            time.sleep(1.2 * attempt)
+        except httpx.HTTPError as exc:
+            last_err = exc
+            logger.warning("captcha attempt %s http error: %s", attempt, exc)
+            time.sleep(1.0 * attempt)
+        except RuntimeError as exc:
+            # Error parsing/halaman — jangan retry sia-sia kecuali network-ish
+            raise
+
+    if last_err is not None:
+        if isinstance(last_err, httpx.TimeoutException):
+            raise RuntimeError(
+                "Timeout menghubungi portal Superman dari Railway (3x coba). "
+                "Jaringan datacenter ke Superman sedang buruk — coba lagi 1–2 menit, "
+                "atau login captcha saat koneksi lebih stabil."
+            ) from last_err
+        raise RuntimeError(f"Gagal menghubungi portal Superman: {last_err}") from last_err
 
     challenge_id = str(uuid.uuid4())
     with _lock:
