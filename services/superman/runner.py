@@ -1177,6 +1177,7 @@ def submit_deklarasi_invoice(
             on_progress=on_progress,
             combined_form=payload.jenis_form == "sppb_sppn",
             store_debug=store_debug,
+            support_docs=support_paths,
         )
         if store_body is None:
             report(90, "Respons simpan kosong — memverifikasi To Do List")

@@ -736,11 +736,228 @@ def _fetch_store_result_ok(body: object) -> bool:
         return False
     if not isinstance(body, dict):
         return True
+    if body.get("reason") and body.get("ok") is False:
+        return False
+    if body.get("transport_error"):
+        return False
     return body.get("ok") is not False and body.get("success") is not False
+
+
+def _snapshot_form_fields(page: Page) -> dict[str, object]:
+    """Ambil field form_spp non-file untuk POST server-side (httpx)."""
+    try:
+        data = page.evaluate(
+            """() => {
+                const form = document.getElementById('form_spp');
+                if (!form) return { fields: {}, token: '', file_fields: [], origin: location.origin };
+                const status = document.getElementById('status_btn');
+                if (status) status.value = '0';
+                const fields = {};
+                const fd = new FormData(form);
+                for (const [key, val] of fd.entries()) {
+                    if (typeof File !== 'undefined' && val instanceof File) continue;
+                    const s = String(val ?? '');
+                    if (key in fields) {
+                        const prev = fields[key];
+                        if (Array.isArray(prev)) prev.push(s);
+                        else fields[key] = [prev, s];
+                    } else {
+                        fields[key] = s;
+                    }
+                }
+                const file_fields = [...form.querySelectorAll('input[type=file]')]
+                    .map((el) => el.name)
+                    .filter(Boolean);
+                const token = document.querySelector('meta[name=csrf-token]')?.content
+                    || document.querySelector('input[name=_token]')?.value
+                    || fields._token
+                    || '';
+                return { fields, token, file_fields, origin: location.origin, referer: location.href };
+            }"""
+        )
+    except Exception as exc:
+        return {"error": str(exc)}
+    return data if isinstance(data, dict) else {"error": "snapshot invalid"}
+
+
+def _post_store_via_httpx(
+    page: Page,
+    *,
+    support_docs: list[Path] | None = None,
+    combined_form: bool = False,
+    timeout_s: float = 120.0,
+) -> dict[str, object] | None:
+    """Fallback Railway: POST /spp/store lewat Python httpx (HTTP/1.1, tanpa TLS browser).
+
+    Browser Playwright sering NS_BINDING_ABORTED / abort di endpoint multipart.
+    Stack Python + http2=False sering lebih tahan dari datacenter (lihat netdiag).
+    """
+    try:
+        import httpx
+    except ImportError:
+        return {"ok": False, "reason": "httpx tidak terpasang", "transport_error": True}
+
+    snap = _snapshot_form_fields(page)
+    if snap.get("error"):
+        return {"ok": False, "reason": f"snapshot form: {snap.get('error')}", "transport_error": True}
+
+    fields = snap.get("fields") if isinstance(snap.get("fields"), dict) else {}
+    token = str(snap.get("token") or fields.get("_token") or "")
+    origin = str(snap.get("origin") or "").rstrip("/")
+    if not origin:
+        try:
+            origin = page.evaluate("() => location.origin") or ""
+        except Exception:
+            origin = ""
+    if not origin:
+        return {"ok": False, "reason": "origin Superman tidak diketahui", "transport_error": True}
+
+    store_url = f"{origin}/spp/store"
+    referer = str(snap.get("referer") or f"{origin}/spp/tambah")
+
+    cookies = {c["name"]: c["value"] for c in page.context.cookies() if c.get("name")}
+    if not cookies:
+        return {"ok": False, "reason": "cookie sesi Superman kosong", "transport_error": True}
+
+    paths = [Path(p) for p in (support_docs or []) if Path(p).is_file()]
+    upload_paths, tmp = _prepare_unique_upload_paths([str(p) for p in paths]) if paths else ([], None)
+
+    file_field_names = [
+        str(n) for n in (snap.get("file_fields") or []) if str(n).strip()
+    ]
+    if not file_field_names:
+        file_field_names = ["dokumen_pendukung_sppn[]"]
+        if combined_form:
+            file_field_names.append("dokumen_pendukung_sppb[]")
+
+    # httpx: list of (name, (filename, bytes, content_type))
+    files: list[tuple[str, tuple[str, bytes, str]]] = []
+    for path_str in upload_paths:
+        p = Path(path_str)
+        try:
+            content = p.read_bytes()
+        except OSError as exc:
+            if tmp is not None:
+                tmp.cleanup()
+            return {
+                "ok": False,
+                "reason": f"gagal baca file {p.name}: {exc}",
+                "transport_error": True,
+            }
+        mime = "application/pdf" if p.suffix.lower() == ".pdf" else "application/octet-stream"
+        for field_name in file_field_names:
+            files.append((field_name, (p.name, content, mime)))
+
+    headers = {
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": referer,
+        "Origin": origin,
+    }
+    if token:
+        headers["X-CSRF-TOKEN"] = token
+
+    # Flatten multi-value fields for httpx data=
+    data: list[tuple[str, str]] = []
+    for key, val in fields.items():
+        if isinstance(val, list):
+            for item in val:
+                data.append((key, str(item)))
+        else:
+            data.append((key, str(val)))
+
+    started = time.monotonic()
+    try:
+        with httpx.Client(
+            http2=False,
+            verify=True,
+            cookies=cookies,
+            timeout=httpx.Timeout(timeout_s, connect=30.0),
+            follow_redirects=True,
+        ) as client:
+            resp = client.post(store_url, data=data, files=files or None, headers=headers)
+        elapsed = round(time.monotonic() - started, 2)
+        text = resp.text or ""
+        try:
+            parsed = resp.json()
+        except Exception:
+            parsed = None
+        if isinstance(parsed, dict):
+            parsed = {
+                **parsed,
+                "_transport": "httpx",
+                "_http_status": resp.status_code,
+                "_elapsed_s": elapsed,
+            }
+            return parsed
+        return {
+            "ok": resp.is_success,
+            "status": resp.status_code,
+            "text": text[:5000],
+            "_transport": "httpx",
+            "_elapsed_s": elapsed,
+        }
+    except Exception as exc:
+        elapsed = round(time.monotonic() - started, 2)
+        logger.warning("httpx POST /spp/store gagal (%.1fs): %s", elapsed, exc)
+        return {
+            "ok": False,
+            "reason": f"httpx /spp/store gagal: {exc}",
+            "transport_error": True,
+            "_transport": "httpx",
+            "_elapsed_s": elapsed,
+        }
+    finally:
+        if tmp is not None:
+            tmp.cleanup()
+
+
+def _try_store_fallbacks(
+    page: Page,
+    *,
+    support_docs: list[Path] | None,
+    combined_form: bool,
+    store_debug: dict[str, object] | None,
+    prefer_httpx_first: bool = False,
+) -> dict[str, object] | None:
+    """Urutan fallback simpan: browser fetch dan/atau httpx (bukan navigasi penuh)."""
+    order: list[str] = (
+        ["httpx", "fetch"] if prefer_httpx_first else ["fetch", "httpx"]
+    )
+    # Env SUPERMAN_STORE_HTTPX=0 menonaktifkan jalur Python.
+    if os.getenv("SUPERMAN_STORE_HTTPX", "1").strip().lower() in {"0", "false", "no"}:
+        order = [m for m in order if m != "httpx"]
+
+    for method in order:
+        if method == "fetch":
+            body = _post_store_via_fetch(page)
+            if store_debug is not None:
+                attempts = store_debug.setdefault("fetch_on_submit", [])
+                if isinstance(attempts, list):
+                    attempts.append(body)
+                    del attempts[:-5]
+            if _fetch_store_result_ok(body):
+                return body  # type: ignore[return-value]
+        elif method == "httpx":
+            body = _post_store_via_httpx(
+                page,
+                support_docs=support_docs,
+                combined_form=combined_form,
+                timeout_s=120.0,
+            )
+            if store_debug is not None:
+                attempts = store_debug.setdefault("httpx_on_submit", [])
+                if isinstance(attempts, list):
+                    attempts.append(body)
+                    del attempts[:-5]
+            if _fetch_store_result_ok(body):
+                return body  # type: ignore[return-value]
+    return None
 
 
 def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
     """Fallback: kirim FormData ke /spp/store via fetch (tanpa navigasi halaman)."""
+    # Timeout 120s: PDF multi-file dari Railway sering >20s; abort cepat = false fail.
     try:
         result = page.evaluate(
             """async () => {
@@ -755,7 +972,7 @@ def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
                 const headers = {};
                 if (token) headers['X-CSRF-TOKEN'] = token;
                 const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 20000);
+                const timer = setTimeout(() => controller.abort(), 120000);
                 let resp;
                 try {
                     resp = await fetch('/spp/store', {
@@ -768,7 +985,7 @@ def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
                 } catch (err) {
                     clearTimeout(timer);
                     const msg = err && err.message ? err.message : String(err);
-                    return { ok: false, reason: 'fetch /spp/store gagal: ' + msg };
+                    return { ok: false, reason: 'fetch /spp/store gagal: ' + msg, transport_error: true };
                 }
                 clearTimeout(timer);
                 const text = await resp.text();
@@ -780,7 +997,7 @@ def _post_store_via_fetch(page: Page) -> dict[str, object] | None:
             }"""
         )
     except Exception as exc:
-        return {"ok": False, "reason": str(exc)}
+        return {"ok": False, "reason": str(exc), "transport_error": True}
     if not isinstance(result, dict):
         return None
     if result.get("json") is not None:
@@ -1089,6 +1306,8 @@ def _submit_and_wait_store(
     simpan=None,
     skip_validate: bool = False,
     store_debug: dict[str, object] | None = None,
+    support_docs: list[Path] | None = None,
+    combined_form: bool = False,
 ) -> dict | list | str | None:
     captured: dict[str, object | None] = {"resp": None}
     seen_posts: list[str] = []
@@ -1186,16 +1405,23 @@ def _submit_and_wait_store(
                 page.wait_for_timeout(1500)
                 elapsed += 1500
                 if captured["resp"] is None:
+                    # Railway: browser AJAX sering gagal — coba fetch + httpx.
+                    # httpx dulu setelah request_failed ke /spp/store terlihat.
+                    prefer_httpx = any(
+                        "/spp/store" in f and ("ABORTED" in f or "ALPN" in f or "FAILED" in f)
+                        for f in failed_requests
+                    )
                     fetch_started = time.monotonic()
-                    fetch_body = _post_store_via_fetch(page)
+                    fallback_body = _try_store_fallbacks(
+                        page,
+                        support_docs=support_docs,
+                        combined_form=combined_form,
+                        store_debug=store_debug,
+                        prefer_httpx_first=prefer_httpx,
+                    )
                     elapsed += int((time.monotonic() - fetch_started) * 1000)
-                    if store_debug is not None:
-                        attempts = store_debug.setdefault("fetch_on_submit", [])
-                        if isinstance(attempts, list):
-                            attempts.append(fetch_body)
-                            del attempts[:-5]
-                    if _fetch_store_result_ok(fetch_body):
-                        return fetch_body
+                    if fallback_body is not None:
+                        return fallback_body
             _progress_heartbeat(
                 on_progress,
                 elapsed,
@@ -1227,11 +1453,20 @@ def _submit_and_wait_store(
             store_debug["loading_seen"] = loading_seen
             store_debug["page_url"] = page.url
             store_debug["dialog_msgs"] = dialog_msgs[-5:]
-            if captured["resp"] is None and loading_seen:
-                fetch_body = _post_store_via_fetch(page)
-                store_debug["fetch_store_attempt"] = fetch_body
-                if _fetch_store_result_ok(fetch_body):
-                    return fetch_body
+            if captured["resp"] is None:
+                # Akhir timeout: prioritaskan httpx (stabil di Railway vs browser TLS).
+                fallback_body = _try_store_fallbacks(
+                    page,
+                    support_docs=support_docs,
+                    combined_form=combined_form,
+                    store_debug=store_debug,
+                    prefer_httpx_first=True,
+                )
+                store_debug["final_store_fallback"] = (
+                    "ok" if fallback_body is not None else "failed"
+                )
+                if fallback_body is not None:
+                    return fallback_body
         return None
     finally:
         if store_debug is not None and failed_requests:
@@ -1248,6 +1483,7 @@ def submit_sppn_draft(
     on_progress: ProgressCallback | None = None,
     combined_form: bool = False,
     store_debug: dict[str, object] | None = None,
+    support_docs: list[Path] | None = None,
 ) -> dict | list | str | None:
     def report(percent: int, stage: str) -> None:
         if on_progress:
@@ -1278,7 +1514,7 @@ def submit_sppn_draft(
     _install_swal_auto_confirm(page, print_after=print_after)
     _install_form_submit_guard(page)
 
-    store_timeout_ms = 90_000
+    store_timeout_ms = 120_000
     store_body: dict | list | str | None = None
     debug: dict[str, object] = store_debug if store_debug is not None else {}
     wait_msg = (
@@ -1300,9 +1536,24 @@ def submit_sppn_draft(
             base_percent=89,
             use_simpan_click=True,
             store_debug=debug,
+            support_docs=support_docs,
+            combined_form=combined_form,
         )
     except RuntimeError:
         raise
+
+    if store_body is None:
+        # Langsung coba httpx sekali lagi sebelum retry click (lebih andal di Railway).
+        report(90, "Mencoba simpan lewat jalur server (httpx)")
+        direct = _try_store_fallbacks(
+            page,
+            support_docs=support_docs,
+            combined_form=combined_form,
+            store_debug=debug,
+            prefer_httpx_first=True,
+        )
+        if direct is not None:
+            store_body = direct
 
     if store_body is None:
         has_simpan = bool(
@@ -1318,7 +1569,7 @@ def submit_sppn_draft(
         else:
             report(90, "Mencoba ulang simpan draft")
             _recover_form_before_retry(page)
-            retry_timeout_ms = 20_000
+            retry_timeout_ms = 90_000
             retry_msg = (
                 "Menunggu dialog simpan Superman (percobaan 2)"
                 if combined_form
@@ -1335,6 +1586,8 @@ def submit_sppn_draft(
                     use_simpan_click=True,
                     skip_validate=True,
                     store_debug=debug,
+                    support_docs=support_docs,
+                    combined_form=combined_form,
                 )
             except RuntimeError as exc:
                 debug["retry_error"] = str(exc)
@@ -1342,6 +1595,18 @@ def submit_sppn_draft(
             except Exception as exc:
                 debug["retry_error"] = str(exc)
                 logger.warning("Retry simpan draft gagal (%s)", exc)
+
+            if store_body is None:
+                report(91, "Percobaan terakhir simpan (httpx)")
+                last_try = _try_store_fallbacks(
+                    page,
+                    support_docs=support_docs,
+                    combined_form=combined_form,
+                    store_debug=debug,
+                    prefer_httpx_first=True,
+                )
+                if last_try is not None:
+                    store_body = last_try
 
     try:
         page.wait_for_load_state("domcontentloaded", timeout=15000)
