@@ -179,6 +179,7 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
             headless=cfg.headless,
             slow_mo=cfg.slow_mo_ms,
             args=_BROWSER_ARGS,
+            proxy=cfg.browser_proxy(),
         )
         page = browser.new_page()
         page.set_default_timeout(45_000)

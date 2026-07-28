@@ -64,7 +64,11 @@ def is_session_valid(cfg: SupermanConfig, state_path: Path) -> bool:
         pass
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(
+                headless=True,
+                args=_HTTP2_DISABLED_ARGS,
+                proxy=cfg.browser_proxy(),
+            )
             context = browser.new_context(storage_state=str(state_path))
             page = context.new_page()
             page.goto(_session_check_url(cfg), wait_until="domcontentloaded", timeout=30000)
@@ -147,7 +151,12 @@ def _save_session(cfg: SupermanConfig, *, manual: bool = False) -> str:
         raise RuntimeError("Set SUPERMAN_USER dan SUPERMAN_PASSWORD di .env")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not manual, slow_mo=200 if manual else 0)
+        browser = p.chromium.launch(
+            headless=not manual,
+            slow_mo=200 if manual else 0,
+            args=_HTTP2_DISABLED_ARGS,
+            proxy=cfg.browser_proxy(),
+        )
         context = browser.new_context()
         page = context.new_page()
         if manual:
@@ -202,14 +211,23 @@ def open_authenticated_context(cfg: SupermanConfig) -> tuple:
     p = sync_playwright().start()
     engine = cfg.browser_engine
     if engine == "firefox":
-        browser = p.firefox.launch(headless=cfg.headless, slow_mo=cfg.slow_mo_ms)
+        browser = p.firefox.launch(
+            headless=cfg.headless,
+            slow_mo=cfg.slow_mo_ms,
+            proxy=cfg.browser_proxy(),
+        )
     elif engine == "webkit":
-        browser = p.webkit.launch(headless=cfg.headless, slow_mo=cfg.slow_mo_ms)
+        browser = p.webkit.launch(
+            headless=cfg.headless,
+            slow_mo=cfg.slow_mo_ms,
+            proxy=cfg.browser_proxy(),
+        )
     else:
         browser = p.chromium.launch(
             headless=cfg.headless,
             slow_mo=cfg.slow_mo_ms,
             args=_HTTP2_DISABLED_ARGS,
+            proxy=cfg.browser_proxy(),
         )
     context: BrowserContext = browser.new_context(storage_state=state)
     return p, browser, context
