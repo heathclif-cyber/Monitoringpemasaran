@@ -1115,29 +1115,16 @@ def inspect_superman_todo(
 
 
 def request_captcha() -> dict[str, Any]:
-    from services.superman.sync_executor import run_playwright_sync
-
-    # Batas 90s agar dialog captcha tidak loading tanpa pesan error.
-    return run_playwright_sync(start_captcha_challenge, _api_config(), timeout=90)
+    # HTTP murni (tanpa Playwright) — cepat & stabil di Railway.
+    return start_captcha_challenge(_api_config())
 
 
 def refresh_captcha(challenge_id: str) -> dict[str, Any]:
-    from services.superman.sync_executor import run_playwright_sync
-
-    return run_playwright_sync(
-        refresh_captcha_challenge, challenge_id.strip(), timeout=60
-    )
+    return refresh_captcha_challenge(challenge_id.strip())
 
 
 def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
-    from services.superman.sync_executor import run_playwright_sync
-
-    return run_playwright_sync(
-        verify_captcha_challenge,
-        challenge_id.strip(),
-        answer.strip(),
-        timeout=90,
-    )
+    return verify_captcha_challenge(challenge_id.strip(), answer.strip())
 
 
 def submit_deklarasi_invoice(

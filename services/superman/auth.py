@@ -37,6 +37,31 @@ def _session_check_url(cfg: SupermanConfig) -> str:
 def is_session_valid(cfg: SupermanConfig, state_path: Path) -> bool:
     if not state_path.is_file():
         return False
+    # Prefer HTTP check (cepat di Railway); Playwright page.goto sering hang.
+    try:
+        import json
+
+        import httpx
+
+        state = json.loads(Path(state_path).read_text(encoding="utf-8"))
+        cookies = {
+            c["name"]: c["value"]
+            for c in (state.get("cookies") or [])
+            if c.get("name") and c.get("value") is not None
+        }
+        if not cookies:
+            return False
+        with httpx.Client(timeout=20.0, follow_redirects=True, cookies=cookies) as client:
+            resp = client.get(_session_check_url(cfg))
+            html = (resp.text or "").lower()
+            if resp.status_code >= 400:
+                return False
+            # Halaman login = session mati
+            if "signin-username" in html or 'name="username"' in html:
+                return False
+            return True
+    except Exception:
+        pass
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
