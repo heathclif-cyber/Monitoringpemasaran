@@ -34,9 +34,6 @@ class SupermanConfig:
     headless: bool
     slow_mo_ms: int
     browser_engine: str
-    proxy_server: str
-    proxy_username: str
-    proxy_password: str
 
     @classmethod
     def from_env(cls) -> "SupermanConfig":
@@ -59,21 +56,4 @@ class SupermanConfig:
             headless=os.getenv("SUPERMAN_HEADLESS", "true").lower() == "true",
             slow_mo_ms=int(os.getenv("SUPERMAN_SLOW_MO", "150")),
             browser_engine=os.getenv("SUPERMAN_BROWSER", "chromium").strip().lower(),
-            proxy_server=os.getenv("SUPERMAN_PROXY_SERVER", "").strip(),
-            proxy_username=os.getenv("SUPERMAN_PROXY_USERNAME", "").strip(),
-            proxy_password=_env_credential(
-                "SUPERMAN_PROXY_PASSWORD",
-                b64_name="SUPERMAN_PROXY_PASSWORD_B64",
-            ),
         )
-
-    def browser_proxy(self) -> dict[str, str] | None:
-        """Konfigurasi proxy Playwright tanpa mengekspos kredensial ke UI/log."""
-        if not self.proxy_server:
-            return None
-        proxy = {"server": self.proxy_server}
-        if self.proxy_username:
-            proxy["username"] = self.proxy_username
-        if self.proxy_password:
-            proxy["password"] = self.proxy_password
-        return proxy

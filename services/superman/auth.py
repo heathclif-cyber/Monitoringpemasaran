@@ -67,7 +67,6 @@ def is_session_valid(cfg: SupermanConfig, state_path: Path) -> bool:
             browser = p.chromium.launch(
                 headless=True,
                 args=_HTTP2_DISABLED_ARGS,
-                proxy=cfg.browser_proxy(),
             )
             context = browser.new_context(storage_state=str(state_path))
             page = context.new_page()
@@ -155,7 +154,6 @@ def _save_session(cfg: SupermanConfig, *, manual: bool = False) -> str:
             headless=not manual,
             slow_mo=200 if manual else 0,
             args=_HTTP2_DISABLED_ARGS,
-            proxy=cfg.browser_proxy(),
         )
         context = browser.new_context()
         page = context.new_page()
@@ -214,20 +212,17 @@ def open_authenticated_context(cfg: SupermanConfig) -> tuple:
         browser = p.firefox.launch(
             headless=cfg.headless,
             slow_mo=cfg.slow_mo_ms,
-            proxy=cfg.browser_proxy(),
         )
     elif engine == "webkit":
         browser = p.webkit.launch(
             headless=cfg.headless,
             slow_mo=cfg.slow_mo_ms,
-            proxy=cfg.browser_proxy(),
         )
     else:
         browser = p.chromium.launch(
             headless=cfg.headless,
             slow_mo=cfg.slow_mo_ms,
             args=_HTTP2_DISABLED_ARGS,
-            proxy=cfg.browser_proxy(),
         )
     context: BrowserContext = browser.new_context(storage_state=state)
     return p, browser, context

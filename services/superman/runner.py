@@ -1118,26 +1118,15 @@ def inspect_superman_todo(
 
 
 def request_captcha() -> dict[str, Any]:
-    from services.superman.sync_executor import run_playwright_sync
-
-    return run_playwright_sync(start_captcha_challenge, _api_config(), timeout=180)
+    return start_captcha_challenge(_api_config())
 
 
 def refresh_captcha(challenge_id: str) -> dict[str, Any]:
-    from services.superman.sync_executor import run_playwright_sync
-
-    return run_playwright_sync(refresh_captcha_challenge, challenge_id.strip(), timeout=90)
+    return refresh_captcha_challenge(challenge_id.strip())
 
 
 def verify_captcha(challenge_id: str, answer: str) -> dict[str, Any]:
-    from services.superman.sync_executor import run_playwright_sync
-
-    return run_playwright_sync(
-        verify_captcha_challenge,
-        challenge_id.strip(),
-        answer.strip(),
-        timeout=120,
-    )
+    return verify_captcha_challenge(challenge_id.strip(), answer.strip())
 
 
 def submit_deklarasi_invoice(

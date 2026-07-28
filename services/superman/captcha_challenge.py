@@ -1,39 +1,44 @@
-"""Tantangan captcha Superman melalui Chromium Playwright di Railway.
+"""Captcha login ringan untuk menyiapkan sesi Chromium Superman di Railway.
 
-Browser dipertahankan selama operator menjawab captcha. Dengan begitu gambar,
-cookie, dan form yang dikirim semuanya berasal dari sesi Chromium yang sama.
-Ini menghindari jalur httpx terpisah yang sering timeout dari Railway.
+HTTP dipakai hanya pada tahap login/captcha. Setelah login berhasil, cookie
+ditulis ke storage state dan seluruh deklarasi tetap dijalankan Chromium
+Playwright di Railway.
 """
 
 from __future__ import annotations
 
 import base64
+import json
 import logging
+import os
+import re
+import tempfile
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from threading import Lock
-from typing import Any, Literal
+from typing import Any
+from urllib.parse import unquote, urljoin, urlparse
 
-from playwright.sync_api import Browser, Page, Playwright, sync_playwright
+import httpx
 
-from services.superman.auth import _is_login_page, save_storage_state_atomic
 from services.superman.config import SupermanConfig
 
 logger = logging.getLogger("superman.captcha")
-
 TTL_SECONDS = 300
-LoginFailureKind = Literal["captcha", "credentials", "lockout", "unknown"]
-_BROWSER_ARGS = ["--disable-http2", "--disable-dev-shm-usage"]
+_TOKEN_RE = re.compile(r'name=["\']_token["\']\s+value=["\']([^"\']+)["\']', re.I)
+_CAPTCHA_RE = re.compile(r'src=["\']([^"\']*captcha[^"\']*)["\']', re.I)
 
 
 @dataclass
 class PendingCaptcha:
-    pw: Playwright
-    browser: Browser
-    page: Page
     cfg: SupermanConfig
     created_at: float
+    cookies: dict[str, str] = field(default_factory=dict)
+    token: str = ""
+    captcha_src: str = ""
+    base_url: str = ""
 
 
 _store: dict[str, PendingCaptcha] = {}
@@ -42,212 +47,161 @@ _lock = Lock()
 
 def _dispose(challenge_id: str) -> None:
     with _lock:
-        entry = _store.pop(challenge_id, None)
-    if not entry:
-        return
-    try:
-        entry.browser.close()
-    except Exception:
-        pass
-    try:
-        entry.pw.stop()
-    except Exception:
-        pass
+        _store.pop(challenge_id, None)
 
 
-def _cleanup_expired() -> None:
+def _cleanup() -> None:
     now = time.time()
     with _lock:
-        expired = [key for key, entry in _store.items() if now - entry.created_at > TTL_SECONDS]
-    for challenge_id in expired:
-        _dispose(challenge_id)
+        expired = [key for key, value in _store.items() if now - value.created_at > TTL_SECONDS]
+    for key in expired:
+        _dispose(key)
 
 
-def _dispose_all() -> None:
+def _entry(challenge_id: str) -> PendingCaptcha:
+    _cleanup()
     with _lock:
-        challenge_ids = list(_store)
-    for challenge_id in challenge_ids:
-        _dispose(challenge_id)
-
-
-def _get_entry(challenge_id: str) -> PendingCaptcha:
-    _cleanup_expired()
-    with _lock:
-        entry = _store.get(challenge_id)
-    if not entry:
+        value = _store.get(challenge_id)
+    if not value:
         raise ValueError("Tantangan captcha kedaluwarsa. Muat ulang captcha.")
-    return entry
+    return value
 
 
-def _fill_credentials(page: Page, cfg: SupermanConfig) -> None:
-    page.fill("#signin-username", cfg.username)
-    page.fill("#signin-password", cfg.password)
+def _client(cookies: dict[str, str] | None = None) -> httpx.Client:
+    return httpx.Client(
+        http2=False,
+        follow_redirects=True,
+        timeout=httpx.Timeout(45.0, connect=15.0),
+        cookies=cookies or {},
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+    )
 
 
-def _captcha_locator(page: Page):
-    primary = page.locator(".captcha img")
-    if primary.count() > 0:
-        return primary.first
-    return page.locator("img[src*='captcha']").first
+def _token(html: str) -> str:
+    match = _TOKEN_RE.search(html or "")
+    return match.group(1) if match else ""
 
 
-def _captcha_image(page: Page) -> bytes:
-    image = _captcha_locator(page)
-    image.wait_for(state="visible", timeout=15_000)
-    return image.screenshot(type="png")
+def _captcha_src(html: str, base_url: str) -> str:
+    match = _CAPTCHA_RE.search(html or "")
+    if not match:
+        return ""
+    src = match.group(1).strip()
+    if src.startswith("//"):
+        return "https:" + src
+    return src if src.startswith("http") else urljoin(base_url + "/", src.lstrip("/"))
 
 
-def _image_payload(body: bytes, challenge_id: str) -> dict[str, Any]:
-    return {
-        "challenge_id": challenge_id,
-        "image_base64": base64.b64encode(body).decode("ascii"),
-        "mime_type": "image/png",
-    }
+def _image(client: httpx.Client, src: str) -> bytes:
+    if not src:
+        raise RuntimeError("Gambar captcha tidak ditemukan di halaman login Superman.")
+    response = client.get(src)
+    if response.status_code >= 400 or not response.content:
+        raise RuntimeError(f"Gagal mengunduh gambar captcha (HTTP {response.status_code}).")
+    return response.content
 
 
-def _page_error_text(page: Page) -> str:
-    messages: list[str] = []
-    for selector in (".alert-danger", ".text-danger strong", "form .text-danger", ".help-block", "#countdown"):
-        locator = page.locator(selector)
-        for index in range(min(locator.count(), 3)):
-            try:
-                value = locator.nth(index).inner_text(timeout=700).strip()
-            except Exception:
-                continue
-            if value and value not in messages:
-                messages.append(value)
-    return " ".join(messages)
+def _payload(image: bytes, challenge_id: str) -> dict[str, Any]:
+    return {"challenge_id": challenge_id, "image_base64": base64.b64encode(image).decode("ascii"), "mime_type": "image/png"}
 
 
-def _classify_login_failure(page: Page) -> tuple[LoginFailureKind, str]:
-    page_error = _page_error_text(page)
-    try:
-        body = page.locator("body").inner_text(timeout=2_000).lower()
-    except Exception:
-        body = ""
-    combined = f"{body} {page_error.lower()}"
-    if "gagal login lebih dari" in combined or "coba lagi dalam" in combined:
-        return "lockout", page_error or "Akun Superman terkunci sementara. Tunggu beberapa menit."
-    if any(word in combined for word in ("password", "username", "kata sandi")) and any(
-        word in combined for word in ("salah", "tidak sesuai", "invalid")
-    ):
-        return "credentials", page_error or "Username atau password Superman salah."
-    if "captcha" in combined:
-        return "captcha", page_error or "Captcha salah. Selesaikan hitungan lalu coba lagi."
-    return "unknown", page_error or "Login Superman belum berhasil. Coba captcha baru."
+def _cookies(client: httpx.Client) -> dict[str, str]:
+    return {name: value for name, value in client.cookies.items()}
 
 
-def _open_login_page(page: Page, cfg: SupermanConfig) -> None:
-    last_error: Exception | None = None
-    for attempt in range(1, 4):
-        try:
-            page.goto(cfg.base_url, wait_until="domcontentloaded", timeout=45_000)
-            page.wait_for_selector("#signin-username, .captcha img, form.form-auth-small", timeout=20_000)
-            return
-        except Exception as exc:
-            last_error = exc
-            logger.warning("Chromium captcha attempt %s gagal: %s", attempt, exc)
-            page.wait_for_timeout(700 * attempt)
-    raise RuntimeError(
-        "Chromium Railway tidak dapat membuka form login Superman setelah 3 percobaan. "
-        "Periksa koneksi Railway ke portal Superman."
-    ) from last_error
-
-
-def _reload_captcha(entry: PendingCaptcha) -> bytes:
-    page = entry.page
-    reload_button = page.locator("#reload")
-    if reload_button.count() == 1:
-        reload_button.click()
-        page.wait_for_timeout(900)
-    else:
-        _open_login_page(page, entry.cfg)
-    _fill_credentials(page, entry.cfg)
-    return _captcha_image(page)
+def _load_login(entry: PendingCaptcha) -> bytes:
+    base = entry.base_url
+    with _client(entry.cookies) as client:
+        page = client.get(base + "/")
+        if page.status_code >= 400:
+            raise RuntimeError(f"Portal Superman merespons HTTP {page.status_code} saat membuka login.")
+        entry.token = _token(page.text)
+        entry.captcha_src = _captcha_src(page.text, base)
+        if not entry.token or not entry.captcha_src:
+            raise RuntimeError("Form login atau captcha Superman tidak dapat dibaca.")
+        image = _image(client, entry.captcha_src)
+        entry.cookies = _cookies(client)
+        entry.created_at = time.time()
+        return image
 
 
 def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
     if not cfg.username or not cfg.password:
         raise RuntimeError("Set SUPERMAN_USER dan SUPERMAN_PASSWORD di environment.")
-
-    _cleanup_expired()
-    _dispose_all()
-    pw = sync_playwright().start()
-    browser: Browser | None = None
-    try:
-        browser = pw.chromium.launch(
-            headless=cfg.headless,
-            slow_mo=cfg.slow_mo_ms,
-            args=_BROWSER_ARGS,
-            proxy=cfg.browser_proxy(),
-        )
-        page = browser.new_page()
-        page.set_default_timeout(45_000)
-        _open_login_page(page, cfg)
-        _fill_credentials(page, cfg)
-        image = _captcha_image(page)
-    except Exception:
-        if browser is not None:
-            try:
-                browser.close()
-            except Exception:
-                pass
-        pw.stop()
-        raise
-
-    challenge_id = str(uuid.uuid4())
-    with _lock:
-        _store[challenge_id] = PendingCaptcha(
-            pw=pw,
-            browser=browser,
-            page=page,
-            cfg=cfg,
-            created_at=time.time(),
-        )
-    logger.info("captcha challenge siap id=%s (chromium)", challenge_id[:8])
-    return _image_payload(image, challenge_id)
+    _cleanup()
+    entry = PendingCaptcha(cfg=cfg, created_at=time.time(), base_url=cfg.base_url.rstrip("/"))
+    last_error: Exception | None = None
+    for attempt in range(1, 4):
+        try:
+            image = _load_login(entry)
+            challenge_id = str(uuid.uuid4())
+            with _lock:
+                _store.clear()
+                _store[challenge_id] = entry
+            logger.info("captcha challenge siap id=%s (httpx session)", challenge_id[:8])
+            return _payload(image, challenge_id)
+        except (httpx.HTTPError, RuntimeError) as exc:
+            last_error = exc
+            logger.warning("captcha HTTP attempt %s gagal: %s", attempt, exc)
+            time.sleep(attempt)
+    raise RuntimeError("Tidak dapat memuat captcha Superman setelah 3 percobaan. Coba lagi 1-2 menit.") from last_error
 
 
 def refresh_captcha_challenge(challenge_id: str) -> dict[str, Any]:
-    entry = _get_entry(challenge_id)
-    image = _reload_captcha(entry)
-    entry.created_at = time.time()
-    return _image_payload(image, challenge_id)
+    entry = _entry(challenge_id)
+    try:
+        return _payload(_load_login(entry), challenge_id)
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Gagal refresh captcha Superman: {exc}") from exc
+
+
+def _is_login_html(html: str) -> bool:
+    body = (html or "").lower()
+    return "signin-username" in body or 'name="username"' in body or 'id="captcha"' in body
+
+
+def _save_state(client: httpx.Client, base_url: str, state_path: str) -> None:
+    host = urlparse(base_url).hostname or "superman.ptpn1.co.id"
+    state = {"cookies": [{"name": key, "value": value, "domain": host, "path": "/", "expires": -1, "httpOnly": True, "secure": True, "sameSite": "Lax"} for key, value in _cookies(client).items()], "origins": []}
+    path = Path(state_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            json.dump(state, file)
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
 
 
 def verify_captcha_challenge(challenge_id: str, answer: str) -> dict[str, Any]:
-    entry = _get_entry(challenge_id)
-    answer = answer.strip()
-    if not answer:
+    entry = _entry(challenge_id)
+    if not answer.strip():
         raise ValueError("Jawaban captcha kosong.")
-
-    page = entry.page
+    base = entry.base_url
     try:
-        _fill_credentials(page, entry.cfg)
-        page.fill("#captcha", answer)
-        submit = page.locator("form.form-auth-small button[type='submit']")
-        if submit.count() != 1:
-            raise RuntimeError("Tombol login Superman tidak ditemukan.")
-        try:
-            with page.expect_navigation(wait_until="domcontentloaded", timeout=45_000):
-                submit.click()
-        except Exception:
-            page.wait_for_timeout(1_500)
-    except Exception as exc:
-        raise RuntimeError(f"Chromium gagal mengirim login Superman: {exc}") from exc
+        with _client(entry.cookies) as client:
+            headers = {"Referer": base + "/", "Origin": base}
+            xsrf = client.cookies.get("XSRF-TOKEN")
+            if xsrf:
+                headers["X-XSRF-TOKEN"] = unquote(xsrf)
+            response = client.post(base + "/user/login", data={"_token": entry.token, "username": entry.cfg.username, "password": entry.cfg.password, "captcha": answer.strip()}, headers=headers)
+            if response.status_code < 400 and not _is_login_html(response.text):
+                check = client.get(base + "/sppd")
+                if check.status_code < 400 and not _is_login_html(check.text):
+                    _save_state(client, base, entry.cfg.state_path)
+                    _dispose(challenge_id)
+                    logger.info("login Superman OK; sesi siap untuk Chromium")
+                    return {"ok": True, "session_valid": True}
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Gagal login Superman: {exc}") from exc
 
-    if not _is_login_page(page):
-        save_storage_state_atomic(page.context, entry.cfg.state_path)
-        _dispose(challenge_id)
-        logger.info("login Superman OK via Chromium captcha")
-        return {"ok": True, "session_valid": True}
-
-    kind, message = _classify_login_failure(page)
-    image = _reload_captcha(entry)
-    entry.created_at = time.time()
-    return {
-        "ok": False,
-        "error": message,
-        "failure_kind": kind,
-        **_image_payload(image, challenge_id),
-    }
+    image = _load_login(entry)
+    return {"ok": False, "error": "Captcha salah atau login belum diterima. Coba gambar baru.", "failure_kind": "captcha", **_payload(image, challenge_id)}
