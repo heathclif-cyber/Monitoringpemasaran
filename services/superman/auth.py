@@ -102,7 +102,7 @@ def login(page: Page, cfg: SupermanConfig, max_attempts: int | None = None) -> b
         page.goto(cfg.base_url, wait_until="networkidle")
     raise SupermanCaptchaError(
         f"Login Superman gagal setelah {attempts} percobaan captcha (terakhir OCR={last_raw!r}). "
-        "Jalankan `python scripts/superman_login.py --manual` di komputer lokal untuk menyimpan session, "
+        "Jalankan `python scripts/superman/commands/login.py --manual` di komputer lokal untuk menyimpan session, "
         "lalu pasang file session ke Railway (SUPERMAN_STATE_PATH + volume)."
     )
 

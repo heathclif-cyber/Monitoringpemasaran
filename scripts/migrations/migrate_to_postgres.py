@@ -1,7 +1,7 @@
 """
 Script Migrasi Data: SQLite (Lokal) -> PostgreSQL (Railway)
 ===========================================================
-Jalankan sekali untuk memindahkan semua data dari blueprint.db ke Railway PostgreSQL.
+Jalankan sekali untuk memindahkan data lokal `var/data/blueprint.db` ke Railway PostgreSQL.
 
 Usage:
     python migrate_to_postgres.py
@@ -11,6 +11,7 @@ Pastikan DATABASE_URL sudah diset di .env sebelum menjalankan script ini.
 
 import os
 import sys
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 # Load .env
@@ -21,7 +22,7 @@ except ImportError:
     pass
 
 # ---- Konfigurasi ----
-SQLITE_URL = "sqlite:///./blueprint.db"
+SQLITE_URL = "sqlite:///./var/data/blueprint.db"
 PG_URL = os.getenv("DATABASE_URL", "")
 
 if not PG_URL or "sqlite" in PG_URL:
@@ -62,7 +63,7 @@ PgSession = sessionmaker(bind=pg_engine)
 
 # ---- Import Models ----
 # Tambahkan path proyek agar import model bisa jalan
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import models
 
 # Buat tabel di PostgreSQL jika belum ada

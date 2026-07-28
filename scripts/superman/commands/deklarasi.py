@@ -11,10 +11,10 @@ Jenis form otomatis:
   - Tanpa PPh → SPPn Saja
 
 Contoh:
-  python scripts/superman_login.py
-  python scripts/superman_deklarasi.py --no-do DO-2026-001 --dry-run
-  python scripts/superman_deklarasi.py --no-do DO-2026-001 --submit
-  python scripts/superman_deklarasi.py --no-do DO-2026-001 --doc path/manual.pdf
+  python scripts/superman/commands/login.py
+  python scripts/superman/commands/deklarasi.py --no-do DO-2026-001 --dry-run
+  python scripts/superman/commands/deklarasi.py --no-do DO-2026-001 --submit
+  python scripts/superman/commands/deklarasi.py --no-do DO-2026-001 --doc path/manual.pdf
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -82,7 +82,7 @@ def main() -> int:
     page = context.new_page()
     try:
         fill_sppn_draft(page, cfg, payload, support_doc=support)
-        out = ROOT / "scripts" / "_superman_probe" / f"draft_{args.no_do.replace('/', '_')}.png"
+        out = ROOT / "var" / "superman" / "probes" / f"draft_{args.no_do.replace('/', '_')}.png"
         out.parent.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(out), full_page=True)
         print(f"Screenshot draft: {out}")
@@ -103,8 +103,9 @@ def main() -> int:
             except Exception as exc:
                 err_shot = (
                     ROOT
-                    / "scripts"
-                    / "_superman_probe"
+                    / "var"
+                    / "superman"
+                    / "probes"
                     / f"submit_error_{args.no_do.replace('/', '_')}.png"
                 )
                 page.screenshot(path=str(err_shot), full_page=True)
@@ -120,8 +121,9 @@ def main() -> int:
 
             post_shot = (
                 ROOT
-                / "scripts"
-                / "_superman_probe"
+                / "var"
+                / "superman"
+                / "probes"
                 / f"submitted_{args.no_do.replace('/', '_')}.png"
             )
             page.screenshot(path=str(post_shot), full_page=True)

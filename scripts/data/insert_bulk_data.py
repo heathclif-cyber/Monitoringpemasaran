@@ -1,16 +1,17 @@
 import os
 import sys
+from pathlib import Path
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# Add project context
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Allow `python scripts/data/insert_bulk_data.py` from any working directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from models import Kontrak
 from database import _clean_db_url
 
 # 1. Tentukan URL Database Tujuan (Railway PostgreSQL)
-DB_URL = os.getenv("DATABASE_URL", "sqlite:///./blueprint.db")
+DB_URL = os.getenv("DATABASE_URL", "sqlite:///./var/data/blueprint.db")
 
 # 2. Persiapan Koneksi ke Database
 engine = create_engine(

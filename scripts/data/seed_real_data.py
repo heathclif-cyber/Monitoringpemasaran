@@ -4,9 +4,10 @@ Seed script: menghapus data dummy dan memasukkan data kontrak real PTPN I
 import sys
 import os
 import math
+from pathlib import Path
 from datetime import date, timedelta
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from database import SessionLocal, engine
 import models

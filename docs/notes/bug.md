@@ -438,7 +438,7 @@ Tanpa (1) dan (3), operasi malam ini tidak bisa dilanjutkan sama sekali — tapi
 - **Status:** Mitigated (UX/error path) — **bukan** solved 100% reliability Railway
 - Railway **boleh** dicoba (captcha + deklarasi server) saat jaringan bagus
 - Railway **tidak boleh** dianggap jalur andal tunggal untuk login captcha / POST `/spp/store`
-- Saat captcha timeout 3×: tunggu beberapa menit, atau **agent lokal** (`scripts/superman_agent.py watch`) — app tetap di Railway, Playwright di PC user
+- Saat captcha timeout 3×: tunggu beberapa menit, atau **agent lokal** (`scripts/superman/commands/agent.py watch`) — app tetap di Railway, Playwright di PC user
 - Jangka menengah: PC kantor 24 jam / tunnel — lihat `DEPLOY_GUIDE.md` / `SUPERMAN_AGENT.md`
 
 ### File utama

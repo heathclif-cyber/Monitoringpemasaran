@@ -7,16 +7,16 @@ App Monitoring tetap di Railway; Playwright + login Superman dijalankan di PC in
 Prasyarat:
   - Python 3.12 + dependensi project (playwright terinstall: `playwright install chromium`)
   - `.env` lokal berisi DATABASE_URL (Railway Postgres) + SUPERMAN_USER / SUPERMAN_PASSWORD
-  - Session Superman lokal: `python scripts/superman_login.py --manual` jika perlu
+  - Session Superman lokal: `python scripts/superman/commands/login.py --manual` jika perlu
 
 Contoh:
-  python scripts/superman_agent.py watch \\
+  python scripts/superman/commands/agent.py watch \\
     --api https://monitoringpemasaran-production.up.railway.app \\
     --username admin --password '***'
 
   # Atau pakai token:
   set MONITORING_API_TOKEN=eyJ...
-  python scripts/superman_agent.py watch --api https://...
+  python scripts/superman/commands/agent.py watch --api https://...
 
 Env opsional:
   SUPERMAN_AGENT_ID   — id stabil antar-restart
@@ -40,7 +40,7 @@ import uuid
 from pathlib import Path
 
 # Project root on sys.path
-_ROOT = Path(__file__).resolve().parents[1]
+_ROOT = Path(__file__).resolve().parents[3]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
@@ -148,7 +148,7 @@ def run_claimed_job(client: ApiClient, agent_id: str, job: dict) -> None:
     documents = job.get("documents") or []
     print(f"\n=== JOB {job_id[:8]}… invoice={no_invoice} docs={len(documents)} ===")
 
-    tmp = _ROOT / "scripts" / "_agent_docs" / job_id
+    tmp = _ROOT / "var" / "superman" / "agent_docs" / job_id
     try:
         paths = download_docs(client, documents, tmp)
 
@@ -283,7 +283,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
 
 def _agent_id_path() -> Path:
-    return _ROOT / "scripts" / ".superman_agent_id"
+    return _ROOT / "var" / "superman" / ".superman_agent_id"
 
 
 def _load_or_create_agent_id() -> str:

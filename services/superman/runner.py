@@ -113,7 +113,7 @@ def get_status() -> dict[str, Any]:
         "captcha_hint": (
             None
             if session_valid
-            else "Jika OCR gagal: jalankan `python scripts/superman_login.py --manual` lokal, "
+            else "Jika OCR gagal: jalankan `python scripts/superman/commands/login.py --manual` lokal, "
             "lalu salin file session ke Railway (SUPERMAN_STATE_PATH + volume)."
         ),
     }
@@ -1168,6 +1168,8 @@ def submit_deklarasi_invoice(
     store_debug: dict[str, Any] = {}
     new_todo_ids: list[str] = []
     before_todo_ids: set[str] = set()
+    submit_error: str | None = None
+    todo_check_error: str | None = None
     expect_sppb = payload.pph_nominal > 0
     pw, browser, context = open_authenticated_context(cfg)
     try:
@@ -1180,31 +1182,47 @@ def submit_deklarasi_invoice(
             on_progress=on_progress,
         )
         before_todo_ids = _snapshot_todo_ids(page, cfg.base_url)
-        store_body = submit_sppn_draft(
-            page,
-            on_progress=on_progress,
-            combined_form=payload.jenis_form == "sppb_sppn",
-            store_debug=store_debug,
-            support_docs=support_paths,
-        )
-        if store_body is None:
+        try:
+            store_body = submit_sppn_draft(
+                page,
+                on_progress=on_progress,
+                combined_form=payload.jenis_form == "sppb_sppn",
+                store_debug=store_debug,
+                support_docs=support_paths,
+            )
+        except Exception as exc:
+            # Jangan submit ulang otomatis setelah koneksi Railway putus;
+            # draft mungkin sudah diterima Superman.
+            submit_error = str(exc).strip() or type(exc).__name__
+            store_debug["submit_error"] = submit_error
+            report(95, "Status simpan belum pasti; memeriksa To Do List")
+        if store_body is None and not submit_error:
             report(90, "Respons simpan kosong — memverifikasi To Do List")
         report(95, "Memverifikasi To Do List")
         store_sppb, store_sppn = _extract_numbers_from_store(store_body)
-        match = _find_todo_match(
-            page,
-            cfg.base_url,
-            payload,
-            expect_sppb=expect_sppb,
-            before_ids=before_todo_ids,
-            retries=6,
-            delay_ms=1500,
-        )
+        try:
+            match = _find_todo_match(
+                page,
+                cfg.base_url,
+                payload,
+                expect_sppb=expect_sppb,
+                before_ids=before_todo_ids,
+                retries=6,
+                delay_ms=1500,
+            )
+        except Exception as exc:
+            todo_check_error = str(exc).strip() or type(exc).__name__
+            store_debug["todo_check_error"] = todo_check_error
         if not (store_sppb or store_sppn) and not match:
             page_sppb, page_sppn = _extract_numbers_from_page(page)
             store_sppb = store_sppb or page_sppb
             store_sppn = store_sppn or page_sppn
-        after_rows = _fetch_todo_rows(page, cfg.base_url)
+        try:
+            after_rows = _fetch_todo_rows(page, cfg.base_url)
+        except Exception as exc:
+            todo_check_error = todo_check_error or (str(exc).strip() or type(exc).__name__)
+            store_debug["todo_check_error"] = todo_check_error
+            after_rows = []
         new_todo_ids = [
             _todo_row_id(row)
             for row in after_rows
@@ -1283,13 +1301,25 @@ def submit_deklarasi_invoice(
             f"Salin manual atau gunakan Pulihkan dari To Do: {format_superman_ref(sppb_no, sppn_no)}"
         )
     else:
-        recoverable = bool(match) or bool(new_todo_ids) or any(
+        recoverable = bool(submit_error) or bool(match) or bool(new_todo_ids) or any(
             item.get("score", 0) >= 70 for item in todo_debug
         )
         result["partial"] = True
         result["ok"] = False
         result["recoverable"] = recoverable
-        if store_body is None and not new_todo_ids:
+        if submit_error:
+            result["message"] = (
+                "Status simpan draft di Superman belum pasti; sistem tidak mengirim ulang "
+                "agar tidak membuat SPP ganda. Periksa To Do List atau gunakan Pulihkan dari To Do List. "
+                f"Detail: {submit_error[:300]}"
+            )
+        elif todo_check_error:
+            result["message"] = (
+                "Respons simpan Superman belum dapat diverifikasi karena To Do List tidak merespons. "
+                "Jangan deklarasi ulang dulu; coba Pulihkan dari To Do List beberapa saat lagi. "
+                f"Detail: {todo_check_error[:300]}"
+            )
+        elif store_body is None and not new_todo_ids:
             network_failures = store_debug.get("request_failures")
             invalid_fields = (store_debug.get("form_before_save") or {}).get("invalid_fields")
             if network_failures and not invalid_fields:
@@ -1427,7 +1457,7 @@ def start_deklarasi_job(
             if (executor or "").strip().lower() in ("agent", "local", "pc"):
                 raise ValueError(
                     "Agent lokal Anda offline. Jalankan di PC login: "
-                    "python scripts/superman_agent.py watch --api <URL> "
+                    "python scripts/superman/commands/agent.py watch --api <URL> "
                     f"--username {uname or '<user>'} --password <pass>"
                 )
         # Session Superman di PC agent user — Railway tidak menjalankan Playwright.
@@ -1446,7 +1476,7 @@ def start_deklarasi_job(
             "user_id": uid,
             "message": (
                 f"Job menunggu agent lokal Anda ({uname or 'user'}). "
-                "Pastikan `superman_agent.py watch` berjalan di PC yang dipakai login."
+                "Pastikan `agent.py watch` berjalan di PC yang dipakai login."
             ),
         }
 

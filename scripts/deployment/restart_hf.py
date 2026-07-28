@@ -9,7 +9,11 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "huggingface_hub"])
     from huggingface_hub import HfApi
 
-api = HfApi(token="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")
+hf_token = os.getenv("HF_TOKEN")
+if not hf_token:
+    raise SystemExit("HF_TOKEN harus diset sebelum menjalankan skrip ini.")
+
+api = HfApi(token=hf_token)
 
 try:
     print("Checking repository info...")

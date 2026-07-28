@@ -1,9 +1,10 @@
 import os
 import sys
+from pathlib import Path
 from datetime import datetime
 import json
 
-sys.path.append(os.getcwd())
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from database import SessionLocal
 import models
 

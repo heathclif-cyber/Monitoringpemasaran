@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 # Raw data from user
 raw_data = """
@@ -43,7 +44,8 @@ Beteleme	Sawit		23/03/2026	 4.147.555 	Sinergi Perkebunan Nusantara	Tandan Buah 
 """
 
 def seed():
-    conn = sqlite3.connect('blueprint.db')
+    db_path = Path(__file__).resolve().parents[2] / "var" / "data" / "blueprint.db"
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
     # Create table if not exists (in case create_all wasn't called)

@@ -23,7 +23,7 @@ _PERSIST_DEBOUNCE_SECONDS = 0.3
 def _default_agents_path() -> Path:
     state_path = os.getenv(
         "SUPERMAN_STATE_PATH",
-        os.path.join(os.path.dirname(__file__), "..", "..", "scripts", ".superman_state.json"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "var", "superman", ".superman_state.json"),
     )
     return Path(state_path).resolve().parent / "superman_agents.json"
 
@@ -271,7 +271,7 @@ def get_status(*, user_id: int | None = None, username: str = "") -> dict[str, A
             if online
             else (
                 f"Agent lokal Anda offline. Di PC yang dipakai login, jalankan: "
-                f"python scripts/superman_agent.py watch --api <URL_RAILWAY> "
+                f"python scripts/superman/commands/agent.py watch --api <URL_RAILWAY> "
                 f"--username <user_app> --password <pass>"
             )
         ),

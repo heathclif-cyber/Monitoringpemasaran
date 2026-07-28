@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -47,7 +47,7 @@ def main() -> int:
         print(str(exc), file=sys.stderr)
         print(
             "\nCoba lagi dengan captcha manual:\n"
-            "  python scripts/superman_login.py --manual --force",
+            "  python scripts/superman/commands/login.py --manual --force",
             file=sys.stderr,
         )
         return 1

@@ -68,7 +68,7 @@ Butuh domain di akun Cloudflare untuk URL permanen. Tanpa domain: quick tunnel (
 
 ## Opsi native Windows (tanpa Docker)
 
-Hanya jika Docker tidak tersedia. Lihat `scripts/start_office_server.ps1` + Postgres Windows.  
+Hanya jika Docker tidak tersedia. Lihat `scripts/office/start_server.ps1` + Postgres Windows.
 Untuk production kantor + tunnel, **Docker tetap disarankan** (satu perintah, selaras compose).
 
 ---

@@ -5,6 +5,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 pip-log.txt
 pip-delete-this-directory.txt
 .tox/
@@ -27,5 +28,4 @@ node_modules/
 *.sql
 .env
 uploads/
-scripts/.superman_state.json
-scripts/_superman_probe/
+var/

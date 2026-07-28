@@ -6,8 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-SESSION = ROOT / "scripts" / ".superman_state.json"
+ROOT = Path(__file__).resolve().parents[3]
+SESSION = ROOT / "var" / "superman" / ".superman_state.json"
 
 
 def main() -> int:

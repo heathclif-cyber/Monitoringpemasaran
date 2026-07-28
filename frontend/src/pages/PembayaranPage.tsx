@@ -236,7 +236,14 @@ export default function PembayaranPage() {
     if (exactTransferNominal > 0 && sisaPelunasan > 0) {
       setValue('nominal_transfer', exactTransferNominal)
     }
-  }, [selectedInvoice, exactTransferNominal, sisaPelunasan, isExisting, savedNo, setValue])
+  }, [
+    selectedInvoice,
+    exactTransferNominal,
+    sisaPelunasan,
+    isExisting,
+    savedNo,
+    setValue,
+  ])
 
   const resetSupermanProgress = () => {
     setFailed(false)
@@ -476,6 +483,21 @@ export default function PembayaranPage() {
       setIsExisting(true)
       setSavedNo(saved.no_pembayaran)
       addNotification('Pembayaran berhasil disimpan', 'success')
+      const savedPelunasan = effectivePelunasan(
+        nominalTransfer,
+        data.is_pph_disetor,
+        currentKontrak,
+      )
+      const { surplus: savedSurplus } = paymentBalance(
+        existingTotal + savedPelunasan,
+        invoiceTotal,
+      )
+      if (savedSurplus > PAYMENT_LUNAS_TOLERANCE) {
+        addNotification(
+          `Kelebihan pembayaran ${formatCurrency(savedSurplus)} telah tercatat pada invoice ini.`,
+          'warning',
+        )
+      }
       if (saved.warning) {
         addNotification(saved.warning, 'warning')
       }

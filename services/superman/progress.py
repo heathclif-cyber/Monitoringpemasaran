@@ -41,7 +41,7 @@ _INTERRUPTED_MSG = (
 def _default_jobs_path() -> Path:
     state_path = os.getenv(
         "SUPERMAN_STATE_PATH",
-        os.path.join(os.path.dirname(__file__), "..", "..", "scripts", ".superman_state.json"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "var", "superman", ".superman_state.json"),
     )
     return Path(state_path).resolve().parent / "superman_jobs.json"
 

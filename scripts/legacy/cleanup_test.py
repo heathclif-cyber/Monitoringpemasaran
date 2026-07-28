@@ -1,7 +1,9 @@
 import sqlite3
+from pathlib import Path
 
 try:
-    conn = sqlite3.connect('blueprint.db')
+    db_path = Path(__file__).resolve().parents[2] / "var" / "data" / "blueprint.db"
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM laporan_bypass WHERE unit = 'Labuan'")
     rows = cursor.rowcount

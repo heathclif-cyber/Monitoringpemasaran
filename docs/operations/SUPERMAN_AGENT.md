@@ -42,7 +42,7 @@ SUPERMAN_HEADLESS=false
 4. Login session Superman di PC itu (jika captcha):
 
 ```powershell
-python scripts\superman_login.py --manual
+python scripts\superman\commands\login.py --manual
 ```
 
 ## Menjalankan agent (setiap kali kerja / autostart)
@@ -50,7 +50,7 @@ python scripts\superman_login.py --manual
 Pakai **username/password app Monitoring** yang sama dengan login web:
 
 ```powershell
-python scripts\superman_agent.py watch `
+python scripts\superman\commands\agent.py watch `
   --api https://monitoringpemasaran-production.up.railway.app `
   --username NAMA_USER_APP `
   --password ****
@@ -61,7 +61,7 @@ Biarkan jendela ini **tetap terbuka** saat klik “Buat SPPn Superman” di web.
 Cek status:
 
 ```powershell
-python scripts\superman_agent.py status `
+python scripts\superman\commands\agent.py status `
   --api https://monitoringpemasaran-production.up.railway.app `
   --username NAMA_USER_APP --password ****
 ```
@@ -107,5 +107,5 @@ Tidak perlu ubah Railway URL.
 | Stuck “Menunggu agent” | `watch` belum jalan / username beda dengan web |
 | Claim kosong terus | Token agent beda user dari yang klik web |
 | Gagal dokumen | Upload PDF di app; unduh lewat `/api/documents/download/...` |
-| Captcha Superman | `superman_login.py --manual` di PC agent |
+| Captcha Superman | `commands/login.py --manual` di PC agent |
 | DATABASE_URL error | Agent butuh URL Postgres production di `.env` |

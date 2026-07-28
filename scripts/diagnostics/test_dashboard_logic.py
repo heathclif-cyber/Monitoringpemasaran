@@ -1,7 +1,9 @@
 import os
 import sys
-# Add current directory to path so it can find models, database, etc.
-sys.path.append(os.getcwd())
+from pathlib import Path
+
+# Allow this diagnostic to find application modules from any working directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine

@@ -51,7 +51,7 @@ class SupermanConfig:
             cash_flow=os.getenv("SUPERMAN_CASH_FLOW", "1"),
             state_path=os.getenv(
                 "SUPERMAN_STATE_PATH",
-                os.path.join(os.path.dirname(__file__), "..", "..", "scripts", ".superman_state.json"),
+                os.path.join(os.path.dirname(__file__), "..", "..", "var", "superman", ".superman_state.json"),
             ),
             headless=os.getenv("SUPERMAN_HEADLESS", "true").lower() == "true",
             slow_mo_ms=int(os.getenv("SUPERMAN_SLOW_MO", "150")),
