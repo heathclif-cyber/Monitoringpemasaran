@@ -449,6 +449,11 @@ Tanpa (1) dan (3), operasi malam ini tidak bisa dilanjutkan sama sekali — tapi
 - `frontend/src/utils/supermanUtils.ts` (`POLL_TIMEOUT_MS` 3 menit)
 - `frontend/src/pages/PembayaranPage.tsx` (hapus termin)
 
+### Log otomatis (untuk AI / operator)
+- Modul: `services/superman/error_log.py` → file `/data/superman_error_log.jsonl`
+- API: `GET /api/superman/error-log?limit=50`
+- Panduan: `docs/operations/superman-error-log.md`
+
 ---
 
 ## Pola operasional (bukan bug, sering disalahartikan)

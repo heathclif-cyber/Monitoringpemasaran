@@ -271,16 +271,43 @@ def update_job(job_id: str, percent: int, stage: str) -> None:
 
 def complete_job(job_id: str, result: dict[str, Any]) -> None:
     _ensure_loaded()
+    invoice_ref = ""
+    executor = ""
     with _lock:
         job = _jobs.get(job_id)
         if not job:
             return
+        invoice_ref = job.no_invoice
+        executor = job.executor or ""
         job.status = "completed"
         job.percent = 100
         job.stage = "Selesai"
         job.result = result
         job.updated_at = time.time()
     _persist_jobs_now()
+    # Job "completed" tapi ok=false (partial store/network) — tetap log otomatis.
+    if isinstance(result, dict) and not result.get("ok"):
+        try:
+            from services.superman.error_log import log_superman_error
+
+            log_superman_error(
+                source="complete_job_not_ok",
+                message=str(result.get("message") or "deklarasi selesai tanpa ok"),
+                kind=None,
+                severity="warning",
+                no_invoice=invoice_ref or str(result.get("no_invoice") or ""),
+                job_id=job_id,
+                executor=executor,
+                context={
+                    "partial": result.get("partial"),
+                    "recoverable": result.get("recoverable"),
+                    "sppn_no": result.get("sppn_no"),
+                    "sppb_no": result.get("sppb_no"),
+                    "extract_debug": result.get("extract_debug"),
+                },
+            )
+        except Exception:
+            pass
 
 
 def fail_job(
@@ -291,11 +318,17 @@ def fail_job(
 ) -> None:
     _ensure_loaded()
     invoice_ref = "?"
+    executor = ""
+    percent = 0
+    stage = ""
     with _lock:
         job = _jobs.get(job_id)
         if not job:
             return
         invoice_ref = job.no_invoice
+        executor = job.executor or ""
+        percent = job.percent
+        stage = job.stage
         job.status = "failed"
         job.error = error
         job.updated_at = time.time()
@@ -307,6 +340,20 @@ def fail_job(
         error,
         debug or {},
     )
+    try:
+        from services.superman.error_log import log_superman_error
+
+        log_superman_error(
+            source="fail_job",
+            message=str(error),
+            kind=None,
+            no_invoice=invoice_ref,
+            job_id=job_id,
+            executor=executor,
+            context={"debug": debug or {}, "percent": percent, "stage": stage},
+        )
+    except Exception:
+        pass
 
 
 def _fail_stale_job(job: SupermanJob) -> None:

@@ -303,11 +303,34 @@ def start_captcha_challenge(cfg: SupermanConfig) -> dict[str, Any]:
 
     if last_err is not None:
         if isinstance(last_err, httpx.TimeoutException):
-            raise RuntimeError(
+            msg = (
                 "Timeout menghubungi portal Superman dari Railway (3x coba). "
                 "Jaringan datacenter ke Superman sedang buruk — coba lagi 1–2 menit, "
                 "atau login captcha saat koneksi lebih stabil."
-            ) from last_err
+            )
+            try:
+                from services.superman.error_log import log_superman_error
+
+                log_superman_error(
+                    source="captcha_start",
+                    message=msg,
+                    kind="captcha_network_timeout",
+                    context={"attempts": 3, "last_error": str(last_err)[:500]},
+                )
+            except Exception:
+                pass
+            raise RuntimeError(msg) from last_err
+        try:
+            from services.superman.error_log import log_superman_error
+
+            log_superman_error(
+                source="captcha_start",
+                message=f"Gagal menghubungi portal Superman: {last_err}",
+                kind="captcha_network_error",
+                context={"last_error": str(last_err)[:500]},
+            )
+        except Exception:
+            pass
         raise RuntimeError(f"Gagal menghubungi portal Superman: {last_err}") from last_err
 
     challenge_id = str(uuid.uuid4())

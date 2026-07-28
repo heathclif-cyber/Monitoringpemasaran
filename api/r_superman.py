@@ -86,6 +86,22 @@ def superman_status(_user=Depends(require_write)):
     return get_status()
 
 
+@router.get("/error-log")
+def superman_error_log(
+    limit: int = Query(50, ge=1, le=500),
+    _user=Depends(require_write),
+):
+    """Log error Superman otomatis (JSONL) — untuk operator / AI agent debug."""
+    from services.superman.error_log import log_path, read_recent_errors
+
+    events = read_recent_errors(limit=limit)
+    return {
+        "path": str(log_path()),
+        "count": len(events),
+        "events": events,
+    }
+
+
 @router.get("/debug/netprobe")
 def superman_netprobe(
     authenticated: bool = Query(False),
@@ -120,15 +136,23 @@ def _captcha_http_error(exc: Exception) -> HTTPException:
     msg = str(exc).strip() or type(exc).__name__
     # Playwright timeout / goto gagal → 502 (upstream Superman / jaringan Railway)
     lower = msg.lower()
-    if "timeout" in lower or "network" in lower or "superman" in lower:
-        return HTTPException(
-            status_code=502,
-            detail=msg if len(msg) < 500 else msg[:500],
-        )
-    return HTTPException(
-        status_code=502,
-        detail=f"Gagal memuat captcha Superman: {msg[:400]}",
-    )
+    detail = msg if len(msg) < 500 else msg[:500]
+    if not ("timeout" in lower or "network" in lower or "superman" in lower):
+        detail = f"Gagal memuat captcha Superman: {msg[:400]}"
+    try:
+        from services.superman.error_log import log_superman_error
+
+        # Hindari double-log bila captcha_challenge sudah menulis event yang sama
+        if "3x coba" not in detail:
+            log_superman_error(
+                source="api_captcha",
+                message=detail,
+                http_status=502,
+                context={"exc_type": type(exc).__name__},
+            )
+    except Exception:
+        pass
+    return HTTPException(status_code=502, detail=detail)
 
 
 @router.get("/captcha")
