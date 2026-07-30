@@ -1,10 +1,14 @@
-# Superman Local Agent — Railway + device user
+# Superman Local Agent — LEGACY (tidak disarankan)
 
-> **Panduan lengkap multi-user + prompt Claude Cowork:**  
-> [`SUPERMAN_AGENT_SETUP_MULTIUSER.md`](./SUPERMAN_AGENT_SETUP_MULTIUSER.md)  
-> Buka file itu di device lain / serahkan ke AI untuk setup end-to-end.
+> **Jalur utama sekarang: PC kantor murni (Docker), tanpa multi-agent.**  
+> Baca: **[`docs/deployment/KANTOR_MURNI.md`](../deployment/KANTOR_MURNI.md)**  
+> Staf hanya buka browser; Superman + captcha di server PC kantor.
 
-Aplikasi **tetap di Railway**. Playwright (isi form Superman) dijalankan di **PC/device user yang login**, lewat agent desktop.
+---
+
+## Di bawah ini: dokumentasi agent desktop (legacy / darurat Railway)
+
+Aplikasi di Railway. Playwright dijalankan di PC lewat agent desktop — **hanya jika belum pindah ke PC kantor**.
 
 ```
 [Browser user]  →  Railway (UI + API + DB)

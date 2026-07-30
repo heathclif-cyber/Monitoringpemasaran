@@ -13,10 +13,11 @@
 | Pembayaran ditolak / PPh | BUG-001, BUG-002 + `pembayaran_utils.py` | Superman |
 | Captcha / login Superman | `sync_executor.py`, `captcha_challenge.py` | `runner.py` penuh |
 | Fitur UI baru | `CLAUDE.md` konvensi frontend + 1 page terkait | Backend |
-| Agent lokal Superman (Playwright di PC user, app di Railway) | [SUPERMAN_AGENT.md](./SUPERMAN_AGENT.md) + `scripts/superman_agent.py watch` — job terikat `user_id` | Server Railway Playwright |
-| Deploy / setup **PC kantor** + tunnel internet | **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** penuh (Phase 0–8) + `scripts/office/*` | Contabo, Railway redeploy |
-| Ringkas LAN-only kantor | [OFFICE_IP_DEPLOY.md](./OFFICE_IP_DEPLOY.md) | Tunnel detail |
-| Deploy Railway (legacy cloud) | Catatan production di §3; migrasi keluar lewat DEPLOY_GUIDE Phase 2+7 | — |
+| Agent lokal Superman (legacy darurat) | `docs/operations/SUPERMAN_AGENT.md` | Jalur utama: PC kantor murni |
+| **Migrasi Railway → PC kantor** (otomatis, AI di VS Code, output URL, auto GitHub) | **[docs/deployment/MIGRATE_RAILWAY_TO_OFFICE.md](./docs/deployment/MIGRATE_RAILWAY_TO_OFFICE.md)** | Multi-agent / bat per user |
+| Deploy PC kantor detail / tunnel | [DEPLOY_GUIDE.md](./docs/deployment/DEPLOY_GUIDE.md) + `scripts/office/*` | Contabo |
+| Ringkas LAN-only / konsep murni | [OFFICE_IP_DEPLOY.md](./docs/deployment/OFFICE_IP_DEPLOY.md), [KANTOR_MURNI.md](./docs/deployment/KANTOR_MURNI.md) | — |
+| Deploy Railway (legacy) | Migrasi keluar lewat MIGRATE_RAILWAY_TO_OFFICE | — |
 
 **Aturan emas:** 1 task = maks **3–5 file** dibuka. Pakai `Grep` / `Read` dengan `offset`+`limit`, bukan baca file utuh.
 

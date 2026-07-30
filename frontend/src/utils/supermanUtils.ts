@@ -58,41 +58,18 @@ export async function fetchSupermanAgentStatus(): Promise<SupermanAgentStatus> {
 }
 
 /**
- * Prefer agent di PC user yang login (mine_online).
- * App tetap di Railway; Playwright di device user yang menjalankan agent.
+ * Executor Superman: default **server** (PC kantor self-host / Docker).
+ * Multi-agent desktop tidak dipakai sebagai jalur utama.
  */
 export async function resolveSupermanExecutor(): Promise<{
   executor: 'agent' | 'server'
   agentOnline: boolean
   hint: string
 }> {
-  try {
-    const st = await fetchSupermanAgentStatus()
-    const mine = st.mine_online ?? st.online
-    if (mine) {
-      const names = (st.agents || []).map((a) => a.name || a.hostname || a.agent_id.slice(0, 8)).join(', ')
-      return {
-        executor: 'agent',
-        agentOnline: true,
-        hint: names
-          ? `Agent Anda online (${names}) — Superman dijalankan di PC ini/device agent Anda.`
-          : 'Agent Anda online — Superman dijalankan di PC agent Anda.',
-      }
-    }
-    return {
-      executor: 'server',
-      agentOnline: false,
-      hint:
-        st.hint ||
-        'Agent Anda offline. Double-click Mulai-Agent.bat di PC (user login sama dengan web), '
-        + 'biarkan terbuka, lalu klik Buat Deklarasi lagi. Captcha di web Railway tidak akan berhasil.',
-    }
-  } catch {
-    return {
-      executor: 'server',
-      agentOnline: false,
-      hint: 'Status agent tidak terbaca — fallback server Railway.',
-    }
+  return {
+    executor: 'server',
+    agentOnline: false,
+    hint: 'Superman dijalankan di server app (PC kantor). Captcha sekali lewat web jika diminta.',
   }
 }
 
