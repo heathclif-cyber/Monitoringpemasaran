@@ -1,5 +1,9 @@
 # Superman Local Agent — Railway + device user
 
+> **Panduan lengkap multi-user + prompt Claude Cowork:**  
+> [`SUPERMAN_AGENT_SETUP_MULTIUSER.md`](./SUPERMAN_AGENT_SETUP_MULTIUSER.md)  
+> Buka file itu di device lain / serahkan ke AI untuk setup end-to-end.
+
 Aplikasi **tetap di Railway**. Playwright (isi form Superman) dijalankan di **PC/device user yang login**, lewat agent desktop.
 
 ```
@@ -10,14 +14,18 @@ Aplikasi **tetap di Railway**. Playwright (isi form Superman) dijalankan di **PC
               [Agent di PC Anda]  →  Playwright → portal Superman
 ```
 
-## Aturan penting
+## Aturan penting (multi-user / multi-device)
 
 | Aturan | Arti |
 |--------|------|
-| Agent = user login | Heartbeat & claim pakai token user app yang sama |
-| Job terikat `user_id` | Agent Budi **tidak** bisa ambil job Ani |
-| Multi-device | Jalankan `watch` di PC yang sedang dipakai; matikan agent di PC lama |
-| Railway | Host app saja; **bukan** default runner Playwright jika agent online |
+| Agent = user login | Heartbeat & claim pakai token user app yang sama dengan browser web |
+| Job terikat `user_id` | Agent Budi **tidak** bisa ambil job Ani — aman multi-user |
+| Multi-device | Tiap user jalankan `watch` di PC-nya sendiri (paralel OK) |
+| Satu user, banyak PC | Hanya 1 agent aktif per user; matikan agent di PC lama |
+| Session Superman | Per-PC di file lokal (`.superman_state.json`); captcha di PC agent |
+| Railway | Host app + antrean job; Playwright default di PC agent jika online |
+
+**Contoh 3 user:** Budi, Ani, Citra masing-masing buka `Mulai-Superman-Agent.bat`, login user app sendiri, biarkan jendela terbuka. Di web, masing-masing login user yang sama lalu klik Buat Deklarasi — job hanya jatuh ke agent user itu.
 
 ## Setup sekali per device user
 
@@ -107,5 +115,16 @@ Tidak perlu ubah Railway URL.
 | Stuck “Menunggu agent” | `watch` belum jalan / username beda dengan web |
 | Claim kosong terus | Token agent beda user dari yang klik web |
 | Gagal dokumen | Upload PDF di app; unduh lewat `/api/documents/download/...` |
-| Captcha Superman | `commands/login.py --manual` di PC agent |
+| Captcha Superman | Agent auto-OCR dulu; jika gagal buka browser. Atau: `commands/login.py --manual` |
 | DATABASE_URL error | Agent butuh URL Postgres production di `.env` |
+| Job user A di agent user B | Normal tidak terjadi (filter `user_id`). Cek login web vs agent sama |
+| Beberapa agent 1 user | Claim race: satu agent menang; matikan agent di device yang tidak dipakai |
+
+## Verifikasi uji (2026-07-30)
+
+Invoice `R08D-RO/INV/2026.07.29-1` (CV Melolo Indah, Rp 180jt) via agent lokal:
+
+1. Heartbeat + claim + unduh 3 dokumen ✓  
+2. Playwright di PC (session captcha lokal) ✓  
+3. Draft SPPn tersimpan: **R8/R08D/SPPn/83/VII/2026** ✓  
+4. Field `superman` di invoice ter-update ✓

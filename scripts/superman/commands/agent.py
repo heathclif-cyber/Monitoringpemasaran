@@ -140,6 +140,44 @@ def download_docs(client: ApiClient, documents: list[dict], dest: Path) -> list[
     return paths
 
 
+def ensure_local_superman_session(*, on_progress=None) -> str:
+    """Pastikan session portal Superman di PC agent (OCR dulu, fallback browser).
+
+    Multi-user: tiap device punya file session sendiri di SUPERMAN_STATE_PATH.
+    """
+    from services.superman.auth import (
+        SupermanCaptchaError,
+        SupermanCaptchaRequired,
+        _save_session,
+        ensure_session,
+    )
+    from services.superman.config import SupermanConfig
+
+    cfg = SupermanConfig.from_env()
+    if not cfg.username or not cfg.password:
+        raise RuntimeError(
+            "SUPERMAN_USER / SUPERMAN_PASSWORD kosong di .env PC agent "
+            "(credential portal Superman, bukan user app Monitoring)."
+        )
+    report = on_progress or (lambda _p, _s: None)
+    report(8, "Memvalidasi session Superman di PC agent...")
+    try:
+        # Agent selalu boleh auto-login OCR di PC (tidak bergantung SUPERMAN_AUTO_LOGIN server)
+        path = ensure_session(cfg, auto_login=True)
+        report(12, "Session Superman PC valid")
+        return path
+    except (SupermanCaptchaRequired, SupermanCaptchaError) as exc:
+        print(f"  [session] Auto-login gagal: {exc}")
+        print(
+            "  [session] Membuka browser — selesaikan captcha login Superman, "
+            "tunggu sampai masuk dashboard."
+        )
+        report(9, "Captcha manual di browser PC agent...")
+        path = _save_session(cfg, manual=True)
+        report(12, "Session Superman PC tersimpan (manual)")
+        return path
+
+
 def run_claimed_job(client: ApiClient, agent_id: str, job: dict) -> None:
     from services.superman.runner import submit_deklarasi_invoice
 
@@ -177,6 +215,7 @@ def run_claimed_job(client: ApiClient, agent_id: str, job: dict) -> None:
                 print(f"  [warn] progress API: {exc}")
 
         on_progress(3, "Agent mengunduh dokumen & memulai Playwright...")
+        ensure_local_superman_session(on_progress=on_progress)
         result = submit_deklarasi_invoice(
             no_invoice,
             on_progress=on_progress,

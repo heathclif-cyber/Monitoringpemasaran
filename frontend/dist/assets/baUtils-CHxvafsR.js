@@ -1,0 +1,1 @@
+function a(n,e,t=0,o=0){let c=n*e;return o>0&&t>0?c+=t*(n/o):o<=0&&t>0&&(c+=t),c}function f(n){return Math.round((n+Number.EPSILON)*100)/100}function i(n,e,t="true",o=11,c=0,r=0){const u=a(n,e,c,r),s=String(t).toLowerCase()!=="false"?u*(o/100):0;return f(u+s)}export{i as c};

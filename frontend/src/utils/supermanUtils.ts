@@ -84,7 +84,8 @@ export async function resolveSupermanExecutor(): Promise<{
       agentOnline: false,
       hint:
         st.hint ||
-        'Agent Anda offline. Jalankan di PC: python scripts/superman_agent.py watch — fallback Railway sering gagal.',
+        'Agent Anda offline. Double-click Mulai-Agent.bat di PC (user login sama dengan web), '
+        + 'biarkan terbuka, lalu klik Buat Deklarasi lagi. Captcha di web Railway tidak akan berhasil.',
     }
   } catch {
     return {

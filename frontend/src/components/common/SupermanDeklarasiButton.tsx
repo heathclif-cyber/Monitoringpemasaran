@@ -237,9 +237,21 @@ export function SupermanDeklarasiButton({
       await showResult(result)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Gagal membuat SPPn di Superman'
-      if (isSupermanSessionError(err) || isSupermanSessionMessage(message)) {
+      const low = message.toLowerCase()
+      const pointsToLocalAgent =
+        low.includes('agent') ||
+        low.includes('pc') ||
+        low.includes('connecttimeout') ||
+        low.includes('railway')
+      if (
+        (isSupermanSessionError(err) || isSupermanSessionMessage(message)) &&
+        !pointsToLocalAgent
+      ) {
         closeProgress()
-        setCaptchaOpen(true)
+        addNotification(
+          'Session server kosong. Jalankan Mulai-Agent.bat di PC, lalu klik Buat Deklarasi lagi.',
+          'warning',
+        )
         return
       }
       setFailed(true)
@@ -290,24 +302,30 @@ export function SupermanDeklarasiButton({
     setLoading(true)
     try {
       const exec = await resolveSupermanExecutor()
-      // Mode agent: session Superman ada di PC agent, skip captcha server Railway.
-      if (exec.executor === 'server') {
-        const status = await client.get<SupermanStatus>('/api/superman/status')
-        if (!status.session_valid) {
-          setOpen(false)
-          setCaptchaOpen(true)
-          return
-        }
-      }
-      await runDeklarasi()
-    } catch (err) {
-      if (isSupermanSessionError(err)) {
-        setOpen(false)
-        setCaptchaOpen(true)
+      // Mode agent: captcha di PC — jangan buka dialog Railway (selalu timeout).
+      if (exec.agentOnline || exec.executor === 'agent') {
+        await runDeklarasi()
         return
       }
+      // Server only: cek session Railway
+      try {
+        const status = await client.get<SupermanStatus>('/api/superman/status')
+        if (status.session_valid) {
+          await runDeklarasi()
+          return
+        }
+      } catch {
+        /* ignore */
+      }
+      setOpen(false)
       addNotification(
-        err instanceof Error ? err.message : 'Gagal memeriksa session Superman',
+        'Agent PC offline. Jalankan Mulai-Agent.bat (user sama dengan web), biarkan terbuka, lalu coba lagi. '
+          + 'Captcha di web Railway tidak berhasil (jaringan datacenter).',
+        'warning',
+      )
+    } catch (err) {
+      addNotification(
+        err instanceof Error ? err.message : 'Gagal memeriksa status Superman',
         'error',
       )
     } finally {

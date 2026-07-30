@@ -64,10 +64,7 @@ def is_session_valid(cfg: SupermanConfig, state_path: Path) -> bool:
         pass
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=_HTTP2_DISABLED_ARGS,
-            )
+            browser = p.chromium.launch(**_chromium_launch_kwargs(headless=True))
             context = browser.new_context(storage_state=str(state_path))
             page = context.new_page()
             page.goto(_session_check_url(cfg), wait_until="domcontentloaded", timeout=30000)
@@ -151,9 +148,7 @@ def _save_session(cfg: SupermanConfig, *, manual: bool = False) -> str:
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            headless=not manual,
-            slow_mo=200 if manual else 0,
-            args=_HTTP2_DISABLED_ARGS,
+            **_chromium_launch_kwargs(headless=not manual, slow_mo=200 if manual else 0)
         )
         context = browser.new_context()
         page = context.new_page()
@@ -196,6 +191,27 @@ Pola ini khas proxy/WAF pihak ketiga yang salah menangani ALPN untuk HTTP/2;
 matikan HTTP/2 di Chromium supaya TLS jatuh ke HTTP/1.1 saja."""
 
 
+def _chromium_launch_kwargs(*, headless: bool, slow_mo: int = 0) -> dict:
+    """Launch Chromium / Chrome / Edge.
+
+    SUPERMAN_BROWSER:
+      - chromium (default) — butuh `playwright install chromium` (sering diblokir IT)
+      - chrome — Google Chrome yang sudah terpasang di PC (tanpa unduh)
+      - msedge / edge — Microsoft Edge terpasang (tanpa unduh, cocok PC kantor)
+    """
+    engine = (os.getenv("SUPERMAN_BROWSER") or "chromium").strip().lower()
+    kwargs: dict = {
+        "headless": headless,
+        "slow_mo": slow_mo,
+        "args": list(_HTTP2_DISABLED_ARGS),
+    }
+    if engine in ("chrome", "google-chrome", "googlechrome"):
+        kwargs["channel"] = "chrome"
+    elif engine in ("msedge", "edge", "microsoft-edge"):
+        kwargs["channel"] = "msedge"
+    return kwargs
+
+
 def open_authenticated_context(cfg: SupermanConfig) -> tuple:
     """Return (playwright_manager, browser, context) — caller must close.
 
@@ -219,10 +235,9 @@ def open_authenticated_context(cfg: SupermanConfig) -> tuple:
             slow_mo=cfg.slow_mo_ms,
         )
     else:
+        # chromium / chrome / msedge via channel
         browser = p.chromium.launch(
-            headless=cfg.headless,
-            slow_mo=cfg.slow_mo_ms,
-            args=_HTTP2_DISABLED_ARGS,
+            **_chromium_launch_kwargs(headless=cfg.headless, slow_mo=cfg.slow_mo_ms)
         )
     context: BrowserContext = browser.new_context(storage_state=state)
     return p, browser, context

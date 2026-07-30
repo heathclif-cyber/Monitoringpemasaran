@@ -360,9 +360,26 @@ export default function PembayaranPage() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Gagal membuat SPPn di Superman'
-      if (isSupermanSessionError(err) || isSupermanSessionMessage(message)) {
+      const low = message.toLowerCase()
+      // Error captcha/session dari jalur agent/PC — jangan buka dialog captcha Railway
+      const pointsToLocalAgent =
+        low.includes('agent') ||
+        low.includes('pc anda') ||
+        low.includes('pc agent') ||
+        low.includes('mulai-agent') ||
+        low.includes('connecttimeout') ||
+        low.includes('railway')
+      if (
+        (isSupermanSessionError(err) || isSupermanSessionMessage(message)) &&
+        !pointsToLocalAgent
+      ) {
+        // Hanya captcha server murni (jarang berhasil) — tetap arahkan ke agent
         closeSupermanProgress()
-        setCaptchaOpen(true)
+        addNotification(
+          'Session Superman di server kosong. Jalankan Mulai-Agent.bat di PC, '
+            + 'lalu klik Buat Deklarasi lagi (captcha diisi di PC, bukan di web).',
+          'warning',
+        )
         return
       }
       setFailed(true)
@@ -416,16 +433,36 @@ export default function PembayaranPage() {
       return
     }
     try {
-      const status = await client.get<SupermanStatus>('/api/superman/status')
-      if (!status.session_valid) {
-        pendingSupermanRef.current = true
-        setCaptchaOpen(true)
+      // Captcha di Railway hampir selalu gagal (ConnectTimeout ke portal Superman).
+      // Jika agent lokal user online → langsung executor=agent, captcha di PC.
+      const exec = await resolveSupermanExecutor()
+      if (exec.agentOnline) {
+        addNotification(exec.hint, 'info')
+        await runSupermanForInvoice(noInvoice)
         return
       }
-      await runSupermanForInvoice(noInvoice)
+
+      // Agent offline: coba session server; jika tidak ada, minta buka agent (bukan andalkan captcha Railway)
+      try {
+        const status = await client.get<SupermanStatus>('/api/superman/status')
+        if (status.session_valid) {
+          await runSupermanForInvoice(noInvoice)
+          return
+        }
+      } catch {
+        /* ignore — status server tidak wajib */
+      }
+
+      addNotification(
+        'Agent PC offline dan session Railway kosong. '
+          + 'Jalankan Mulai-Agent.bat di PC (login user yang sama), biarkan terbuka, '
+          + 'lalu klik Buat Deklarasi lagi. Captcha di web Railway tidak akan berhasil.',
+        'warning',
+      )
+      // Jangan buka dialog captcha Railway — membingungkan & selalu timeout
     } catch (err) {
       addNotification(
-        err instanceof Error ? err.message : 'Gagal memeriksa session Superman',
+        err instanceof Error ? err.message : 'Gagal memulai Superman',
         'error',
       )
     }
