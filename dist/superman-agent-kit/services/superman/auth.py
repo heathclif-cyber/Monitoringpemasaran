@@ -1,0 +1,243 @@
+from __future__ import annotations
+
+import os
+import tempfile
+import threading
+from pathlib import Path
+
+from playwright.sync_api import BrowserContext, Page, sync_playwright
+
+from services.superman.captcha import solve_math_captcha
+from services.superman.config import SupermanConfig
+
+
+class SupermanCaptchaError(RuntimeError):
+    """Login gagal karena captcha OCR tidak berhasil."""
+
+
+class SupermanCaptchaRequired(RuntimeError):
+    """Session Superman belum ada — user harus isi captcha lewat UI."""
+
+
+_session_io_lock = threading.Lock()
+
+
+def _is_login_page(page: Page) -> bool:
+    return page.locator("#signin-username").count() > 0
+
+
+def _max_captcha_attempts() -> int:
+    return int(os.getenv("SUPERMAN_CAPTCHA_MAX_ATTEMPTS", "40"))
+
+
+def _session_check_url(cfg: SupermanConfig) -> str:
+    return f"{cfg.base_url.rstrip('/')}/sppd"
+
+
+def is_session_valid(cfg: SupermanConfig, state_path: Path) -> bool:
+    if not state_path.is_file():
+        return False
+    # Prefer HTTP check (cepat di Railway); Playwright page.goto sering hang.
+    try:
+        import json
+
+        import httpx
+
+        state = json.loads(Path(state_path).read_text(encoding="utf-8"))
+        cookies = {
+            c["name"]: c["value"]
+            for c in (state.get("cookies") or [])
+            if c.get("name") and c.get("value") is not None
+        }
+        if not cookies:
+            return False
+        with httpx.Client(timeout=20.0, follow_redirects=True, cookies=cookies) as client:
+            resp = client.get(_session_check_url(cfg))
+            html = (resp.text or "").lower()
+            if resp.status_code >= 400:
+                return False
+            # Halaman login = session mati
+            if "signin-username" in html or 'name="username"' in html:
+                return False
+            return True
+    except Exception:
+        pass
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(**_chromium_launch_kwargs(headless=True))
+            context = browser.new_context(storage_state=str(state_path))
+            page = context.new_page()
+            page.goto(_session_check_url(cfg), wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(1500)
+            valid = not _is_login_page(page)
+            browser.close()
+        return valid
+    except Exception:
+        return False
+
+
+def login(page: Page, cfg: SupermanConfig, max_attempts: int | None = None) -> bool:
+    attempts = max_attempts or _max_captcha_attempts()
+    page.goto(cfg.base_url, wait_until="networkidle", timeout=60000)
+    last_raw: str | None = None
+    for _ in range(attempts):
+        page.fill("#signin-username", cfg.username)
+        page.fill("#signin-password", cfg.password)
+        img_src = page.locator('img[src*="captcha"]').first.get_attribute("src") or ""
+        if img_src.startswith("/"):
+            img_src = cfg.base_url.rstrip("/") + img_src
+        body = page.request.get(img_src).body()
+        answer, raw = solve_math_captcha(body)
+        last_raw = raw
+        if not answer:
+            page.click("#reload")
+            page.wait_for_timeout(600)
+            continue
+        page.fill("#captcha", answer)
+        page.click('button[type="submit"]')
+        page.wait_for_load_state("networkidle", timeout=20000)
+        page.wait_for_timeout(1200)
+        if not _is_login_page(page):
+            return True
+        page.goto(cfg.base_url, wait_until="networkidle")
+    raise SupermanCaptchaError(
+        f"Login Superman gagal setelah {attempts} percobaan captcha (terakhir OCR={last_raw!r}). "
+        "Jalankan `python scripts/superman/commands/login.py --manual` di komputer lokal untuk menyimpan session, "
+        "lalu pasang file session ke Railway (SUPERMAN_STATE_PATH + volume)."
+    )
+
+
+def login_manual(page: Page, cfg: SupermanConfig, timeout_ms: int = 300_000) -> bool:
+    page.goto(cfg.base_url, wait_until="networkidle", timeout=60000)
+    page.fill("#signin-username", cfg.username)
+    page.fill("#signin-password", cfg.password)
+    page.wait_for_function(
+        "() => !document.querySelector('#signin-username')",
+        timeout=timeout_ms,
+    )
+    return True
+
+
+def _write_storage_state_atomic(context: BrowserContext, state_path: Path) -> None:
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=state_path.parent,
+        prefix=f".{state_path.name}.",
+        suffix=".tmp",
+    )
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+    try:
+        context.storage_state(path=str(tmp_path))
+        os.replace(tmp_path, state_path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def save_storage_state_atomic(context: BrowserContext, state_path: Path | str) -> None:
+    with _session_io_lock:
+        _write_storage_state_atomic(context, Path(state_path))
+
+
+def _save_session(cfg: SupermanConfig, *, manual: bool = False) -> str:
+    state_path = Path(cfg.state_path)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    if not cfg.username or not cfg.password:
+        raise RuntimeError("Set SUPERMAN_USER dan SUPERMAN_PASSWORD di .env")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            **_chromium_launch_kwargs(headless=not manual, slow_mo=200 if manual else 0)
+        )
+        context = browser.new_context()
+        page = context.new_page()
+        if manual:
+            login_manual(page, cfg)
+        else:
+            login(page, cfg)
+        save_storage_state_atomic(context, state_path)
+        browser.close()
+    return str(state_path)
+
+
+def _auto_login_enabled() -> bool:
+    return os.getenv("SUPERMAN_AUTO_LOGIN", "").lower() in ("1", "true", "yes")
+
+
+def ensure_session(cfg: SupermanConfig, *, auto_login: bool | None = None) -> str:
+    state_path = Path(cfg.state_path)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    force = os.getenv("SUPERMAN_FORCE_LOGIN", "").lower() in ("1", "true", "yes")
+    use_auto = _auto_login_enabled() if auto_login is None else auto_login
+
+    if state_path.exists() and not force:
+        if is_session_valid(cfg, state_path):
+            return str(state_path)
+        state_path.unlink(missing_ok=True)
+
+    if not use_auto:
+        raise SupermanCaptchaRequired(
+            "Session Superman belum aktif. Isi captcha login Superman terlebih dahulu."
+        )
+
+    return _save_session(cfg, manual=False)
+
+
+_HTTP2_DISABLED_ARGS = ["--disable-http2"]
+"""ERR_ALPN_NEGOTIATION_FAILED terlihat konsisten pada POST /spp/store (payload
+besar, multipart+lampiran) — endpoint kecil (check-urutan-anomaly) selalu lolos.
+Pola ini khas proxy/WAF pihak ketiga yang salah menangani ALPN untuk HTTP/2;
+matikan HTTP/2 di Chromium supaya TLS jatuh ke HTTP/1.1 saja."""
+
+
+def _chromium_launch_kwargs(*, headless: bool, slow_mo: int = 0) -> dict:
+    """Launch Chromium / Chrome / Edge.
+
+    SUPERMAN_BROWSER:
+      - chromium (default) — butuh `playwright install chromium` (sering diblokir IT)
+      - chrome — Google Chrome yang sudah terpasang di PC (tanpa unduh)
+      - msedge / edge — Microsoft Edge terpasang (tanpa unduh, cocok PC kantor)
+    """
+    engine = (os.getenv("SUPERMAN_BROWSER") or "chromium").strip().lower()
+    kwargs: dict = {
+        "headless": headless,
+        "slow_mo": slow_mo,
+        "args": list(_HTTP2_DISABLED_ARGS),
+    }
+    if engine in ("chrome", "google-chrome", "googlechrome"):
+        kwargs["channel"] = "chrome"
+    elif engine in ("msedge", "edge", "microsoft-edge"):
+        kwargs["channel"] = "msedge"
+    return kwargs
+
+
+def open_authenticated_context(cfg: SupermanConfig) -> tuple:
+    """Return (playwright_manager, browser, context) — caller must close.
+
+    Engine dipilih via SUPERMAN_BROWSER (default chromium). Firefox pakai TLS
+    stack berbeda total (NSS, bukan BoringSSL) — dicoba sebagai mitigasi
+    ERR_ALPN_NEGOTIATION_FAILED yang konsisten muncul di Chromium saat POST
+    besar ke /spp/store, kalau memang bug-nya spesifik ke fingerprint TLS
+    Chromium.
+    """
+    state = ensure_session(cfg)
+    p = sync_playwright().start()
+    engine = cfg.browser_engine
+    if engine == "firefox":
+        browser = p.firefox.launch(
+            headless=cfg.headless,
+            slow_mo=cfg.slow_mo_ms,
+        )
+    elif engine == "webkit":
+        browser = p.webkit.launch(
+            headless=cfg.headless,
+            slow_mo=cfg.slow_mo_ms,
+        )
+    else:
+        # chromium / chrome / msedge via channel
+        browser = p.chromium.launch(
+            **_chromium_launch_kwargs(headless=cfg.headless, slow_mo=cfg.slow_mo_ms)
+        )
+    context: BrowserContext = browser.new_context(storage_state=state)
+    return p, browser, context

@@ -1,0 +1,17 @@
+﻿JIKA MULTI-AGENT DIBLOKIR KEAMANAN IT
+====================================
+Jangan pasang agent di setiap laptop.
+
+Model yang disarankan:
+1. Satu PC KANTOR (server kecil) yang diizinkan jaringan
+2. Install kit + Mulai-Agent.bat di PC itu (user service/shared)
+3. Semua staf cuma buka WEB di browser masing-masing
+4. Job dijalankan di PC agent pusat (bukan multi-device)
+
+Atau: minta IT buka akses ke:
+- https://superman.ptpn1.co.id
+- unduhan Playwright (jika pakai chromium)
+- CDN Microsoft Edge sudah ada di Windows = lebih aman
+
+Pack ini default SUPERMAN_BROWSER=msedge
+= pakai Edge Windows, TIDAK unduh Chrome for Testing.

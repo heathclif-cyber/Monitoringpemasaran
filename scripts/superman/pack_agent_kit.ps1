@@ -27,6 +27,8 @@ $files = @(
   "services\cache.py",
   "services\laporan_ho_export.py",
   "services\local_storage.py",
+  "services\money_utils.py",
+  "services\pembayaran_utils.py",
   "services\volume_utils.py",
   "services\superman\__init__.py",
   "services\superman\agent_registry.py",
