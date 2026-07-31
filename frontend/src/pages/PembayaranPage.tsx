@@ -135,6 +135,10 @@ export default function PembayaranPage() {
     if (selectedInvoice) {
       fetchInvoiceContext(selectedInvoice)
       pembayaranStore.fetchByInvoice(selectedInvoice).then(setInvoicePembayaran)
+      // Termin baru: jangan bawa/isi nominal dari sisa — user isi transfer aktual.
+      if (!isExisting && !savedNo) {
+        setValue('nominal_transfer', 0)
+      }
     } else {
       setInvoicePembayaran([])
     }
@@ -231,19 +235,10 @@ export default function PembayaranPage() {
   const baNo = (currentInvoice?.no_ba || '').trim()
   const isInvoiceLocked = Boolean(invoiceSuperman)
 
-  useEffect(() => {
-    if (!selectedInvoice || isExisting || savedNo) return
-    if (exactTransferNominal > 0 && sisaPelunasan > 0) {
-      setValue('nominal_transfer', exactTransferNominal)
-    }
-  }, [
-    selectedInvoice,
-    exactTransferNominal,
-    sisaPelunasan,
-    isExisting,
-    savedNo,
-    setValue,
-  ])
+  // Jangan auto-isi nominal_transfer dengan sisa pelunasan.
+  // User mengisi transfer aktual; sisa tetap untuk termin berikutnya
+  // (dan Superman baru setelah ada pembayaran atas sisa/kurang bayar).
+  // Opt-in via tombol "Gunakan pas-pasan" di bawah field nominal.
 
   const resetSupermanProgress = () => {
     setFailed(false)
@@ -595,7 +590,8 @@ export default function PembayaranPage() {
                 </p>
                 {!invoiceSuperman && !isInvoiceFullyPaid && (
                   <p className="text-xs text-slate-400 mt-1">
-                    Catat pembayaran dulu. Superman dibuat terpisah setelah invoice lunas dan dokumen wajib lengkap.
+                    Isi nominal transfer aktual (boleh sebagian). Sisa kurang bayar tetap;
+                    Superman dibuat setelah lunas — termasuk jika dilunasi lewat termin berikutnya.
                   </p>
                 )}
                 {!invoiceSuperman && isInvoiceFullyPaid && (
@@ -681,21 +677,26 @@ export default function PembayaranPage() {
                   {errors.nominal_transfer && (
                     <p className="text-xs text-red-500 mt-1">{errors.nominal_transfer.message}</p>
                   )}
-                  {selectedInvoice && exactTransferNominal > 0 && sisaPelunasan > 0 && (
+                  {selectedInvoice && sisaPelunasan > 0 && (
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       <p className="text-xs text-slate-500">
-                        Transfer pas-pasan lunas: {formatCurrency(exactTransferNominal)}
-                        {currentKontrak?.is_pph === 'true' && (
-                          <> · pelunasan tersisa {formatCurrency(sisaPelunasan)}</>
+                        Sisa pelunasan: {formatCurrency(sisaPelunasan)}
+                        {exactTransferNominal > 0 && exactTransferNominal !== sisaPelunasan && (
+                          <> · transfer pas-pasan lunas: {formatCurrency(exactTransferNominal)}</>
+                        )}
+                        {exactTransferNominal > 0 && exactTransferNominal === sisaPelunasan && (
+                          <> · isi nominal aktual (boleh sebagian)</>
                         )}
                       </p>
-                      {Number(nominalTransfer) !== exactTransferNominal && canEdit() && (
+                      {exactTransferNominal > 0 &&
+                        Number(nominalTransfer) !== exactTransferNominal &&
+                        canEdit() && (
                         <button
                           type="button"
                           className="text-xs text-primary underline-offset-2 hover:underline"
                           onClick={() => setValue('nominal_transfer', exactTransferNominal)}
                         >
-                          Gunakan pas-pasan
+                          Gunakan pas-pasan lunas
                         </button>
                       )}
                     </div>

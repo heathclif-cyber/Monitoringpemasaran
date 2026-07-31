@@ -21,7 +21,7 @@ const PAGE_META: Record<string, PageMeta> = {
     breadcrumb: 'Dokumen / Invoice',
   },
   '/pembayaran': {
-    title: 'Input Pembayaran',
+    title: 'Pembayaran',
     description: 'Catat transfer mitra dan buat SPPn Superman (no pembayaran = referensi AU58)',
     breadcrumb: 'Dokumen / Pembayaran',
   },

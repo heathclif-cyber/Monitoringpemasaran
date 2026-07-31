@@ -420,7 +420,7 @@ export default function DOPage() {
                 />
                 {errors.no_pembayaran && <p className="text-xs text-red-500 mt-1">{errors.no_pembayaran.message}</p>}
                 <p className="text-xs text-slate-400 mt-1">
-                  Pilih nomor Superman dari pembayaran yang sudah lunas. Buat deklarasi di menu Input Pembayaran.
+                  Pilih nomor Superman dari pembayaran yang sudah lunas. Buat deklarasi di menu Pembayaran.
                   Format: nomor Superman - nama pembeli - tanggal pembayaran.
                 </p>
               </div>
