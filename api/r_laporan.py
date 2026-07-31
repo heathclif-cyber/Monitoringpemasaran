@@ -26,6 +26,15 @@ from services.laporan_ho_export import generate_laporan_ho_xlsx, MONTHS_ID
 
 router = APIRouter(prefix="/api/laporan", tags=["Laporan"])
 
+
+def _display_satuan(satuan) -> str:
+    """Normalize unit label for laporan UI/export. Product names are untouched."""
+    s = (satuan or "Kg").strip()
+    if s.lower() in ("butir", "ea"):
+        return "EA"
+    return s or "Kg"
+
+
 def format_date(d):
     if not d: return ""
     return d.strftime("%d/%m/%Y")
@@ -314,7 +323,7 @@ def _build_laporan_rows(db: Session):
             "Link_Berita_Acara_Serah_Terima": do.link_berita_acara_serah_terima if do else "",
             "Dokumen_Superman": dokumen_superman,
             "Dokumen_Superman_Siap": dokumen_superman_siap,
-            "Satuan": k.satuan or "Kg"
+            "Satuan": _display_satuan(k.satuan),
         }
 
     for k in kontraks:
@@ -379,7 +388,7 @@ def _build_laporan_rows(db: Session):
             "Jumlah_DO": b.volume or 0,
             "PPN_Persen": 0,
             "PPh_Persen": 0,
-            "Satuan": b.satuan or "Kg",
+            "Satuan": _display_satuan(b.satuan),
             "Pendapatan_Pokok": b.nominal or 0,
             "Pendapatan_Setelah_PPN": b.nominal or 0,
             "Pajak_PPN": 0,

@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { LaporanRow } from '@/types'
+import { normalizeSatuan } from '@/utils/satuanUtils'
 
 /** Convert 0-based column index to Excel letter (0 → A, 13 → N). */
 function colLetter(index: number): string {
@@ -117,7 +118,7 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
     setStr(2, row.No_Kontrak)
     setStr(3, row.Unit)
     setStr(4, row.Komoditi)
-    setStr(5, row.Satuan || 'Kg')
+    setStr(5, normalizeSatuan(row.Satuan))
     setStr(6, row.Billing_Date)
     setStr(7, row.Tanggal_Transfer)
     setNum(10, row.Jumlah_Transfer)

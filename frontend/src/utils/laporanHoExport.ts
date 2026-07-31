@@ -1,4 +1,5 @@
 import type { LaporanRow } from '@/types'
+import { normalizeSatuan } from '@/utils/satuanUtils'
 
 function pickReportMonth(months: string[]): string | null {
   if (months.length === 0) return null
@@ -12,7 +13,7 @@ function toHoPayloadRow(row: LaporanRow) {
     Jumlah_DO: row.Jumlah_DO,
     DPP_Pokok: row.DPP_Pokok,
     Pendapatan_Pokok: row.Pendapatan_Pokok,
-    Satuan: row.Satuan,
+    Satuan: normalizeSatuan(row.Satuan),
     Raw_Date: row.Raw_Date,
     Tanggal_Transfer: row.Tanggal_Transfer,
     Bulan_Buku: row.Bulan_Buku,

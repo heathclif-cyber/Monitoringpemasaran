@@ -33,6 +33,7 @@ import { FilterSelect } from '@/components/common/FilterBar'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
+import { normalizeSatuan } from '@/utils/satuanUtils'
 import {
   filterLaporanRows,
   calculateLaporanSummary,
@@ -713,7 +714,7 @@ function LaporanTableRow({
       </td>
       <td className={cn(TD, 'min-w-[8rem] whitespace-normal break-words')}>{row.Unit}</td>
       <td className={cn(TD, 'min-w-[7.5rem] whitespace-normal break-words')}>{row.Komoditi}</td>
-      <td className={cn(TD, 'text-center min-w-[4.5rem]')}>{row.Satuan}</td>
+      <td className={cn(TD, 'text-center min-w-[4.5rem]')}>{normalizeSatuan(row.Satuan)}</td>
       <td className={cn(TD, 'whitespace-nowrap min-w-[8rem]')}>{formatDate(row.Billing_Date)}</td>
       <td className={cn(TD, 'whitespace-nowrap min-w-[8rem]')}>{formatDate(row.Tanggal_Transfer)}</td>
       <MoneyCell value={row.Pelunasan} className="text-blue-600 dark:text-blue-400 font-medium" />

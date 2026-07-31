@@ -225,7 +225,7 @@ def _ba_to_ho_row(ba, kontrak, invoice=None) -> dict:
         "Jumlah_DO": volume,
         "DPP_Pokok": pokok,
         "Pendapatan_Pokok": pokok,
-        "Satuan": kontrak.satuan or "Kg",
+        "Satuan": "EA" if (kontrak.satuan or "").strip().lower() in ("butir", "ea") else (kontrak.satuan or "Kg"),
         "No_BA": ba.no_ba,
         "Tanggal_BA": ba.tanggal_ba.strftime("%Y-%m-%d") if ba.tanggal_ba else "",
         "Bulan_Buku": _format_bulan_buku(buku),
