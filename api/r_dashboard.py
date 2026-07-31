@@ -138,7 +138,7 @@ def get_dashboard_data(
                 pendapatan_do = k_nilai * (do_vol / k_vol) if k_vol > 0 else k_nilai
             
             satuan = (k.satuan or "Kg").lower()
-            if satuan == "butir":
+            if satuan in ("butir", "ea"):
                 total_volume_butir += do_vol
             else:
                 total_volume_kg += do_vol
@@ -167,7 +167,7 @@ def get_dashboard_data(
             if not _effective_sap(do.billing_sap, getattr(inv, "billing_sap", None)):
                 sap_m[sk]["missing_billing"] += 1
             
-            if satuan == "butir":
+            if satuan in ("butir", "ea"):
                 vol_m_butir[f"{m:02d}"] += do_vol
             else:
                 vol_m_kg[f"{m:02d}"] += do_vol
@@ -227,7 +227,7 @@ def get_dashboard_data(
             total_nilai_invoice += nom
             
             satuan = (b.satuan or "Kg").lower()
-            if satuan == "butir":
+            if satuan in ("butir", "ea"):
                 total_volume_butir += vol
             else:
                 total_volume_kg += vol
@@ -246,7 +246,7 @@ def get_dashboard_data(
             if not _sap_val(b.billing_sap):
                 sap_m[bk]["missing_billing"] += 1
             
-            if satuan == "butir":
+            if satuan in ("butir", "ea"):
                 vol_m_butir[f"{m:02d}"] += vol
             else:
                 vol_m_kg[f"{m:02d}"] += vol

@@ -39,7 +39,7 @@ async function fetchDashboardData() {
         
         let doVolText = [];
         if (data.summary.total_volume_kg > 0) doVolText.push(Number(data.summary.total_volume_kg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
-        if (data.summary.total_volume_butir > 0) doVolText.push(Number(data.summary.total_volume_butir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (data.summary.total_volume_butir > 0) doVolText.push(Number(data.summary.total_volume_butir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' EA');
         if (doVolText.length === 0) doVolText.push('0 Kg');
 
         const volDetailEl = document.getElementById('dash-volume-detail');
@@ -263,7 +263,7 @@ async function fetchDashboardData() {
                         borderRadius: 6,
                     },
                     {
-                        label: 'Realisasi (Butir)',
+                        label: 'Realisasi (EA)',
                         data: data.charts.bulanan.volume_butir,
                         backgroundColor: '#fbbf24', // Yellowish/Amber
                         borderRadius: 6,

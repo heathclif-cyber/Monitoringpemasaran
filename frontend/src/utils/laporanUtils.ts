@@ -140,6 +140,7 @@ export function calculateLaporanSummary(rows: LaporanRow[]): LaporanSummary {
 
   for (const row of rows) {
     const satuan = (row.Satuan || 'Kg').toLowerCase()
+    const isEa = satuan === 'ea' || satuan === 'butir'
     const volDo = row.Jumlah_DO || 0
     const harga = row.Harga_Satuan || 0
 
@@ -154,12 +155,12 @@ export function calculateLaporanSummary(rows: LaporanRow[]): LaporanSummary {
       if (sisaBayar > 0) result.sisaBayar += sisaBayar
       const sisaVol = row.Sisa_Volume || 0
       if (sisaVol > 0) {
-        if (satuan === 'butir') result.sisaVolumeButir += sisaVol
+        if (isEa) result.sisaVolumeButir += sisaVol
         else result.sisaVolume += sisaVol
       }
     }
 
-    if (satuan === 'butir') {
+    if (isEa) {
       result.barangTerkirimButir += volDo
       totalButirVolume += volDo
       totalButirHargaVolume += harga * volDo

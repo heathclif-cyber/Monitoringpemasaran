@@ -439,7 +439,7 @@
             const volDO = parseFloat(r.Jumlah_DO) || 0;
             const satuan = (r.Satuan || "Kg").toLowerCase();
 
-            if (satuan === "butir") {
+            if (satuan === "butir" || satuan === "ea") {
                 totalDOVolumeButir += volDO;
                 totalPendapatanButir += pendPokok;
                 totalDPPButir += (parseFloat(r.DPP_Pokok) || 0);
@@ -456,7 +456,7 @@
                 uniqueInvoices.add(idKey);
                 if (r.Sisa_Pembayaran && r.Sisa_Pembayaran > 0) totalSisaPembayaran += r.Sisa_Pembayaran;
                 if (r.Sisa_Volume && r.Sisa_Volume > 0) {
-                    if (satuan === "butir") totalSisaVolumeButir += r.Sisa_Volume;
+                    if (satuan === "butir" || satuan === "ea") totalSisaVolumeButir += r.Sisa_Volume;
                     else totalSisaVolumeKg += r.Sisa_Volume;
                 }
             }
@@ -466,7 +466,7 @@
         
         let sisaVolText = [];
         if (totalSisaVolumeKg > 0) sisaVolText.push(Number(totalSisaVolumeKg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
-        if (totalSisaVolumeButir > 0) sisaVolText.push(Number(totalSisaVolumeButir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (totalSisaVolumeButir > 0) sisaVolText.push(Number(totalSisaVolumeButir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' EA');
         if (sisaVolText.length === 0) sisaVolText.push('0 Kg');
         document.getElementById('summary-sisa-volume').innerText = sisaVolText.join(' | ');
 
@@ -475,7 +475,7 @@
         
         let doVolText = [];
         if (totalDOVolumeKg > 0) doVolText.push(Number(totalDOVolumeKg).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kg');
-        if (totalDOVolumeButir > 0) doVolText.push(Number(totalDOVolumeButir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' Butir');
+        if (totalDOVolumeButir > 0) doVolText.push(Number(totalDOVolumeButir).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' EA');
         if (doVolText.length === 0) doVolText.push('0 Kg');
         document.getElementById('summary-barang-disetor').innerText = doVolText.join(' | ');
 
@@ -484,7 +484,7 @@
             avgText.push(`${formatRupiah(totalDPPKg / totalDOVolumeKg)} / Kg`);
         }
         if (totalDOVolumeButir > 0) {
-            avgText.push(`${formatRupiah(totalDPPButir / totalDOVolumeButir)} / Butir`);
+            avgText.push(`${formatRupiah(totalDPPButir / totalDOVolumeButir)} / EA`);
         }
         if (avgText.length === 0) avgText.push('Rp 0');
         document.getElementById('summary-harga-rata').innerHTML = avgText.join('<br><span class="text-xs text-slate-400 mt-1">|</span> ');

@@ -307,21 +307,21 @@ export default function LaporanPage() {
           fitValue
           label="Sisa Barang (DO)"
           value={formatNumber(summary.sisaVolume)}
-          subtitle={`Butir: ${formatNumber(summary.sisaVolumeButir)}`}
+          subtitle={`EA: ${formatNumber(summary.sisaVolumeButir)}`}
           icon={Package}
         />
         <StatCard
           fitValue
           label="Harga Rata-Rata"
           value={`${formatCurrency(summary.hargaRataKg)}/Kg`}
-          subtitle={`${formatCurrency(summary.hargaRataButir)}/Butir · Σ(harga×vol)/Σvol`}
+          subtitle={`${formatCurrency(summary.hargaRataButir)}/EA · Σ(harga×vol)/Σvol`}
           icon={BarChart3}
         />
         <StatCard
           fitValue
           label="Barang Terkirim"
           value={formatNumber(summary.barangTerkirimKg)}
-          subtitle={`Butir: ${formatNumber(summary.barangTerkirimButir)}`}
+          subtitle={`EA: ${formatNumber(summary.barangTerkirimButir)}`}
           icon={Box}
         />
       </div>

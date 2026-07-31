@@ -133,7 +133,7 @@ export default function BypassPage() {
                   <Label className="text-xs">Satuan</Label>
                   <NativeSelect {...register('satuan')}>
                     <option value="Kg">Kg</option>
-                    <option value="Butir">Butir</option>
+                    <option value="EA">EA</option>
                   </NativeSelect>
                 </div>
               </div>

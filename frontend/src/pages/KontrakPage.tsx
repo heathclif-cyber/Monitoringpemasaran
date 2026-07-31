@@ -33,6 +33,7 @@ import {
   syncKontrakFieldsFromUnits,
   type UnitRow,
 } from '@/utils/kontrakUtils'
+import { normalizeSatuan } from '@/utils/satuanUtils'
 
 const KONTRAK_STEPS: FormStep[] = [
   { id: 'identitas', label: 'Identitas', description: 'Data dasar & pihak' },
@@ -134,7 +135,7 @@ export default function KontrakPage() {
       no_reff: '',
       komoditi: 'Kelapa',
       jenis_komoditi: '',
-      satuan: 'Butir',
+      satuan: 'EA',
       tahun_panen: '',
       kebun_produsen: '',
       simbol: '',
@@ -216,12 +217,15 @@ export default function KontrakPage() {
       // Fallback material fields dari kontrak-level jika unit tidak punya
       const fbKomoditi = data.komoditi || ''
       const fbJenis = data.jenis_komoditi || ''
-      const fbSatuan = data.satuan || 'Kg'
+      const fbSatuan = normalizeSatuan(data.satuan || 'Kg')
       const fbTahun = data.tahun_panen || ''
       const fbDeskripsi = data.deskripsi_produk || ''
       const loadedPayung = isPayungBA(data.tipe_alur)
       if (loadedPayung) {
         setValue('volume', 0)
+      }
+      if (data.satuan) {
+        setValue('satuan', fbSatuan)
       }
       if (data.units && data.units.length > 0) {
         setUnitList(data.units.map(u => ({
@@ -229,7 +233,7 @@ export default function KontrakPage() {
           volume: loadedPayung ? 0 : (u.volume || 0),
           komoditi: u.komoditi || fbKomoditi,
           jenis_komoditi: u.jenis_komoditi || fbJenis,
-          satuan: u.satuan || fbSatuan,
+          satuan: normalizeSatuan(u.satuan || fbSatuan),
           tahun_panen: u.tahun_panen || fbTahun,
           deskripsi_produk: u.deskripsi_produk || fbDeskripsi,
         })))
@@ -596,7 +600,7 @@ export default function KontrakPage() {
                             className={`${sel} w-20 shrink-0`}
                           >
                             <option value="Kg">Kg</option>
-                            <option value="Butir">Butir</option>
+                            <option value="EA">EA</option>
                           </NativeSelect>
                           <Input
                             value={unit.tahun_panen}

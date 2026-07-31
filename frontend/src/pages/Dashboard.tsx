@@ -71,7 +71,7 @@ function StatCards() {
       <StatCard
         label="Volume Realisasi"
         value={formatNumber(summary.total_volume_all)}
-        subtitle={`${formatNumberDec(summary.total_volume_kg)} Kg | ${formatNumberDec(summary.total_volume_butir)} Butir`}
+        subtitle={`${formatNumberDec(summary.total_volume_kg)} Kg | ${formatNumberDec(summary.total_volume_butir)} EA`}
         icon={Box}
         trend={volumeTrend}
       />
@@ -163,7 +163,7 @@ function VolumeChart() {
   const chartData = data.charts.bulanan.labels.map((label, i) => ({
     bulan: label,
     'Volume Kg': data.charts.bulanan.volume_kg[i] || 0,
-    'Volume Butir': data.charts.bulanan.volume_butir[i] || 0,
+    'Volume EA': data.charts.bulanan.volume_butir[i] || 0,
   }))
 
   return (
@@ -180,7 +180,7 @@ function VolumeChart() {
             <Tooltip formatter={(value: number) => formatNumberDec(value)} />
             <Legend wrapperStyle={chartTheme.legendStyle} />
             <Bar dataKey="Volume Kg" fill="#f97316" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="Volume Butir" fill="var(--chart-2)" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="Volume EA" fill="var(--chart-2)" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { ResponsiveContainer, Treemap, Tooltip } from 'recharts'
 import type { StokSaldo } from '@/types'
 import { cn, formatNumber } from '@/lib/utils'
+import { isEaSatuan } from '@/utils/satuanUtils'
 
 interface StokSaldoHeatmapProps {
   saldos: StokSaldo[]
@@ -89,14 +90,14 @@ function shortMaterial(name: string): string {
 function compactSaldo(saldo: number, satuan: string, compact: boolean): string {
   const sign = saldo < 0 ? '−' : ''
   const abs = Math.abs(saldo)
-  const suf = satuan === 'Butir' ? ' Btr' : ' Kg'
+  const ea = isEaSatuan(satuan)
   if (compact) {
     if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)} jt`
     if (abs >= 10_000) return `${sign}${Math.round(abs / 1000)} rb`
     if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(1)} rb`
-    return `${sign}${Math.round(abs)}${satuan === 'Butir' ? ' B' : ''}`
+    return `${sign}${Math.round(abs)}${ea ? ' EA' : ''}`
   }
-  return `${formatNumber(saldo)} ${satuan}`
+  return `${formatNumber(saldo)} ${ea ? 'EA' : satuan}`
 }
 
 type LabelTier = 'large' | 'medium' | 'small' | 'tiny'
@@ -334,16 +335,16 @@ function SatuanHeatmap({ title, items }: { title: string; items: StokSaldo[] }) 
 
 export function StokSaldoHeatmap({ saldos, className }: StokSaldoHeatmapProps) {
   const bySatuan = useMemo(() => {
-    const kg = saldos.filter((s) => s.satuan !== 'Butir')
-    const butir = saldos.filter((s) => s.satuan === 'Butir')
-    return { kg, butir }
+    const kg = saldos.filter((s) => !isEaSatuan(s.satuan))
+    const ea = saldos.filter((s) => isEaSatuan(s.satuan))
+    return { kg, ea }
   }, [saldos])
 
   return (
     <div className={cn('space-y-5', className)}>
       <SatuanHeatmap title="Satuan Kg" items={bySatuan.kg} />
-      {bySatuan.butir.length > 0 && (
-        <SatuanHeatmap title="Satuan Butir" items={bySatuan.butir} />
+      {bySatuan.ea.length > 0 && (
+        <SatuanHeatmap title="Satuan EA" items={bySatuan.ea} />
       )}
     </div>
   )

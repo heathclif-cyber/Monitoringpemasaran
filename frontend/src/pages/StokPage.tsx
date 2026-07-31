@@ -18,6 +18,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { cn, formatNumber } from '@/lib/utils'
 import type { StokLedgerEntry } from '@/types'
+import { normalizeSatuan } from '@/utils/satuanUtils'
 
 const stokSchema = z.object({
   tanggal: z.string().min(1, 'Tanggal wajib diisi'),
@@ -118,7 +119,7 @@ export default function StokPage() {
     setValue('unit', entry.unit)
     setValue('jenis_material', entry.jenis_material)
     setValue('volume', entry.volume)
-    setValue('satuan', entry.satuan)
+    setValue('satuan', normalizeSatuan(entry.satuan))
     setValue('catatan', entry.catatan || '')
   }
 
@@ -183,7 +184,7 @@ export default function StokPage() {
                   <Label className="text-xs">Satuan</Label>
                   <NativeSelect {...register('satuan')}>
                     <option value="Kg">Kg</option>
-                    <option value="Butir">Butir</option>
+                    <option value="EA">EA</option>
                   </NativeSelect>
                 </div>
               </div>

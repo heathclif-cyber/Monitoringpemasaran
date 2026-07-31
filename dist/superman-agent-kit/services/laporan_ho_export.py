@@ -376,7 +376,7 @@ def _row_kuantum_nilai(row: dict) -> tuple[float, float]:
     volume = float(row.get("Jumlah_DO") or 0)
     # Selaras Total Pendapatan Laporan Digital (bukan DPP_Pokok)
     nilai = float(row.get("Pendapatan_Pokok") or row.get("DPP_Pokok") or 0)
-    if satuan == "butir":
+    if satuan in ("butir", "ea"):
         return 0.0, nilai
     return volume, nilai
 
