@@ -381,6 +381,7 @@ class DocumentPipelineResponse(BaseModel):
     summary: DocumentPipelineSummaryOut
     rows: List[DocumentPipelineRowOut]
     units: List[str]
+    buyers: List[str] = []
     scope: str = "all"  # all | unit
 
 

@@ -744,6 +744,7 @@ def document_pipeline(
     missing_slot: Optional[str] = Query(default=None),
     scope: str = Query(default="all"),
     unit: Optional[str] = Query(default=None),
+    pembeli: Optional[str] = Query(default=None),
     material: List[str] = Query(default=[]),
     q: str = Query(default=""),
     limit: int = Query(default=200, ge=1, le=500),
@@ -776,6 +777,7 @@ def document_pipeline(
 
     materials = [m.strip() for m in material if m and m.strip()]
     unit_filter = unit.strip() if unit and unit.strip() else None
+    buyer_filter = pembeli.strip() if pembeli and pembeli.strip() else None
     term = q.strip().lower() if q and q.strip() else None
 
     dos = (
@@ -870,6 +872,8 @@ def document_pipeline(
         satuan: Optional[str] = None,
     ) -> schemas.DocumentPipelineRowOut | None:
         if unit_filter and (unit_name or "").strip() != unit_filter:
+            return None
+        if buyer_filter and (pembeli or "").strip() != buyer_filter:
             return None
         if materials:
             if not kontrak_obj:
@@ -1075,12 +1079,15 @@ def document_pipeline(
 
     all_rows: list[schemas.DocumentPipelineRowOut] = []
     units_set: set[str] = set()
+    buyers_set: set[str] = set()
 
     for do in dos:
         inv = do.invoice
         if not inv or not inv.kontrak:
             continue
         kontrak = inv.kontrak
+        if kontrak.pembeli:
+            buyers_set.add(kontrak.pembeli.strip())
         unit_name = (
             do.kepada_unit
             or inv.nama_unit
@@ -1143,6 +1150,8 @@ def document_pipeline(
         if not inv.kontrak:
             continue
         kontrak = inv.kontrak
+        if kontrak.pembeli:
+            buyers_set.add(kontrak.pembeli.strip())
         unit_name = inv.nama_unit or kontrak.kebun_produsen or (
             kontrak.units[0].nama_unit if kontrak.units else None
         )
@@ -1252,6 +1261,7 @@ def document_pipeline(
         summary=summary,
         rows=rows,
         units=sorted(units_set),
+        buyers=sorted(b for b in buyers_set if b),
         scope=scope_norm,
     )
 

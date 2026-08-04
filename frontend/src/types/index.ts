@@ -390,6 +390,7 @@ export interface DocumentPipelineResponse {
   summary: DocumentPipelineSummary
   rows: DocumentPipelineRow[]
   units: string[]
+  buyers?: string[]
   scope?: 'all' | 'unit'
 }
 

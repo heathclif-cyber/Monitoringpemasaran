@@ -259,11 +259,13 @@ export default function UnitDocPage() {
   const prefs = useMemo(() => readPrefs(), [])
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(prefs.statusFilter || 'incomplete')
   const [unit, setUnit] = useState(prefs.unit || '')
+  const [buyer, setBuyer] = useState('')
   const [q, setQ] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [data, setData] = useState<DocumentPipelineResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [unitsFromApi, setUnitsFromApi] = useState<string[]>([])
+  const [buyersFromApi, setBuyersFromApi] = useState<string[]>([])
   const [groupByUnit, setGroupByUnit] = useState(true)
 
   useEffect(() => {
@@ -279,17 +281,19 @@ export default function UnitDocPage() {
         limit: '300',
       })
       if (unit) params.set('unit', unit)
+      if (buyer) params.set('pembeli', buyer)
       if (q.trim()) params.set('q', q.trim())
       const res = await client.get<DocumentPipelineResponse>(`/api/documents/pipeline?${params}`)
       setData(res)
       if (res.units?.length) setUnitsFromApi(res.units)
+      if (res.buyers?.length) setBuyersFromApi(res.buyers)
     } catch (err: unknown) {
       setData(null)
       addNotification(err instanceof Error ? err.message : 'Gagal memuat data unit', 'error')
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, unit, q, addNotification])
+  }, [statusFilter, unit, buyer, q, addNotification])
 
   useEffect(() => {
     load()
@@ -308,6 +312,12 @@ export default function UnitDocPage() {
     if (unit) set.add(unit)
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'id'))
   }, [unitsFromApi, data?.units, unit])
+
+  const buyerOptions = useMemo(() => {
+    const values = new Set([...buyersFromApi, ...(data?.buyers ?? [])])
+    if (buyer) values.add(buyer)
+    return Array.from(values).filter(Boolean).sort((a, b) => a.localeCompare(b, 'id'))
+  }, [buyersFromApi, data?.buyers, buyer])
 
   const grouped = useMemo(() => {
     if (!groupByUnit) return null
@@ -398,6 +408,19 @@ export default function UnitDocPage() {
           {unitOptions.map((u) => (
             <option key={u} value={u}>
               {u}
+            </option>
+          ))}
+        </NativeSelect>
+        <NativeSelect
+          value={buyer}
+          onChange={(e) => setBuyer(e.target.value)}
+          className="h-8 w-auto text-xs min-w-[12rem] max-w-[18rem]"
+          aria-label="Filter pembeli"
+        >
+          <option value="">Semua pembeli</option>
+          {buyerOptions.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </NativeSelect>
