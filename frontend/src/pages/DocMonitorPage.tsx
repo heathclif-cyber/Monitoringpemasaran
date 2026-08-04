@@ -41,6 +41,7 @@ type FilterMode = 'incomplete' | 'all' | 'complete'
 type MissingSlotFilter =
   | ''
   | 'unit_tasks'
+  | 'regional_tasks'
   | 'ba_serah_terima'
   | 'do'
   | 'deklarasi'
@@ -49,37 +50,52 @@ type MissingSlotFilter =
   | 'kontrak'
   | 'invoice'
   | 'rekening_koran'
+  | 'faktur_pajak'
 
 const PREFS_KEY = 'pantau-dokumen-prefs'
 
 const BROWSER_VIEWABLE = new Set(['pdf', 'jpg', 'jpeg', 'png'])
 
-const UNIT_SLOT_KEYS = new Set(['do', 'deklarasi', 'ba_serah_terima', 'ba_panen'])
-const HO_SLOT_KEYS = new Set(['kontrak', 'invoice', 'rekening_koran', 'kuitansi', 'superman'])
-
-const SLOT_ORDER = [
+/** Unit: BA Panen + BA Serah Terima Barang */
+const UNIT_SLOT_KEYS = new Set(['ba_serah_terima', 'ba_panen'])
+/** Regional: kontrak, invoice, DO, deklarasi, rekening koran, faktur pajak, dll. */
+const REGIONAL_SLOT_KEYS = new Set([
+  'kontrak',
+  'invoice',
+  'rekening_koran',
+  'faktur_pajak',
+  'kuitansi',
   'do',
   'deklarasi',
+  'superman',
+])
+
+const SLOT_ORDER = [
   'ba_serah_terima',
   'ba_panen',
   'kontrak',
   'invoice',
   'rekening_koran',
+  'faktur_pajak',
   'kuitansi',
+  'do',
+  'deklarasi',
   'superman',
 ] as const
 
 const MISSING_SLOT_OPTIONS: { value: MissingSlotFilter; label: string }[] = [
   { value: '', label: 'Semua jenis kekurangan' },
-  { value: 'unit_tasks', label: 'Tugas unit (DO / Deklarasi / BA ST)' },
-  { value: 'ba_serah_terima', label: 'Kurang BA Serah Terima' },
-  { value: 'do', label: 'Kurang file DO' },
-  { value: 'deklarasi', label: 'Kurang Deklarasi' },
-  { value: 'superman', label: 'Belum Superman' },
+  { value: 'unit_tasks', label: 'Kurang tugas Unit (BA)' },
+  { value: 'regional_tasks', label: 'Kurang tugas Regional' },
+  { value: 'ba_serah_terima', label: 'Kurang BA Serah Terima (Unit)' },
   { value: 'ba_panen', label: 'Sudah ada BA Panen' },
-  { value: 'kontrak', label: 'Kurang file Kontrak' },
-  { value: 'invoice', label: 'Kurang file Invoice' },
-  { value: 'rekening_koran', label: 'Kurang Rekening Koran' },
+  { value: 'do', label: 'Kurang file DO (Regional)' },
+  { value: 'deklarasi', label: 'Kurang Deklarasi (Regional)' },
+  { value: 'faktur_pajak', label: 'Kurang Faktur Pajak (Regional)' },
+  { value: 'rekening_koran', label: 'Kurang Rekening Koran (Regional)' },
+  { value: 'superman', label: 'Belum Superman (Regional)' },
+  { value: 'kontrak', label: 'Kurang file Kontrak (Regional)' },
+  { value: 'invoice', label: 'Kurang file Invoice (Regional)' },
 ]
 
 function readPrefs(): { unit?: string; statusFilter?: FilterMode } {
@@ -143,14 +159,18 @@ function PipelineChip({ slot }: { slot: DocumentPipelineSlot }) {
         ? 'BA Panen'
         : slot.slot_key === 'rekening_koran'
           ? 'Rek. Koran'
-          : slot.slot_key === 'superman'
-            ? 'SPP'
-            : slot.label.split(' ')[0]
+          : slot.slot_key === 'faktur_pajak'
+            ? 'Faktur'
+            : slot.slot_key === 'superman'
+              ? 'SPP'
+              : slot.label.split(' ')[0]
+  const owner = slot.responsibility === 'unit' ? 'Unit' : 'Regional'
 
   return (
     <span
       title={[
         slot.label,
+        owner,
         slot.required ? 'Wajib' : 'Opsional',
         slot.uploaded ? 'Sudah ada' : 'Belum',
         slot.note || '',
@@ -164,6 +184,7 @@ function PipelineChip({ slot }: { slot: DocumentPipelineSlot }) {
     >
       {slot.uploaded ? <CheckCircle2 size={10} /> : <CircleAlert size={10} />}
       {short}
+      <span className="opacity-60 font-normal">{owner === 'Unit' ? 'U' : 'R'}</span>
       {!slot.required && <span className="opacity-70">*</span>}
     </span>
   )
@@ -234,6 +255,16 @@ function SlotUploadRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium">{slot.label}</p>
+          <span
+            className={cn(
+              'text-[10px] font-medium uppercase tracking-wide rounded px-1.5 py-0.5',
+              slot.responsibility === 'unit'
+                ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/40 dark:text-violet-300'
+                : 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300',
+            )}
+          >
+            {slot.responsibility === 'unit' ? 'Unit' : 'Regional'}
+          </span>
           {slot.required ? (
             <span className="text-[10px] font-medium uppercase tracking-wide text-red-600 dark:text-red-400">
               Wajib
@@ -446,9 +477,9 @@ export default function DocMonitorPage() {
             <span className="text-xs font-medium uppercase tracking-wide">Dokumen</span>
           </div>
           <p className="text-sm text-muted-foreground max-w-3xl">
-            Satu menu untuk <strong>memantau</strong> kelengkapan dan <strong>mengunggah</strong> PDF.
-            Rantai: <strong>Kontrak → Invoice → DO → Superman → BA</strong>.{' '}
-            <strong>BA Serah Terima Barang</strong> wajib per DO; <strong>BA Panen</strong> opsional.
+            Satu menu untuk <strong>memantau</strong> dan <strong>mengunggah</strong> PDF.
+            <strong> Regional:</strong> Kontrak, Invoice, DO, Deklarasi, Rekening Koran, Faktur Pajak.
+            <strong> Unit:</strong> BA Panen (opsional) dan BA Serah Terima Barang (wajib per DO).
           </p>
         </div>
 
@@ -493,17 +524,22 @@ export default function DocMonitorPage() {
         {(
           [
             {
-              label: 'Total (filter unit/cari)',
+              label: 'Total baris',
               value: summary?.total_rows ?? 0,
               tone: 'default' as const,
               slot: '' as MissingSlotFilter,
             },
             {
-              label: 'Belum Lengkap',
-              value: summary?.incomplete ?? 0,
-              tone: 'warn' as const,
+              label: 'Kurang tugas Unit',
+              value: summary?.incomplete_unit ?? 0,
+              tone: 'danger' as const,
               slot: 'unit_tasks' as MissingSlotFilter,
-              hint: 'Klik: filter tugas unit',
+            },
+            {
+              label: 'Kurang tugas Regional',
+              value: summary?.incomplete_regional ?? 0,
+              tone: 'warn' as const,
+              slot: 'regional_tasks' as MissingSlotFilter,
             },
             {
               label: 'Kurang BA Serah Terima',
@@ -512,22 +548,16 @@ export default function DocMonitorPage() {
               slot: 'ba_serah_terima' as MissingSlotFilter,
             },
             {
-              label: 'Kurang DO File',
-              value: summary?.missing_do ?? 0,
+              label: 'Kurang Faktur Pajak',
+              value: summary?.missing_faktur_pajak ?? 0,
               tone: 'warn' as const,
-              slot: 'do' as MissingSlotFilter,
+              slot: 'faktur_pajak' as MissingSlotFilter,
             },
             {
               label: 'Belum Superman',
               value: summary?.missing_superman ?? 0,
               tone: 'warn' as const,
               slot: 'superman' as MissingSlotFilter,
-            },
-            {
-              label: 'Punya BA Panen',
-              value: summary?.with_ba_panen ?? 0,
-              tone: 'ok' as const,
-              slot: 'ba_panen' as MissingSlotFilter,
             },
           ] as const
         ).map((c) => {
@@ -550,7 +580,6 @@ export default function DocMonitorPage() {
                     'text-xl font-semibold mt-1 tabular-nums',
                     c.tone === 'danger' && 'text-red-600',
                     c.tone === 'warn' && 'text-amber-600',
-                    c.tone === 'ok' && 'text-emerald-600',
                   )}
                 >
                   {c.value}
@@ -705,12 +734,12 @@ export default function DocMonitorPage() {
               <span className="h-2 w-2 rounded-full bg-red-400" /> Wajib belum upload
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-slate-400" /> Opsional (BA Panen / Kuitansi)
+              <span className="h-2 w-2 rounded-full bg-violet-500" /> Unit (BA Panen / BA Serah Terima)
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-sky-400" /> Superman siap dideklarasi
+              <span className="h-2 w-2 rounded-full bg-sky-500" /> Regional (kontrak–invoice–DO–faktur–dll.)
             </span>
-            <span className="text-muted-foreground/80">· Klik kartu ringkasan untuk filter cepat</span>
+            <span className="text-muted-foreground/80">· Chip R/U = Regional / Unit · Klik kartu = filter</span>
           </div>
         </CardHeader>
 
@@ -752,8 +781,18 @@ export default function DocMonitorPage() {
                     const orderedSlots = SLOT_ORDER.map((k) =>
                       row.slots.find((s) => s.slot_key === k),
                     ).filter(Boolean) as DocumentPipelineSlot[]
-                    const unitSlots = orderedSlots.filter((s) => UNIT_SLOT_KEYS.has(s.slot_key))
-                    const hoSlots = orderedSlots.filter((s) => HO_SLOT_KEYS.has(s.slot_key))
+                    const unitSlots = orderedSlots.filter(
+                      (s) => UNIT_SLOT_KEYS.has(s.slot_key) || s.responsibility === 'unit',
+                    )
+                    const regionalSlots = orderedSlots.filter(
+                      (s) =>
+                        REGIONAL_SLOT_KEYS.has(s.slot_key) ||
+                        s.responsibility === 'regional' ||
+                        (!UNIT_SLOT_KEYS.has(s.slot_key) && s.responsibility !== 'unit'),
+                    )
+                    // Hindari duplikat jika filter overlap
+                    const unitKeys = new Set(unitSlots.map((s) => s.slot_key))
+                    const regionalOnly = regionalSlots.filter((s) => !unitKeys.has(s.slot_key))
                     return (
                       <Fragment key={key}>
                         <tr
@@ -826,6 +865,34 @@ export default function DocMonitorPage() {
                               <div className="space-y-4 max-w-4xl">
                                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                                   <span>
+                                    Unit:{' '}
+                                    <strong
+                                      className={
+                                        row.unit_complete === false
+                                          ? 'text-amber-700 dark:text-amber-300'
+                                          : 'text-emerald-700 dark:text-emerald-300'
+                                      }
+                                    >
+                                      {row.unit_complete === false
+                                        ? `Belum (${(row.missing_unit || []).join(', ') || '…'})`
+                                        : 'Lengkap'}
+                                    </strong>
+                                  </span>
+                                  <span>
+                                    Regional:{' '}
+                                    <strong
+                                      className={
+                                        row.regional_complete === false
+                                          ? 'text-amber-700 dark:text-amber-300'
+                                          : 'text-emerald-700 dark:text-emerald-300'
+                                      }
+                                    >
+                                      {row.regional_complete === false
+                                        ? `Belum (${(row.missing_regional || []).slice(0, 3).join(', ') || '…'})`
+                                        : 'Lengkap'}
+                                    </strong>
+                                  </span>
+                                  <span>
                                     BA Panen:{' '}
                                     <strong className="text-foreground">
                                       {row.no_ba || '— (opsional)'}
@@ -839,15 +906,15 @@ export default function DocMonitorPage() {
                                   </span>
                                 </div>
                                 <SlotGroup
-                                  title="Tugas unit"
-                                  hint="DO, Deklarasi, BA Serah Terima · BA Panen opsional"
+                                  title="Tanggung jawab Unit"
+                                  hint="BA Serah Terima Barang (wajib per DO) · BA Panen (opsional)"
                                   slots={unitSlots}
                                   onUploaded={load}
                                 />
                                 <SlotGroup
-                                  title="Dokumen pusat / HO"
-                                  hint="Kontrak, Invoice, Rekening Koran, Kuitansi, Superman"
-                                  slots={hoSlots}
+                                  title="Tanggung jawab Regional"
+                                  hint="Kontrak, Invoice, Rekening Koran, Faktur Pajak, DO, Deklarasi, Kuitansi, Superman"
+                                  slots={regionalOnly}
                                   onUploaded={load}
                                 />
                               </div>

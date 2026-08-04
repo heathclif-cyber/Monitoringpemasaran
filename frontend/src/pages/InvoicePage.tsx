@@ -712,7 +712,24 @@ export default function InvoicePage() {
           {exportNo && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <DocumentUpload entityType="invoice" entityId={exportNo} docType="invoice" />
-              <DocumentUpload entityType="invoice" entityId={exportNo} docType="kuitansi" />
+              <DocumentUpload
+                entityType="invoice"
+                entityId={exportNo}
+                docType="faktur_pajak"
+                label="Faktur Pajak (Regional)"
+              />
+              <DocumentUpload
+                entityType="invoice"
+                entityId={exportNo}
+                docType="rekening_koran"
+                label="Rekening Koran (Regional)"
+              />
+              <DocumentUpload
+                entityType="invoice"
+                entityId={exportNo}
+                docType="kuitansi"
+                label="Kuitansi (opsional)"
+              />
             </div>
           )}
           </ReadOnlyFieldset>

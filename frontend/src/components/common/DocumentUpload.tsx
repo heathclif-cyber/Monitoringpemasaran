@@ -12,6 +12,7 @@ const DOC_TYPE_LABELS: Record<DocumentDocType, string> = {
   invoice: 'Invoice',
   kuitansi: 'Kuitansi',
   rekening_koran: 'Rekening Koran Penerimaan',
+  faktur_pajak: 'Faktur Pajak',
   do: 'Delivery Order',
   deklarasi: 'Deklarasi Penerimaan',
   berita_acara: 'BA Serah Terima Barang',

@@ -28,10 +28,11 @@ VALID_DOC_TYPES = {
     "invoice",
     "kuitansi",
     "rekening_koran",
+    "faktur_pajak",
     "do",
     "deklarasi",
-    "berita_acara",  # BA Serah Terima Barang (biasanya di entity DO)
-    "ba_panen",      # BA Panen (entity BA, opsional)
+    "berita_acara",  # BA Serah Terima Barang (biasanya di entity DO) — tanggung jawab unit
+    "ba_panen",      # BA Panen (entity BA, opsional) — tanggung jawab unit
 }
 
 DOC_TYPE_LABELS = {
@@ -39,16 +40,37 @@ DOC_TYPE_LABELS = {
     "invoice": "Invoice",
     "kuitansi": "Kuitansi",
     "rekening_koran": "Rekening Koran Penerimaan",
+    "faktur_pajak": "Faktur Pajak",
     "do": "Delivery Order",
     "deklarasi": "Deklarasi Penerimaan",
     "berita_acara": "BA Serah Terima Barang",
     "ba_panen": "BA Panen",
 }
 
+# Pemenuhan dokumen: regional (kantor/HO) vs unit kebun
+# Regional: kontrak, invoice, DO, deklarasi, rekening koran, faktur pajak, kuitansi
+# Unit: BA Panen, BA Serah Terima Barang
+DOC_RESPONSIBILITY: dict[str, str] = {
+    "kontrak": "regional",
+    "invoice": "regional",
+    "kuitansi": "regional",
+    "rekening_koran": "regional",
+    "faktur_pajak": "regional",
+    "do": "regional",
+    "deklarasi": "regional",
+    "berita_acara": "unit",
+    "ba_panen": "unit",
+}
+
+RESPONSIBILITY_LABELS = {
+    "regional": "Regional",
+    "unit": "Unit",
+}
+
 # Slot wajib per entitas (dihitung di completeness / ringkasan)
 ENTITY_DOC_REQUIREMENTS: dict[str, list[str]] = {
     "kontrak": ["kontrak"],
-    "invoice": ["invoice", "rekening_koran", "kuitansi"],
+    "invoice": ["invoice", "rekening_koran", "faktur_pajak"],
     "do": ["do", "deklarasi", "berita_acara"],
     "bypass": ["deklarasi"],
     "ba": [],  # BA Panen opsional — tidak memblokir kelengkapan entitas BA
@@ -57,7 +79,20 @@ ENTITY_DOC_REQUIREMENTS: dict[str, list[str]] = {
 # Slot opsional (ditampilkan di UI, tidak dihitung missing)
 ENTITY_OPTIONAL_DOCS: dict[str, list[str]] = {
     "ba": ["ba_panen"],
+    "invoice": ["kuitansi"],
 }
+
+
+def _responsibility_for_doc(doc_type: Optional[str], *, slot_key: Optional[str] = None) -> str:
+    if slot_key == "superman":
+        return "regional"
+    if slot_key == "ba_serah_terima":
+        return "unit"
+    if slot_key == "ba_panen":
+        return "unit"
+    if doc_type:
+        return DOC_RESPONSIBILITY.get(doc_type, "regional")
+    return "regional"
 
 
 def _doc_type_candidates(entity_type: str, doc_type: str) -> list[str]:
@@ -195,6 +230,7 @@ def _slot_from_upload(
     required: bool = True,
 ) -> schemas.DocumentSlotOut:
     file_exists = _check_file_exists(upload) if upload else False
+    responsibility = _responsibility_for_doc(doc_type)
     return schemas.DocumentSlotOut(
         doc_type=doc_type,
         label=DOC_TYPE_LABELS.get(doc_type, doc_type),
@@ -208,6 +244,7 @@ def _slot_from_upload(
         entity_type=entity_type,
         entity_id=entity_id,
         slot_key=f"{entity_type}:{doc_type}",
+        responsibility=responsibility,
     )
 
 
@@ -598,6 +635,7 @@ def _pipeline_slot(
     doc_type: Optional[str],
     cache: dict[tuple[str, str], dict[str, "models.DocumentUpload"]],
     note: Optional[str] = None,
+    responsibility: Optional[str] = None,
 ) -> schemas.DocumentPipelineSlotOut:
     upload = None
     if entity_type and entity_id and doc_type:
@@ -605,6 +643,7 @@ def _pipeline_slot(
         upload = _pick_upload(by_type, entity_type, doc_type)
     file_exists = _check_file_exists(upload) if upload else False
     uploaded = upload is not None and file_exists
+    owner = responsibility or _responsibility_for_doc(doc_type, slot_key=slot_key)
     return schemas.DocumentPipelineSlotOut(
         slot_key=slot_key,
         label=label,
@@ -619,6 +658,7 @@ def _pipeline_slot(
         uploaded_at=upload.uploaded_at if upload else None,
         document_id=upload.id if upload else None,
         note=note,
+        responsibility=owner,
     )
 
 
@@ -650,9 +690,11 @@ _PIPELINE_MISSING_SLOTS = {
     "kontrak",
     "invoice",
     "rekening_koran",
+    "faktur_pajak",
     "superman",
-    "unit_tasks",  # DO file + deklarasi + BA Serah Terima
-    "ba_panen",  # opsional — baris yang sudah punya file BA Panen (filter "with")
+    "unit_tasks",  # tanggung jawab unit: BA Serah Terima (+ BA Panen jika ada no_ba)
+    "regional_tasks",  # tanggung jawab regional yang wajib belum lengkap
+    "ba_panen",  # filter baris yang sudah punya file BA Panen
 }
 
 
@@ -660,10 +702,11 @@ def _row_matches_missing_slot(row: schemas.DocumentPipelineRowOut, missing_slot:
     if missing_slot == "superman":
         return bool(row.no_invoice) and row.superman_status != "done"
     if missing_slot == "unit_tasks":
-        return any(
-            s.slot_key in ("do", "deklarasi", "ba_serah_terima") and s.required and not s.uploaded
-            for s in row.slots
+        return not row.unit_complete or any(
+            s.slot_key == "ba_panen" and s.entity_id and not s.uploaded for s in row.slots
         )
+    if missing_slot == "regional_tasks":
+        return not row.regional_complete
     if missing_slot == "ba_panen":
         return any(s.slot_key == "ba_panen" and s.uploaded for s in row.slots)
     return any(s.slot_key == missing_slot and not s.uploaded for s in row.slots)
@@ -682,9 +725,10 @@ def document_pipeline(
     """
     Pantau kelengkapan rantai dokumen per DO (dan invoice tanpa DO).
 
-    Slot wajib: Kontrak, Invoice, Rekening Koran, DO, Deklarasi, BA Serah Terima.
-    Opsional: Kuitansi, BA Panen.
-    Superman: status nomor SPP (bukan file upload).
+    Regional (wajib): Kontrak, Invoice, Rekening Koran, Faktur Pajak, DO, Deklarasi.
+    Unit (wajib): BA Serah Terima Barang (per DO).
+    Opsional: Kuitansi (Regional), BA Panen (Unit).
+    Superman: status nomor SPP — Regional (bukan file upload).
 
     missing_slot: ba_serah_terima | do | deklarasi | kontrak | invoice |
                   rekening_koran | superman | unit_tasks | ba_panen
@@ -819,6 +863,7 @@ def document_pipeline(
                 entity_id=no_kontrak,
                 doc_type="kontrak",
                 cache=cache,
+                note="Tanggung jawab Regional",
             ),
             _pipeline_slot(
                 slot_key="invoice",
@@ -828,7 +873,7 @@ def document_pipeline(
                 entity_id=no_invoice,
                 doc_type="invoice" if no_invoice else None,
                 cache=cache,
-                note=None if no_invoice else "Invoice belum dibuat",
+                note=("Tanggung jawab Regional" if no_invoice else "Invoice belum dibuat"),
             ),
             _pipeline_slot(
                 slot_key="rekening_koran",
@@ -838,6 +883,17 @@ def document_pipeline(
                 entity_id=no_invoice,
                 doc_type="rekening_koran" if no_invoice else None,
                 cache=cache,
+                note="Tanggung jawab Regional",
+            ),
+            _pipeline_slot(
+                slot_key="faktur_pajak",
+                label=DOC_TYPE_LABELS["faktur_pajak"],
+                required=bool(no_invoice),
+                entity_type="invoice" if no_invoice else None,
+                entity_id=no_invoice,
+                doc_type="faktur_pajak" if no_invoice else None,
+                cache=cache,
+                note="Tanggung jawab Regional",
             ),
             _pipeline_slot(
                 slot_key="kuitansi",
@@ -847,6 +903,7 @@ def document_pipeline(
                 entity_id=no_invoice,
                 doc_type="kuitansi" if no_invoice else None,
                 cache=cache,
+                note="Opsional · Regional",
             ),
             _pipeline_slot(
                 slot_key="do",
@@ -856,7 +913,7 @@ def document_pipeline(
                 entity_id=no_do,
                 doc_type="do" if no_do else None,
                 cache=cache,
-                note=None if no_do else "DO belum dibuat",
+                note=("Tanggung jawab Regional" if no_do else "DO belum dibuat"),
             ),
             _pipeline_slot(
                 slot_key="deklarasi",
@@ -866,6 +923,7 @@ def document_pipeline(
                 entity_id=no_do,
                 doc_type="deklarasi" if no_do else None,
                 cache=cache,
+                note="Tanggung jawab Regional",
             ),
             _pipeline_slot(
                 slot_key="ba_serah_terima",
@@ -875,7 +933,12 @@ def document_pipeline(
                 entity_id=no_do,
                 doc_type="berita_acara" if no_do else None,
                 cache=cache,
-                note=None if no_do else "BA Serah Terima diunggah per DO",
+                note=(
+                    "Tanggung jawab Unit — diunggah per DO"
+                    if no_do
+                    else "BA Serah Terima diunggah per DO (Unit)"
+                ),
+                responsibility="unit",
             ),
             _pipeline_slot(
                 slot_key="ba_panen",
@@ -886,17 +949,22 @@ def document_pipeline(
                 doc_type="ba_panen" if no_ba else None,
                 cache=cache,
                 note=(
-                    f"No. BA: {no_ba}"
+                    f"No. BA: {no_ba} · Tanggung jawab Unit (opsional)"
                     if no_ba
-                    else "Opsional — hanya jika ada BA Panen (alur payung)"
+                    else "Opsional (Unit) — hanya jika ada BA Panen / alur payung"
                 ),
+                responsibility="unit",
             ),
         ]
 
-        kontrak_ok = slots[0].uploaded
-        invoice_ok = slots[1].uploaded if no_invoice else False
-        rekening_ok = slots[2].uploaded if no_invoice else False
-        ba_panen_ok = slots[7].uploaded if no_ba else False
+        def _slot(key: str) -> schemas.DocumentPipelineSlotOut | None:
+            return next((s for s in slots if s.slot_key == key), None)
+
+        kontrak_ok = bool(_slot("kontrak") and _slot("kontrak").uploaded)
+        invoice_ok = bool(_slot("invoice") and _slot("invoice").uploaded) if no_invoice else False
+        rekening_ok = bool(_slot("rekening_koran") and _slot("rekening_koran").uploaded) if no_invoice else False
+        ba_panen_slot = _slot("ba_panen")
+        ba_panen_ok = bool(ba_panen_slot and ba_panen_slot.uploaded) if no_ba else False
         sm_status = _superman_status_for_row(
             superman_no=superman_no,
             kontrak_ok=kontrak_ok,
@@ -906,7 +974,7 @@ def document_pipeline(
             tipe_alur=tipe_alur,
             has_ba=bool(no_ba),
         )
-        # Slot status Superman (bukan file)
+        # Slot status Superman (bukan file) — proses Regional
         slots.append(
             schemas.DocumentPipelineSlotOut(
                 slot_key="superman",
@@ -930,6 +998,7 @@ def document_pipeline(
                         else "Dokumen pendukung Superman belum lengkap"
                     )
                 ),
+                responsibility="regional",
             )
         )
 
@@ -937,6 +1006,19 @@ def document_pipeline(
         required_uploaded = sum(1 for s in required_slots if s.uploaded)
         missing = [s.label for s in required_slots if not s.uploaded]
         is_complete = len(missing) == 0
+
+        missing_regional = [
+            s.label
+            for s in required_slots
+            if s.responsibility == "regional" and not s.uploaded
+        ]
+        missing_unit = [
+            s.label
+            for s in required_slots
+            if s.responsibility == "unit" and not s.uploaded
+        ]
+        regional_complete = len(missing_regional) == 0
+        unit_complete = len(missing_unit) == 0
 
         row_key = no_do or no_invoice or no_kontrak
         return schemas.DocumentPipelineRowOut(
@@ -957,6 +1039,10 @@ def document_pipeline(
             required_uploaded=required_uploaded,
             missing_required=missing,
             is_complete=is_complete,
+            regional_complete=regional_complete,
+            unit_complete=unit_complete,
+            missing_regional=missing_regional,
+            missing_unit=missing_unit,
         )
 
     all_rows: list[schemas.DocumentPipelineRowOut] = []
@@ -1047,6 +1133,8 @@ def document_pipeline(
         total_rows=len(all_rows),
         complete=sum(1 for r in all_rows if r.is_complete),
         incomplete=sum(1 for r in all_rows if not r.is_complete),
+        incomplete_regional=sum(1 for r in all_rows if not r.regional_complete),
+        incomplete_unit=sum(1 for r in all_rows if not r.unit_complete),
         missing_kontrak=sum(
             1 for r in all_rows if any(s.slot_key == "kontrak" and not s.uploaded for s in r.slots)
         ),
@@ -1062,6 +1150,11 @@ def document_pipeline(
             1
             for r in all_rows
             if any(s.slot_key == "deklarasi" and s.required and not s.uploaded for s in r.slots)
+        ),
+        missing_faktur_pajak=sum(
+            1
+            for r in all_rows
+            if any(s.slot_key == "faktur_pajak" and s.required and not s.uploaded for s in r.slots)
         ),
         missing_ba_serah_terima=sum(
             1
@@ -1389,6 +1482,7 @@ BUNDLE_FILE_PREFIX: dict[str, str | None] = {
     "kontrak": None,
     "invoice": None,
     "kuitansi": "Kuitansi",
+    "faktur_pajak": "Faktur-Pajak",
     "do": None,
     "deklarasi": "Deklarasi",
     "berita_acara": "BA-Serah-Terima",

@@ -608,13 +608,23 @@ export default function DOPage() {
 
           {exportNo && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <DocumentUpload entityType="do" entityId={exportNo} docType="do" />
-              <DocumentUpload entityType="do" entityId={exportNo} docType="deklarasi" />
+              <DocumentUpload
+                entityType="do"
+                entityId={exportNo}
+                docType="do"
+                label="Delivery Order (Regional)"
+              />
+              <DocumentUpload
+                entityType="do"
+                entityId={exportNo}
+                docType="deklarasi"
+                label="Deklarasi Penerimaan (Regional)"
+              />
               <DocumentUpload
                 entityType="do"
                 entityId={exportNo}
                 docType="berita_acara"
-                label="BA Serah Terima Barang"
+                label="BA Serah Terima Barang (Unit)"
               />
             </div>
           )}

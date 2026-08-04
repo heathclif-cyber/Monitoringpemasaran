@@ -26,10 +26,13 @@ export type DocumentDocType =
   | 'invoice'
   | 'kuitansi'
   | 'rekening_koran'
+  | 'faktur_pajak'
   | 'do'
   | 'deklarasi'
-  | 'berita_acara' // BA Serah Terima Barang (biasanya di DO)
-  | 'ba_panen' // BA Panen (entity BA, opsional)
+  | 'berita_acara' // BA Serah Terima Barang (biasanya di DO) — unit
+  | 'ba_panen' // BA Panen (entity BA, opsional) — unit
+
+export type DocumentResponsibility = 'regional' | 'unit'
 
 // ============================================================
 // Entity Interfaces — matching backend models.py / schemas.py
@@ -307,6 +310,7 @@ export interface DocumentSlot {
   entity_type?: DocumentEntityType | null
   entity_id?: string | null
   slot_key?: string | null
+  responsibility?: DocumentResponsibility
 }
 
 export type DocumentPipelineSupermanStatus = 'done' | 'ready' | 'missing_docs' | 'none'
@@ -325,6 +329,7 @@ export interface DocumentPipelineSlot {
   uploaded_at: string | null
   document_id: number | null
   note?: string | null
+  responsibility?: DocumentResponsibility
 }
 
 export interface DocumentPipelineRow {
@@ -345,16 +350,23 @@ export interface DocumentPipelineRow {
   required_uploaded: number
   missing_required: string[]
   is_complete: boolean
+  regional_complete?: boolean
+  unit_complete?: boolean
+  missing_regional?: string[]
+  missing_unit?: string[]
 }
 
 export interface DocumentPipelineSummary {
   total_rows: number
   complete: number
   incomplete: number
+  incomplete_regional?: number
+  incomplete_unit?: number
   missing_kontrak: number
   missing_invoice: number
   missing_do: number
   missing_deklarasi: number
+  missing_faktur_pajak?: number
   missing_ba_serah_terima: number
   missing_superman: number
   with_ba_panen: number

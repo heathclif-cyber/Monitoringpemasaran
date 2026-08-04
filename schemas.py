@@ -268,6 +268,7 @@ class DocumentSlotOut(BaseModel):
     entity_type: Optional[str] = None
     entity_id: Optional[str] = None
     slot_key: Optional[str] = None
+    responsibility: str = "regional"  # regional | unit
 
 
 class DocumentCompletenessSummary(BaseModel):
@@ -319,6 +320,7 @@ class DocumentPipelineSlotOut(BaseModel):
     uploaded_at: Optional[datetime] = None
     document_id: Optional[int] = None
     note: Optional[str] = None
+    responsibility: str = "regional"  # regional | unit
 
 
 class DocumentPipelineRowOut(BaseModel):
@@ -339,16 +341,23 @@ class DocumentPipelineRowOut(BaseModel):
     required_uploaded: int
     missing_required: List[str]
     is_complete: bool
+    regional_complete: bool = True
+    unit_complete: bool = True
+    missing_regional: List[str] = []
+    missing_unit: List[str] = []
 
 
 class DocumentPipelineSummaryOut(BaseModel):
     total_rows: int
     complete: int
     incomplete: int
+    incomplete_regional: int = 0
+    incomplete_unit: int = 0
     missing_kontrak: int
     missing_invoice: int
     missing_do: int
     missing_deklarasi: int
+    missing_faktur_pajak: int = 0
     missing_ba_serah_terima: int
     missing_superman: int
     with_ba_panen: int
