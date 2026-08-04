@@ -1,6 +1,8 @@
 # Indeks Dokumentasi
 
 - `architecture/`: keputusan dan analisis desain aplikasi.
+  - **UI Design System (wajib page baru):** [architecture/DESIGN_SYSTEM.md](./architecture/DESIGN_SYSTEM.md)
+  - Guideline ringkas: [architecture/DESIGN_GUIDELINES.md](./architecture/DESIGN_GUIDELINES.md)
 - `deployment/`: panduan deployment Railway dan server kantor.
   - **Migrasi otomatis Railway → PC kantor (AI VS Code):** [deployment/MIGRATE_RAILWAY_TO_OFFICE.md](./deployment/MIGRATE_RAILWAY_TO_OFFICE.md)
   - Konsep murni (tanpa multi-agent): [deployment/KANTOR_MURNI.md](./deployment/KANTOR_MURNI.md)

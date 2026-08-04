@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { cn, formatNumber } from '@/lib/utils'
 import type { StokLedgerEntry } from '@/types'
 import { normalizeSatuan } from '@/utils/satuanUtils'
@@ -137,7 +138,11 @@ export default function StokPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageShell density="default">
+      <PageHeader
+        title="Persediaan"
+        description="Catat stok masuk; penjualan DO mengurangi saldo otomatis"
+      />
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,420px)_1fr] gap-6 items-start">
         <Card>
           <CardHeader className="pb-3">
@@ -373,6 +378,6 @@ export default function StokPage() {
         description={`Hapus persediaan masuk ${deleteTarget?.unit} / ${deleteTarget?.jenis_material} pada ${deleteTarget?.tanggal}?`}
         onConfirm={handleDelete}
       />
-    </div>
+    </PageShell>
   )
 }

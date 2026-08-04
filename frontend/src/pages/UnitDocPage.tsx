@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  CheckCircle2,
-  CircleAlert,
-  CloudUpload,
-  Eye,
-  Loader2,
-  RefreshCw,
-  Search,
-} from 'lucide-react'
+import { CheckCircle2, CloudUpload, Eye, Loader2, RefreshCw, Search } from 'lucide-react'
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { useCanEdit } from '@/store/authStore'
@@ -16,6 +8,14 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DocxPreview } from '@/components/common/DocxPreview'
+import {
+  FilterToolbar,
+  ListPanel,
+  PageHeader,
+  PageShell,
+  StatPills,
+  StatusPill,
+} from '@/components/patterns'
 import { cn, formatDate, formatNumberDec, safe } from '@/lib/utils'
 import type {
   DocumentPipelineResponse,
@@ -44,6 +44,17 @@ function writePrefs(prefs: { unit: string; statusFilter: StatusFilter }) {
   } catch {
     /* ignore */
   }
+}
+
+function formatVolumeLabel(volume?: number | null, satuan?: string | null): string | null {
+  if (volume == null || Number.isNaN(Number(volume))) return null
+  const unit = (satuan || 'Kg').trim() || 'Kg'
+  const n = Number(volume)
+  const text =
+    Math.abs(n - Math.round(n)) < 1e-9
+      ? new Intl.NumberFormat('id-ID').format(Math.round(n))
+      : formatNumberDec(n)
+  return `${text} ${unit}`
 }
 
 function CompactUpload({
@@ -95,15 +106,13 @@ function CompactUpload({
   if (slot.uploaded && !fileMissing) {
     return (
       <div className="inline-flex items-center gap-1">
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-          <CheckCircle2 size={13} /> Sudah ada
-        </span>
+        <StatusPill tone="success">Sudah ada</StatusPill>
         {canView && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 px-1.5 text-[11px]"
+            className="h-8 px-1.5 text-xs"
             onClick={() => {
               if (isDocx) setDocxOpen(true)
               else if (viewUrl) window.open(viewUrl, '_blank', 'noopener,noreferrer')
@@ -125,7 +134,7 @@ function CompactUpload({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-1.5 text-[11px] text-muted-foreground"
+              className="h-8 px-1.5 text-xs text-muted-foreground"
               disabled={uploading}
               onClick={() => inputRef.current?.click()}
             >
@@ -150,11 +159,7 @@ function CompactUpload({
   }
 
   if (!canUpload) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600">
-        <CircleAlert size={13} /> Belum
-      </span>
-    )
+    return <StatusPill tone="danger">Belum</StatusPill>
   }
 
   return (
@@ -169,26 +174,16 @@ function CompactUpload({
       <Button
         type="button"
         size="sm"
-        className="h-8 gap-1 text-xs whitespace-nowrap bg-rose-600 hover:bg-rose-700 text-white"
+        variant="destructive"
+        className="h-8 gap-1 text-xs whitespace-nowrap"
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
       >
         {uploading ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />}
-        {fileMissing ? 'Upload ulang BA Serah Terima' : 'Upload BA Serah Terima'}
+        {fileMissing ? 'Upload ulang' : 'Upload BA Serah Terima'}
       </Button>
     </>
   )
-}
-
-function formatVolumeLabel(volume?: number | null, satuan?: string | null): string | null {
-  if (volume == null || Number.isNaN(Number(volume))) return null
-  const unit = (satuan || 'Kg').trim() || 'Kg'
-  const n = Number(volume)
-  const text =
-    Math.abs(n - Math.round(n)) < 1e-9
-      ? new Intl.NumberFormat('id-ID').format(Math.round(n))
-      : formatNumberDec(n)
-  return `${text} ${unit}`
 }
 
 function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: () => void }) {
@@ -201,48 +196,48 @@ function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: ()
     <div
       className={cn(
         'flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3',
-        'border-b border-border/70 px-3 py-2 last:border-0',
-        needBaSt && 'bg-rose-50/50 dark:bg-rose-950/20',
+        'border-b border-border/70 px-3 py-2.5 last:border-0',
+        needBaSt && 'bg-destructive/5',
       )}
     >
       <div className="min-w-0 sm:w-[40%] sm:shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
           <p className="text-sm font-semibold truncate">{row.no_do}</p>
           {needBaSt ? (
-            <span className="shrink-0 rounded bg-rose-600 text-white px-1.5 py-0.5 text-[9px] font-bold uppercase">
+            <StatusPill tone="action" icon={false}>
               Aksi
-            </span>
+            </StatusPill>
           ) : (
-            <span className="shrink-0 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-[9px] font-bold uppercase">
+            <StatusPill tone="success" icon={false}>
               OK
-            </span>
+            </StatusPill>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground truncate">
+        <p className="text-xs text-muted-foreground truncate mt-0.5">
           {safe(row.unit)}
           {row.tanggal ? ` · ${formatDate(row.tanggal)}` : ''}
           {row.no_invoice ? ` · Inv ${row.no_invoice}` : ''}
         </p>
       </div>
 
-      <div className="flex flex-col gap-1 sm:flex-1 min-w-0 text-xs">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium text-foreground shrink-0">BA Serah Terima Barang</span>
-          <span className="text-[10px] font-medium text-rose-600 shrink-0">wajib</span>
-        </div>
+      <div className="flex flex-col gap-1 sm:flex-1 min-w-0">
+        <p className="text-xs font-medium text-foreground">
+          BA Serah Terima Barang
+          <span className="ml-1.5 text-[10px] font-medium text-destructive">wajib</span>
+        </p>
         {volLabel ? (
           <div className="inline-flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[12px] font-bold tabular-nums text-violet-900 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+            <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-bold tabular-nums">
               Vol. {volLabel}
             </span>
             {row.komoditi ? (
-              <span className="text-[11px] text-muted-foreground truncate">{row.komoditi}</span>
+              <span className="text-xs text-muted-foreground truncate">{row.komoditi}</span>
             ) : null}
           </div>
         ) : (
-          <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-            Volume DO kosong — isi volume di form DO
-          </span>
+          <StatusPill tone="warning" icon={false}>
+            Volume DO kosong
+          </StatusPill>
         )}
       </div>
 
@@ -250,11 +245,9 @@ function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: ()
         {baSt ? (
           <CompactUpload slot={baSt} onUploaded={onUploaded} />
         ) : done ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-            <CheckCircle2 size={14} /> OK
-          </span>
+          <StatusPill tone="success">OK</StatusPill>
         ) : (
-          <span className="text-[11px] text-muted-foreground">—</span>
+          <span className="text-xs text-muted-foreground">—</span>
         )}
       </div>
     </div>
@@ -333,23 +326,18 @@ export default function UnitDocPage() {
   }, [rows, groupByUnit])
 
   return (
-    <div className="space-y-3 max-w-5xl">
-      <div className="rounded-lg border bg-card px-3 py-2.5 space-y-2">
-        <div className="flex flex-wrap items-center gap-2 justify-between">
-          <div className="min-w-0">
-            <h1 className="text-base font-semibold leading-tight">Dokumen Unit</h1>
-            <p className="text-[11px] text-muted-foreground">
-              Wajib: <strong>BA Serah Terima Barang</strong> per DO — cek <strong>volume</strong> yang
-              harus diserahkan
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 min-w-[140px]">
-              <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
+    <PageShell width="narrow" density="compact">
+      <PageHeader
+        title="Dokumen Unit"
+        description="Wajib: BA Serah Terima Barang per DO — cek volume yang harus diserahkan"
+        actions={
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[120px]">
+              <div className="h-2 w-20 rounded-full bg-muted overflow-hidden">
                 <div
                   className={cn(
                     'h-full rounded-full transition-all',
-                    pct >= 90 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-rose-500',
+                    pct >= 90 ? 'bg-primary' : pct >= 50 ? 'bg-amber-500' : 'bg-destructive',
                   )}
                   style={{ width: `${pct}%` }}
                 />
@@ -368,81 +356,73 @@ export default function UnitDocPage() {
               Muat
             </Button>
           </div>
-        </div>
+        }
+      />
 
-        <div className="flex flex-wrap gap-1.5 text-[11px]">
-          <span className="rounded-md bg-muted px-2 py-1 tabular-nums">
-            Total DO <strong>{total}</strong>
-          </span>
-          <span className="rounded-md bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 px-2 py-1 tabular-nums">
-            Belum upload BA ST <strong>{missingBaSt || incomplete}</strong>
-          </span>
-          <span className="rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-1 tabular-nums">
-            Sudah lengkap <strong>{complete}</strong>
-          </span>
-        </div>
+      <StatPills
+        items={[
+          { label: 'Total DO', value: total },
+          { label: 'Belum BA ST', value: missingBaSt || incomplete, tone: 'danger' },
+          { label: 'Lengkap', value: complete, tone: 'success' },
+        ]}
+      />
 
-        <div className="flex flex-wrap gap-2 items-center">
-          <NativeSelect
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="h-8 w-auto text-xs min-w-[8.5rem]"
-          >
-            <option value="incomplete">Belum lengkap</option>
-            <option value="all">Semua</option>
-            <option value="complete">Sudah lengkap</option>
-          </NativeSelect>
-          <NativeSelect
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-            className="h-8 w-auto text-xs min-w-[10rem] max-w-[14rem]"
-          >
-            <option value="">Semua unit</option>
-            {unitOptions.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </NativeSelect>
-          <div className="flex gap-1 flex-1 min-w-[10rem] max-w-xs">
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && setQ(searchInput)}
-              placeholder="Cari No DO / invoice…"
-              className="h-8 text-xs"
-            />
-            <Button type="button" size="sm" className="h-8 px-2" onClick={() => setQ(searchInput)}>
-              <Search size={13} />
-            </Button>
-          </div>
-          <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="rounded border-border"
-              checked={groupByUnit}
-              onChange={(e) => setGroupByUnit(e.target.checked)}
-            />
-            Kelompokkan unit
-          </label>
+      <FilterToolbar>
+        <NativeSelect
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          className="h-8 w-auto text-xs min-w-[8.5rem]"
+        >
+          <option value="incomplete">Belum lengkap</option>
+          <option value="all">Semua</option>
+          <option value="complete">Sudah lengkap</option>
+        </NativeSelect>
+        <NativeSelect
+          value={unit}
+          onChange={(e) => setUnit(e.target.value)}
+          className="h-8 w-auto text-xs min-w-[10rem] max-w-[14rem]"
+        >
+          <option value="">Semua unit</option>
+          {unitOptions.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </NativeSelect>
+        <div className="flex gap-1 flex-1 min-w-[10rem] max-w-xs">
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && setQ(searchInput)}
+            placeholder="Cari No DO / invoice…"
+            className="h-8 text-xs"
+          />
+          <Button type="button" size="sm" className="h-8 px-2" onClick={() => setQ(searchInput)}>
+            <Search size={13} />
+          </Button>
         </div>
-      </div>
+        <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="rounded border-border"
+            checked={groupByUnit}
+            onChange={(e) => setGroupByUnit(e.target.checked)}
+          />
+          Kelompokkan unit
+        </label>
+      </FilterToolbar>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-            <Loader2 size={16} className="animate-spin" /> Memuat…
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="py-10 text-center space-y-1">
-            <CheckCircle2 className="mx-auto text-emerald-500" size={28} />
-            <p className="text-sm font-medium">
-              {statusFilter === 'incomplete'
-                ? 'Semua BA Serah Terima sudah diunggah'
-                : 'Tidak ada data'}
-            </p>
-          </div>
-        ) : groupByUnit && grouped ? (
+      <ListPanel
+        loading={loading}
+        empty={!loading && rows.length === 0}
+        emptyIcon={CheckCircle2}
+        emptyTitle={
+          statusFilter === 'incomplete'
+            ? 'Semua BA Serah Terima sudah diunggah'
+            : 'Tidak ada data'
+        }
+      >
+        {groupByUnit && grouped ? (
           <div>
             {grouped.map(([unitName, unitRows]) => {
               const need = unitRows.filter((r) => !r.unit_complete).length
@@ -452,9 +432,9 @@ export default function UnitDocPage() {
                     <span className="text-xs font-semibold truncate">{unitName}</span>
                     <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
                       {need > 0 ? (
-                        <span className="text-rose-600 font-semibold">{need} belum</span>
+                        <span className="text-destructive font-semibold">{need} belum</span>
                       ) : (
-                        <span className="text-emerald-600 font-semibold">semua OK</span>
+                        <span className="text-primary font-semibold">semua OK</span>
                       )}
                       {' · '}
                       {unitRows.length} DO
@@ -474,11 +454,11 @@ export default function UnitDocPage() {
             ))}
           </div>
         )}
-      </div>
+      </ListPanel>
 
-      <p className="text-[10px] text-muted-foreground px-0.5">
-        Baris merah muda = BA Serah Terima Barang belum diunggah. Tombol merah = upload PDF.
+      <p className="text-[10px] text-muted-foreground">
+        Baris disorot = BA Serah Terima belum diunggah. Tombol merah = aksi upload PDF.
       </p>
-    </div>
+    </PageShell>
   )
 }

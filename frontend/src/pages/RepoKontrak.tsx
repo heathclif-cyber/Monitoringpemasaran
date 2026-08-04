@@ -15,6 +15,7 @@ import { DocxPreview } from '@/components/common/DocxPreview'
 import { SearchInput } from '@/components/common/SearchInput'
 import { FilterBar, FilterSelect } from '@/components/common/FilterBar'
 import { DataTable } from '@/components/common/DataTable'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { formatCurrency, formatDate, safe } from '@/lib/utils'
 import type { Kontrak } from '@/types'
 
@@ -99,7 +100,8 @@ export default function RepoKontrak() {
   ]
 
   return (
-    <div className="space-y-4">
+    <PageShell density="compact">
+      <PageHeader title="Arsip Kontrak" description="Kelola dan unduh dokumen kontrak tersimpan" />
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Cari no kontrak, pembeli..." />
         <FilterSelect
@@ -227,6 +229,6 @@ export default function RepoKontrak() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

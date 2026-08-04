@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
+import { PageHeader, PageShell } from '@/components/patterns'
 
 const bypassSchema = z.object({
   unit: z.string().min(1, 'Unit wajib diisi'),
@@ -80,7 +81,11 @@ export default function BypassPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <PageShell width="narrow">
+      <PageHeader
+        title="Input Bypass"
+        description="Entri manual transaksi tanpa kontrak"
+      />
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
         <ReadOnlyFieldset className="block">
         <div className="grid grid-cols-2 gap-6">
@@ -165,6 +170,6 @@ export default function BypassPage() {
           </Button>
         </div>
       </form>
-    </div>
+    </PageShell>
   )
 }

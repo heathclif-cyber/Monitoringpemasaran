@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DocxPreview } from '@/components/common/DocxPreview'
 import { MultiSelectFilter } from '@/components/common/MultiSelectFilter'
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { cn, formatDate, safe } from '@/lib/utils'
 import type {
   DocumentPipelineResponse,
@@ -464,49 +465,41 @@ export default function DocMonitorPage() {
     MISSING_SLOT_OPTIONS.find((o) => o.value === missingSlot)?.label || null
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <CloudUpload size={16} />
-            <span className="text-xs font-medium uppercase tracking-wide">Dokumen</span>
+    <PageShell density="compact">
+      <PageHeader
+        title="Dokumen"
+        description="Pantau & unggah PDF — Regional: kontrak–invoice–DO–faktur · Unit: BA Serah Terima"
+        actions={
+          <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('pipeline')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                viewMode === 'pipeline'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <FileSearch size={13} />
+              Pantau rantai
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('entity')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                viewMode === 'entity'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <CloudUpload size={13} />
+              Upload per nomor
+            </button>
           </div>
-          <p className="text-sm text-muted-foreground max-w-3xl">
-            Satu menu untuk <strong>memantau</strong> dan <strong>mengunggah</strong> PDF.
-            <strong> Regional:</strong> Kontrak, Invoice, DO, Deklarasi, Rekening Koran, Faktur Pajak.
-            <strong> Unit:</strong> BA Serah Terima Barang (wajib per DO).
-          </p>
-        </div>
-
-        <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5 self-start">
-          <button
-            type="button"
-            onClick={() => setViewMode('pipeline')}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-              viewMode === 'pipeline'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <FileSearch size={13} />
-            Pantau rantai
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('entity')}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-              viewMode === 'entity'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <CloudUpload size={13} />
-            Upload per nomor
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {viewMode === 'entity' ? (
         <Suspense fallback={<LoadingSkeleton rows={6} />}>
@@ -921,6 +914,6 @@ export default function DocMonitorPage() {
       </Card>
       </>
       )}
-    </div>
+    </PageShell>
   )
 }

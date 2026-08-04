@@ -1,6 +1,8 @@
 # Design System & UI Standardization Guidelines
 **Application:** Monitoringpemasaran
 
+> **Sumber utama (wajib):** [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) — pola halaman (`PageShell`, `PageHeader`, `FilterToolbar`, `StatPills`, `ListPanel`, `StatusPill`) di `frontend/src/components/patterns/`.
+
 This document outlines the standardized design principles applied to the application to achieve a modern, minimal, "Platform-like" (SaaS) aesthetic similar to industry leaders like Vercel, Stripe, or Linear.
 
 ## 1. Core Philosophy

@@ -42,6 +42,7 @@ npm run build    # production build ke dist/
 npx tsc --noEmit # type-check
 ```
 - Semua komponen baru pakai shadcn/ui primitives (`components/ui/`)
+- Halaman baru: ikuti `DESIGN_SYSTEM.md` + bungkus dengan pola di `components/patterns/`
 - Classnames selalu via `cn()` dari `@/lib/utils`
 - Format currency: `formatCurrency()` / `formatCurrencyDec()` dari `@/lib/utils`
 - Semua types di `types/index.ts` — jangan scatter di file lain
@@ -155,6 +156,7 @@ Satu kontrak bisa punya beberapa invoice (pembayaran bertahap). Saat buat invoic
 
 ## Panduan Referensi
 
-- `DESIGN_GUIDELINES.md` — Guideline UI/UX sebelum migrasi React
-- `DESIGN_SYSTEM.md` (di `asetopt-monitor`) — Referensi arsitektur React + shadcn/ui
+- `docs/architecture/DESIGN_SYSTEM.md` — **Standar UI + pola halaman** (wajib untuk page baru)
+- `docs/architecture/DESIGN_GUIDELINES.md` — Guideline ringkas (palet, tipografi)
+- Pola React: `frontend/src/components/patterns/` (`PageShell`, `PageHeader`, `FilterToolbar`, `StatPills`, `ListPanel`, `StatusPill`)
 - `ANALYSIS_MULTI_INVOICE.md` — Analisis fitur multi-invoice per kontrak

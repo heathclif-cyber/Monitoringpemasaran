@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { formatCurrency } from '@/lib/utils'
 import { calculateBAInvoiceAmount } from '@/utils/baUtils'
 import type { Kontrak } from '@/types'
@@ -173,7 +174,11 @@ export default function BAPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <PageShell width="narrow">
+      <PageHeader
+        title="Berita Acara"
+        description="Input berita acara untuk kontrak payung"
+      />
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
         <Card>
           <CardHeader className="pb-3">
@@ -339,6 +344,6 @@ export default function BAPage() {
           </Button>
         </div>
       </form>
-    </div>
+    </PageShell>
   )
 }
