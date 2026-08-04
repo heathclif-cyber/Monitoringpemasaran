@@ -712,10 +712,46 @@ def _row_matches_missing_slot(row: schemas.DocumentPipelineRowOut, missing_slot:
     return any(s.slot_key == missing_slot and not s.uploaded for s in row.slots)
 
 
+def _build_unit_agg(rows: list[schemas.DocumentPipelineRowOut]) -> list[schemas.DocumentUnitAggOut]:
+    buckets: dict[str, dict[str, int]] = {}
+    for r in rows:
+        name = (r.unit or "Tanpa unit").strip() or "Tanpa unit"
+        b = buckets.setdefault(
+            name,
+            {"total": 0, "complete": 0, "incomplete": 0, "missing_ba_st": 0, "with_ba_panen": 0},
+        )
+        b["total"] += 1
+        if r.unit_complete:
+            b["complete"] += 1
+        else:
+            b["incomplete"] += 1
+        if any(s.slot_key == "ba_serah_terima" and s.required and not s.uploaded for s in r.slots):
+            b["missing_ba_st"] += 1
+        if any(s.slot_key == "ba_panen" and s.uploaded for s in r.slots):
+            b["with_ba_panen"] += 1
+    out: list[schemas.DocumentUnitAggOut] = []
+    for name, b in buckets.items():
+        pct = round((b["complete"] / b["total"]) * 100, 1) if b["total"] else 0.0
+        out.append(
+            schemas.DocumentUnitAggOut(
+                unit=name,
+                total=b["total"],
+                complete=b["complete"],
+                incomplete=b["incomplete"],
+                missing_ba_st=b["missing_ba_st"],
+                with_ba_panen=b["with_ba_panen"],
+                pct=pct,
+            )
+        )
+    out.sort(key=lambda x: (-x.incomplete, -x.total, x.unit.lower()))
+    return out
+
+
 @router.get("/pipeline", response_model=schemas.DocumentPipelineResponse)
 def document_pipeline(
     status_filter: str = Query(default="incomplete"),
     missing_slot: Optional[str] = Query(default=None),
+    scope: str = Query(default="all"),
     unit: Optional[str] = Query(default=None),
     material: List[str] = Query(default=[]),
     q: str = Query(default=""),
@@ -730,11 +766,14 @@ def document_pipeline(
     Opsional: Kuitansi (Regional), BA Panen (Unit).
     Superman: status nomor SPP — Regional (bukan file upload).
 
-    missing_slot: ba_serah_terima | do | deklarasi | kontrak | invoice |
-                  rekening_koran | superman | unit_tasks | ba_panen
+    scope=unit → hanya DO + slot Unit (BA Serah Terima / BA Panen),
+                 status complete/incomplete mengikuti unit_complete.
     """
     if status_filter not in ("all", "complete", "incomplete"):
         raise HTTPException(status_code=400, detail="status_filter tidak valid")
+    scope_norm = (scope or "all").strip().lower()
+    if scope_norm not in ("all", "unit"):
+        raise HTTPException(status_code=400, detail="scope tidak valid (all | unit)")
 
     slot_filter = missing_slot.strip().lower() if missing_slot and missing_slot.strip() else None
     if slot_filter and slot_filter not in _PIPELINE_MISSING_SLOTS:
@@ -1128,11 +1167,24 @@ def document_pipeline(
         if row:
             all_rows.append(row)
 
-    # Ringkasan dari hasil filter unit/material/q (sebelum status & missing_slot)
+    # Scope unit: hanya baris yang punya DO (kewajiban BA Serah Terima)
+    if scope_norm == "unit":
+        all_rows = [r for r in all_rows if r.no_do]
+        for r in all_rows:
+            r.slots = [s for s in r.slots if (s.responsibility or "regional") == "unit"]
+
+    # Ringkasan dari hasil filter unit/material/q (+ scope), sebelum status & missing_slot
+    if scope_norm == "unit":
+        complete_n = sum(1 for r in all_rows if r.unit_complete)
+        incomplete_n = sum(1 for r in all_rows if not r.unit_complete)
+    else:
+        complete_n = sum(1 for r in all_rows if r.is_complete)
+        incomplete_n = sum(1 for r in all_rows if not r.is_complete)
+
     summary = schemas.DocumentPipelineSummaryOut(
         total_rows=len(all_rows),
-        complete=sum(1 for r in all_rows if r.is_complete),
-        incomplete=sum(1 for r in all_rows if not r.is_complete),
+        complete=complete_n,
+        incomplete=incomplete_n,
         incomplete_regional=sum(1 for r in all_rows if not r.regional_complete),
         incomplete_unit=sum(1 for r in all_rows if not r.unit_complete),
         missing_kontrak=sum(
@@ -1165,20 +1217,32 @@ def document_pipeline(
         with_ba_panen=sum(
             1 for r in all_rows if any(s.slot_key == "ba_panen" and s.uploaded for s in r.slots)
         ),
+        by_unit=_build_unit_agg(all_rows) if scope_norm == "unit" else [],
     )
 
     rows = all_rows
-    if status_filter == "complete":
-        rows = [r for r in rows if r.is_complete]
-    elif status_filter == "incomplete":
-        rows = [r for r in rows if not r.is_complete]
+    if scope_norm == "unit":
+        if status_filter == "complete":
+            rows = [r for r in rows if r.unit_complete]
+        elif status_filter == "incomplete":
+            rows = [r for r in rows if not r.unit_complete]
+    else:
+        if status_filter == "complete":
+            rows = [r for r in rows if r.is_complete]
+        elif status_filter == "incomplete":
+            rows = [r for r in rows if not r.is_complete]
 
     if slot_filter:
         rows = [r for r in rows if _row_matches_missing_slot(r, slot_filter)]
 
     rows = rows[:limit]
 
-    return schemas.DocumentPipelineResponse(summary=summary, rows=rows, units=sorted(units_set))
+    return schemas.DocumentPipelineResponse(
+        summary=summary,
+        rows=rows,
+        units=sorted(units_set),
+        scope=scope_norm,
+    )
 
 
 @router.get("/summary", response_model=List[schemas.DocumentSummaryRow])

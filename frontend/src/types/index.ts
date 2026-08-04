@@ -356,6 +356,16 @@ export interface DocumentPipelineRow {
   missing_unit?: string[]
 }
 
+export interface DocumentUnitAgg {
+  unit: string
+  total: number
+  complete: number
+  incomplete: number
+  missing_ba_st: number
+  with_ba_panen: number
+  pct: number
+}
+
 export interface DocumentPipelineSummary {
   total_rows: number
   complete: number
@@ -370,12 +380,14 @@ export interface DocumentPipelineSummary {
   missing_ba_serah_terima: number
   missing_superman: number
   with_ba_panen: number
+  by_unit?: DocumentUnitAgg[]
 }
 
 export interface DocumentPipelineResponse {
   summary: DocumentPipelineSummary
   rows: DocumentPipelineRow[]
   units: string[]
+  scope?: 'all' | 'unit'
 }
 
 export interface DocumentCompletenessSummary {

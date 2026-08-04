@@ -347,6 +347,17 @@ class DocumentPipelineRowOut(BaseModel):
     missing_unit: List[str] = []
 
 
+class DocumentUnitAggOut(BaseModel):
+    """Agregasi kelengkapan dokumen Unit per nama unit kebun."""
+    unit: str
+    total: int
+    complete: int
+    incomplete: int
+    missing_ba_st: int
+    with_ba_panen: int
+    pct: float = 0.0
+
+
 class DocumentPipelineSummaryOut(BaseModel):
     total_rows: int
     complete: int
@@ -361,12 +372,14 @@ class DocumentPipelineSummaryOut(BaseModel):
     missing_ba_serah_terima: int
     missing_superman: int
     with_ba_panen: int
+    by_unit: List[DocumentUnitAggOut] = []
 
 
 class DocumentPipelineResponse(BaseModel):
     summary: DocumentPipelineSummaryOut
     rows: List[DocumentPipelineRowOut]
     units: List[str]
+    scope: str = "all"  # all | unit
 
 
 DocumentCompletenessOut.model_rebuild()

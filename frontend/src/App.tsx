@@ -21,6 +21,7 @@ const RepoPembayaran = lazy(() => import('@/pages/RepoPembayaran'))
 const RepoDO = lazy(() => import('@/pages/RepoDO'))
 const TraceKontrak = lazy(() => import('@/pages/TraceKontrak'))
 const DocMonitorPage = lazy(() => import('@/pages/DocMonitorPage'))
+const UnitDocPage = lazy(() => import('@/pages/UnitDocPage'))
 const StokPage = lazy(() => import('@/pages/StokPage'))
 const UsersPage = lazy(() => import('@/pages/UsersPage'))
 
@@ -45,6 +46,7 @@ export default function App() {
             {/* Satu menu Dokumen: pantau rantai + upload (alias path lama tetap jalan) */}
             <Route path="/upload" element={<DocMonitorPage />} />
             <Route path="/pantau-dokumen" element={<DocMonitorPage />} />
+            <Route path="/dokumen-unit" element={<UnitDocPage />} />
             <Route path="/stok" element={<StokPage />} />
             <Route path="/repo/kontrak" element={<RepoKontrak />} />
             <Route path="/repo/invoice" element={<RepoInvoice />} />

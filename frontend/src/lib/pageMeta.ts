@@ -50,6 +50,11 @@ const PAGE_META: Record<string, PageMeta> = {
     description: 'Pantau kelengkapan dan unggah PDF (kontrak–invoice–DO–Superman–BA)',
     breadcrumb: 'Dokumen',
   },
+  '/dokumen-unit': {
+    title: 'Dokumen Unit',
+    description: 'Pantau visual kelengkapan BA Serah Terima & BA Panen (tugas unit)',
+    breadcrumb: 'Dokumen / Unit',
+  },
   '/berita-acara': {
     title: 'Berita Acara',
     description: 'Input BA Panen (opsional) untuk kontrak payung',
