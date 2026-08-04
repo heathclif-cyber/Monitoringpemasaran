@@ -3,6 +3,8 @@
 Standar visual dan pola halaman untuk React SPA (`frontend/`).  
 Semua UI baru **wajib** mengikuti dokumen ini. Guideline ringkas lama: [DESIGN_GUIDELINES.md](./DESIGN_GUIDELINES.md).
 
+**Prompt siap pakai untuk redesign dengan AI lain:** [PROMPT_UI_UX_REDESIGN.md](./PROMPT_UI_UX_REDESIGN.md)
+
 ---
 
 ## 1. Prinsip

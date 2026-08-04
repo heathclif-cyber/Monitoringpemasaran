@@ -226,6 +226,7 @@ Satu kontrak bisa punya beberapa invoice (pembayaran bertahap). Saat buat invoic
 ## Panduan Referensi
 
 - [docs/architecture/DESIGN_SYSTEM.md](./docs/architecture/DESIGN_SYSTEM.md) — **Standar UI + pola halaman** (baca sebelum UI baru)
+- [docs/architecture/PROMPT_UI_UX_REDESIGN.md](./docs/architecture/PROMPT_UI_UX_REDESIGN.md) — **Prompt copy-paste** untuk redesign UI/UX di AI lain
 - [docs/architecture/DESIGN_GUIDELINES.md](./docs/architecture/DESIGN_GUIDELINES.md) — Guideline ringkas (palet, tipografi)
 - `frontend/src/components/patterns/` — implementasi pola (import dari `@/components/patterns`)
 - `docs/architecture/ANALYSIS_MULTI_INVOICE.md` — Analisis fitur multi-invoice per kontrak
