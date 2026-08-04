@@ -320,8 +320,8 @@ export default function BAPage() {
               <DocumentUpload
                 entityType="ba"
                 entityId={exportNo}
-                docType="ba_panen"
-                label="BA Panen (opsional)"
+                docType="berita_acara"
+                label="Dokumen Berita Acara"
               />
             </CardContent>
           </Card>

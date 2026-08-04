@@ -16,7 +16,7 @@ const DOC_TYPE_LABELS: Record<DocumentDocType, string> = {
   do: 'Delivery Order',
   deklarasi: 'Deklarasi Penerimaan',
   berita_acara: 'BA Serah Terima Barang',
-  ba_panen: 'BA Panen',
+  ba_panen: 'Berita Acara', // legacy
 }
 
 interface DocumentUploadProps {

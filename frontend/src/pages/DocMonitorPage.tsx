@@ -46,7 +46,6 @@ type MissingSlotFilter =
   | 'do'
   | 'deklarasi'
   | 'superman'
-  | 'ba_panen'
   | 'kontrak'
   | 'invoice'
   | 'rekening_koran'
@@ -56,8 +55,8 @@ const PREFS_KEY = 'pantau-dokumen-prefs'
 
 const BROWSER_VIEWABLE = new Set(['pdf', 'jpg', 'jpeg', 'png'])
 
-/** Unit: BA Panen + BA Serah Terima Barang */
-const UNIT_SLOT_KEYS = new Set(['ba_serah_terima', 'ba_panen'])
+/** Unit: hanya BA Serah Terima Barang */
+const UNIT_SLOT_KEYS = new Set(['ba_serah_terima'])
 /** Regional: kontrak, invoice, DO, deklarasi, rekening koran, faktur pajak, dll. */
 const REGIONAL_SLOT_KEYS = new Set([
   'kontrak',
@@ -72,7 +71,6 @@ const REGIONAL_SLOT_KEYS = new Set([
 
 const SLOT_ORDER = [
   'ba_serah_terima',
-  'ba_panen',
   'kontrak',
   'invoice',
   'rekening_koran',
@@ -85,10 +83,9 @@ const SLOT_ORDER = [
 
 const MISSING_SLOT_OPTIONS: { value: MissingSlotFilter; label: string }[] = [
   { value: '', label: 'Semua jenis kekurangan' },
-  { value: 'unit_tasks', label: 'Kurang tugas Unit (BA)' },
+  { value: 'unit_tasks', label: 'Kurang tugas Unit (BA Serah Terima)' },
   { value: 'regional_tasks', label: 'Kurang tugas Regional' },
   { value: 'ba_serah_terima', label: 'Kurang BA Serah Terima (Unit)' },
-  { value: 'ba_panen', label: 'Sudah ada BA Panen' },
   { value: 'do', label: 'Kurang file DO (Regional)' },
   { value: 'deklarasi', label: 'Kurang Deklarasi (Regional)' },
   { value: 'faktur_pajak', label: 'Kurang Faktur Pajak (Regional)' },
@@ -155,15 +152,13 @@ function PipelineChip({ slot }: { slot: DocumentPipelineSlot }) {
   const short =
     slot.slot_key === 'ba_serah_terima'
       ? 'BA ST'
-      : slot.slot_key === 'ba_panen'
-        ? 'BA Panen'
-        : slot.slot_key === 'rekening_koran'
-          ? 'Rek. Koran'
-          : slot.slot_key === 'faktur_pajak'
-            ? 'Faktur'
-            : slot.slot_key === 'superman'
-              ? 'SPP'
-              : slot.label.split(' ')[0]
+      : slot.slot_key === 'rekening_koran'
+        ? 'Rek. Koran'
+        : slot.slot_key === 'faktur_pajak'
+          ? 'Faktur'
+          : slot.slot_key === 'superman'
+            ? 'SPP'
+            : slot.label.split(' ')[0]
   const owner = slot.responsibility === 'unit' ? 'Unit' : 'Regional'
 
   return (
@@ -449,7 +444,7 @@ export default function DocMonitorPage() {
 
   const applyQuickFilter = (slot: MissingSlotFilter) => {
     setMissingSlot((prev) => (prev === slot ? '' : slot))
-    if (slot && slot !== 'ba_panen') {
+    if (slot) {
       setStatusFilter('incomplete')
     }
     setExpanded(null)
@@ -479,7 +474,7 @@ export default function DocMonitorPage() {
           <p className="text-sm text-muted-foreground max-w-3xl">
             Satu menu untuk <strong>memantau</strong> dan <strong>mengunggah</strong> PDF.
             <strong> Regional:</strong> Kontrak, Invoice, DO, Deklarasi, Rekening Koran, Faktur Pajak.
-            <strong> Unit:</strong> BA Panen (opsional) dan BA Serah Terima Barang (wajib per DO).
+            <strong> Unit:</strong> BA Serah Terima Barang (wajib per DO).
           </p>
         </div>
 
@@ -734,7 +729,7 @@ export default function DocMonitorPage() {
               <span className="h-2 w-2 rounded-full bg-red-400" /> Wajib belum upload
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-violet-500" /> Unit (BA Panen / BA Serah Terima)
+              <span className="h-2 w-2 rounded-full bg-violet-500" /> Unit (BA Serah Terima)
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-sky-500" /> Regional (kontrak–invoice–DO–faktur–dll.)
@@ -893,12 +888,6 @@ export default function DocMonitorPage() {
                                     </strong>
                                   </span>
                                   <span>
-                                    BA Panen:{' '}
-                                    <strong className="text-foreground">
-                                      {row.no_ba || '— (opsional)'}
-                                    </strong>
-                                  </span>
-                                  <span>
                                     Superman:{' '}
                                     <strong className="text-foreground">
                                       {row.superman || row.superman_status}
@@ -907,7 +896,7 @@ export default function DocMonitorPage() {
                                 </div>
                                 <SlotGroup
                                   title="Tanggung jawab Unit"
-                                  hint="BA Serah Terima Barang (wajib per DO) · BA Panen (opsional)"
+                                  hint="BA Serah Terima Barang (wajib per DO)"
                                   slots={unitSlots}
                                   onUploaded={load}
                                 />

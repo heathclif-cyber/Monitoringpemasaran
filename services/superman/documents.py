@@ -30,9 +30,9 @@ class ResolvedSupportDoc:
 
 
 def _doc_type_candidates(entity_type: str, doc_type: str) -> list[str]:
-    """Alias: BA Panen di entity ba bisa tersimpan sebagai ba_panen atau legacy berita_acara."""
+    """Entity ba: berita_acara (utama) atau ba_panen (file legacy)."""
     if entity_type == "ba" and doc_type in ("ba_panen", "berita_acara"):
-        return ["ba_panen", "berita_acara"]
+        return ["berita_acara", "ba_panen"]
     return [doc_type]
 
 
@@ -169,7 +169,8 @@ def _standar_mandatory_sources(kontrak_id: str, no_invoice: str) -> list[Support
 
 def _payung_ba_mandatory_sources(no_ba: str, no_invoice: str) -> list[SupportSource]:
     return [
-        ("ba", no_ba, "ba_panen", "BA Panen"),
+        # berita_acara (utama) / ba_panen (legacy file lama)
+        ("ba", no_ba, "berita_acara", "Berita Acara"),
         *_invoice_mandatory_sources(no_invoice),
         *_rekening_koran_mandatory_sources(no_invoice),
     ]
@@ -429,13 +430,13 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
         if not no_ba:
             requirements.append(
                 {
-                    "label": "BA Panen",
+                    "label": "Berita Acara",
                     "entity_type": "ba",
                     "entity_id": "-",
-                    "doc_type": "ba_panen",
+                    "doc_type": "berita_acara",
                     "uploaded": False,
                     "file_name": None,
-                    "upload_hint": "Hubungkan DO ke BA Panen terlebih dahulu",
+                    "upload_hint": "Hubungkan DO ke Berita Acara terlebih dahulu",
                 }
             )
             return requirements, False
@@ -651,13 +652,13 @@ def superman_doc_requirements_for_invoice(
         if not no_ba:
             requirements.append(
                 {
-                    "label": "BA Panen",
+                    "label": "Berita Acara",
                     "entity_type": "ba",
                     "entity_id": "-",
-                    "doc_type": "ba_panen",
+                    "doc_type": "berita_acara",
                     "uploaded": False,
                     "file_name": None,
-                    "upload_hint": "Hubungkan invoice ke BA Panen terlebih dahulu",
+                    "upload_hint": "Hubungkan invoice ke Berita Acara terlebih dahulu",
                 }
             )
             return requirements, False
@@ -722,13 +723,13 @@ def superman_doc_requirements_for_pembayaran(
         if not no_ba:
             requirements.append(
                 {
-                    "label": "BA Panen",
+                    "label": "Berita Acara",
                     "entity_type": "ba",
                     "entity_id": "-",
-                    "doc_type": "ba_panen",
+                    "doc_type": "berita_acara",
                     "uploaded": False,
                     "file_name": None,
-                    "upload_hint": "Hubungkan invoice ke BA Panen terlebih dahulu",
+                    "upload_hint": "Hubungkan invoice ke Berita Acara terlebih dahulu",
                 }
             )
             return requirements, False

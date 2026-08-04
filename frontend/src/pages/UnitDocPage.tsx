@@ -46,17 +46,12 @@ function writePrefs(prefs: { unit: string; statusFilter: StatusFilter }) {
   }
 }
 
-/** Tombol upload ringkas — satu baris */
 function CompactUpload({
   slot,
   onUploaded,
-  label,
-  required,
 }: {
   slot: DocumentPipelineSlot
   onUploaded: () => void
-  label: string
-  required?: boolean
 }) {
   const { addNotification } = useAppStore()
   const canEdit = useCanEdit()
@@ -87,7 +82,7 @@ function CompactUpload({
     setUploading(true)
     try {
       await client.uploadFormData<DocumentUpload>('/api/documents/upload', formData)
-      addNotification(`${label} berhasil di-upload`, 'success')
+      addNotification('BA Serah Terima berhasil di-upload', 'success')
       onUploaded()
     } catch (err: unknown) {
       addNotification(err instanceof Error ? err.message : 'Upload gagal', 'error')
@@ -99,9 +94,9 @@ function CompactUpload({
 
   if (slot.uploaded && !fileMissing) {
     return (
-      <div className="inline-flex items-center gap-1.5">
+      <div className="inline-flex items-center gap-1">
         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-          <CheckCircle2 size={13} /> Ada
+          <CheckCircle2 size={13} /> Sudah ada
         </span>
         {canView && (
           <Button
@@ -154,17 +149,10 @@ function CompactUpload({
     )
   }
 
-  // Belum ada file
   if (!canUpload) {
     return (
-      <span
-        className={cn(
-          'inline-flex items-center gap-1 text-[11px] font-medium',
-          required ? 'text-rose-600' : 'text-muted-foreground',
-        )}
-      >
-        <CircleAlert size={13} />
-        Belum
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600">
+        <CircleAlert size={13} /> Belum
       </span>
     )
   }
@@ -181,45 +169,21 @@ function CompactUpload({
       <Button
         type="button"
         size="sm"
-        variant={required ? 'default' : 'outline'}
-        className={cn(
-          'h-8 gap-1 text-xs whitespace-nowrap',
-          required && 'bg-rose-600 hover:bg-rose-700 text-white',
-        )}
+        className="h-8 gap-1 text-xs whitespace-nowrap bg-rose-600 hover:bg-rose-700 text-white"
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
       >
         {uploading ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />}
-        {fileMissing ? 'Upload ulang' : `Upload ${label}`}
+        {fileMissing ? 'Upload ulang BA Serah Terima' : 'Upload BA Serah Terima'}
       </Button>
     </>
   )
 }
 
-function StatusDot({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-        ok
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-          : 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300',
-      )}
-      title={label}
-    >
-      {ok ? <CheckCircle2 size={11} /> : <CircleAlert size={11} />}
-      {label}
-    </span>
-  )
-}
-
 function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: () => void }) {
   const baSt = row.slots.find((s) => s.slot_key === 'ba_serah_terima')
-  const baPanen = row.slots.find((s) => s.slot_key === 'ba_panen')
-  const done = row.unit_complete !== false
+  const done = Boolean(baSt?.uploaded) || row.unit_complete !== false
   const needBaSt = Boolean(baSt && !baSt.uploaded)
-  const hasBaPanenSlot = Boolean(baPanen?.entity_id)
-  const baPanenOk = Boolean(baPanen?.uploaded)
 
   return (
     <div
@@ -227,50 +191,42 @@ function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: ()
         'flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3',
         'border-b border-border/70 px-3 py-2 last:border-0',
         needBaSt && 'bg-rose-50/50 dark:bg-rose-950/20',
-        done && !needBaSt && 'bg-transparent',
       )}
     >
-      {/* Identitas */}
-      <div className="min-w-0 sm:w-[38%] sm:shrink-0">
+      <div className="min-w-0 sm:w-[42%] sm:shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
           <p className="text-sm font-semibold truncate">{row.no_do}</p>
-          {!done && (
+          {needBaSt ? (
             <span className="shrink-0 rounded bg-rose-600 text-white px-1.5 py-0.5 text-[9px] font-bold uppercase">
               Aksi
+            </span>
+          ) : (
+            <span className="shrink-0 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-[9px] font-bold uppercase">
+              OK
             </span>
           )}
         </div>
         <p className="text-[11px] text-muted-foreground truncate">
           {safe(row.unit)}
           {row.tanggal ? ` · ${formatDate(row.tanggal)}` : ''}
+          {row.no_invoice ? ` · Inv ${row.no_invoice}` : ''}
         </p>
       </div>
 
-      {/* Status chips */}
-      <div className="flex flex-wrap items-center gap-1 sm:flex-1 min-w-0">
-        <StatusDot ok={!needBaSt && Boolean(baSt?.uploaded)} label="BA Serah Terima" />
-        {hasBaPanenSlot ? (
-          <StatusDot ok={baPanenOk} label="BA Panen" />
-        ) : (
-          <span className="text-[10px] text-muted-foreground px-1">BA Panen —</span>
-        )}
+      <div className="flex items-center gap-1.5 sm:flex-1 min-w-0 text-xs">
+        <span className="text-muted-foreground shrink-0">BA Serah Terima Barang</span>
+        <span className="text-[10px] font-medium text-rose-600 shrink-0">wajib</span>
       </div>
 
-      {/* Satu area aksi */}
-      <div className="flex flex-wrap items-center gap-1.5 sm:justify-end sm:shrink-0">
-        {needBaSt && baSt && (
-          <CompactUpload slot={baSt} onUploaded={onUploaded} label="BA Serah Terima" required />
-        )}
-        {!needBaSt && hasBaPanenSlot && baPanen && !baPanenOk && (
-          <CompactUpload slot={baPanen} onUploaded={onUploaded} label="BA Panen" />
-        )}
-        {!needBaSt && baSt?.uploaded && (
-          <CompactUpload slot={baSt} onUploaded={onUploaded} label="BA ST" required />
-        )}
-        {done && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+      <div className="flex items-center gap-1.5 sm:justify-end sm:shrink-0">
+        {baSt ? (
+          <CompactUpload slot={baSt} onUploaded={onUploaded} />
+        ) : done ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
             <CheckCircle2 size={14} /> OK
           </span>
+        ) : (
+          <span className="text-[11px] text-muted-foreground">—</span>
         )}
       </div>
     </div>
@@ -350,17 +306,15 @@ export default function UnitDocPage() {
 
   return (
     <div className="space-y-3 max-w-5xl">
-      {/* Toolbar padat */}
       <div className="rounded-lg border bg-card px-3 py-2.5 space-y-2">
         <div className="flex flex-wrap items-center gap-2 justify-between">
           <div className="min-w-0">
             <h1 className="text-base font-semibold leading-tight">Dokumen Unit</h1>
             <p className="text-[11px] text-muted-foreground">
-              Wajib: <strong>BA Serah Terima</strong> per DO · Opsional: BA Panen
+              Hanya satu dokumen wajib: <strong>BA Serah Terima Barang</strong> (per DO)
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Progress tipis */}
             <div className="flex items-center gap-2 min-w-[140px]">
               <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
                 <div
@@ -387,30 +341,25 @@ export default function UnitDocPage() {
           </div>
         </div>
 
-        {/* Stats 1 baris */}
         <div className="flex flex-wrap gap-1.5 text-[11px]">
           <span className="rounded-md bg-muted px-2 py-1 tabular-nums">
-            Total <strong>{total}</strong>
+            Total DO <strong>{total}</strong>
           </span>
           <span className="rounded-md bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 px-2 py-1 tabular-nums">
-            Perlu aksi <strong>{incomplete}</strong>
+            Belum upload BA ST <strong>{missingBaSt || incomplete}</strong>
           </span>
           <span className="rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-1 tabular-nums">
-            Lengkap <strong>{complete}</strong>
-          </span>
-          <span className="rounded-md bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-1 tabular-nums">
-            Kurang BA ST <strong>{missingBaSt}</strong>
+            Sudah lengkap <strong>{complete}</strong>
           </span>
         </div>
 
-        {/* Filter 1 baris */}
         <div className="flex flex-wrap gap-2 items-center">
           <NativeSelect
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             className="h-8 w-auto text-xs min-w-[8.5rem]"
           >
-            <option value="incomplete">Perlu aksi</option>
+            <option value="incomplete">Belum lengkap</option>
             <option value="all">Semua</option>
             <option value="complete">Sudah lengkap</option>
           </NativeSelect>
@@ -450,7 +399,6 @@ export default function UnitDocPage() {
         </div>
       </div>
 
-      {/* Daftar padat */}
       <div className="rounded-lg border bg-card overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
@@ -461,7 +409,7 @@ export default function UnitDocPage() {
             <CheckCircle2 className="mx-auto text-emerald-500" size={28} />
             <p className="text-sm font-medium">
               {statusFilter === 'incomplete'
-                ? 'Tidak ada yang perlu diisi — semua lengkap'
+                ? 'Semua BA Serah Terima sudah diunggah'
                 : 'Tidak ada data'}
             </p>
           </div>
@@ -475,7 +423,7 @@ export default function UnitDocPage() {
                     <span className="text-xs font-semibold truncate">{unitName}</span>
                     <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
                       {need > 0 ? (
-                        <span className="text-rose-600 font-semibold">{need} perlu aksi</span>
+                        <span className="text-rose-600 font-semibold">{need} belum</span>
                       ) : (
                         <span className="text-emerald-600 font-semibold">semua OK</span>
                       )}
@@ -500,7 +448,7 @@ export default function UnitDocPage() {
       </div>
 
       <p className="text-[10px] text-muted-foreground px-0.5">
-        Baris merah muda = BA Serah Terima belum diunggah. Tombol merah = aksi utama unit.
+        Baris merah muda = BA Serah Terima Barang belum diunggah. Tombol merah = upload PDF.
       </p>
     </div>
   )

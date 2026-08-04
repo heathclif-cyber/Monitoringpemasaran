@@ -610,8 +610,8 @@ export default function PembayaranPage() {
               <CardTitle className="text-sm font-semibold">Dokumen Pendukung Superman</CardTitle>
               <p className="text-xs text-slate-500 mt-1">
                 {isPayung
-                  ? 'Wajib: BA Panen, Invoice, dan Rekening Koran Penerimaan (kontrak payung). Kuitansi opsional. BA Serah Terima Barang diunggah di DO.'
-                  : 'Wajib: Kontrak, Invoice, dan Rekening Koran Penerimaan. Kuitansi opsional. BA Serah Terima Barang diunggah di DO.'}
+                  ? 'Wajib: Berita Acara, Invoice, dan Rekening Koran Penerimaan (kontrak payung). Kuitansi opsional. BA Serah Terima Barang diunggah di DO (tugas unit).'
+                  : 'Wajib: Kontrak, Invoice, dan Rekening Koran Penerimaan. Kuitansi opsional. BA Serah Terima Barang diunggah di DO (tugas unit).'}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -620,8 +620,8 @@ export default function PembayaranPage() {
                   <DocumentUpload
                     entityType="ba"
                     entityId={baNo}
-                    docType="ba_panen"
-                    label="BA Panen"
+                    docType="berita_acara"
+                    label="Berita Acara"
                     onUploaded={handleDocumentUploaded}
                   />
                 ) : currentKontrak?.no_kontrak ? (

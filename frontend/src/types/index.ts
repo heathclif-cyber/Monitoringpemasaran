@@ -30,7 +30,7 @@ export type DocumentDocType =
   | 'do'
   | 'deklarasi'
   | 'berita_acara' // BA Serah Terima Barang (biasanya di DO) — unit
-  | 'ba_panen' // BA Panen (entity BA, opsional) — unit
+  | 'ba_panen' // legacy — file lama; UI baru pakai berita_acara
 
 export type DocumentResponsibility = 'regional' | 'unit'
 

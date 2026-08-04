@@ -52,12 +52,12 @@ const PAGE_META: Record<string, PageMeta> = {
   },
   '/dokumen-unit': {
     title: 'Dokumen Unit',
-    description: 'Pantau visual kelengkapan BA Serah Terima & BA Panen (tugas unit)',
+    description: 'Pantau BA Serah Terima Barang yang wajib dilengkapi unit',
     breadcrumb: 'Dokumen / Unit',
   },
   '/berita-acara': {
     title: 'Berita Acara',
-    description: 'Input BA Panen (opsional) untuk kontrak payung',
+    description: 'Input berita acara untuk kontrak payung',
     breadcrumb: 'Dokumen / Berita Acara',
   },
   '/stok': {

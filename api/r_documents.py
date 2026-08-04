@@ -31,8 +31,8 @@ VALID_DOC_TYPES = {
     "faktur_pajak",
     "do",
     "deklarasi",
-    "berita_acara",  # BA Serah Terima Barang (biasanya di entity DO) — tanggung jawab unit
-    "ba_panen",      # BA Panen (entity BA, opsional) — tanggung jawab unit
+    "berita_acara",  # BA Serah Terima (entity DO) atau dokumen BA payung (entity ba)
+    "ba_panen",      # legacy — tetap diterima, tidak ditampilkan di UI
 }
 
 DOC_TYPE_LABELS = {
@@ -44,12 +44,12 @@ DOC_TYPE_LABELS = {
     "do": "Delivery Order",
     "deklarasi": "Deklarasi Penerimaan",
     "berita_acara": "BA Serah Terima Barang",
-    "ba_panen": "BA Panen",
+    "ba_panen": "Berita Acara",  # legacy label
 }
 
 # Pemenuhan dokumen: regional (kantor/HO) vs unit kebun
 # Regional: kontrak, invoice, DO, deklarasi, rekening koran, faktur pajak, kuitansi
-# Unit: BA Panen, BA Serah Terima Barang
+# Unit: hanya BA Serah Terima Barang (entity DO, doc_type berita_acara)
 DOC_RESPONSIBILITY: dict[str, str] = {
     "kontrak": "regional",
     "invoice": "regional",
@@ -59,7 +59,7 @@ DOC_RESPONSIBILITY: dict[str, str] = {
     "do": "regional",
     "deklarasi": "regional",
     "berita_acara": "unit",
-    "ba_panen": "unit",
+    "ba_panen": "regional",  # legacy
 }
 
 RESPONSIBILITY_LABELS = {
@@ -78,7 +78,7 @@ ENTITY_DOC_REQUIREMENTS: dict[str, list[str]] = {
 
 # Slot opsional (ditampilkan di UI, tidak dihitung missing)
 ENTITY_OPTIONAL_DOCS: dict[str, list[str]] = {
-    "ba": ["ba_panen"],
+    "ba": [],  # BA Panen dihapus dari alur; payung pakai berita_acara jika di-upload manual
     "invoice": ["kuitansi"],
 }
 
@@ -88,17 +88,15 @@ def _responsibility_for_doc(doc_type: Optional[str], *, slot_key: Optional[str] 
         return "regional"
     if slot_key == "ba_serah_terima":
         return "unit"
-    if slot_key == "ba_panen":
-        return "unit"
     if doc_type:
         return DOC_RESPONSIBILITY.get(doc_type, "regional")
     return "regional"
 
 
 def _doc_type_candidates(entity_type: str, doc_type: str) -> list[str]:
-    """BA Panen di entity ba: ba_panen (baru) atau berita_acara (legacy)."""
+    """Entity ba: berita_acara (utama) atau ba_panen (file legacy)."""
     if entity_type == "ba" and doc_type in ("ba_panen", "berita_acara"):
-        return ["ba_panen", "berita_acara"]
+        return ["berita_acara", "ba_panen"]
     return [doc_type]
 
 
@@ -692,9 +690,8 @@ _PIPELINE_MISSING_SLOTS = {
     "rekening_koran",
     "faktur_pajak",
     "superman",
-    "unit_tasks",  # tanggung jawab unit: BA Serah Terima (+ BA Panen jika ada no_ba)
+    "unit_tasks",  # tanggung jawab unit: BA Serah Terima Barang saja
     "regional_tasks",  # tanggung jawab regional yang wajib belum lengkap
-    "ba_panen",  # filter baris yang sudah punya file BA Panen
 }
 
 
@@ -702,13 +699,9 @@ def _row_matches_missing_slot(row: schemas.DocumentPipelineRowOut, missing_slot:
     if missing_slot == "superman":
         return bool(row.no_invoice) and row.superman_status != "done"
     if missing_slot == "unit_tasks":
-        return not row.unit_complete or any(
-            s.slot_key == "ba_panen" and s.entity_id and not s.uploaded for s in row.slots
-        )
+        return not row.unit_complete
     if missing_slot == "regional_tasks":
         return not row.regional_complete
-    if missing_slot == "ba_panen":
-        return any(s.slot_key == "ba_panen" and s.uploaded for s in row.slots)
     return any(s.slot_key == missing_slot and not s.uploaded for s in row.slots)
 
 
@@ -727,8 +720,6 @@ def _build_unit_agg(rows: list[schemas.DocumentPipelineRowOut]) -> list[schemas.
             b["incomplete"] += 1
         if any(s.slot_key == "ba_serah_terima" and s.required and not s.uploaded for s in r.slots):
             b["missing_ba_st"] += 1
-        if any(s.slot_key == "ba_panen" and s.uploaded for s in r.slots):
-            b["with_ba_panen"] += 1
     out: list[schemas.DocumentUnitAggOut] = []
     for name, b in buckets.items():
         pct = round((b["complete"] / b["total"]) * 100, 1) if b["total"] else 0.0
@@ -739,7 +730,7 @@ def _build_unit_agg(rows: list[schemas.DocumentPipelineRowOut]) -> list[schemas.
                 complete=b["complete"],
                 incomplete=b["incomplete"],
                 missing_ba_st=b["missing_ba_st"],
-                with_ba_panen=b["with_ba_panen"],
+                with_ba_panen=0,
                 pct=pct,
             )
         )
@@ -763,10 +754,11 @@ def document_pipeline(
 
     Regional (wajib): Kontrak, Invoice, Rekening Koran, Faktur Pajak, DO, Deklarasi.
     Unit (wajib): BA Serah Terima Barang (per DO).
-    Opsional: Kuitansi (Regional), BA Panen (Unit).
+    Opsional: Kuitansi (Regional).
+    Unit (wajib): BA Serah Terima Barang saja.
     Superman: status nomor SPP — Regional (bukan file upload).
 
-    scope=unit → hanya DO + slot Unit (BA Serah Terima / BA Panen),
+    scope=unit → hanya DO + slot Unit (BA Serah Terima Barang),
                  status complete/incomplete mengikuti unit_complete.
     """
     if status_filter not in ("all", "complete", "incomplete"):
@@ -979,21 +971,6 @@ def document_pipeline(
                 ),
                 responsibility="unit",
             ),
-            _pipeline_slot(
-                slot_key="ba_panen",
-                label=DOC_TYPE_LABELS["ba_panen"],
-                required=False,
-                entity_type="ba" if no_ba else None,
-                entity_id=no_ba,
-                doc_type="ba_panen" if no_ba else None,
-                cache=cache,
-                note=(
-                    f"No. BA: {no_ba} · Tanggung jawab Unit (opsional)"
-                    if no_ba
-                    else "Opsional (Unit) — hanya jika ada BA Panen / alur payung"
-                ),
-                responsibility="unit",
-            ),
         ]
 
         def _slot(key: str) -> schemas.DocumentPipelineSlotOut | None:
@@ -1002,14 +979,18 @@ def document_pipeline(
         kontrak_ok = bool(_slot("kontrak") and _slot("kontrak").uploaded)
         invoice_ok = bool(_slot("invoice") and _slot("invoice").uploaded) if no_invoice else False
         rekening_ok = bool(_slot("rekening_koran") and _slot("rekening_koran").uploaded) if no_invoice else False
-        ba_panen_slot = _slot("ba_panen")
-        ba_panen_ok = bool(ba_panen_slot and ba_panen_slot.uploaded) if no_ba else False
+        # Dokumen BA payung (legacy ba_panen / berita_acara di entity ba) untuk kesiapan Superman
+        ba_doc_ok = False
+        if no_ba:
+            ba_uploads = cache.get(("ba", no_ba), {})
+            ba_upload = _pick_upload(ba_uploads, "ba", "berita_acara")
+            ba_doc_ok = bool(ba_upload and _check_file_exists(ba_upload))
         sm_status = _superman_status_for_row(
             superman_no=superman_no,
             kontrak_ok=kontrak_ok,
             invoice_ok=invoice_ok,
             rekening_ok=rekening_ok,
-            ba_panen_ok=ba_panen_ok,
+            ba_panen_ok=ba_doc_ok,
             tipe_alur=tipe_alur,
             has_ba=bool(no_ba),
         )
@@ -1214,9 +1195,7 @@ def document_pipeline(
             if any(s.slot_key == "ba_serah_terima" and s.required and not s.uploaded for s in r.slots)
         ),
         missing_superman=sum(1 for r in all_rows if r.superman_status != "done" and r.no_invoice),
-        with_ba_panen=sum(
-            1 for r in all_rows if any(s.slot_key == "ba_panen" and s.uploaded for s in r.slots)
-        ),
+        with_ba_panen=0,
         by_unit=_build_unit_agg(all_rows) if scope_norm == "unit" else [],
     )
 
