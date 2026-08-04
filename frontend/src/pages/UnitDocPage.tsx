@@ -225,20 +225,24 @@ function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: ()
         </p>
       </div>
 
-      <div className="flex flex-col gap-0.5 sm:flex-1 min-w-0 text-xs">
+      <div className="flex flex-col gap-1 sm:flex-1 min-w-0 text-xs">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-muted-foreground shrink-0">BA Serah Terima Barang</span>
+          <span className="font-medium text-foreground shrink-0">BA Serah Terima Barang</span>
           <span className="text-[10px] font-medium text-rose-600 shrink-0">wajib</span>
         </div>
         {volLabel ? (
-          <p className="text-[12px] font-semibold tabular-nums text-foreground">
-            Volume: {volLabel}
+          <div className="inline-flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[12px] font-bold tabular-nums text-violet-900 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+              Vol. {volLabel}
+            </span>
             {row.komoditi ? (
-              <span className="font-normal text-muted-foreground"> · {row.komoditi}</span>
+              <span className="text-[11px] text-muted-foreground truncate">{row.komoditi}</span>
             ) : null}
-          </p>
+          </div>
         ) : (
-          <p className="text-[11px] text-muted-foreground">Volume DO belum tercatat</p>
+          <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            Volume DO kosong — isi volume di form DO
+          </span>
         )}
       </div>
 

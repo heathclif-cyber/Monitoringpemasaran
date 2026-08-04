@@ -1111,7 +1111,15 @@ def document_pipeline(
             or (kontrak.units[0].satuan if kontrak.units else None)
             or "Kg"
         )
-        vol = float(do.volume_do) if do.volume_do is not None else None
+        # Volume acuan BA Serah Terima: volume_do, fallback invoice.volume
+        vol = None
+        try:
+            if do.volume_do is not None:
+                vol = float(do.volume_do)
+            elif getattr(inv, "volume", None) is not None:
+                vol = float(inv.volume)
+        except (TypeError, ValueError):
+            vol = None
 
         row = build_row(
             no_kontrak=kontrak.no_kontrak,
