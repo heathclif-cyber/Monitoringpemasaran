@@ -41,14 +41,14 @@ const PAGE_META: Record<string, PageMeta> = {
     breadcrumb: 'Laporan / Bypass',
   },
   '/upload': {
-    title: 'Upload Dokumen',
-    description: 'Unggah kontrak, invoice, DO, deklarasi, dan berita acara',
-    breadcrumb: 'Dokumen / Upload',
+    title: 'Dokumen',
+    description: 'Pantau kelengkapan dan unggah PDF (kontrak–invoice–DO–Superman–BA)',
+    breadcrumb: 'Dokumen',
   },
   '/pantau-dokumen': {
-    title: 'Pantau Dokumen',
-    description: 'Pantau kelengkapan kontrak–invoice–DO–Superman–BA untuk unit',
-    breadcrumb: 'Dokumen / Pantau',
+    title: 'Dokumen',
+    description: 'Pantau kelengkapan dan unggah PDF (kontrak–invoice–DO–Superman–BA)',
+    breadcrumb: 'Dokumen',
   },
   '/berita-acara': {
     title: 'Berita Acara',

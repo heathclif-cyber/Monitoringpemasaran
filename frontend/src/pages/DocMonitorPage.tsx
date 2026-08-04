@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircle2,
   CircleAlert,
@@ -22,12 +22,18 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DocxPreview } from '@/components/common/DocxPreview'
 import { MultiSelectFilter } from '@/components/common/MultiSelectFilter'
+import { LoadingSkeleton } from '@/components/common/LoadingSkeleton'
 import { cn, formatDate, safe } from '@/lib/utils'
 import type {
   DocumentPipelineResponse,
   DocumentPipelineSlot,
   DocumentUpload,
 } from '@/types'
+
+/** Mode upload per nomor (UI lama UploadPage) — digabung ke menu tunggal */
+const EntityUploadPage = lazy(() => import('@/pages/UploadPage'))
+
+type DocViewMode = 'pipeline' | 'entity'
 
 type FilterMode = 'incomplete' | 'all' | 'complete'
 
@@ -349,6 +355,7 @@ function SlotGroup({
 export default function DocMonitorPage() {
   const { addNotification } = useAppStore()
   const prefs = useMemo(() => readPrefs(), [])
+  const [viewMode, setViewMode] = useState<DocViewMode>('pipeline')
   const [statusFilter, setStatusFilter] = useState<FilterMode>(prefs.statusFilter || 'incomplete')
   const [missingSlot, setMissingSlot] = useState<MissingSlotFilter>('')
   const [unit, setUnit] = useState(prefs.unit || '')
@@ -432,19 +439,55 @@ export default function DocMonitorPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <FileSearch size={16} />
-          <span className="text-xs font-medium uppercase tracking-wide">Unit / Dokumen</span>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <CloudUpload size={16} />
+            <span className="text-xs font-medium uppercase tracking-wide">Dokumen</span>
+          </div>
+          <p className="text-sm text-muted-foreground max-w-3xl">
+            Satu menu untuk <strong>memantau</strong> kelengkapan dan <strong>mengunggah</strong> PDF.
+            Rantai: <strong>Kontrak → Invoice → DO → Superman → BA</strong>.{' '}
+            <strong>BA Serah Terima Barang</strong> wajib per DO; <strong>BA Panen</strong> opsional.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground max-w-3xl">
-          Pantau kelengkapan rantai <strong>Kontrak → Invoice → DO → Superman → BA</strong>.
-          Prioritas unit: <strong>file DO</strong>, <strong>Deklarasi</strong>, dan{' '}
-          <strong>BA Serah Terima Barang</strong>. <strong>BA Panen</strong> bersifat opsional
-          (alur payung).
-        </p>
+
+        <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5 self-start">
+          <button
+            type="button"
+            onClick={() => setViewMode('pipeline')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+              viewMode === 'pipeline'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <FileSearch size={13} />
+            Pantau rantai
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('entity')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+              viewMode === 'entity'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <CloudUpload size={13} />
+            Upload per nomor
+          </button>
+        </div>
       </div>
 
+      {viewMode === 'entity' ? (
+        <Suspense fallback={<LoadingSkeleton rows={6} />}>
+          <EntityUploadPage />
+        </Suspense>
+      ) : (
+      <>
       {/* Summary cards — klik = filter cepat */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {(
@@ -523,7 +566,7 @@ export default function DocMonitorPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <ClipboardCheck size={16} className="text-muted-foreground" />
-              <CardTitle className="text-sm font-semibold">Pantau Dokumen Unit</CardTitle>
+              <CardTitle className="text-sm font-semibold">Pantau & Upload Dokumen</CardTitle>
               {rows.length > 0 && (
                 <span className="text-xs text-muted-foreground">
                   {rows.length} baris ditampilkan
@@ -820,6 +863,8 @@ export default function DocMonitorPage() {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   )
 }

@@ -11,7 +11,6 @@ import {
   Archive,
   CloudUpload,
   ClipboardList,
-  ClipboardCheck,
   Boxes,
 } from 'lucide-react'
 import {
@@ -31,8 +30,7 @@ const NAV_COMMANDS = [
   { label: 'Pembayaran', to: '/pembayaran', icon: Banknote, group: 'Menu' },
   { label: 'Delivery Order', to: '/delivery-order', icon: Truck, group: 'Menu' },
   { label: 'Berita Acara', to: '/berita-acara', icon: ClipboardList, group: 'Menu' },
-  { label: 'Pantau Dokumen', to: '/pantau-dokumen', icon: ClipboardCheck, group: 'Menu' },
-  { label: 'Upload Dokumen', to: '/upload', icon: CloudUpload, group: 'Menu' },
+  { label: 'Dokumen (Pantau & Upload)', to: '/upload', icon: CloudUpload, group: 'Menu' },
   { label: 'Persediaan', to: '/stok', icon: Boxes, group: 'Menu' },
   { label: 'Laporan Digital', to: '/laporan', icon: Table, group: 'Menu' },
   { label: 'Input Bypass', to: '/bypass', icon: Zap, group: 'Menu' },
