@@ -32,7 +32,8 @@ DOC_TYPE_SUBFOLDERS: dict[str, str] = {
     "kuitansi": "Invoice/Kuitansi",
     "do": "DO",
     "deklarasi": "Deklarasi",
-    "berita_acara": "Berita-Acara",
+    "berita_acara": "BA-Serah-Terima",
+    "ba_panen": "BA-Panen",
 }
 
 ALLOWED_EXTENSIONS = {".docx", ".pdf", ".jpg", ".jpeg", ".png", ".xlsx", ".xls"}

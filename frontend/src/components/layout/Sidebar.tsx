@@ -14,6 +14,7 @@ import {
   PanelLeft,
   CloudUpload,
   ClipboardList,
+  ClipboardCheck,
   Boxes,
   Users,
 } from 'lucide-react'
@@ -36,6 +37,7 @@ const navItems: NavItemDef[] = [
   { label: 'Pembayaran', to: '/pembayaran', icon: <Banknote size={16} /> },
   { label: 'Delivery Order', to: '/delivery-order', icon: <Truck size={16} /> },
   { label: 'Berita Acara', to: '/berita-acara', icon: <ClipboardList size={16} /> },
+  { label: 'Pantau Dokumen', to: '/pantau-dokumen', icon: <ClipboardCheck size={16} /> },
   { label: 'Upload Dokumen', to: '/upload', icon: <CloudUpload size={16} /> },
   { label: 'Persediaan', to: '/stok', icon: <Boxes size={16} /> },
   { label: 'Laporan Digital', to: '/laporan', icon: <Table size={16} /> },

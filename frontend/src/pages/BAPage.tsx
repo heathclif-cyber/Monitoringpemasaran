@@ -317,7 +317,12 @@ export default function BAPage() {
               <CardTitle className="text-sm font-semibold">Upload Dokumen BA</CardTitle>
             </CardHeader>
             <CardContent>
-              <DocumentUpload entityType="ba" entityId={exportNo} docType="berita_acara" />
+              <DocumentUpload
+                entityType="ba"
+                entityId={exportNo}
+                docType="ba_panen"
+                label="BA Panen (opsional)"
+              />
             </CardContent>
           </Card>
         )}

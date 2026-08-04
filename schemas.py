@@ -264,6 +264,10 @@ class DocumentSlotOut(BaseModel):
     web_url: Optional[str] = None
     uploaded_at: Optional[datetime] = None
     document_id: Optional[int] = None
+    required: bool = True
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    slot_key: Optional[str] = None
 
 
 class DocumentCompletenessSummary(BaseModel):
@@ -298,6 +302,62 @@ class DocumentSummaryRow(BaseModel):
     uploaded: int
     missing: int
     slots: List[DocumentSlotOut]
+
+
+class DocumentPipelineSlotOut(BaseModel):
+    """Satu slot dokumen di rantai kontrak → invoice → DO → Superman → BA."""
+    slot_key: str
+    label: str
+    required: bool = True
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    doc_type: Optional[str] = None
+    uploaded: bool = False
+    file_exists: bool = True
+    file_name: Optional[str] = None
+    web_url: Optional[str] = None
+    uploaded_at: Optional[datetime] = None
+    document_id: Optional[int] = None
+    note: Optional[str] = None
+
+
+class DocumentPipelineRowOut(BaseModel):
+    row_key: str
+    no_kontrak: str
+    no_invoice: Optional[str] = None
+    no_do: Optional[str] = None
+    no_ba: Optional[str] = None
+    unit: Optional[str] = None
+    komoditi: Optional[str] = None
+    pembeli: Optional[str] = None
+    tanggal: Optional[date] = None
+    tipe_alur: str = "STANDAR"
+    superman: Optional[str] = None
+    superman_status: str = "none"  # done | ready | missing_docs | none
+    slots: List[DocumentPipelineSlotOut]
+    required_total: int
+    required_uploaded: int
+    missing_required: List[str]
+    is_complete: bool
+
+
+class DocumentPipelineSummaryOut(BaseModel):
+    total_rows: int
+    complete: int
+    incomplete: int
+    missing_kontrak: int
+    missing_invoice: int
+    missing_do: int
+    missing_deklarasi: int
+    missing_ba_serah_terima: int
+    missing_superman: int
+    with_ba_panen: int
+
+
+class DocumentPipelineResponse(BaseModel):
+    summary: DocumentPipelineSummaryOut
+    rows: List[DocumentPipelineRowOut]
+    units: List[str]
 
 
 DocumentCompletenessOut.model_rebuild()

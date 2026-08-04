@@ -29,22 +29,33 @@ class ResolvedSupportDoc:
         return f"{self.label} ({self.entity_type}/{self.entity_id}, {self.file_name})"
 
 
+def _doc_type_candidates(entity_type: str, doc_type: str) -> list[str]:
+    """Alias: BA Panen di entity ba bisa tersimpan sebagai ba_panen atau legacy berita_acara."""
+    if entity_type == "ba" and doc_type in ("ba_panen", "berita_acara"):
+        return ["ba_panen", "berita_acara"]
+    return [doc_type]
+
+
 def _latest_upload(
     db: Session,
     entity_type: str,
     entity_id: str,
     doc_type: str,
 ) -> models.DocumentUpload | None:
-    return (
-        db.query(models.DocumentUpload)
-        .filter(
-            models.DocumentUpload.entity_type == entity_type,
-            models.DocumentUpload.entity_id == entity_id,
-            models.DocumentUpload.doc_type == doc_type,
+    for candidate in _doc_type_candidates(entity_type, doc_type):
+        upload = (
+            db.query(models.DocumentUpload)
+            .filter(
+                models.DocumentUpload.entity_type == entity_type,
+                models.DocumentUpload.entity_id == entity_id,
+                models.DocumentUpload.doc_type == candidate,
+            )
+            .order_by(models.DocumentUpload.uploaded_at.desc())
+            .first()
         )
-        .order_by(models.DocumentUpload.uploaded_at.desc())
-        .first()
-    )
+        if upload:
+            return upload
+    return None
 
 
 def _path_from_upload(upload: models.DocumentUpload) -> Path:
@@ -88,7 +99,7 @@ def _resolve_upload(
                     path=path,
                     entity_type=entity_type,
                     entity_id=entity_id,
-                    doc_type=doc_type,
+                    doc_type=upload.doc_type or doc_type,
                     file_name=upload.file_name,
                     label=label,
                     document_id=int(upload.id) if upload.id is not None else None,
@@ -96,17 +107,18 @@ def _resolve_upload(
         except StorageError:
             pass
 
-    scanned = _scan_folder(entity_type, entity_id, doc_type)
-    if scanned and scanned.is_file():
-        return ResolvedSupportDoc(
-            path=scanned,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            doc_type=doc_type,
-            file_name=scanned.name,
-            label=label,
-            document_id=int(upload.id) if upload and upload.id is not None else None,
-        )
+    for candidate in _doc_type_candidates(entity_type, doc_type):
+        scanned = _scan_folder(entity_type, entity_id, candidate)
+        if scanned and scanned.is_file():
+            return ResolvedSupportDoc(
+                path=scanned,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                doc_type=candidate,
+                file_name=scanned.name,
+                label=label,
+                document_id=int(upload.id) if upload and upload.id is not None else None,
+            )
 
     raise FileNotFoundError(
         f"Dokumen {label} tidak ditemukan untuk {entity_type}={entity_id} "
@@ -120,7 +132,13 @@ _PENDING_SUPPORT_HINT = (
     "Upload Kontrak, Invoice, dan Rekening Koran Penerimaan (wajib). Kuitansi opsional."
 )
 
-_ATTACH_ORDER = {"invoice": 0, "kontrak": 1, "berita_acara": 1, "rekening_koran": 2}
+_ATTACH_ORDER = {
+    "invoice": 0,
+    "kontrak": 1,
+    "berita_acara": 1,
+    "ba_panen": 1,
+    "rekening_koran": 2,
+}
 
 
 def _invoice_mandatory_sources(no_invoice: str) -> list[SupportSource]:
@@ -151,7 +169,7 @@ def _standar_mandatory_sources(kontrak_id: str, no_invoice: str) -> list[Support
 
 def _payung_ba_mandatory_sources(no_ba: str, no_invoice: str) -> list[SupportSource]:
     return [
-        ("ba", no_ba, "berita_acara", "Berita Acara"),
+        ("ba", no_ba, "ba_panen", "BA Panen"),
         *_invoice_mandatory_sources(no_invoice),
         *_rekening_koran_mandatory_sources(no_invoice),
     ]
@@ -365,9 +383,10 @@ def _upload_status(
         except StorageError:
             pass
 
-    scanned = _scan_folder(entity_type, entity_id, doc_type)
-    if scanned and scanned.is_file():
-        return True, scanned.name
+    for candidate in _doc_type_candidates(entity_type, doc_type):
+        scanned = _scan_folder(entity_type, entity_id, candidate)
+        if scanned and scanned.is_file():
+            return True, scanned.name
     return False, None
 
 
@@ -410,13 +429,13 @@ def superman_doc_requirements_for_do(db: Session, no_do: str) -> tuple[list[dict
         if not no_ba:
             requirements.append(
                 {
-                    "label": "Berita Acara",
+                    "label": "BA Panen",
                     "entity_type": "ba",
                     "entity_id": "-",
-                    "doc_type": "berita_acara",
+                    "doc_type": "ba_panen",
                     "uploaded": False,
                     "file_name": None,
-                    "upload_hint": "Hubungkan DO ke Berita Acara terlebih dahulu",
+                    "upload_hint": "Hubungkan DO ke BA Panen terlebih dahulu",
                 }
             )
             return requirements, False
@@ -632,13 +651,13 @@ def superman_doc_requirements_for_invoice(
         if not no_ba:
             requirements.append(
                 {
-                    "label": "Berita Acara",
+                    "label": "BA Panen",
                     "entity_type": "ba",
                     "entity_id": "-",
-                    "doc_type": "berita_acara",
+                    "doc_type": "ba_panen",
                     "uploaded": False,
                     "file_name": None,
-                    "upload_hint": "Hubungkan invoice ke Berita Acara terlebih dahulu",
+                    "upload_hint": "Hubungkan invoice ke BA Panen terlebih dahulu",
                 }
             )
             return requirements, False
@@ -703,13 +722,13 @@ def superman_doc_requirements_for_pembayaran(
         if not no_ba:
             requirements.append(
                 {
-                    "label": "Berita Acara",
+                    "label": "BA Panen",
                     "entity_type": "ba",
                     "entity_id": "-",
-                    "doc_type": "berita_acara",
+                    "doc_type": "ba_panen",
                     "uploaded": False,
                     "file_name": None,
-                    "upload_hint": "Hubungkan invoice ke Berita Acara terlebih dahulu",
+                    "upload_hint": "Hubungkan invoice ke BA Panen terlebih dahulu",
                 }
             )
             return requirements, False

@@ -23,7 +23,16 @@ from services.local_storage import (
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
 VALID_ENTITY_TYPES = {"kontrak", "invoice", "do", "bypass", "ba"}
-VALID_DOC_TYPES = {"kontrak", "invoice", "kuitansi", "rekening_koran", "do", "deklarasi", "berita_acara"}
+VALID_DOC_TYPES = {
+    "kontrak",
+    "invoice",
+    "kuitansi",
+    "rekening_koran",
+    "do",
+    "deklarasi",
+    "berita_acara",  # BA Serah Terima Barang (biasanya di entity DO)
+    "ba_panen",      # BA Panen (entity BA, opsional)
+}
 
 DOC_TYPE_LABELS = {
     "kontrak": "Dokumen Kontrak",
@@ -32,16 +41,41 @@ DOC_TYPE_LABELS = {
     "rekening_koran": "Rekening Koran Penerimaan",
     "do": "Delivery Order",
     "deklarasi": "Deklarasi Penerimaan",
-    "berita_acara": "Berita Acara Serah Terima",
+    "berita_acara": "BA Serah Terima Barang",
+    "ba_panen": "BA Panen",
 }
 
+# Slot wajib per entitas (dihitung di completeness / ringkasan)
 ENTITY_DOC_REQUIREMENTS: dict[str, list[str]] = {
     "kontrak": ["kontrak"],
     "invoice": ["invoice", "rekening_koran", "kuitansi"],
     "do": ["do", "deklarasi", "berita_acara"],
     "bypass": ["deklarasi"],
-    "ba": ["berita_acara"],
+    "ba": [],  # BA Panen opsional — tidak memblokir kelengkapan entitas BA
 }
+
+# Slot opsional (ditampilkan di UI, tidak dihitung missing)
+ENTITY_OPTIONAL_DOCS: dict[str, list[str]] = {
+    "ba": ["ba_panen"],
+}
+
+
+def _doc_type_candidates(entity_type: str, doc_type: str) -> list[str]:
+    """BA Panen di entity ba: ba_panen (baru) atau berita_acara (legacy)."""
+    if entity_type == "ba" and doc_type in ("ba_panen", "berita_acara"):
+        return ["ba_panen", "berita_acara"]
+    return [doc_type]
+
+
+def _pick_upload(
+    by_type: dict[str, "models.DocumentUpload"],
+    entity_type: str,
+    doc_type: str,
+) -> "models.DocumentUpload | None":
+    for candidate in _doc_type_candidates(entity_type, doc_type):
+        if candidate in by_type:
+            return by_type[candidate]
+    return None
 
 FIXED_MATERIALS = [
     "TBS (TANDAN BUAH SEGAR)",
@@ -152,8 +186,34 @@ def _upload_out(record: "models.DocumentUpload") -> schemas.DocumentUploadOut:
     return schemas.DocumentUploadOut(**data)
 
 
+def _slot_from_upload(
+    *,
+    entity_type: str,
+    entity_id: str,
+    doc_type: str,
+    upload: "models.DocumentUpload | None",
+    required: bool = True,
+) -> schemas.DocumentSlotOut:
+    file_exists = _check_file_exists(upload) if upload else False
+    return schemas.DocumentSlotOut(
+        doc_type=doc_type,
+        label=DOC_TYPE_LABELS.get(doc_type, doc_type),
+        uploaded=upload is not None,
+        file_exists=file_exists,
+        file_name=upload.file_name if upload else None,
+        web_url=upload.web_url if upload else None,
+        uploaded_at=upload.uploaded_at if upload else None,
+        document_id=upload.id if upload else None,
+        required=required,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        slot_key=f"{entity_type}:{doc_type}",
+    )
+
+
 def _build_slots(db: Session, entity_type: str, entity_id: str) -> list[schemas.DocumentSlotOut]:
     required = ENTITY_DOC_REQUIREMENTS.get(entity_type, [])
+    optional = ENTITY_OPTIONAL_DOCS.get(entity_type, [])
     uploads = (
         db.query(models.DocumentUpload)
         .filter(
@@ -163,31 +223,42 @@ def _build_slots(db: Session, entity_type: str, entity_id: str) -> list[schemas.
         .order_by(models.DocumentUpload.uploaded_at.desc())
         .all()
     )
-    by_type = {u.doc_type: u for u in uploads}
+    by_type: dict[str, models.DocumentUpload] = {}
+    for u in uploads:
+        if u.doc_type not in by_type:
+            by_type[u.doc_type] = u
 
     slots: list[schemas.DocumentSlotOut] = []
     for doc_type in required:
-        upload = by_type.get(doc_type)
-        file_exists = _check_file_exists(upload) if upload else False
+        upload = _pick_upload(by_type, entity_type, doc_type)
         slots.append(
-            schemas.DocumentSlotOut(
+            _slot_from_upload(
+                entity_type=entity_type,
+                entity_id=entity_id,
                 doc_type=doc_type,
-                label=DOC_TYPE_LABELS.get(doc_type, doc_type),
-                uploaded=upload is not None,
-                file_exists=file_exists,
-                file_name=upload.file_name if upload else None,
-                web_url=upload.web_url if upload else None,
-                uploaded_at=upload.uploaded_at if upload else None,
-                document_id=upload.id if upload else None,
+                upload=upload,
+                required=True,
+            )
+        )
+    for doc_type in optional:
+        upload = _pick_upload(by_type, entity_type, doc_type)
+        slots.append(
+            _slot_from_upload(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                doc_type=doc_type,
+                upload=upload,
+                required=False,
             )
         )
     return slots
 
 
 def _summarize_slots(slots: list[schemas.DocumentSlotOut]) -> schemas.DocumentCompletenessSummary:
-    # Hanya hitung sebagai "uploaded" jika file fisik benar-benar ada
-    uploaded = sum(1 for s in slots if s.uploaded and s.file_exists)
-    total = len(slots)
+    # Hanya slot wajib; file harus benar-benar ada di disk
+    required = [s for s in slots if s.required]
+    uploaded = sum(1 for s in required if s.uploaded and s.file_exists)
+    total = len(required)
     return schemas.DocumentCompletenessSummary(total=total, uploaded=uploaded, missing=total - uploaded)
 
 
@@ -298,7 +369,7 @@ def _sync_entity_link(
         rec = db.query(models.LaporanBypass).filter(models.LaporanBypass.id == bypass_id).first()
         if rec:
             rec.link_deklarasi_penerimaan = web_url
-    elif entity_type == "ba" and doc_type == "berita_acara":
+    elif entity_type == "ba" and doc_type in ("berita_acara", "ba_panen"):
         ba = db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == entity_id).first()
         if ba:
             ba.link_berita_acara = web_url
@@ -473,21 +544,29 @@ def _build_slots_from_cache(
 ) -> list[schemas.DocumentSlotOut]:
     """Build slots using a pre-fetched cache (avoids per-row DB queries)."""
     required = ENTITY_DOC_REQUIREMENTS.get(entity_type, [])
+    optional = ENTITY_OPTIONAL_DOCS.get(entity_type, [])
     by_type = uploads_cache.get(entity_id, {})
     slots: list[schemas.DocumentSlotOut] = []
     for doc_type in required:
-        upload = by_type.get(doc_type)
-        file_exists = _check_file_exists(upload) if upload else False
+        upload = _pick_upload(by_type, entity_type, doc_type)
         slots.append(
-            schemas.DocumentSlotOut(
+            _slot_from_upload(
+                entity_type=entity_type,
+                entity_id=entity_id,
                 doc_type=doc_type,
-                label=DOC_TYPE_LABELS.get(doc_type, doc_type),
-                uploaded=upload is not None,
-                file_exists=file_exists,
-                file_name=upload.file_name if upload else None,
-                web_url=upload.web_url if upload else None,
-                uploaded_at=upload.uploaded_at if upload else None,
-                document_id=upload.id if upload else None,
+                upload=upload,
+                required=True,
+            )
+        )
+    for doc_type in optional:
+        upload = _pick_upload(by_type, entity_type, doc_type)
+        slots.append(
+            _slot_from_upload(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                doc_type=doc_type,
+                upload=upload,
+                required=False,
             )
         )
     return slots
@@ -507,6 +586,506 @@ def list_materials(db: Session = Depends(get_db)):
         if val and val.strip():
             values.add(val.strip())
     return sorted(values)
+
+
+def _pipeline_slot(
+    *,
+    slot_key: str,
+    label: str,
+    required: bool,
+    entity_type: Optional[str],
+    entity_id: Optional[str],
+    doc_type: Optional[str],
+    cache: dict[tuple[str, str], dict[str, "models.DocumentUpload"]],
+    note: Optional[str] = None,
+) -> schemas.DocumentPipelineSlotOut:
+    upload = None
+    if entity_type and entity_id and doc_type:
+        by_type = cache.get((entity_type, entity_id), {})
+        upload = _pick_upload(by_type, entity_type, doc_type)
+    file_exists = _check_file_exists(upload) if upload else False
+    uploaded = upload is not None and file_exists
+    return schemas.DocumentPipelineSlotOut(
+        slot_key=slot_key,
+        label=label,
+        required=required,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        doc_type=doc_type,
+        uploaded=uploaded,
+        file_exists=file_exists if upload else True,
+        file_name=upload.file_name if upload else None,
+        web_url=upload.web_url if upload else None,
+        uploaded_at=upload.uploaded_at if upload else None,
+        document_id=upload.id if upload else None,
+        note=note,
+    )
+
+
+def _superman_status_for_row(
+    *,
+    superman_no: Optional[str],
+    kontrak_ok: bool,
+    invoice_ok: bool,
+    rekening_ok: bool,
+    ba_panen_ok: bool,
+    tipe_alur: str,
+    has_ba: bool,
+) -> str:
+    if superman_no and str(superman_no).strip():
+        return "done"
+    if tipe_alur == "PAYUNG_BA":
+        if not has_ba:
+            return "missing_docs"
+        ready = ba_panen_ok and invoice_ok and rekening_ok
+    else:
+        ready = kontrak_ok and invoice_ok and rekening_ok
+    return "ready" if ready else "missing_docs"
+
+
+_PIPELINE_MISSING_SLOTS = {
+    "ba_serah_terima",
+    "do",
+    "deklarasi",
+    "kontrak",
+    "invoice",
+    "rekening_koran",
+    "superman",
+    "unit_tasks",  # DO file + deklarasi + BA Serah Terima
+    "ba_panen",  # opsional — baris yang sudah punya file BA Panen (filter "with")
+}
+
+
+def _row_matches_missing_slot(row: schemas.DocumentPipelineRowOut, missing_slot: str) -> bool:
+    if missing_slot == "superman":
+        return bool(row.no_invoice) and row.superman_status != "done"
+    if missing_slot == "unit_tasks":
+        return any(
+            s.slot_key in ("do", "deklarasi", "ba_serah_terima") and s.required and not s.uploaded
+            for s in row.slots
+        )
+    if missing_slot == "ba_panen":
+        return any(s.slot_key == "ba_panen" and s.uploaded for s in row.slots)
+    return any(s.slot_key == missing_slot and not s.uploaded for s in row.slots)
+
+
+@router.get("/pipeline", response_model=schemas.DocumentPipelineResponse)
+def document_pipeline(
+    status_filter: str = Query(default="incomplete"),
+    missing_slot: Optional[str] = Query(default=None),
+    unit: Optional[str] = Query(default=None),
+    material: List[str] = Query(default=[]),
+    q: str = Query(default=""),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    """
+    Pantau kelengkapan rantai dokumen per DO (dan invoice tanpa DO).
+
+    Slot wajib: Kontrak, Invoice, Rekening Koran, DO, Deklarasi, BA Serah Terima.
+    Opsional: Kuitansi, BA Panen.
+    Superman: status nomor SPP (bukan file upload).
+
+    missing_slot: ba_serah_terima | do | deklarasi | kontrak | invoice |
+                  rekening_koran | superman | unit_tasks | ba_panen
+    """
+    if status_filter not in ("all", "complete", "incomplete"):
+        raise HTTPException(status_code=400, detail="status_filter tidak valid")
+
+    slot_filter = missing_slot.strip().lower() if missing_slot and missing_slot.strip() else None
+    if slot_filter and slot_filter not in _PIPELINE_MISSING_SLOTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"missing_slot tidak valid. Pilih: {', '.join(sorted(_PIPELINE_MISSING_SLOTS))}",
+        )
+
+    materials = [m.strip() for m in material if m and m.strip()]
+    unit_filter = unit.strip() if unit and unit.strip() else None
+    term = q.strip().lower() if q and q.strip() else None
+
+    dos = (
+        db.query(models.DeliveryOrder)
+        .options(
+            joinedload(models.DeliveryOrder.invoice)
+            .joinedload(models.Invoice.kontrak)
+            .joinedload(models.Kontrak.units),
+            joinedload(models.DeliveryOrder.invoice).joinedload(models.Invoice.pembayaran),
+            joinedload(models.DeliveryOrder.invoice).joinedload(models.Invoice.berita_acara),
+            joinedload(models.DeliveryOrder.berita_acara),
+            joinedload(models.DeliveryOrder.pembayaran),
+        )
+        .order_by(models.DeliveryOrder.tanggal_do.desc())
+        .limit(1000)
+        .all()
+    )
+
+    # Invoice yang belum punya DO — tetap dipantau
+    invoices_with_do = {d.no_invoice for d in dos if d.no_invoice}
+    orphan_invoices = (
+        db.query(models.Invoice)
+        .options(
+            joinedload(models.Invoice.kontrak).joinedload(models.Kontrak.units),
+            joinedload(models.Invoice.pembayaran),
+            joinedload(models.Invoice.berita_acara),
+        )
+        .order_by(models.Invoice.tanggal_transaksi.desc())
+        .limit(500)
+        .all()
+    )
+    orphan_invoices = [inv for inv in orphan_invoices if inv.no_invoice not in invoices_with_do]
+
+    # Kumpulkan entity ids untuk batch upload
+    entity_keys: list[tuple[str, str]] = []
+    for do in dos:
+        inv = do.invoice
+        kontrak = inv.kontrak if inv else None
+        if kontrak:
+            entity_keys.append(("kontrak", kontrak.no_kontrak))
+        if inv:
+            entity_keys.append(("invoice", inv.no_invoice))
+        entity_keys.append(("do", do.no_do))
+        no_ba = do.no_ba or (inv.no_ba if inv else None)
+        if no_ba:
+            entity_keys.append(("ba", no_ba))
+    for inv in orphan_invoices:
+        if inv.kontrak:
+            entity_keys.append(("kontrak", inv.kontrak.no_kontrak))
+        entity_keys.append(("invoice", inv.no_invoice))
+        if inv.no_ba:
+            entity_keys.append(("ba", inv.no_ba))
+
+    entity_keys = list(dict.fromkeys(entity_keys))
+    cache: dict[tuple[str, str], dict[str, models.DocumentUpload]] = {}
+    if entity_keys:
+        # Query per entity_type groups to keep filter efficient
+        by_type_ids: dict[str, list[str]] = {}
+        for et, eid in entity_keys:
+            by_type_ids.setdefault(et, []).append(eid)
+        for et, ids in by_type_ids.items():
+            uploads = (
+                db.query(models.DocumentUpload)
+                .filter(
+                    models.DocumentUpload.entity_type == et,
+                    models.DocumentUpload.entity_id.in_(ids),
+                )
+                .order_by(models.DocumentUpload.uploaded_at.desc())
+                .all()
+            )
+            for u in uploads:
+                key = (et, u.entity_id)
+                if key not in cache:
+                    cache[key] = {}
+                if u.doc_type not in cache[key]:
+                    cache[key][u.doc_type] = u
+
+    def build_row(
+        *,
+        no_kontrak: str,
+        no_invoice: Optional[str],
+        no_do: Optional[str],
+        no_ba: Optional[str],
+        unit_name: Optional[str],
+        komoditi: Optional[str],
+        pembeli: Optional[str],
+        tanggal,
+        tipe_alur: str,
+        superman_no: Optional[str],
+        kontrak_obj,
+    ) -> schemas.DocumentPipelineRowOut | None:
+        if unit_filter and (unit_name or "").strip() != unit_filter:
+            return None
+        if materials:
+            if not kontrak_obj:
+                return None
+            if not (_collect_kontrak_materials(kontrak_obj, unit_name) & set(materials)):
+                return None
+
+        if term:
+            hay = " ".join(
+                filter(
+                    None,
+                    [no_kontrak, no_invoice, no_do, no_ba, unit_name, komoditi, pembeli, superman_no],
+                )
+            ).lower()
+            if term not in hay:
+                return None
+
+        slots: list[schemas.DocumentPipelineSlotOut] = [
+            _pipeline_slot(
+                slot_key="kontrak",
+                label=DOC_TYPE_LABELS["kontrak"],
+                required=True,
+                entity_type="kontrak",
+                entity_id=no_kontrak,
+                doc_type="kontrak",
+                cache=cache,
+            ),
+            _pipeline_slot(
+                slot_key="invoice",
+                label=DOC_TYPE_LABELS["invoice"],
+                required=bool(no_invoice),
+                entity_type="invoice" if no_invoice else None,
+                entity_id=no_invoice,
+                doc_type="invoice" if no_invoice else None,
+                cache=cache,
+                note=None if no_invoice else "Invoice belum dibuat",
+            ),
+            _pipeline_slot(
+                slot_key="rekening_koran",
+                label=DOC_TYPE_LABELS["rekening_koran"],
+                required=bool(no_invoice),
+                entity_type="invoice" if no_invoice else None,
+                entity_id=no_invoice,
+                doc_type="rekening_koran" if no_invoice else None,
+                cache=cache,
+            ),
+            _pipeline_slot(
+                slot_key="kuitansi",
+                label=DOC_TYPE_LABELS["kuitansi"],
+                required=False,
+                entity_type="invoice" if no_invoice else None,
+                entity_id=no_invoice,
+                doc_type="kuitansi" if no_invoice else None,
+                cache=cache,
+            ),
+            _pipeline_slot(
+                slot_key="do",
+                label=DOC_TYPE_LABELS["do"],
+                required=bool(no_do),
+                entity_type="do" if no_do else None,
+                entity_id=no_do,
+                doc_type="do" if no_do else None,
+                cache=cache,
+                note=None if no_do else "DO belum dibuat",
+            ),
+            _pipeline_slot(
+                slot_key="deklarasi",
+                label=DOC_TYPE_LABELS["deklarasi"],
+                required=bool(no_do),
+                entity_type="do" if no_do else None,
+                entity_id=no_do,
+                doc_type="deklarasi" if no_do else None,
+                cache=cache,
+            ),
+            _pipeline_slot(
+                slot_key="ba_serah_terima",
+                label=DOC_TYPE_LABELS["berita_acara"],
+                required=bool(no_do),
+                entity_type="do" if no_do else None,
+                entity_id=no_do,
+                doc_type="berita_acara" if no_do else None,
+                cache=cache,
+                note=None if no_do else "BA Serah Terima diunggah per DO",
+            ),
+            _pipeline_slot(
+                slot_key="ba_panen",
+                label=DOC_TYPE_LABELS["ba_panen"],
+                required=False,
+                entity_type="ba" if no_ba else None,
+                entity_id=no_ba,
+                doc_type="ba_panen" if no_ba else None,
+                cache=cache,
+                note=(
+                    f"No. BA: {no_ba}"
+                    if no_ba
+                    else "Opsional — hanya jika ada BA Panen (alur payung)"
+                ),
+            ),
+        ]
+
+        kontrak_ok = slots[0].uploaded
+        invoice_ok = slots[1].uploaded if no_invoice else False
+        rekening_ok = slots[2].uploaded if no_invoice else False
+        ba_panen_ok = slots[7].uploaded if no_ba else False
+        sm_status = _superman_status_for_row(
+            superman_no=superman_no,
+            kontrak_ok=kontrak_ok,
+            invoice_ok=invoice_ok,
+            rekening_ok=rekening_ok,
+            ba_panen_ok=ba_panen_ok,
+            tipe_alur=tipe_alur,
+            has_ba=bool(no_ba),
+        )
+        # Slot status Superman (bukan file)
+        slots.append(
+            schemas.DocumentPipelineSlotOut(
+                slot_key="superman",
+                label="Superman (No. SPP)",
+                required=bool(no_invoice),
+                entity_type=None,
+                entity_id=None,
+                doc_type=None,
+                uploaded=sm_status == "done",
+                file_exists=True,
+                file_name=superman_no if sm_status == "done" else None,
+                web_url=None,
+                uploaded_at=None,
+                document_id=None,
+                note=(
+                    f"No. SPP: {superman_no}"
+                    if sm_status == "done"
+                    else (
+                        "Dokumen pendukung siap — belum dideklarasikan"
+                        if sm_status == "ready"
+                        else "Dokumen pendukung Superman belum lengkap"
+                    )
+                ),
+            )
+        )
+
+        required_slots = [s for s in slots if s.required]
+        required_uploaded = sum(1 for s in required_slots if s.uploaded)
+        missing = [s.label for s in required_slots if not s.uploaded]
+        is_complete = len(missing) == 0
+
+        row_key = no_do or no_invoice or no_kontrak
+        return schemas.DocumentPipelineRowOut(
+            row_key=row_key,
+            no_kontrak=no_kontrak,
+            no_invoice=no_invoice,
+            no_do=no_do,
+            no_ba=no_ba,
+            unit=unit_name,
+            komoditi=komoditi,
+            pembeli=pembeli,
+            tanggal=tanggal,
+            tipe_alur=tipe_alur or "STANDAR",
+            superman=superman_no,
+            superman_status=sm_status if no_invoice else "none",
+            slots=slots,
+            required_total=len(required_slots),
+            required_uploaded=required_uploaded,
+            missing_required=missing,
+            is_complete=is_complete,
+        )
+
+    all_rows: list[schemas.DocumentPipelineRowOut] = []
+    units_set: set[str] = set()
+
+    for do in dos:
+        inv = do.invoice
+        if not inv or not inv.kontrak:
+            continue
+        kontrak = inv.kontrak
+        unit_name = (
+            do.kepada_unit
+            or inv.nama_unit
+            or kontrak.kebun_produsen
+            or (kontrak.units[0].nama_unit if kontrak.units else None)
+        )
+        if unit_name:
+            units_set.add(unit_name)
+        no_ba = do.no_ba or inv.no_ba
+        # Superman: prefer pembayaran → do → invoice
+        sm = None
+        if do.pembayaran and do.pembayaran.superman:
+            sm = do.pembayaran.superman
+        elif do.superman:
+            sm = do.superman
+        elif inv.superman:
+            sm = inv.superman
+        else:
+            for p in inv.pembayaran or []:
+                if p.superman:
+                    sm = p.superman
+                    break
+
+        materials_set = _collect_kontrak_materials(kontrak, unit_name)
+        komoditi = next(iter(materials_set), kontrak.jenis_komoditi or kontrak.deskripsi_produk)
+
+        row = build_row(
+            no_kontrak=kontrak.no_kontrak,
+            no_invoice=inv.no_invoice,
+            no_do=do.no_do,
+            no_ba=no_ba,
+            unit_name=unit_name,
+            komoditi=komoditi,
+            pembeli=kontrak.pembeli,
+            tanggal=do.tanggal_do,
+            tipe_alur=getattr(kontrak, "tipe_alur", None) or "STANDAR",
+            superman_no=sm,
+            kontrak_obj=kontrak,
+        )
+        if row:
+            all_rows.append(row)
+
+    for inv in orphan_invoices:
+        if not inv.kontrak:
+            continue
+        kontrak = inv.kontrak
+        unit_name = inv.nama_unit or kontrak.kebun_produsen or (
+            kontrak.units[0].nama_unit if kontrak.units else None
+        )
+        if unit_name:
+            units_set.add(unit_name)
+        sm = inv.superman
+        if not sm:
+            for p in inv.pembayaran or []:
+                if p.superman:
+                    sm = p.superman
+                    break
+        materials_set = _collect_kontrak_materials(kontrak, unit_name)
+        komoditi = next(iter(materials_set), kontrak.jenis_komoditi or kontrak.deskripsi_produk)
+        row = build_row(
+            no_kontrak=kontrak.no_kontrak,
+            no_invoice=inv.no_invoice,
+            no_do=None,
+            no_ba=inv.no_ba,
+            unit_name=unit_name,
+            komoditi=komoditi,
+            pembeli=kontrak.pembeli,
+            tanggal=inv.tanggal_transaksi,
+            tipe_alur=getattr(kontrak, "tipe_alur", None) or "STANDAR",
+            superman_no=sm,
+            kontrak_obj=kontrak,
+        )
+        if row:
+            all_rows.append(row)
+
+    # Ringkasan dari hasil filter unit/material/q (sebelum status & missing_slot)
+    summary = schemas.DocumentPipelineSummaryOut(
+        total_rows=len(all_rows),
+        complete=sum(1 for r in all_rows if r.is_complete),
+        incomplete=sum(1 for r in all_rows if not r.is_complete),
+        missing_kontrak=sum(
+            1 for r in all_rows if any(s.slot_key == "kontrak" and not s.uploaded for s in r.slots)
+        ),
+        missing_invoice=sum(
+            1
+            for r in all_rows
+            if any(s.slot_key == "invoice" and s.required and not s.uploaded for s in r.slots)
+        ),
+        missing_do=sum(
+            1 for r in all_rows if any(s.slot_key == "do" and s.required and not s.uploaded for s in r.slots)
+        ),
+        missing_deklarasi=sum(
+            1
+            for r in all_rows
+            if any(s.slot_key == "deklarasi" and s.required and not s.uploaded for s in r.slots)
+        ),
+        missing_ba_serah_terima=sum(
+            1
+            for r in all_rows
+            if any(s.slot_key == "ba_serah_terima" and s.required and not s.uploaded for s in r.slots)
+        ),
+        missing_superman=sum(1 for r in all_rows if r.superman_status != "done" and r.no_invoice),
+        with_ba_panen=sum(
+            1 for r in all_rows if any(s.slot_key == "ba_panen" and s.uploaded for s in r.slots)
+        ),
+    )
+
+    rows = all_rows
+    if status_filter == "complete":
+        rows = [r for r in rows if r.is_complete]
+    elif status_filter == "incomplete":
+        rows = [r for r in rows if not r.is_complete]
+
+    if slot_filter:
+        rows = [r for r in rows if _row_matches_missing_slot(r, slot_filter)]
+
+    rows = rows[:limit]
+
+    return schemas.DocumentPipelineResponse(summary=summary, rows=rows, units=sorted(units_set))
 
 
 @router.get("/summary", response_model=List[schemas.DocumentSummaryRow])
@@ -812,7 +1391,9 @@ BUNDLE_FILE_PREFIX: dict[str, str | None] = {
     "kuitansi": "Kuitansi",
     "do": None,
     "deklarasi": "Deklarasi",
-    "berita_acara": "Berita-Acara",
+    "berita_acara": "BA-Serah-Terima",
+    "ba_panen": "BA-Panen",
+    "rekening_koran": "Rekening-Koran",
 }
 
 

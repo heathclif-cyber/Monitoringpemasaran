@@ -610,7 +610,12 @@ export default function DOPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <DocumentUpload entityType="do" entityId={exportNo} docType="do" />
               <DocumentUpload entityType="do" entityId={exportNo} docType="deklarasi" />
-              <DocumentUpload entityType="do" entityId={exportNo} docType="berita_acara" />
+              <DocumentUpload
+                entityType="do"
+                entityId={exportNo}
+                docType="berita_acara"
+                label="BA Serah Terima Barang"
+              />
             </div>
           )}
           </ReadOnlyFieldset>

@@ -21,6 +21,7 @@ const RepoPembayaran = lazy(() => import('@/pages/RepoPembayaran'))
 const RepoDO = lazy(() => import('@/pages/RepoDO'))
 const TraceKontrak = lazy(() => import('@/pages/TraceKontrak'))
 const UploadPage = lazy(() => import('@/pages/UploadPage'))
+const DocMonitorPage = lazy(() => import('@/pages/DocMonitorPage'))
 const StokPage = lazy(() => import('@/pages/StokPage'))
 const UsersPage = lazy(() => import('@/pages/UsersPage'))
 
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/bypass" element={<BypassPage />} />
             <Route path="/berita-acara" element={<BAPage />} />
             <Route path="/upload" element={<UploadPage />} />
+            <Route path="/pantau-dokumen" element={<DocMonitorPage />} />
             <Route path="/stok" element={<StokPage />} />
             <Route path="/repo/kontrak" element={<RepoKontrak />} />
             <Route path="/repo/invoice" element={<RepoInvoice />} />

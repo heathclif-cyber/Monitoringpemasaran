@@ -45,6 +45,16 @@ const PAGE_META: Record<string, PageMeta> = {
     description: 'Unggah kontrak, invoice, DO, deklarasi, dan berita acara',
     breadcrumb: 'Dokumen / Upload',
   },
+  '/pantau-dokumen': {
+    title: 'Pantau Dokumen',
+    description: 'Pantau kelengkapan kontrak–invoice–DO–Superman–BA untuk unit',
+    breadcrumb: 'Dokumen / Pantau',
+  },
+  '/berita-acara': {
+    title: 'Berita Acara',
+    description: 'Input BA Panen (opsional) untuk kontrak payung',
+    breadcrumb: 'Dokumen / Berita Acara',
+  },
   '/stok': {
     title: 'Persediaan',
     description: 'Catat persediaan masuk per tanggal; penjualan DO mengurangi saldo otomatis',

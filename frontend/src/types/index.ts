@@ -21,7 +21,15 @@ export type SapField =
   | 'link_berita_acara_serah_terima'
 
 export type DocumentEntityType = 'kontrak' | 'invoice' | 'do' | 'bypass' | 'ba'
-export type DocumentDocType = 'kontrak' | 'invoice' | 'kuitansi' | 'rekening_koran' | 'do' | 'deklarasi' | 'berita_acara'
+export type DocumentDocType =
+  | 'kontrak'
+  | 'invoice'
+  | 'kuitansi'
+  | 'rekening_koran'
+  | 'do'
+  | 'deklarasi'
+  | 'berita_acara' // BA Serah Terima Barang (biasanya di DO)
+  | 'ba_panen' // BA Panen (entity BA, opsional)
 
 // ============================================================
 // Entity Interfaces — matching backend models.py / schemas.py
@@ -295,6 +303,67 @@ export interface DocumentSlot {
   web_url: string | null
   uploaded_at: string | null
   document_id: number | null
+  required?: boolean
+  entity_type?: DocumentEntityType | null
+  entity_id?: string | null
+  slot_key?: string | null
+}
+
+export type DocumentPipelineSupermanStatus = 'done' | 'ready' | 'missing_docs' | 'none'
+
+export interface DocumentPipelineSlot {
+  slot_key: string
+  label: string
+  required: boolean
+  entity_type: DocumentEntityType | null
+  entity_id: string | null
+  doc_type: DocumentDocType | null
+  uploaded: boolean
+  file_exists?: boolean
+  file_name: string | null
+  web_url: string | null
+  uploaded_at: string | null
+  document_id: number | null
+  note?: string | null
+}
+
+export interface DocumentPipelineRow {
+  row_key: string
+  no_kontrak: string
+  no_invoice: string | null
+  no_do: string | null
+  no_ba: string | null
+  unit: string | null
+  komoditi: string | null
+  pembeli: string | null
+  tanggal: string | null
+  tipe_alur: string
+  superman: string | null
+  superman_status: DocumentPipelineSupermanStatus
+  slots: DocumentPipelineSlot[]
+  required_total: number
+  required_uploaded: number
+  missing_required: string[]
+  is_complete: boolean
+}
+
+export interface DocumentPipelineSummary {
+  total_rows: number
+  complete: number
+  incomplete: number
+  missing_kontrak: number
+  missing_invoice: number
+  missing_do: number
+  missing_deklarasi: number
+  missing_ba_serah_terima: number
+  missing_superman: number
+  with_ba_panen: number
+}
+
+export interface DocumentPipelineResponse {
+  summary: DocumentPipelineSummary
+  rows: DocumentPipelineRow[]
+  units: string[]
 }
 
 export interface DocumentCompletenessSummary {
