@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -12,6 +12,7 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeft,
+  X,
   CloudUpload,
   ClipboardList,
   ClipboardCheck,
@@ -128,31 +129,57 @@ export function Sidebar() {
   const location = useLocation()
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+  const mobileNavOpen = useAppStore((s) => s.mobileNavOpen)
+  const closeMobileNav = useAppStore((s) => s.closeMobileNav)
   const isAdmin = useAuthStore((s) => s.isAdmin)
   const user = useAuthStore((s) => s.user)
+  const compact = collapsed && !mobileNavOpen
   const sidebarWidth = collapsed ? '64px' : '240px'
+
+  useEffect(() => {
+    closeMobileNav()
+  }, [location.pathname, closeMobileNav])
 
   return (
     <>
       <style>{`:root { --sidebar-width: ${sidebarWidth}; }`}</style>
+      {mobileNavOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 cursor-default bg-foreground/20 lg:hidden"
+          aria-label="Tutup navigasi"
+          onClick={closeMobileNav}
+        />
+      ) : null}
       <aside
-        className="fixed top-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-card transition-[width] duration-200"
-        style={{ width: 'var(--sidebar-width, 240px)' }}
+        className={cn(
+          'fixed top-0 left-0 z-50 flex h-screen w-72 -translate-x-full flex-col border-r border-border bg-card shadow-xl transition-[transform,width] duration-200 lg:w-[var(--sidebar-width)] lg:translate-x-0 lg:shadow-none',
+          mobileNavOpen && 'translate-x-0',
+        )}
       >
         <div className="flex h-14 items-center gap-2.5 border-b border-border px-3 shrink-0">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <FileText size={15} />
           </div>
-          {!collapsed && (
+          {!compact && (
             <div className="min-w-0 flex-1">
               <h1 className="text-sm font-semibold text-foreground leading-tight truncate">PTPN I</h1>
               <p className="text-[11px] text-muted-foreground font-medium">Regional 8</p>
             </div>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={closeMobileNav}
+            className="ml-auto h-8 w-8 lg:hidden"
+            aria-label="Tutup navigasi"
+          >
+            <X size={16} />
+          </Button>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3">
-          {!collapsed && (
+          {!compact && (
             <p className="px-4 mb-2 text-[11px] font-medium text-muted-foreground">Menu</p>
           )}
           <ul className="space-y-0.5">
@@ -163,7 +190,7 @@ export function Sidebar() {
                     <NavParent
                       item={item}
                       defaultOpen={item.children.some((c) => location.pathname === c.to)}
-                      collapsed={collapsed}
+                      collapsed={compact}
                     />
                   </li>
                 )
@@ -173,21 +200,21 @@ export function Sidebar() {
                   <NavLink
                     to={item.to!}
                     end={item.to === '/'}
-                    title={collapsed ? item.label : undefined}
+                    title={compact ? item.label : undefined}
                     className={({ isActive }) =>
                       cn(
                         'flex items-center rounded-md text-[13px] font-medium transition-colors',
-                        collapsed ? 'mx-2 h-9 w-9 justify-center' : 'gap-2.5 py-2 px-3 mx-2',
+                        compact ? 'mx-2 h-9 w-9 justify-center' : 'gap-2.5 py-2 px-3 mx-2',
                         isActive
                           ? 'bg-primary/10 text-primary font-semibold'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                       )
                     }
                   >
-                    <span className={cn('flex justify-center shrink-0', collapsed ? '' : 'w-5')}>
+                    <span className={cn('flex justify-center shrink-0', compact ? '' : 'w-5')}>
                       {item.icon}
                     </span>
-                    {!collapsed && <span className="truncate">{item.label}</span>}
+                    {!compact && <span className="truncate">{item.label}</span>}
                   </NavLink>
                 </li>
               )
@@ -198,32 +225,32 @@ export function Sidebar() {
         {/* Menu admin */}
         {isAdmin() && (
           <div className="px-2 pb-1">
-            {!collapsed && (
+            {!compact && (
               <p className="px-2 mb-1 text-[11px] font-medium text-muted-foreground">Admin</p>
             )}
             <NavLink
               to="/users"
-              title={collapsed ? 'Kelola User' : undefined}
+              title={compact ? 'Kelola User' : undefined}
               className={({ isActive }) =>
                 cn(
                   'flex items-center rounded-md text-[13px] font-medium transition-colors',
-                  collapsed ? 'mx-0 h-9 w-9 justify-center' : 'gap-2.5 py-2 px-3',
+                  compact ? 'mx-0 h-9 w-9 justify-center' : 'gap-2.5 py-2 px-3',
                   isActive
                     ? 'bg-primary/10 text-primary font-semibold'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                 )
               }
             >
-              <span className={cn('flex justify-center shrink-0', collapsed ? '' : 'w-5')}>
+              <span className={cn('flex justify-center shrink-0', compact ? '' : 'w-5')}>
                 <Users size={16} />
               </span>
-              {!collapsed && <span className="truncate">Kelola User</span>}
+              {!compact && <span className="truncate">Kelola User</span>}
             </NavLink>
           </div>
         )}
 
         {/* Badge tamu */}
-        {!collapsed && user?.role === 'tamu' && (
+        {!compact && user?.role === 'tamu' && (
           <div className="px-4 pb-2">
             <div className="rounded-md bg-muted px-3 py-2 text-[11px] text-muted-foreground text-center">
               Mode <strong>Tamu</strong> — hanya lihat & unduh
@@ -234,12 +261,12 @@ export function Sidebar() {
         <div className="border-t border-border p-2 shrink-0">
           <Button
             variant="ghost"
-            size={collapsed ? 'icon' : 'sm'}
+            size={compact ? 'icon' : 'sm'}
             onClick={toggleSidebar}
-            className={cn('w-full text-muted-foreground hover:text-foreground', collapsed && 'h-9 w-9')}
-            title={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+            className={cn('hidden w-full text-muted-foreground hover:text-foreground lg:inline-flex', compact && 'h-9 w-9')}
+            title={compact ? 'Perluas sidebar' : 'Ciutkan sidebar'}
           >
-            {collapsed ? (
+            {compact ? (
               <PanelLeft size={16} />
             ) : (
               <>

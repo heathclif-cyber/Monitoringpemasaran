@@ -18,27 +18,33 @@ import { TrendingUp, Wallet, Box, FileText, AlertTriangle, RefreshCw } from 'luc
 import { useDashboardStore } from '@/store/dashboardStore'
 import { useAppStore } from '@/store/appStore'
 import { StatCard } from '@/components/common/StatCard'
-import { FilterBar, FilterSelect } from '@/components/common/FilterBar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { CardSkeleton } from '@/components/common/LoadingSkeleton'
-import { PageHeader, PageShell } from '@/components/patterns'
+import { FilterToolbar, PageHeader, PageShell, StatusPill } from '@/components/patterns'
 import { formatCurrency, formatNumber, formatNumberDec, formatShortNumber } from '@/lib/utils'
 import { calcMonthOverMonthTrend } from '@/lib/trendUtils'
 
-const CHART_COLORS = ['#059669', '#10b981', '#34d399', '#6ee7b7', '#047857', '#065f46', '#0d9488', '#14b8a6']
-const CHART_PRIMARY = '#059669'
-const CHART_SECONDARY = '#10b981'
-const CHART_TERTIARY = '#f59e0b'
+const CHART_COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+]
+const CHART_PRIMARY = 'hsl(var(--chart-1))'
+const CHART_SECONDARY = 'hsl(var(--chart-3))'
+const CHART_TERTIARY = 'hsl(var(--chart-2))'
 
 function useChartTheme() {
   const theme = useAppStore((s) => s.theme)
   const isDark = theme === 'dark'
   return {
-    gridStroke: isDark ? 'hsl(217 33% 22%)' : '#f0f0f0',
-    tick: { fontSize: 11, fill: isDark ? 'hsl(215 20% 65%)' : '#64748b' },
-    legendStyle: { fontSize: 11, color: isDark ? 'hsl(210 40% 90%)' : '#334155' },
+    gridStroke: 'hsl(var(--border))',
+    tick: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' },
+    legendStyle: { fontSize: 11, color: 'hsl(var(--foreground))' },
   }
 }
 
@@ -180,8 +186,8 @@ function VolumeChart() {
             <YAxis tick={chartTheme.tick} tickFormatter={(v) => formatShortNumber(v)} />
             <Tooltip formatter={(value: number) => formatNumberDec(value)} />
             <Legend wrapperStyle={chartTheme.legendStyle} />
-            <Bar dataKey="Volume Kg" fill="#f97316" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="Volume EA" fill="var(--chart-2)" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="Volume Kg" fill={CHART_TERTIARY} radius={[3, 3, 0, 0]} />
+            <Bar dataKey="Volume EA" fill={CHART_SECONDARY} radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
@@ -287,9 +293,11 @@ function MonthlyBreakdown() {
                 <td className="px-4 py-2 text-right">
                   {row.cashin > 0 ? formatCurrency(row.cashin) : <span className="text-gray-300">-</span>}
                 </td>
-                <td className={`px-4 py-2 text-right font-medium ${row.selisih <= 0 ? 'text-green-600' : 'text-amber-600'}`}>
+                <td className="px-4 py-2 text-right">
                   {row.pendapatan > 0 || row.cashin > 0 ? (
-                    row.selisih <= 0 ? 'Lunas' : formatCurrency(row.selisih)
+                    <StatusPill tone={row.selisih <= 0 ? 'success' : 'warning'} icon={false}>
+                      {row.selisih <= 0 ? 'Lunas' : formatCurrency(row.selisih)}
+                    </StatusPill>
                   ) : (
                     <span className="text-gray-300">-</span>
                   )}
@@ -343,11 +351,11 @@ function SapStatus() {
 
   const MissingBadge = ({ val }: { val: number }) =>
     val > 0 ? (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-destructive/10 text-xs font-bold text-destructive">
         {val}
       </span>
     ) : (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 text-xs">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs text-primary">
         ✓
       </span>
     )
@@ -361,7 +369,7 @@ function SapStatus() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {summary.map((item) => (
             <div key={item.label} className="text-center">
-              <p className={`text-2xl font-bold ${item.value > 0 ? 'text-rose-600' : 'text-muted-foreground'}`}>
+              <p className={`text-2xl font-bold tabular-nums ${item.value > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {item.value}
               </p>
               <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
@@ -431,38 +439,52 @@ export default function Dashboard() {
       <PageHeader
         title="Dashboard"
         description="Ringkasan pendapatan, volume, dan status SAP"
+        actions={
+          <Button variant="outline" size="sm" onClick={doFetch} disabled={isLoading} className="gap-2">
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : undefined} />
+            Perbarui
+          </Button>
+        }
       />
-      <FilterBar>
+      <FilterToolbar>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground shrink-0">Tahun</Label>
-          <FilterSelect
+          <NativeSelect
+            className="h-8 w-auto min-w-24"
             value={String(filters.year)}
-            onChange={(v) => setFilters({ year: Number(v) })}
-            options={availableYears.map((y) => ({ value: String(y), label: String(y) }))}
-          />
+            onChange={(event) => setFilters({ year: Number(event.target.value) })}
+          >
+            {availableYears.map((year) => <option key={year} value={year}>{year}</option>)}
+          </NativeSelect>
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground shrink-0">Unit</Label>
-          <FilterSelect
+          <NativeSelect
+            className="h-8 w-auto min-w-36"
             value={filters.unit}
-            onChange={(v) => setFilters({ unit: v })}
-            options={[{ value: 'ALL', label: 'Semua Unit' }, ...availableUnits.map((u) => ({ value: u, label: u }))]}
-          />
+            onChange={(event) => setFilters({ unit: event.target.value })}
+          >
+            <option value="ALL">Semua Unit</option>
+            {availableUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+          </NativeSelect>
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground shrink-0">Komoditi</Label>
-          <FilterSelect
+          <NativeSelect
+            className="h-8 w-auto min-w-40"
             value={filters.komoditi}
-            onChange={(v) => setFilters({ komoditi: v })}
-            options={[{ value: 'ALL', label: 'Semua Komoditi' }, ...availableKomoditas.map((k) => ({ value: k, label: k }))]}
-          />
+            onChange={(event) => setFilters({ komoditi: event.target.value })}
+          >
+            <option value="ALL">Semua Komoditi</option>
+            {availableKomoditas.map((commodity) => <option key={commodity} value={commodity}>{commodity}</option>)}
+          </NativeSelect>
         </div>
-      </FilterBar>
+      </FilterToolbar>
 
       {fetchError ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <AlertTriangle size={40} className="text-rose-400 mb-3" />
+            <AlertTriangle size={40} className="mb-3 text-destructive" />
             <p className="text-sm font-medium text-foreground">{fetchError}</p>
             <p className="text-xs text-muted-foreground mt-1">Periksa koneksi database atau coba lagi</p>
             <Button variant="outline" size="sm" onClick={doFetch} className="mt-4 gap-2">

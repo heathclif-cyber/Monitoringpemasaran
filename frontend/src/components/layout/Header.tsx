@@ -1,9 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { getPageMeta } from '@/lib/pageMeta'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/authStore'
+import { useAppStore } from '@/store/appStore'
 
 const ROLE_LABELS: Record<string, string> = { admin: 'Admin', staff: 'Staff', tamu: 'Tamu' }
 
@@ -13,6 +14,7 @@ export function Header() {
   const meta = getPageMeta(location.pathname)
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
+  const openMobileNav = useAppStore((s) => s.openMobileNav)
 
   const handleLogout = () => {
     logout()
@@ -21,14 +23,24 @@ export function Header() {
 
   return (
     <header
-      className="fixed top-0 right-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card/95 backdrop-blur-sm px-6"
-      style={{ left: 'var(--sidebar-width, 240px)' }}
+      className="fixed top-0 right-0 left-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur-sm sm:px-5 lg:left-[var(--sidebar-width)] lg:px-6"
     >
-      <div className="min-w-0">
-        {meta.breadcrumb && (
-          <p className="text-[11px] font-medium text-muted-foreground truncate">{meta.breadcrumb}</p>
-        )}
-        <h2 className="text-[15px] font-semibold text-foreground leading-tight truncate">{meta.title}</h2>
+      <div className="flex min-w-0 items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 lg:hidden"
+          onClick={openMobileNav}
+          aria-label="Buka navigasi"
+        >
+          <Menu size={18} />
+        </Button>
+        <div className="min-w-0">
+          {meta.breadcrumb && (
+            <p className="truncate text-xs font-medium text-muted-foreground">{meta.breadcrumb}</p>
+          )}
+          <p className="truncate text-sm font-semibold leading-tight text-foreground">{meta.title}</p>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />
@@ -41,11 +53,15 @@ export function Header() {
               <p className="text-[12px] font-medium text-foreground leading-tight">{user.nama_lengkap}</p>
               <p className="text-[10px] text-muted-foreground">{user.jabatan ?? ROLE_LABELS[user.role] ?? user.role}</p>
             </div>
+            <span className="hidden h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary sm:inline-flex" aria-hidden="true">
+              {user.nama_lengkap.slice(0, 1).toUpperCase()}
+            </span>
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
               title="Keluar"
+              aria-label="Keluar dari aplikasi"
               onClick={handleLogout}
             >
               <LogOut size={15} />

@@ -18,10 +18,13 @@ interface AppStore {
   availableKomoditas: string[]
   availableYears: number[]
   sidebarCollapsed: boolean
+  mobileNavOpen: boolean
   theme: Theme
   addNotification: (message: string, type: NotificationType) => void
   removeNotification: (id: string) => void
   toggleSidebar: () => void
+  openMobileNav: () => void
+  closeMobileNav: () => void
   toggleTheme: () => void
   fetchDropdownData: () => Promise<void>
 }
@@ -42,6 +45,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   availableKomoditas: [],
   availableYears: [2025, 2026, 2027],
   sidebarCollapsed: readSidebarCollapsed(),
+  mobileNavOpen: false,
   theme: readTheme(),
 
   addNotification: (message: string, type: NotificationType = 'success') => {
@@ -67,6 +71,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     } catch { /* ignore */ }
     set({ sidebarCollapsed: next })
   },
+
+  openMobileNav: () => set({ mobileNavOpen: true }),
+  closeMobileNav: () => set({ mobileNavOpen: false }),
 
   toggleTheme: () => {
     const next: Theme = get().theme === 'dark' ? 'light' : 'dark'
