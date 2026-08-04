@@ -342,6 +342,9 @@ export interface DocumentPipelineRow {
   komoditi: string | null
   pembeli: string | null
   tanggal: string | null
+  /** Volume DO (volume_do) — acuan BA Serah Terima */
+  volume?: number | null
+  satuan?: string | null
   tipe_alur: string
   superman: string | null
   superman_status: DocumentPipelineSupermanStatus

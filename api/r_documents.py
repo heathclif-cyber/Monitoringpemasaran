@@ -866,6 +866,8 @@ def document_pipeline(
         tipe_alur: str,
         superman_no: Optional[str],
         kontrak_obj,
+        volume: Optional[float] = None,
+        satuan: Optional[str] = None,
     ) -> schemas.DocumentPipelineRowOut | None:
         if unit_filter and (unit_name or "").strip() != unit_filter:
             return None
@@ -965,7 +967,11 @@ def document_pipeline(
                 doc_type="berita_acara" if no_do else None,
                 cache=cache,
                 note=(
-                    "Tanggung jawab Unit — diunggah per DO"
+                    (
+                        f"Unit · volume DO {volume:g} {satuan or ''}".strip()
+                        if volume is not None
+                        else "Tanggung jawab Unit — diunggah per DO"
+                    )
                     if no_do
                     else "BA Serah Terima diunggah per DO (Unit)"
                 ),
@@ -1051,6 +1057,8 @@ def document_pipeline(
             komoditi=komoditi,
             pembeli=pembeli,
             tanggal=tanggal,
+            volume=volume,
+            satuan=satuan,
             tipe_alur=tipe_alur or "STANDAR",
             superman=superman_no,
             superman_status=sm_status if no_invoice else "none",
@@ -1098,6 +1106,12 @@ def document_pipeline(
 
         materials_set = _collect_kontrak_materials(kontrak, unit_name)
         komoditi = next(iter(materials_set), kontrak.jenis_komoditi or kontrak.deskripsi_produk)
+        satuan = (
+            kontrak.satuan
+            or (kontrak.units[0].satuan if kontrak.units else None)
+            or "Kg"
+        )
+        vol = float(do.volume_do) if do.volume_do is not None else None
 
         row = build_row(
             no_kontrak=kontrak.no_kontrak,
@@ -1111,6 +1125,8 @@ def document_pipeline(
             tipe_alur=getattr(kontrak, "tipe_alur", None) or "STANDAR",
             superman_no=sm,
             kontrak_obj=kontrak,
+            volume=vol,
+            satuan=satuan,
         )
         if row:
             all_rows.append(row)
@@ -1132,6 +1148,12 @@ def document_pipeline(
                     break
         materials_set = _collect_kontrak_materials(kontrak, unit_name)
         komoditi = next(iter(materials_set), kontrak.jenis_komoditi or kontrak.deskripsi_produk)
+        satuan = (
+            kontrak.satuan
+            or (kontrak.units[0].satuan if kontrak.units else None)
+            or "Kg"
+        )
+        vol = float(inv.volume) if getattr(inv, "volume", None) is not None else None
         row = build_row(
             no_kontrak=kontrak.no_kontrak,
             no_invoice=inv.no_invoice,
@@ -1144,6 +1166,8 @@ def document_pipeline(
             tipe_alur=getattr(kontrak, "tipe_alur", None) or "STANDAR",
             superman_no=sm,
             kontrak_obj=kontrak,
+            volume=vol,
+            satuan=satuan,
         )
         if row:
             all_rows.append(row)

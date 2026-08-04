@@ -16,7 +16,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DocxPreview } from '@/components/common/DocxPreview'
-import { cn, formatDate, safe } from '@/lib/utils'
+import { cn, formatDate, formatNumberDec, safe } from '@/lib/utils'
 import type {
   DocumentPipelineResponse,
   DocumentPipelineRow,
@@ -180,10 +180,22 @@ function CompactUpload({
   )
 }
 
+function formatVolumeLabel(volume?: number | null, satuan?: string | null): string | null {
+  if (volume == null || Number.isNaN(Number(volume))) return null
+  const unit = (satuan || 'Kg').trim() || 'Kg'
+  const n = Number(volume)
+  const text =
+    Math.abs(n - Math.round(n)) < 1e-9
+      ? new Intl.NumberFormat('id-ID').format(Math.round(n))
+      : formatNumberDec(n)
+  return `${text} ${unit}`
+}
+
 function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: () => void }) {
   const baSt = row.slots.find((s) => s.slot_key === 'ba_serah_terima')
   const done = Boolean(baSt?.uploaded) || row.unit_complete !== false
   const needBaSt = Boolean(baSt && !baSt.uploaded)
+  const volLabel = formatVolumeLabel(row.volume, row.satuan)
 
   return (
     <div
@@ -193,7 +205,7 @@ function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: ()
         needBaSt && 'bg-rose-50/50 dark:bg-rose-950/20',
       )}
     >
-      <div className="min-w-0 sm:w-[42%] sm:shrink-0">
+      <div className="min-w-0 sm:w-[40%] sm:shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
           <p className="text-sm font-semibold truncate">{row.no_do}</p>
           {needBaSt ? (
@@ -213,9 +225,21 @@ function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: ()
         </p>
       </div>
 
-      <div className="flex items-center gap-1.5 sm:flex-1 min-w-0 text-xs">
-        <span className="text-muted-foreground shrink-0">BA Serah Terima Barang</span>
-        <span className="text-[10px] font-medium text-rose-600 shrink-0">wajib</span>
+      <div className="flex flex-col gap-0.5 sm:flex-1 min-w-0 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-muted-foreground shrink-0">BA Serah Terima Barang</span>
+          <span className="text-[10px] font-medium text-rose-600 shrink-0">wajib</span>
+        </div>
+        {volLabel ? (
+          <p className="text-[12px] font-semibold tabular-nums text-foreground">
+            Volume: {volLabel}
+            {row.komoditi ? (
+              <span className="font-normal text-muted-foreground"> · {row.komoditi}</span>
+            ) : null}
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">Volume DO belum tercatat</p>
+        )}
       </div>
 
       <div className="flex items-center gap-1.5 sm:justify-end sm:shrink-0">
@@ -311,7 +335,8 @@ export default function UnitDocPage() {
           <div className="min-w-0">
             <h1 className="text-base font-semibold leading-tight">Dokumen Unit</h1>
             <p className="text-[11px] text-muted-foreground">
-              Hanya satu dokumen wajib: <strong>BA Serah Terima Barang</strong> (per DO)
+              Wajib: <strong>BA Serah Terima Barang</strong> per DO — cek <strong>volume</strong> yang
+              harus diserahkan
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

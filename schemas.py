@@ -333,6 +333,8 @@ class DocumentPipelineRowOut(BaseModel):
     komoditi: Optional[str] = None
     pembeli: Optional[str] = None
     tanggal: Optional[date] = None
+    volume: Optional[float] = None  # volume DO (volume_do) untuk BA Serah Terima
+    satuan: Optional[str] = None
     tipe_alur: str = "STANDAR"
     superman: Optional[str] = None
     superman_status: str = "none"  # done | ready | missing_docs | none

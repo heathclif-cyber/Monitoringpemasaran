@@ -624,7 +624,11 @@ export default function DOPage() {
                 entityType="do"
                 entityId={exportNo}
                 docType="berita_acara"
-                label="BA Serah Terima Barang (Unit)"
+                label={
+                  volumeKeluar && Number(volumeKeluar) > 0
+                    ? `BA Serah Terima Barang · ${formatNumber(volumeKeluar)} ${stokSatuan}`
+                    : 'BA Serah Terima Barang (Unit)'
+                }
               />
             </div>
           )}
