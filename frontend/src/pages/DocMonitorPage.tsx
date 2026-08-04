@@ -14,7 +14,7 @@ import {
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { useCanEdit } from '@/store/authStore'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DocxPreview } from '@/components/common/DocxPreview'
 import { MultiSelectFilter } from '@/components/common/MultiSelectFilter'
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton'
-import { PageHeader, PageShell } from '@/components/patterns'
+import { FilterToolbar, ListPanel, PageHeader, PageShell, StatPills, StatusPill } from '@/components/patterns'
 import { cn, formatDate, safe } from '@/lib/utils'
 import type {
   DocumentPipelineResponse,
@@ -136,16 +136,9 @@ function slotTone(slot: DocumentPipelineSlot): string {
 function CompletenessBadge({ uploaded, total }: { uploaded: number; total: number }) {
   const complete = total > 0 && uploaded === total
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap',
-        complete
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
-          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-      )}
-    >
+    <StatusPill tone={complete ? 'success' : 'warning'} icon={false} className="min-w-10 justify-center normal-case">
       {uploaded}/{total}
-    </span>
+    </StatusPill>
   )
 }
 
@@ -445,9 +438,7 @@ export default function DocMonitorPage() {
 
   const applyQuickFilter = (slot: MissingSlotFilter) => {
     setMissingSlot((prev) => (prev === slot ? '' : slot))
-    if (slot) {
-      setStatusFilter('incomplete')
-    }
+    if (slot) setStatusFilter('incomplete')
     setExpanded(null)
   }
 
@@ -508,7 +499,91 @@ export default function DocMonitorPage() {
       ) : (
       <>
       {/* Summary cards — klik = filter cepat */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <StatPills
+        items={[
+          { label: 'Total', value: summary?.total_rows ?? 0 },
+          { label: 'Tugas Unit', value: summary?.incomplete_unit ?? 0, tone: 'danger' },
+          { label: 'Tugas Regional', value: summary?.incomplete_regional ?? 0, tone: 'warning' },
+          { label: 'BA ST belum', value: summary?.missing_ba_serah_terima ?? 0, tone: 'danger' },
+          { label: 'Faktur belum', value: summary?.missing_faktur_pajak ?? 0, tone: 'warning' },
+          { label: 'Superman belum', value: summary?.missing_superman ?? 0, tone: 'warning' },
+        ]}
+      />
+      <FilterToolbar>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Status</Label>
+          <NativeSelect
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as FilterMode)
+              setExpanded(null)
+            }}
+            className="h-8 w-auto min-w-32 text-xs"
+          >
+            <option value="incomplete">Belum lengkap</option>
+            <option value="all">Semua</option>
+            <option value="complete">Sudah lengkap</option>
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Unit</Label>
+          <NativeSelect
+            value={unit}
+            onChange={(e) => {
+              setUnit(e.target.value)
+              setExpanded(null)
+            }}
+            className="h-8 w-auto min-w-36 text-xs"
+          >
+            <option value="">Semua unit</option>
+            {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Kekurangan</Label>
+          <NativeSelect
+            value={missingSlot}
+            onChange={(e) => {
+              setMissingSlot(e.target.value as MissingSlotFilter)
+              setExpanded(null)
+            }}
+            className="h-8 w-auto min-w-52 text-xs"
+          >
+            {MISSING_SLOT_OPTIONS.map((o) => <option key={o.value || 'all'} value={o.value}>{o.label}</option>)}
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Material</Label>
+          <MultiSelectFilter
+            label="Material"
+            allLabel="Semua material"
+            options={materialOptions}
+            selected={materials}
+            onChange={(next) => {
+              setMaterials(next)
+              setExpanded(null)
+            }}
+            className="h-8 min-w-36 text-xs"
+            contentWidth="w-72"
+          />
+        </div>
+        <div className="flex min-w-52 flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Cari nomor atau unit</Label>
+          <div className="flex gap-1.5">
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+              placeholder="DO, invoice, kontrak…"
+              className="h-8 text-xs"
+            />
+            <Button type="button" size="sm" className="h-8 px-2" onClick={applySearch} aria-label="Cari dokumen">
+              <Search size={13} />
+            </Button>
+          </div>
+        </div>
+      </FilterToolbar>
+      <div className="hidden">
         {(
           [
             {
@@ -578,8 +653,8 @@ export default function DocMonitorPage() {
         })}
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
+      <ListPanel>
+        <div className="space-y-3 border-b p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <ClipboardCheck size={16} className="text-muted-foreground" />
@@ -631,7 +706,7 @@ export default function DocMonitorPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-3">
+          <div className="hidden">
             <div>
               <Label className="text-xs text-muted-foreground">Status</Label>
               <NativeSelect
@@ -729,7 +804,7 @@ export default function DocMonitorPage() {
             </span>
             <span className="text-muted-foreground/80">· Chip R/U = Regional / Unit · Klik kartu = filter</span>
           </div>
-        </CardHeader>
+        </div>
 
         <CardContent className="p-0">
           {loading ? (
@@ -911,7 +986,7 @@ export default function DocMonitorPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </ListPanel>
       </>
       )}
     </PageShell>

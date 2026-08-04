@@ -367,7 +367,19 @@ export default function UnitDocPage() {
         ]}
       />
 
-      <FilterToolbar>
+      <FilterToolbar
+        end={
+          <label className="inline-flex cursor-pointer select-none items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              className="rounded border-border"
+              checked={groupByUnit}
+              onChange={(e) => setGroupByUnit(e.target.checked)}
+            />
+            Kelompokkan unit
+          </label>
+        }
+      >
         <NativeSelect
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
@@ -401,15 +413,6 @@ export default function UnitDocPage() {
             <Search size={13} />
           </Button>
         </div>
-        <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="rounded border-border"
-            checked={groupByUnit}
-            onChange={(e) => setGroupByUnit(e.target.checked)}
-          />
-          Kelompokkan unit
-        </label>
       </FilterToolbar>
 
       <ListPanel
@@ -420,6 +423,16 @@ export default function UnitDocPage() {
           statusFilter === 'incomplete'
             ? 'Semua BA Serah Terima sudah diunggah'
             : 'Tidak ada data'
+        }
+        emptyDescription="Ubah filter atau kata kunci untuk melihat DO lain."
+        header={
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2">
+            <div>
+              <p className="text-xs font-semibold text-foreground">Daftar Delivery Order</p>
+              <p className="text-[11px] text-muted-foreground">BA Serah Terima Barang, volume DO, dan aksi upload</p>
+            </div>
+            <span className="text-[11px] tabular-nums text-muted-foreground">{rows.length} DO ditampilkan</span>
+          </div>
         }
       >
         {groupByUnit && grouped ? (
