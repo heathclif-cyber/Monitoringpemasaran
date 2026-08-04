@@ -21,6 +21,7 @@ import { DocumentUpload } from '@/components/common/DocumentUpload'
 
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { client } from '@/lib/client'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import type { DeliveryOrderInput, StokSaldo } from '@/types'
@@ -402,7 +403,12 @@ export default function DOPage() {
   }, [editNo])
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
+    <PageShell>
+      <PageHeader
+        title="Delivery Order"
+        description="Terbitkan DO berdasarkan pembayaran yang sudah dicatat"
+      />
+      <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
           <Card>
@@ -668,6 +674,7 @@ export default function DOPage() {
           maxVolume={maxVolume}
         />
       </PreviewPanel>
-    </div>
+      </div>
+    </PageShell>
   )
 }

@@ -33,6 +33,7 @@ import { FilterSelect } from '@/components/common/FilterBar'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { normalizeSatuan } from '@/utils/satuanUtils'
 import {
   filterLaporanRows,
@@ -270,34 +271,28 @@ export default function LaporanPage() {
   const handleResetFilters = () => setFilters(createDefaultLaporanFilters())
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Laporan Digital</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? 'Memuat data...' : (
-              <>
-                <span className="font-medium text-foreground">{sorted.length}</span> baris ditampilkan
-                {rows.length !== sorted.length && <> dari {rows.length} total</>}
-                {' · '}{periodLabel}
-                {filters.modeTanggal === 'TRANSFER' ? ' (tgl transfer)' : ' (rencana ambil)'}
-              </>
-            )}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" onClick={() => void fetch()} disabled={isLoading} className="gap-1.5">
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportHO} disabled={isExportingHo || !filters.year || filters.months.length === 0} className="gap-1.5">
-            <Download size={14} className={isExportingHo ? 'animate-pulse' : ''} /> Export HO
-          </Button>
-          <Button variant="default" size="sm" onClick={handleExportExcel} disabled={sorted.length === 0} className="gap-1.5">
-            <Download size={14} /> Export Excel
-          </Button>
-        </div>
-      </div>
+    <PageShell width="full" density="compact">
+      <PageHeader
+        title="Laporan Digital"
+        description={
+          isLoading
+            ? 'Memuat data...'
+            : `${sorted.length} baris ditampilkan${rows.length !== sorted.length ? ` dari ${rows.length} total` : ''} · ${periodLabel}${filters.modeTanggal === 'TRANSFER' ? ' (tgl transfer)' : ' (rencana ambil)'}`
+        }
+        actions={
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" size="sm" onClick={() => void fetch()} disabled={isLoading} className="gap-1.5">
+              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportHO} disabled={isExportingHo || !filters.year || filters.months.length === 0} className="gap-1.5">
+              <Download size={14} className={isExportingHo ? 'animate-pulse' : ''} /> Export HO
+            </Button>
+            <Button variant="default" size="sm" onClick={handleExportExcel} disabled={sorted.length === 0} className="gap-1.5">
+              <Download size={14} /> Export Excel
+            </Button>
+          </div>
+        }
+      />
 
       {/* Summary — nilai menyesuaikan lebar kartu */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -627,7 +622,7 @@ export default function LaporanPage() {
         isDestructive
         onConfirm={handleDeleteBypass}
       />
-    </div>
+    </PageShell>
   )
 }
 

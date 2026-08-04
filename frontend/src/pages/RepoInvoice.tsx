@@ -15,6 +15,7 @@ import { DocxPreview } from '@/components/common/DocxPreview'
 import { SearchInput } from '@/components/common/SearchInput'
 import { FilterBar, FilterSelect } from '@/components/common/FilterBar'
 import { DataTable } from '@/components/common/DataTable'
+import { PageHeader, PageShell } from '@/components/patterns'
 import type { Invoice } from '@/types'
 
 const MONTHS: Record<string, string> = {
@@ -77,7 +78,8 @@ export default function RepoInvoice() {
   }
 
   return (
-    <div className="space-y-4">
+    <PageShell density="compact">
+      <PageHeader title="Arsip Invoice" description="Kelola invoice dan kuitansi tersimpan" />
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Cari no invoice, kontrak..." />
         <FilterSelect value={bulan} onChange={setBulan} options={[{ value: 'ALL', label: 'Semua Bulan' }, ...months]} />
@@ -200,6 +202,6 @@ export default function RepoInvoice() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

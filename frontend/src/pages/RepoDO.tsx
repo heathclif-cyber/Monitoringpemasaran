@@ -15,6 +15,7 @@ import { DocxPreview } from '@/components/common/DocxPreview'
 import { SearchInput } from '@/components/common/SearchInput'
 import { FilterBar, FilterSelect } from '@/components/common/FilterBar'
 import { DataTable } from '@/components/common/DataTable'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { formatDate, safe } from '@/lib/utils'
 import type { DeliveryOrder } from '@/types'
 
@@ -80,7 +81,8 @@ export default function RepoDO() {
   }
 
   return (
-    <div className="space-y-4">
+    <PageShell density="compact">
+      <PageHeader title="Arsip Delivery Order" description="Kelola DO tersimpan" />
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Cari no DO, invoice..." />
         <FilterSelect value={bulan} onChange={setBulan} options={[{ value: 'ALL', label: 'Semua Bulan' }, ...months]} />
@@ -177,6 +179,6 @@ export default function RepoDO() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

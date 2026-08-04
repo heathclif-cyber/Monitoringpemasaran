@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { CardSkeleton } from '@/components/common/LoadingSkeleton'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { formatCurrency, formatNumber, formatNumberDec, formatShortNumber } from '@/lib/utils'
 import { calcMonthOverMonthTrend } from '@/lib/trendUtils'
 
@@ -426,7 +427,11 @@ export default function Dashboard() {
   }, [filters.year, filters.unit, filters.komoditi])
 
   return (
-    <div className="space-y-6">
+    <PageShell>
+      <PageHeader
+        title="Dashboard"
+        description="Ringkasan pendapatan, volume, dan status SAP"
+      />
       <FilterBar>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-muted-foreground shrink-0">Tahun</Label>
@@ -491,6 +496,6 @@ export default function Dashboard() {
           <MonthlyBreakdown />
         </>
       ) : null}
-    </div>
+    </PageShell>
   )
 }

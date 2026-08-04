@@ -12,6 +12,7 @@ import { TableSkeleton } from '@/components/common/LoadingSkeleton'
 import { SearchInput } from '@/components/common/SearchInput'
 import { FilterBar, FilterSelect } from '@/components/common/FilterBar'
 import { DataTable } from '@/components/common/DataTable'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import type { Pembayaran } from '@/types'
 
@@ -74,7 +75,8 @@ export default function RepoPembayaran() {
   }
 
   return (
-    <div className="space-y-4">
+    <PageShell density="compact">
+      <PageHeader title="Arsip Pembayaran" description="Kelola pembayaran mitra tersimpan" />
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Cari no pembayaran, invoice..." />
         <FilterSelect value={bulan} onChange={setBulan} options={[{ value: 'ALL', label: 'Semua Bulan' }, ...months]} />
@@ -163,6 +165,6 @@ export default function RepoPembayaran() {
         description="Pembayaran yang sudah punya DO tidak bisa dihapus."
         onConfirm={handleDelete}
       />
-    </div>
+    </PageShell>
   )
 }

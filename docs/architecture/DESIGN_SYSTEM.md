@@ -192,14 +192,15 @@ Pola: filter bar + `DataTable` / tabel + aksi download/preview (`DocxPreview`).
 
 | Halaman | Status |
 |---------|--------|
-| Dokumen Unit | ✅ `PageShell` + full patterns |
+| Dokumen Unit | ✅ full patterns |
 | Dokumen (pantau) | ✅ `PageShell` + `PageHeader` |
-| Persediaan | ✅ `PageShell` + `PageHeader` |
-| Berita Acara | ✅ `PageShell` + `PageHeader` |
-| Input Bypass | ✅ `PageShell` + `PageHeader` |
-| Arsip Kontrak | ✅ `PageShell` + `PageHeader` |
-| Dashboard / Laporan | ⏳ pola analitik (StatCard/charts) |
-| Form Kontrak / Invoice / DO / Pembayaran | ⏳ form+preview baku — jaga layout, opsional header |
-| Repo Invoice / DO / Pembayaran | ⏳ mirror Repo Kontrak |
+| Persediaan | ✅ |
+| Berita Acara | ✅ |
+| Input Bypass | ✅ |
+| Arsip Kontrak / Invoice / DO / Pembayaran | ✅ |
+| Dashboard | ✅ header + shell (charts tetap) |
+| Laporan Digital | ✅ header + shell (tabel tetap) |
+| Form Kontrak / Invoice / DO / Pembayaran | ✅ header + shell (form+preview tidak diubah) |
+| Users / Trace Kontrak | ✅ |
 
 *Maintainer: update §4–§5 dan tabel migrasi saat pola baru disepakati.*

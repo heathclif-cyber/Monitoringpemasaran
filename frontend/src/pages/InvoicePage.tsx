@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
 import { calculateKontrakPricing, calculateJatuhTempo, isPayungBA as isPayungBAKontrak } from '@/utils/kontrakUtils'
@@ -466,7 +467,12 @@ export default function InvoicePage() {
   }, [editNo])
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
+    <PageShell>
+      <PageHeader
+        title="Cetak Invoice"
+        description="Buat proforma invoice dan kuitansi dari kontrak"
+      />
+      <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
           <Card>
@@ -772,6 +778,7 @@ export default function InvoicePage() {
           baHarga={isPayungBA ? selectedBAObj?.harga_satuan : undefined}
         />
       </PreviewPanel>
-    </div>
+      </div>
+    </PageShell>
   )
 }

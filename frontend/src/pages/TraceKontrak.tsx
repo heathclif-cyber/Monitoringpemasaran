@@ -14,6 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton'
+import { PageShell } from '@/components/patterns'
 import { formatCurrency, formatDate, safe } from '@/lib/utils'
 import { client } from '@/lib/client'
 import type { KontrakTrace, TraceInvoice, TracePembayaran, PaymentStatus } from '@/types'
@@ -85,20 +86,20 @@ export default function TraceKontrak() {
   const satuan = data.satuan || 'Kg'
 
   return (
-    <div className="space-y-5">
+    <PageShell density="compact">
       {/* breadcrumb / back */}
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
-          className="gap-1.5 text-gray-500 hover:text-gray-800 -ml-2"
+          className="gap-1.5 text-muted-foreground hover:text-foreground -ml-2"
           onClick={() => navigate('/repo/kontrak')}
         >
           <ArrowLeft size={15} />
           Repositori Kontrak
         </Button>
-        <span className="text-gray-300">/</span>
-        <span className="text-sm font-semibold text-gray-700 truncate">{data.no_kontrak}</span>
+        <span className="text-muted-foreground/40">/</span>
+        <span className="text-sm font-semibold text-foreground truncate">{data.no_kontrak}</span>
       </div>
 
       {/* header card */}
@@ -290,7 +291,7 @@ export default function TraceKontrak() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   )
 }
 

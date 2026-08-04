@@ -18,6 +18,7 @@ import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
+import { PageHeader, PageShell } from '@/components/patterns'
 import { SupermanDocChecklist } from '@/components/common/SupermanDocChecklist'
 import { SupermanCaptchaDialog } from '@/components/common/SupermanCaptchaDialog'
 import { SupermanProgressDialog } from '@/components/common/SupermanProgressDialog'
@@ -562,7 +563,11 @@ export default function PembayaranPage() {
   const actionsBusy = isSubmitting || supermanRunning
 
   return (
-    <div className="max-w-3xl">
+    <PageShell width="narrow">
+      <PageHeader
+        title="Pembayaran"
+        description="Catat transfer mitra dan buat SPPn Superman"
+      />
       <form onSubmit={(e) => e.preventDefault()} className="space-y-6" autoComplete="off">
         <Card>
           <CardHeader className="pb-3">
@@ -993,6 +998,6 @@ export default function PembayaranPage() {
         isLoading={deleting}
         onConfirm={() => void handleDeletePembayaran()}
       />
-    </div>
+    </PageShell>
   )
 }

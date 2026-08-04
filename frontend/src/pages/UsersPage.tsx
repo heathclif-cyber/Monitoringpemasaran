@@ -14,6 +14,7 @@ import {
 import { client } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
+import { PageHeader, PageShell } from '@/components/patterns'
 import type { User, UserRole } from '@/types'
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -118,16 +119,16 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold">Manajemen User</h2>
-          <p className="text-sm text-muted-foreground">{users.length} user terdaftar</p>
-        </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus size={14} className="mr-1.5" /> Tambah User
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Manajemen User"
+        description={`${users.length} user terdaftar`}
+        actions={
+          <Button size="sm" className="h-8" onClick={() => setCreateOpen(true)}>
+            <Plus size={14} className="mr-1.5" /> Tambah User
+          </Button>
+        }
+      />
 
       <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
@@ -300,6 +301,6 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

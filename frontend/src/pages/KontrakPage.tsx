@@ -19,6 +19,7 @@ import { KontrakPreview } from '@/components/feature/KontrakPreview'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { PageHeader, PageShell } from '@/components/patterns'
 
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
@@ -427,7 +428,12 @@ export default function KontrakPage() {
   const handleBackStep = () => setActiveStep((s) => Math.max(s - 1, 0))
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
+    <PageShell>
+      <PageHeader
+        title="Buat Kontrak"
+        description="Otomasi dokumen kontrak penjualan (.docx)"
+      />
+      <div className="flex flex-col lg:flex-row gap-6">
       {/* Left: Form */}
       <div className="flex-1 min-w-0">
         <FormStepper
@@ -919,6 +925,7 @@ export default function KontrakPage() {
       >
         <KontrakPreview data={{ ...watchedFields, volume: payungMode ? 0 : watchedFields.volume, units: unitList.filter(u => u.nama_unit.trim()).map((u, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit: u.nama_unit, urutan: i, volume: payungMode ? 0 : (u.volume || 0), komoditi: u.komoditi || null, jenis_komoditi: u.jenis_komoditi || null, satuan: u.satuan || null, tahun_panen: u.tahun_panen || null, deskripsi_produk: u.deskripsi_produk || null })) }} />
       </PreviewPanel>
-    </div>
+      </div>
+    </PageShell>
   )
 }
