@@ -42,7 +42,7 @@ npm run build    # production build ke dist/
 npx tsc --noEmit # type-check
 ```
 - Semua komponen baru pakai shadcn/ui primitives (`components/ui/`)
-- Halaman baru: ikuti `DESIGN_SYSTEM.md` + bungkus dengan pola di `components/patterns/`
+- **UI & layout:** ikuti section **UI Design System (wajib)** di bawah
 - Classnames selalu via `cn()` dari `@/lib/utils`
 - Format currency: `formatCurrency()` / `formatCurrencyDec()` dari `@/lib/utils`
 - Semua types di `types/index.ts` — jangan scatter di file lain
@@ -57,6 +57,74 @@ npx tsc --noEmit # type-check
 - **JANGAN ubah format dokumen** (Kontrak, Invoice, DO) — sudah format baku perusahaan
 - Format dokumen mengacu ke `forms.js` original (`buildLivePreview`, `buildInvoicePreview`, `buildDOPreview`)
 - Preview panel selalu visible, lebar 600px, font 9pt
+
+## UI Design System (wajib)
+
+> Detail lengkap: [docs/architecture/DESIGN_SYSTEM.md](./docs/architecture/DESIGN_SYSTEM.md)  
+> Ringkas palet/tipografi: [docs/architecture/DESIGN_GUIDELINES.md](./docs/architecture/DESIGN_GUIDELINES.md)  
+> Implementasi pola: `frontend/src/components/patterns/`
+
+### Prinsip (jangan dilanggar)
+
+1. **Data over decoration** — hindari hero gradient, ring/chart berlebih di halaman operasional, shadow tebal.
+2. **Action-first** — aksi utama (upload, simpan) terlihat jelas; halaman unit/list harus padat.
+3. **Konsisten** — satu pola untuk header, filter, list, status, empty/loading.
+4. **Token, bukan hardcode** — pakai `primary`, `muted`, `destructive`, `border`, `Badge` / `StatusPill`. Hindari warna ad-hoc (`rose-600`, hex) kecuali semantik yang sudah di `StatusPill` / `StatPills`.
+5. **Bahasa UI Indonesia**, kode Inggris.
+
+### Komponen & pola yang wajib dipakai
+
+| Kebutuhan | Pakai (import dari) |
+|-----------|---------------------|
+| Wrapper halaman | `PageShell` — `@/components/patterns` |
+| Judul + deskripsi + actions | `PageHeader` |
+| Bar filter | `FilterToolbar` (+ kontrol `h-8` / `h-9`) |
+| Ringkasan angka 1 baris | `StatPills` |
+| KPI dashboard besar | `StatCard` — `@/components/common` |
+| List + loading + empty | `ListPanel` (+ `EmptyState` / `LoadingSkeleton`) |
+| Chip status baris | `StatusPill` atau `Badge` |
+| Button / Input / Card / Dialog | shadcn `components/ui/*` |
+| Upload PDF | `DocumentUpload` |
+
+Import pola:
+
+```ts
+import {
+  PageShell, PageHeader, FilterToolbar, StatPills, ListPanel, StatusPill,
+} from '@/components/patterns'
+```
+
+### Checklist page / UI baru
+
+- [ ] Bungkus `PageShell` (`width`: `default` | `narrow` | `wide` | `full`)
+- [ ] `PageHeader` bila perlu judul lokal (jangan double deskripsi panjang vs `pageMeta`)
+- [ ] Filter lewat `FilterToolbar`
+- [ ] Angka ringkas: `StatPills` (bukan grid kartu besar di halaman unit/ops)
+- [ ] List: `ListPanel`; status: `StatusPill` / `Badge`
+- [ ] Empty/loading: `EmptyState` / `LoadingSkeleton`
+- [ ] Aksi utama: 1 tombol primer per baris operasional
+- [ ] Types di `types/index.ts`; labels Indonesia
+
+### Pola layout yang sudah baku (jangan dirombak tanpa diskusi)
+
+| Pola | Aturan |
+|------|--------|
+| **Form dokumen** (Kontrak, Invoice, DO, Pembayaran) | Form kiri + preview kanan ~600px, font preview 9pt; **format .docx tidak diubah** |
+| **Repository** | Filter + tabel/DataTable + preview/download `DocxPreview` |
+| **Dashboard / Laporan** | `StatCard` + Recharts; boleh chart |
+| **Halaman operasional unit** (mis. Dokumen Unit) | Padat: `StatPills` + list; **tanpa** hero/chart |
+
+### Anti-pattern (dilarang untuk page baru)
+
+- Hero gradient + banyak chart di halaman upload/unit
+- Button/input custom yang menduplikasi shadcn
+- Empty state hanya teks polos (wajib `EmptyState`)
+- Copy-paste layout 3 halaman tanpa pakai `patterns/`
+- Mengubah token global tanpa update `index.css` + `DESIGN_SYSTEM.md`
+
+### Migrasi bertahap
+
+Saat menyentuh halaman lama, **utamakan** bungkus `PageShell` + `PageHeader` (dan `FilterToolbar` jika ada filter). Jangan big-bang rewrite. Status migrasi ada di tabel §7 `DESIGN_SYSTEM.md`.
 
 ## Struktur Direktori
 
@@ -78,10 +146,11 @@ Monitoringpemasaran/
       lib/             # client.ts (API), utils.ts (cn, formatters)
       utils/           # terbilang.ts, kontrakUtils.ts, doUtils.ts, laporanUtils.ts
       store/           # Zustand: kontrakStore, invoiceStore, doStore, dashboardStore, laporanStore, appStore
-      pages/           # Dashboard, KontrakPage, InvoicePage, DOPage, LaporanPage, BypassPage, RepoKontrak/Invoice/DO
+      pages/           # Dashboard, KontrakPage, InvoicePage, DOPage, LaporanPage, BypassPage, Repo*, UnitDoc, DocMonitor
       components/
         layout/        # AppLayout, Sidebar, Header
         ui/            # shadcn/ui primitives (button, card, badge, dialog, etc.)
+        patterns/      # PageShell, PageHeader, FilterToolbar, StatPills, ListPanel, StatusPill (WAJIB page baru)
         common/        # StatCard, StatusBadge, ConfirmDialog, EmptyState, LoadingSkeleton, Toast, DocxPreview
         feature/       # KontrakPreview, InvoicePreview (inline), DOPreview (inline)
 ```
@@ -156,7 +225,7 @@ Satu kontrak bisa punya beberapa invoice (pembayaran bertahap). Saat buat invoic
 
 ## Panduan Referensi
 
-- `docs/architecture/DESIGN_SYSTEM.md` — **Standar UI + pola halaman** (wajib untuk page baru)
-- `docs/architecture/DESIGN_GUIDELINES.md` — Guideline ringkas (palet, tipografi)
-- Pola React: `frontend/src/components/patterns/` (`PageShell`, `PageHeader`, `FilterToolbar`, `StatPills`, `ListPanel`, `StatusPill`)
-- `ANALYSIS_MULTI_INVOICE.md` — Analisis fitur multi-invoice per kontrak
+- [docs/architecture/DESIGN_SYSTEM.md](./docs/architecture/DESIGN_SYSTEM.md) — **Standar UI + pola halaman** (baca sebelum UI baru)
+- [docs/architecture/DESIGN_GUIDELINES.md](./docs/architecture/DESIGN_GUIDELINES.md) — Guideline ringkas (palet, tipografi)
+- `frontend/src/components/patterns/` — implementasi pola (import dari `@/components/patterns`)
+- `docs/architecture/ANALYSIS_MULTI_INVOICE.md` — Analisis fitur multi-invoice per kontrak
