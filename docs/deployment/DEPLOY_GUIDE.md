@@ -1,5 +1,7 @@
 # DEPLOY PLAYBOOK — PC Kantor Windows + Internet (Cloudflare Tunnel)
 
+> **OS lain:** untuk **Ubuntu Desktop 24.04** pakai [MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md) (bash/Docker Engine). File ini = jalur **Windows** + `scripts/office/*.ps1`.
+
 > **Target arsitektur (disetujui user 2026-07):**  
 > PC Windows kantor **nyala 24 jam** → Docker (app + Postgres) → akses LAN + **internet luar** via Cloudflare Tunnel.  
 > Lepas Railway setelah cutover sukses.
@@ -20,7 +22,9 @@
 
 ## Instruksi untuk AI Agent (VS Code / Claude / Cursor)
 
-Saat user bilang **"eksekusi deploy guide"**, **"setup PC kantor"**, **"deploy office"**, atau sejenis:
+Jika OS PC = **Ubuntu/Linux**, **jangan** ikuti file ini — alih ke [MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md).
+
+Saat user bilang **"eksekusi deploy guide"**, **"setup PC kantor"**, **"deploy office"**, atau sejenis (**Windows**):
 
 1. Baca **file ini seluruhnya** dulu (satu-satunya playbook deploy PC kantor).
 2. Tentukan fase: default **Phase 0 → 7 berurutan** jika setup baru; tanya user jika hanya sebagian.
@@ -761,16 +765,19 @@ docker compose up -d db
 
 | File | Peran |
 |------|--------|
-| `DEPLOY_GUIDE.md` | **Playbook ini** — sumber kebenaran deploy PC+tunnel |
-| `OFFICE_IP_DEPLOY.md` | Ringkas LAN-only; arahkan ke playbook ini untuk internet |
-| `docker-compose.yml` | Stack `app` + `db` |
+| `DEPLOY_GUIDE.md` | **Playbook ini** — Windows + tunnel |
+| `MIGRATE_RAILWAY_TO_OFFICE.md` | Migrasi Railway otomatis **Windows** |
+| `MIGRATE_RAILWAY_TO_UBUNTU.md` | Migrasi Railway **Ubuntu Desktop 24.04** |
+| `OFFICE_IP_DEPLOY.md` | Ringkas LAN-only |
+| `KANTOR_MURNI.md` | Konsep PC kantor murni (tanpa multi-agent) |
+| `docker-compose.yml` | Stack `app` + `db` (sama di Win & Ubuntu) |
 | `.env.office.example` | Template env |
-| `scripts/office/setup_env.ps1` | Buat `.env` |
-| `scripts/office/import_sql.ps1` | Restore SQL ke container db |
-| `scripts/office/ensure_up.ps1` | `docker compose up -d` setelah boot |
-| `scripts/office/auto_deploy.ps1` | git pull + rebuild |
-| `scripts/office/backup_db.ps1` | Dump harian |
-| `agent.md` | Routing task → file ini |
+| `scripts/office/setup_env.ps1` | Buat `.env` (Windows) |
+| `scripts/office/import_sql.ps1` | Restore SQL ke container db (Windows) |
+| `scripts/office/ensure_up.ps1` | `docker compose up -d` setelah boot (Windows) |
+| `scripts/office/auto_deploy.ps1` | git pull + rebuild (Windows) |
+| `scripts/office/backup_db.ps1` | Dump harian (Windows) |
+| `agent.md` | Routing task → playbook OS |
 
 ---
 
@@ -778,5 +785,6 @@ docker compose up -d db
 
 | Tanggal | Perubahan |
 |---------|-----------|
+| 2026-08-12 | Cross-link Ubuntu Desktop 24.04 (`MIGRATE_RAILWAY_TO_UBUNTU.md`); agent alihkan jika OS Linux |
 | 2026-07-20 | Rewrite penuh: port **8000**, health `/health`, env selaras compose, Phase 0 (24 jam), tunnel 4A/4B, script `scripts/office/*`, checklist cutover Railway, instruksi AI agent VS Code |
 | (lama) | Versi awal port 80 / `.env` hanya `DB_PASSWORD` — **usang, diganti** |

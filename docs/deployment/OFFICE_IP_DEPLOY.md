@@ -1,7 +1,9 @@
 # Deploy PC Kantor — ringkasan cepat
 
-> **Playbook lengkap (AI agent / VS Code):** lihat **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)**  
-> Isi: Phase 0–8, Cloudflare Tunnel (internet luar), migrasi Railway, backup, cutover, script `scripts/office/*`.
+> **Playbook lengkap (AI agent / VS Code):**  
+> - **Windows:** [MIGRATE_RAILWAY_TO_OFFICE.md](./MIGRATE_RAILWAY_TO_OFFICE.md) + [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)  
+> - **Ubuntu Desktop 24.04:** [MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md)  
+> Isi: migrasi Railway, Docker, LAN, tunnel opsional, backup, cutover.
 
 ---
 
@@ -10,10 +12,11 @@
 | Mode | URL | Dokumen |
 |------|-----|---------|
 | **LAN saja** | `http://192.168.x.x:8000` | Bagian singkat di bawah |
-| **LAN + internet** | `https://monitoring.domain.com` | **Wajib** ikuti [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) Phase 0–4 |
+| **LAN + internet (Windows)** | `https://monitoring.domain.com` | [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) Phase 4 |
+| **LAN + internet (Ubuntu)** | `https://monitoring.domain.com` | [MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md) Phase 4 |
 
-Stack: PC Windows **24 jam** + Docker (`docker-compose.yml`) + Postgres lokal.  
-**Lepas Railway** setelah cutover (checklist di DEPLOY_GUIDE Phase 7).
+Stack: PC kantor **24 jam** (Windows **atau** Ubuntu Desktop 24.04) + Docker (`docker-compose.yml`) + Postgres lokal.  
+**Lepas Railway** setelah cutover (checklist di playbook OS Anda, Phase 7).
 
 ---
 
@@ -29,6 +32,8 @@ Stack: PC Windows **24 jam** + Docker (`docker-compose.yml`) + Postgres lokal.
 ---
 
 ## Quick start LAN (Docker)
+
+### Windows
 
 ```powershell
 cd D:\Apps-Dev\Monitoringpemasaran
@@ -46,11 +51,28 @@ curl.exe -sS http://127.0.0.1:8000/health
 docker compose ps
 ```
 
-IP LAN:
+IP LAN (Windows):
 
 ```powershell
 Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' }
 ```
+
+### Ubuntu Desktop 24.04
+
+```bash
+cd ~/Apps/Monitoringpemasaran
+
+cp .env.office.example .env
+# edit POSTGRES_PASSWORD + SECRET_KEY + SUPERMAN_*
+
+docker compose up -d --build
+curl -sS http://127.0.0.1:8000/health
+docker compose ps
+
+hostname -I
+```
+
+Detail penuh (dump Railway, firewall ufw, cron): [MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md).
 
 Rekan di Wi‑Fi yang sama: `http://<IP-PC>:8000`
 
@@ -71,13 +93,24 @@ Butuh domain di akun Cloudflare untuk URL permanen. Tanpa domain: quick tunnel (
 Hanya jika Docker tidak tersedia. Lihat `scripts/office/start_server.ps1` + Postgres Windows.
 Untuk production kantor + tunnel, **Docker tetap disarankan** (satu perintah, selaras compose).
 
+Ubuntu: jalur native tanpa Docker **tidak** dibakukan — pakai Docker Engine.
+
 ---
 
 ## Firewall
 
+**Windows:**
+
 ```powershell
 New-NetFirewallRule -DisplayName "Monitoring Pemasaran 8000" `
   -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow
+```
+
+**Ubuntu:**
+
+```bash
+sudo ufw allow 8000/tcp comment 'Monitoring Pemasaran'
+sudo ufw enable
 ```
 
 ---

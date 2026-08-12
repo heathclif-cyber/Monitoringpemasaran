@@ -1,9 +1,16 @@
-# Playbook AI — Migrasi Railway → PC Kantor (otomatis)
+# Playbook AI — Migrasi Railway → PC Kantor Windows (otomatis)
 
-> **Untuk:** VS Code + AI agent (Claude / Cursor / Copilot).  
+> **Untuk:** PC kantor **Windows** + VS Code + AI agent (Claude / Cursor / Copilot).  
 > **User:** cukup jawab pertanyaan di awal, lalu **menunggu**.  
 > **Akhir sukses:** agent menampilkan **URL final** (LAN + internet jika tunnel).  
 > **Setelahnya:** update app **otomatis dari GitHub** (`git pull` + rebuild).
+
+### Pilih playbook menurut OS
+
+| OS PC kantor | Playbook |
+|--------------|----------|
+| **Windows 10/11** | **File ini** + [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) |
+| **Ubuntu Desktop 24.04** (atau Linux) | **[MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md)** — bash, Docker Engine, **jangan** jalankan `*.ps1` |
 
 ```text
 User jawab variabel → AI eksekusi Phase 0–7 → output URL
@@ -22,6 +29,7 @@ User jawab variabel → AI eksekusi Phase 0–7 → output URL
 | Health | `GET http://127.0.0.1:8000/health` → `{"status":"ok"}` |
 | Superman | `SUPERMAN_DEFAULT_EXECUTOR=server` (tanpa multi-agent) |
 | Detail teknis cadangan | [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) |
+| Jalur Ubuntu | [MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md) |
 
 ---
 
@@ -29,7 +37,8 @@ User jawab variabel → AI eksekusi Phase 0–7 → output URL
 
 Saat user bilang: **“migrasi ke PC kantor”**, **“eksekusi MIGRATE_RAILWAY_TO_OFFICE”**, **“setup office otomatis”**:
 
-1. Baca **file ini penuh**.
+0. Jika OS = **Ubuntu/Linux** → **alih ke** [MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md) (stop playbook Windows ini).
+1. Baca **file ini penuh** (jalur Windows).
 2. Jalankan **Phase A (variabel)** — tanya user sekali; jangan tebak secret.
 3. Eksekusi Phase **0 → 1 → 2 → 3 → 5 → 4 → 6 → 7** berurutan (lihat mode di bawah).
 4. Setelah **setiap** step: jalankan **VERIFY**. Gagal → **STOP**, laporkan error + step.
@@ -493,7 +502,8 @@ Get-Content .\logs\auto_deploy.log -Tail 20 -ErrorAction SilentlyContinue
 
 | File | Isi |
 |------|-----|
-| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | Detail perintah tunnel/backup panjang |
+| [MIGRATE_RAILWAY_TO_UBUNTU.md](./MIGRATE_RAILWAY_TO_UBUNTU.md) | Playbook **Ubuntu Desktop 24.04** (bash / Docker Engine) |
+| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | Detail perintah tunnel/backup panjang (Windows) |
 | [KANTOR_MURNI.md](./KANTOR_MURNI.md) | Konsep tanpa multi-agent |
 | [OFFICE_IP_DEPLOY.md](./OFFICE_IP_DEPLOY.md) | LAN singkat |
-| `scripts/office/*.ps1` | setup_env, import_sql, ensure_up, auto_deploy, backup_db |
+| `scripts/office/*.ps1` | setup_env, import_sql, ensure_up, auto_deploy, backup_db (Windows) |

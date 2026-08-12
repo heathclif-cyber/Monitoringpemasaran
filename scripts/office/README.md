@@ -1,6 +1,8 @@
 # scripts/office — helper deploy PC kantor
 
-Digunakan oleh playbook **[DEPLOY_GUIDE.md](../../DEPLOY_GUIDE.md)** (AI agent / manual).
+## Windows (PowerShell)
+
+Digunakan oleh playbook **[MIGRATE_RAILWAY_TO_OFFICE.md](../../docs/deployment/MIGRATE_RAILWAY_TO_OFFICE.md)** dan **[DEPLOY_GUIDE.md](../../docs/deployment/DEPLOY_GUIDE.md)**.
 
 | Script | Fungsi |
 |--------|--------|
@@ -11,3 +13,14 @@ Digunakan oleh playbook **[DEPLOY_GUIDE.md](../../DEPLOY_GUIDE.md)** (AI agent /
 | `backup_db.ps1` | Dump Postgres ke `D:\Backup\MonitoringPemasaran` |
 
 Jalankan dari root repo atau dengan path penuh; semua script resolve root = 3 level di atas file ini (`Monitoringpemasaran/`).
+
+## Ubuntu Desktop 24.04
+
+**Jangan** menjalankan `*.ps1` di bash.  
+Playbook: **[MIGRATE_RAILWAY_TO_UBUNTU.md](../../docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md)**  
+(perintah bash + `docker compose`; script `auto_deploy.sh` / `backup_db.sh` dibuat di Phase 6–7 playbook itu).
+
+| OS | Runtime | Env template |
+|----|---------|--------------|
+| Windows | Docker Desktop | `.env.office.example` → `.env` |
+| Ubuntu 24.04 Desktop | Docker Engine | `.env.office.example` → `.env` (sama) |
