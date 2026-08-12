@@ -337,7 +337,7 @@ Tanpa (1) dan (3), operasi malam ini tidak bisa dilanjutkan sama sekali — tapi
 
 - **Status:** Mitigated — Railway **bisa** menyelesaikan deklarasi, tapi **tidak boleh dianggap 100% reliable** untuk `/spp/store`
 - **Jika gagal lagi:** tunggu 1–2 menit, **Coba Lagi** sekali (jangan paralel 2 job); jangan redeploy saat job di 88%+
-- **Pantau:** apakah kegagalan >50% per minggu — kalau ya, pertimbangkan server Windows kantor (`DEPLOY_GUIDE.md`) atau VPS worker non-datacenter
+- **Pantau:** apakah kegagalan >50% per minggu — kalau ya, pertimbangkan PC kantor Ubuntu (`MIGRATE_RAILWAY_TO_UBUNTU.md`) atau VPS worker non-datacenter
 - **Jangan** anggap masalah selesai permanen hanya karena satu run sukses
 
 **File terkait:** `services/superman/sync_executor.py` (`4701fdb`), `services/superman/filler.py`, `services/superman/netdiag.py`, `api/r_superman.py`
@@ -439,7 +439,7 @@ Tanpa (1) dan (3), operasi malam ini tidak bisa dilanjutkan sama sekali — tapi
 - Railway **boleh** dicoba (captcha + deklarasi server) saat jaringan bagus
 - Railway **tidak boleh** dianggap jalur andal tunggal untuk login captcha / POST `/spp/store`
 - Saat captcha timeout 3×: tunggu beberapa menit, atau **agent lokal** (`scripts/superman/commands/agent.py watch`) — app tetap di Railway, Playwright di PC user
-- Jangka menengah: PC kantor 24 jam / tunnel — lihat `DEPLOY_GUIDE.md` / `SUPERMAN_AGENT.md`
+- Jangka menengah: PC kantor 24 jam / tunnel — lihat `MIGRATE_RAILWAY_TO_UBUNTU.md` / `SUPERMAN_AGENT.md`
 
 ### File utama
 - `services/superman/captcha_challenge.py` (httpx)

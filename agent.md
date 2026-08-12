@@ -14,11 +14,9 @@
 | Captcha / login Superman | `sync_executor.py`, `captcha_challenge.py` | `runner.py` penuh |
 | Fitur UI baru | `CLAUDE.md` konvensi frontend + 1 page terkait | Backend |
 | Agent lokal Superman (legacy darurat) | `docs/operations/SUPERMAN_AGENT.md` | Jalur utama: PC kantor murni |
-| **Migrasi Railway → PC Windows** (AI VS Code, PowerShell) | **[docs/deployment/MIGRATE_RAILWAY_TO_OFFICE.md](./docs/deployment/MIGRATE_RAILWAY_TO_OFFICE.md)** | Multi-agent / bat; playbook Ubuntu |
-| **Migrasi Railway → Ubuntu Desktop 24.04** (AI, bash) | **[docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md](./docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md)** | `scripts/office/*.ps1` (Windows only) |
-| Deploy PC kantor detail / tunnel (Windows) | [DEPLOY_GUIDE.md](./docs/deployment/DEPLOY_GUIDE.md) + `scripts/office/*` | Contabo |
-| Ringkas LAN-only / konsep murni | [OFFICE_IP_DEPLOY.md](./docs/deployment/OFFICE_IP_DEPLOY.md), [KANTOR_MURNI.md](./docs/deployment/KANTOR_MURNI.md) | — |
-| Deploy Railway (legacy) | Migrasi keluar lewat MIGRATE_OFFICE (Win) atau MIGRATE_UBUNTU (Linux) | — |
+| **Migrasi Railway → PC kantor** (Ubuntu Desktop 24.04, AI bash) | **[docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md](./docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md)** | Multi-agent / bat; playbook Windows (sudah dihapus) |
+| Konsep PC kantor murni | [KANTOR_MURNI.md](./docs/deployment/KANTOR_MURNI.md) | — |
+| Deploy Railway (legacy) | Migrasi keluar lewat MIGRATE_RAILWAY_TO_UBUNTU | — |
 
 **Aturan emas:** 1 task = maks **3–5 file** dibuka. Pakai `Grep` / `Read` dengan `offset`+`limit`, bukan baca file utuh.
 
@@ -170,9 +168,8 @@ rg "BUG-00[59]|BUG-012" bug.md
 |------|-------|
 | [CLAUDE.md](./CLAUDE.md) | Konvensi kode, struktur direktori, bisnis logic kontrak/invoice |
 | [bug.md](./bug.md) | Detail root cause historis — 1 BUG per sesi |
-| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | **PC Windows 24 jam + Cloudflare Tunnel + migrasi Railway** (playbook agent) |
-| [MIGRATE_RAILWAY_TO_UBUNTU.md](./docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md) | **Ubuntu Desktop 24.04** migrasi Railway (bash/Docker Engine) |
-| [OFFICE_IP_DEPLOY.md](./OFFICE_IP_DEPLOY.md) | Ringkas akses LAN; full steps di playbook OS |
+| [MIGRATE_RAILWAY_TO_UBUNTU.md](./docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md) | **Satu-satunya** playbook migrasi Railway → PC kantor (Ubuntu Desktop 24.04) |
+| [KANTOR_MURNI.md](./docs/deployment/KANTOR_MURNI.md) | Konsep PC kantor murni |
 | [ANALYSIS_MULTI_INVOICE.md](./ANALYSIS_MULTI_INVOICE.md) | Multi-invoice per kontrak |
 
 ---
@@ -184,5 +181,6 @@ rg "BUG-00[59]|BUG-012" bug.md
 | 2026-07-07 | Rewrite fokus hemat token; perbaiki session path `/data/`; tambah BUG-012, 502@0%, sync_executor |
 | 2026-07-20 | Routing deploy: PC kantor + tunnel → DEPLOY_GUIDE.md Phase 0–8 + scripts/office |
 | 2026-08-12 | Routing migrasi Ubuntu Desktop 24.04 → MIGRATE_RAILWAY_TO_UBUNTU.md |
+| 2026-08-12 | Hapus jalur Windows (MIGRATE_OFFICE, DEPLOY_GUIDE, OFFICE_IP, scripts/office/*.ps1) |
 
 *Maintainer: update §4 dan §10 saat ada pola error baru; detail teknis tetap di bug.md.*

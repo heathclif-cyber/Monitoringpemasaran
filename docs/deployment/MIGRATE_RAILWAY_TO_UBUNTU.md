@@ -1,18 +1,19 @@
 # Playbook AI — Migrasi Railway → Ubuntu Desktop 24.04
 
-> **Untuk:** PC kantor **baru / tanpa Windows**, Ubuntu **Desktop** 24.04 LTS + VS Code/Cursor + AI agent.  
+> **Untuk:** PC kantor Ubuntu **Desktop** 24.04 LTS + VS Code/Cursor + AI agent.  
+> **Ini satu-satunya playbook migrasi Railway → PC kantor** (jalur Windows/PowerShell sudah dihapus).  
 > **User:** install OS sekali, jawab variabel, lalu **menunggu** AI.  
 > **Akhir sukses:** agent menampilkan **URL final** (LAN + internet jika tunnel).  
-> **Stack app:** sama dengan Windows — `docker-compose.yml` + Postgres + `SUPERMAN_DEFAULT_EXECUTOR=server`.
+> **Stack:** `docker-compose.yml` + Postgres + `SUPERMAN_DEFAULT_EXECUTOR=server`.
 
 ```text
 User install Ubuntu Desktop 24.04 + Docker Engine
          ↓
-VS Code / Cursor + AI agent (bash, bukan PowerShell)
+VS Code / Cursor + AI agent (bash)
          ↓
 Phase 0–7 → URL LAN (dan tunnel opsional)
          ↓
-cron / systemd: auto git pull + rebuild (setara Task Scheduler Windows)
+cron / systemd: auto git pull + rebuild
 ```
 
 | Item | Nilai baku |
@@ -24,9 +25,8 @@ cron / systemd: auto git pull + rebuild (setara Task Scheduler Windows)
 | App port | **8000** |
 | Health | `GET http://127.0.0.1:8000/health` → `{"status":"ok"}` |
 | Superman | `SUPERMAN_DEFAULT_EXECUTOR=server` |
-| Container runtime | **Docker Engine** + Compose plugin (**bukan** Docker Desktop wajib) |
-| Playbook Windows (PowerShell) | [MIGRATE_RAILWAY_TO_OFFICE.md](./MIGRATE_RAILWAY_TO_OFFICE.md) |
-| Detail tunnel/backup Windows | [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) — konsep sama; perintah di bawah = Linux |
+| Container runtime | **Docker Engine** + Compose plugin |
+| Konsep singkat | [KANTOR_MURNI.md](./KANTOR_MURNI.md) |
 
 ---
 
@@ -47,10 +47,10 @@ Desktop **tidak** menyunat kemampuan server untuk app ini (Docker, Postgres, por
 
 ## 0. Instruksi ke AI agent (WAJIB)
 
-Saat user bilang: **“migrasi Ubuntu”**, **“eksekusi MIGRATE_RAILWAY_TO_UBUNTU”**, **“setup office Linux”**, atau OS terdeteksi **Linux/Ubuntu**:
+Saat user bilang: **“migrasi ke PC kantor”**, **“migrasi Ubuntu”**, **“eksekusi MIGRATE_RAILWAY_TO_UBUNTU”**, **“setup office”**, atau sejenis:
 
-1. Baca **file ini** (bukan hanya playbook Windows).
-2. **Jangan** jalankan `scripts/office/*.ps1` / PowerShell / Task Scheduler Windows.
+1. Baca **file ini penuh** (satu-satunya playbook migrasi kantor).
+2. Semua perintah **bash** + `docker compose` — tidak ada script PowerShell di repo.
 3. Phase A — tanya variabel sekali; **jangan tebak secret**.
 4. Eksekusi Phase **0 → 1 → 2 → 3 → 5 → 4 → 6 → 7** (lihat mode).
 5. Setelah **setiap** step: **VERIFY**. Gagal → **STOP**, laporkan error + step.
@@ -375,13 +375,11 @@ sudo systemctl enable monpem-ensure-up.service
 
 ## Phase 4 — Cloudflare Tunnel (opsional, akses internet)
 
-Konsep sama [DEPLOY_GUIDE.md Phase 4](./DEPLOY_GUIDE.md). Di Ubuntu:
-
-1. Install `cloudflared` (paket resmi Cloudflare untuk Linux).
+1. Install `cloudflared` (paket resmi Cloudflare untuk Linux / Ubuntu).
 2. `cloudflared tunnel login` (browser).
 3. Buat tunnel → origin `http://127.0.0.1:8000`.
 4. DNS CNAME domain ke tunnel.
-5. Install **systemd service** `cloudflared` (bukan Windows Service).
+5. Install **systemd service** `cloudflared` agar jalan setelah reboot.
 
 **VERIFY:** `https://{{DOMAIN}}/health` dari luar LAN.
 
@@ -390,8 +388,6 @@ Tanpa domain: quick tunnel hanya sementara — jangan andalkan production.
 ---
 
 ## Phase 6 — Auto-update dari GitHub
-
-Setara `auto_deploy.ps1` + Task Scheduler:
 
 ```bash
 mkdir -p "$REPO_DIR/logs" "$REPO_DIR/scripts/office"
@@ -536,7 +532,7 @@ tail -n 30 logs/auto_deploy.log 2>/dev/null || true
 
 ```text
 Eksekusi docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md setup penuh.
-OS: Ubuntu Desktop 24.04. Jangan pakai PowerShell / scripts/office/*.ps1.
+OS: Ubuntu Desktop 24.04. Perintah bash + docker compose.
 Variabel: REPO_DIR=… POSTGRES_PASSWORD=… SECRET_KEY=… SUPERMAN_*=…
 RAILWAY_DB_URL=… MIGRATE_DATA=yes
 Jangan matikan Railway; jangan commit .env; outputkan URL final.
@@ -562,14 +558,10 @@ Mode LAN saja: ganti jadi **`hanya lokal`**.
 
 | File | Isi |
 |------|-----|
-| [MIGRATE_RAILWAY_TO_OFFICE.md](./MIGRATE_RAILWAY_TO_OFFICE.md) | Playbook **Windows** (PowerShell) |
-| [KANTOR_MURNI.md](./KANTOR_MURNI.md) | Konsep tanpa multi-agent |
-| [OFFICE_IP_DEPLOY.md](./OFFICE_IP_DEPLOY.md) | LAN singkat |
-| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | Detail tunnel/backup (asal Windows; konsep dipakai di Phase 4/7) |
-| `.env.office.example` | Template env (sama di Windows & Ubuntu) |
-| `docker-compose.yml` | App + Postgres (identik) |
-| `scripts/office/*.ps1` | **Windows only** |
-| `scripts/office/*.sh` | Dibuat di Phase 6–7 Ubuntu (auto_deploy, backup_db) |
+| [KANTOR_MURNI.md](./KANTOR_MURNI.md) | Konsep PC kantor murni (tanpa multi-agent) |
+| `.env.office.example` | Template env |
+| `docker-compose.yml` | App + Postgres |
+| `scripts/office/*.sh` | Dibuat di Phase 6–7 di PC (auto_deploy, backup_db) — tidak di-commit `.ps1` |
 
 ---
 
@@ -577,4 +569,5 @@ Mode LAN saja: ganti jadi **`hanya lokal`**.
 
 | Tanggal | Perubahan |
 |---------|-----------|
-| 2026-08-12 | Playbook awal: Ubuntu Desktop 24.04, Docker Engine, bash dump/restore, systemd/cron setara Task Scheduler |
+| 2026-08-12 | Playbook awal: Ubuntu Desktop 24.04, Docker Engine, bash dump/restore, systemd/cron |
+| 2026-08-12 | Jalur Windows dihapus; file ini satu-satunya playbook migrasi kantor |
