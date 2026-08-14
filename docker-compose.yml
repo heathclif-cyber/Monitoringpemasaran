@@ -6,7 +6,7 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: monpem-db
     restart: unless-stopped
     environment:
@@ -14,7 +14,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-PtpnKantor_Local_ChangeMe}
       POSTGRES_DB: ${POSTGRES_DB:-monitoringpemasaran}
     volumes:
-      - monpem_pgdata:/var/lib/postgresql/data
+      # Postgres 18 image stores data under /var/lib/postgresql/<version>
+      - monpem_pgdata:/var/lib/postgresql
     ports:
       # Hanya bind localhost di host — app di container pakai hostname "db"
       - "127.0.0.1:5432:5432"
@@ -45,6 +46,8 @@ services:
       SUPERMAN_PASSWORD: ${SUPERMAN_PASSWORD:-}
       SUPERMAN_HEADLESS: ${SUPERMAN_HEADLESS:-true}
       SUPERMAN_DEFAULT_EXECUTOR: ${SUPERMAN_DEFAULT_EXECUTOR:-server}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TAMU_PASSWORD: ${TAMU_PASSWORD:-}
     volumes:
       - monpem_data:/data
       - ./uploads:/data/uploads

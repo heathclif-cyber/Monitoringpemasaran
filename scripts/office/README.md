@@ -1,9 +1,11 @@
 # scripts/office
 
-Helper **Windows PowerShell** untuk deploy kantor **sudah dihapus**.
+Script lokal PC kantor Ubuntu (dibuat saat migrasi). Jangan commit `.env`.
 
-Jalur production kantor saat ini: **Ubuntu Desktop 24.04** — lihat:
+| File | Fungsi |
+|------|--------|
+| `bootstrap_ubuntu.sh` | Phase 0–1: anti-sleep, Docker Engine, cloudflared (sudo) |
+| `auto_deploy.sh` | Cron tiap 15 menit: `git pull` + `docker compose up -d --build` |
+| `backup_db.sh` | Cron 02:00: dump Postgres ke `~/Backup/MonitoringPemasaran/` |
 
-→ [docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md](../../docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md)
-
-Script `auto_deploy.sh` / `backup_db.sh` (jika ada) dibuat **lokal di PC Ubuntu** saat Phase 6–7 playbook itu; tidak di-commit sebagai `*.ps1`.
+Playbook: [docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md](../../docs/deployment/MIGRATE_RAILWAY_TO_UBUNTU.md)
