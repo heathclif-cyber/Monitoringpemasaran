@@ -686,6 +686,47 @@ export interface KontrakTrace {
   invoices: TraceInvoice[]
 }
 
+export interface PiutangRow {
+  row_key: string
+  no_kontrak: string
+  no_invoice: string
+  mitra: string
+  komoditi: string | null
+  unit: string | null
+  tanggal_invoice: string | null
+  jumlah_pembayaran: number
+  total_dibayar_efektif: number
+  piutang_pokok: number
+  piutang_pph_belum_setor: number
+  kategori: string[]
+  is_pph_kontrak: string
+  jumlah_termin_pph_belum_setor: number
+  superman: string | null
+}
+
+export interface PiutangMitraAgg {
+  mitra: string
+  jumlah_invoice: number
+  total_piutang_pokok: number
+  total_piutang_pph_belum_setor: number
+}
+
+export interface PiutangSummary {
+  total_invoice_outstanding: number
+  total_piutang_pokok: number
+  total_piutang_pph_belum_setor: number
+  jumlah_invoice_pokok: number
+  jumlah_invoice_pph_belum_setor: number
+  jumlah_mitra_terdampak: number
+  by_mitra: PiutangMitraAgg[]
+}
+
+export interface PiutangResponse {
+  summary: PiutangSummary
+  rows: PiutangRow[]
+  mitra: string[]
+}
+
 // ============================================================
 // Stok
 // ============================================================

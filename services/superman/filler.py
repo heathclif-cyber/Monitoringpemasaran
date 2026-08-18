@@ -857,14 +857,15 @@ def _post_store_via_httpx(
     if token:
         headers["X-CSRF-TOKEN"] = token
 
-    # Flatten multi-value fields for httpx data=
-    data: list[tuple[str, str]] = []
+    # Multi-value fields as dict[str, list[str]] — httpx 0.28 lempar
+    # "expected a bytes-like object, tuple found" kalau data= berupa
+    # list of tuples dan dikirim bersama files= (multipart).
+    data: dict[str, str | list[str]] = {}
     for key, val in fields.items():
         if isinstance(val, list):
-            for item in val:
-                data.append((key, str(item)))
+            data[key] = [str(item) for item in val]
         else:
-            data.append((key, str(val)))
+            data[key] = str(val)
 
     started = time.monotonic()
     try:

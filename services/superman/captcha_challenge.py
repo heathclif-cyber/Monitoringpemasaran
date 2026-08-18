@@ -110,7 +110,10 @@ def _payload(image: bytes, challenge_id: str) -> dict[str, Any]:
 
 
 def _cookies(client: httpx.Client) -> dict[str, str]:
-    return {name: value for name, value in client.cookies.items()}
+    # Iterasi jar langsung (bukan client.cookies.items()/.get()) — portal Superman
+    # kadang mengirim XSRF-TOKEN dobel dengan path berbeda, dan httpx melempar
+    # CookieConflict kalau nama cookie diakses secara ambigu.
+    return {cookie.name: cookie.value for cookie in client.cookies.jar}
 
 
 def _load_login(entry: PendingCaptcha) -> bytes:
@@ -221,7 +224,7 @@ def verify_captcha_challenge(challenge_id: str, answer: str) -> dict[str, Any]:
     try:
         with _client(entry.cookies) as client:
             headers = {"Referer": base + "/", "Origin": base}
-            xsrf = client.cookies.get("XSRF-TOKEN")
+            xsrf = _cookies(client).get("XSRF-TOKEN")
             if xsrf:
                 headers["X-XSRF-TOKEN"] = unquote(xsrf)
             response = client.post(base + "/user/login", data={"_token": entry.token, "username": entry.cfg.username, "password": entry.cfg.password, "captcha": answer.strip()}, headers=headers)

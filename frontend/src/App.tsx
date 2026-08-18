@@ -13,6 +13,7 @@ const InvoicePage = lazy(() => import('@/pages/InvoicePage'))
 const PembayaranPage = lazy(() => import('@/pages/PembayaranPage'))
 const DOPage = lazy(() => import('@/pages/DOPage'))
 const LaporanPage = lazy(() => import('@/pages/LaporanPage'))
+const PiutangPage = lazy(() => import('@/pages/PiutangPage'))
 const BypassPage = lazy(() => import('@/pages/BypassPage'))
 const BAPage = lazy(() => import('@/pages/BAPage'))
 const RepoKontrak = lazy(() => import('@/pages/RepoKontrak'))
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/pembayaran" element={<PembayaranPage />} />
             <Route path="/delivery-order" element={<DOPage />} />
             <Route path="/laporan" element={<LaporanPage />} />
+            <Route path="/piutang" element={<PiutangPage />} />
             <Route path="/bypass" element={<BypassPage />} />
             <Route path="/berita-acara" element={<BAPage />} />
             {/* Satu menu Dokumen: pantau rantai + upload (alias path lama tetap jalan) */}

@@ -664,84 +664,6 @@ export default function PembayaranPage() {
 
         <ReadOnlyFieldset className="space-y-6 block">
           <fieldset disabled={isInvoiceLocked} className="border-0 p-0 m-0 min-w-0 space-y-6 block">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Data Pembayaran (Termin)</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs">Tanggal Pembayaran *</Label>
-                  <Input type="date" {...register('tanggal_pembayaran')} />
-                  {errors.tanggal_pembayaran && (
-                    <p className="text-xs text-red-500 mt-1">{errors.tanggal_pembayaran.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label className="text-xs">Nominal Transfer *</Label>
-                  <Input type="number" step="any" {...register('nominal_transfer')} />
-                  {errors.nominal_transfer && (
-                    <p className="text-xs text-red-500 mt-1">{errors.nominal_transfer.message}</p>
-                  )}
-                  {selectedInvoice && sisaPelunasan > 0 && (
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <p className="text-xs text-slate-500">
-                        Sisa pelunasan: {formatCurrency(sisaPelunasan)}
-                        {exactTransferNominal > 0 && exactTransferNominal !== sisaPelunasan && (
-                          <> · transfer pas-pasan lunas: {formatCurrency(exactTransferNominal)}</>
-                        )}
-                        {exactTransferNominal > 0 && exactTransferNominal === sisaPelunasan && (
-                          <> · isi nominal aktual (boleh sebagian)</>
-                        )}
-                      </p>
-                      {exactTransferNominal > 0 &&
-                        Number(nominalTransfer) !== exactTransferNominal &&
-                        canEdit() && (
-                        <button
-                          type="button"
-                          className="text-xs text-primary underline-offset-2 hover:underline"
-                          onClick={() => setValue('nominal_transfer', exactTransferNominal)}
-                        >
-                          Gunakan pas-pasan lunas
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {surplusAfterSave > 0 && (
-                    <p className="text-xs text-amber-700 mt-1">
-                      Kelebihan pelunasan setelah simpan: {formatCurrency(surplusAfterSave)}
-                      {exactTransferNominal > 0 && (
-                        <> · pas-pasan: {formatCurrency(exactTransferNominal)}</>
-                      )}
-                    </p>
-                  )}
-                  {currentPphAddon > 0 && (
-                    <p className="text-xs text-emerald-700 mt-1">
-                      + PPh dipotong pembeli: {formatCurrency(currentPphAddon)} → dianggap lunas{' '}
-                      {formatCurrency(effectiveCurrent)}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label className="text-xs">PPh Disetor</Label>
-                  <NativeSelect {...register('is_pph_disetor')}>
-                    <option value="false">Belum</option>
-                    <option value="true">Sudah</option>
-                  </NativeSelect>
-                  {currentKontrak?.is_pph === 'true' && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      Status setor PPh ke KPP — tampil di Laporan Digital. Tidak mempengaruhi lunas/Superman.
-                    </p>
-                  )}
-                </div>
-                {savedNo && (
-                  <div>
-                    <Label className="text-xs">ID Termin</Label>
-                    <p className="text-sm font-mono text-slate-600 mt-1">{savedNo}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             {currentInvoice ? (
               <Card>
                 <CardHeader className="pb-3">
@@ -865,6 +787,84 @@ export default function PembayaranPage() {
                 </CardContent>
               </Card>
             )}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Data Pembayaran (Termin)</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs">Tanggal Pembayaran *</Label>
+                  <Input type="date" {...register('tanggal_pembayaran')} />
+                  {errors.tanggal_pembayaran && (
+                    <p className="text-xs text-red-500 mt-1">{errors.tanggal_pembayaran.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">Nominal Transfer *</Label>
+                  <Input type="number" step="any" {...register('nominal_transfer')} />
+                  {errors.nominal_transfer && (
+                    <p className="text-xs text-red-500 mt-1">{errors.nominal_transfer.message}</p>
+                  )}
+                  {selectedInvoice && sisaPelunasan > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <p className="text-xs text-slate-500">
+                        Sisa pelunasan: {formatCurrency(sisaPelunasan)}
+                        {exactTransferNominal > 0 && exactTransferNominal !== sisaPelunasan && (
+                          <> · transfer pas-pasan lunas: {formatCurrency(exactTransferNominal)}</>
+                        )}
+                        {exactTransferNominal > 0 && exactTransferNominal === sisaPelunasan && (
+                          <> · isi nominal aktual (boleh sebagian)</>
+                        )}
+                      </p>
+                      {exactTransferNominal > 0 &&
+                        Number(nominalTransfer) !== exactTransferNominal &&
+                        canEdit() && (
+                        <button
+                          type="button"
+                          className="text-xs text-primary underline-offset-2 hover:underline"
+                          onClick={() => setValue('nominal_transfer', exactTransferNominal)}
+                        >
+                          Gunakan pas-pasan lunas
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {surplusAfterSave > 0 && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Kelebihan pelunasan setelah simpan: {formatCurrency(surplusAfterSave)}
+                      {exactTransferNominal > 0 && (
+                        <> · pas-pasan: {formatCurrency(exactTransferNominal)}</>
+                      )}
+                    </p>
+                  )}
+                  {currentPphAddon > 0 && (
+                    <p className="text-xs text-emerald-700 mt-1">
+                      + PPh dipotong pembeli: {formatCurrency(currentPphAddon)} → dianggap lunas{' '}
+                      {formatCurrency(effectiveCurrent)}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">PPh Disetor</Label>
+                  <NativeSelect {...register('is_pph_disetor')}>
+                    <option value="false">Belum</option>
+                    <option value="true">Sudah</option>
+                  </NativeSelect>
+                  {currentKontrak?.is_pph === 'true' && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Status setor PPh ke KPP — tampil di Laporan Digital. Tidak mempengaruhi lunas/Superman.
+                    </p>
+                  )}
+                </div>
+                {savedNo && (
+                  <div>
+                    <Label className="text-xs">ID Termin</Label>
+                    <p className="text-sm font-mono text-slate-600 mt-1">{savedNo}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </fieldset>
         </ReadOnlyFieldset>
 

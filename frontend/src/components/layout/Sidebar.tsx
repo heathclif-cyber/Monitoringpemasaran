@@ -18,6 +18,7 @@ import {
   ClipboardCheck,
   Boxes,
   Users,
+  Wallet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
@@ -42,6 +43,7 @@ const navItems: NavItemDef[] = [
   { label: 'Dokumen Unit', to: '/dokumen-unit', icon: <ClipboardCheck size={16} /> },
   { label: 'Persediaan', to: '/stok', icon: <Boxes size={16} /> },
   { label: 'Laporan Digital', to: '/laporan', icon: <Table size={16} /> },
+  { label: 'Monitoring Piutang', to: '/piutang', icon: <Wallet size={16} /> },
   { label: 'Input Bypass', to: '/bypass', icon: <Zap size={16} /> },
   {
     label: 'Repository',

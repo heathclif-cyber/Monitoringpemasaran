@@ -385,6 +385,48 @@ class DocumentPipelineResponse(BaseModel):
     scope: str = "all"  # all | unit
 
 
+# --- Piutang (Monitoring Piutang) ---
+class PiutangRowOut(BaseModel):
+    row_key: str  # = no_invoice
+    no_kontrak: str
+    no_invoice: str
+    mitra: str
+    komoditi: Optional[str] = None
+    unit: Optional[str] = None
+    tanggal_invoice: Optional[date] = None
+    jumlah_pembayaran: float
+    total_dibayar_efektif: float
+    piutang_pokok: float
+    piutang_pph_belum_setor: float
+    kategori: List[str]
+    is_pph_kontrak: str
+    jumlah_termin_pph_belum_setor: int = 0
+    superman: Optional[str] = None
+
+
+class PiutangMitraAggOut(BaseModel):
+    mitra: str
+    jumlah_invoice: int
+    total_piutang_pokok: float
+    total_piutang_pph_belum_setor: float
+
+
+class PiutangSummaryOut(BaseModel):
+    total_invoice_outstanding: int
+    total_piutang_pokok: float
+    total_piutang_pph_belum_setor: float
+    jumlah_invoice_pokok: int
+    jumlah_invoice_pph_belum_setor: int
+    jumlah_mitra_terdampak: int
+    by_mitra: List[PiutangMitraAggOut] = []
+
+
+class PiutangResponse(BaseModel):
+    summary: PiutangSummaryOut
+    rows: List[PiutangRowOut]
+    mitra: List[str] = []
+
+
 DocumentCompletenessOut.model_rebuild()
 
 
