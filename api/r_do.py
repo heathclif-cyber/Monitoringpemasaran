@@ -75,6 +75,8 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     # BA tetap wajib dan berasal dari invoice; pada kontrak normal sifatnya opsional.
     no_ba = do.no_ba or db_invoice.no_ba
     db_ba = get_ba_for_entity(db, no_ba)
+    if no_ba and not db_ba:
+        raise HTTPException(status_code=404, detail="Berita Acara tidak ditemukan")
 
     if payung_ba:
         if not db_ba:

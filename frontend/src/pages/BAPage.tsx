@@ -37,7 +37,7 @@ const baSchema = z.object({
   tanggal_ba: z.string().min(1, 'Tanggal BA wajib diisi'),
   bulan_buku: z.string().min(1, 'Bulan buku wajib diisi'),
   volume_ba: z.coerce.number().min(0.01, 'Volume harus > 0'),
-  harga_satuan: z.coerce.number().min(0.01, 'Harga satuan harus > 0'),
+  harga_satuan: z.coerce.number().min(0),
   nama_unit: z.string().optional(),
   komoditi: z.string().optional(),
   deskripsi: z.string().optional(),
@@ -80,6 +80,7 @@ export default function BAPage() {
   const tanggalBa = watch('tanggal_ba')
   const volumeBa = watch('volume_ba')
   const hargaSatuan = watch('harga_satuan')
+  const isPayungBA = tipeKontrak === 'PAYUNG_BA'
 
   useEffect(() => {
     kontrakStore.fetch()
@@ -94,6 +95,20 @@ export default function BAPage() {
         label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''}`,
       })),
     [kontrakStore.data, tipeKontrak],
+  )
+
+  const baOptions = useMemo(
+    () => baStore.data
+      .filter((ba) => {
+        const kontrak = kontrakStore.data.find((k) => k.no_kontrak === ba.no_kontrak)
+        const tipe = String(kontrak?.tipe_alur || 'STANDAR').toUpperCase()
+        return tipe === tipeKontrak && (!selectedKontrak || ba.no_kontrak === selectedKontrak)
+      })
+      .map((ba) => ({
+        value: ba.no_ba,
+        label: `${ba.no_ba} — ${ba.no_kontrak}`,
+      })),
+    [baStore.data, kontrakStore.data, selectedKontrak, tipeKontrak],
   )
 
   const currentKontrak: Kontrak | undefined = useMemo(
@@ -161,6 +176,10 @@ export default function BAPage() {
 
   const onSubmit = async (data: BAFormData) => {
     try {
+      if (isPayungBA && (!data.harga_satuan || data.harga_satuan <= 0)) {
+        addNotification('Harga satuan BA wajib diisi untuk kontrak payung', 'error')
+        return
+      }
       const payload = {
         ...data,
         bulan_buku: `${data.bulan_buku}-01`,
@@ -182,6 +201,16 @@ export default function BAPage() {
     reset()
     setIsExisting(false)
     setExportNo(null)
+    setTipeKontrak('STANDAR')
+  }
+
+  const selectTab = (next: 'STANDAR' | 'PAYUNG_BA') => {
+    if (next === tipeKontrak) return
+    setTipeKontrak(next)
+    setValue('no_kontrak', '')
+    setValue('no_ba', '')
+    setIsExisting(false)
+    setExportNo(null)
   }
 
   return (
@@ -198,34 +227,36 @@ export default function BAPage() {
               Pilih Alur BA
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-xs">Jenis Kontrak *</Label>
-              <NativeSelect
-                value={tipeKontrak}
-                disabled={isExisting}
-                onChange={(event) => {
-                  const next = event.target.value as 'STANDAR' | 'PAYUNG_BA'
-                  setTipeKontrak(next)
-                  setValue('no_kontrak', '')
-                }}
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 rounded-lg border border-border p-1 bg-muted/40">
+              <button
+                type="button"
+                onClick={() => selectTab('STANDAR')}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${!isPayungBA ? 'bg-background text-brand-700 shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                <option value="STANDAR">Kontrak Normal</option>
-                <option value="PAYUNG_BA">Kontrak Payung</option>
-              </NativeSelect>
-              <p className="text-xs text-slate-400 mt-1">
-                {tipeKontrak === 'PAYUNG_BA'
-                  ? 'BA menjadi dasar volume, harga, dan invoice kontrak payung.'
-                  : 'BA mencatat realisasi pengambilan dan bulan buku kontrak normal.'}
-              </p>
+                Kontrak Normal
+              </button>
+              <button
+                type="button"
+                onClick={() => selectTab('PAYUNG_BA')}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${isPayungBA ? 'bg-background text-brand-700 shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Kontrak Payung
+              </button>
             </div>
+            <p className="text-xs text-slate-500">
+              {isPayungBA
+                ? 'BA menjadi dasar volume, harga, dan invoice kontrak payung.'
+                : 'BA mencatat realisasi pengambilan. Saat dipilih di DO, tanggal BA menggantikan rencana pengambilan dan Bulan Buku BA masuk Laporan Digital.'}
+            </p>
+            <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-xs">No Kontrak *</Label>
               <SearchableSelect
                 options={kontrakOptions}
                 value={watch('no_kontrak')}
                 onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
-                placeholder={`-- Pilih Kontrak ${tipeKontrak === 'PAYUNG_BA' ? 'Payung' : 'Normal'} --`}
+                placeholder={`-- Pilih Kontrak ${isPayungBA ? 'Payung' : 'Normal'} --`}
               />
               {kontrakOptions.length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">Belum ada kontrak yang dapat dipilih</p>
@@ -235,10 +266,7 @@ export default function BAPage() {
             <div>
               <Label className="text-xs">No Berita Acara *</Label>
               <SearchableSelect
-                options={baStore.data.map((b) => ({
-                  value: b.no_ba,
-                  label: `${b.no_ba} — ${b.no_kontrak}`,
-                }))}
+                options={baOptions}
                 value={watch('no_ba')}
                 allowCustom={canEdit()}
                 onChange={(v) => setValue('no_ba', v, { shouldValidate: true })}
@@ -247,6 +275,7 @@ export default function BAPage() {
               />
               <p className="text-xs text-slate-400 mt-1">Daftar dari database. Pilih BA lama → data terisi otomatis.</p>
               {errors.no_ba && <p className="text-xs text-red-500 mt-1">{errors.no_ba.message}</p>}
+            </div>
             </div>
           </CardContent>
         </Card>
@@ -274,9 +303,13 @@ export default function BAPage() {
               {errors.volume_ba && <p className="text-xs text-red-500 mt-1">{errors.volume_ba.message}</p>}
             </div>
             <div>
-              <Label className="text-xs">Harga Satuan (saat transaksi) *</Label>
-              <Input type="number" step="any" {...register('harga_satuan')} />
-              <p className="text-xs text-slate-400 mt-1">Harga komoditi berlaku pada pengiriman ini — tidak disimpan di kontrak payung.</p>
+              <Label className="text-xs">{isPayungBA ? 'Harga Satuan (saat transaksi) *' : 'Harga Satuan Kontrak'}</Label>
+              <Input type="number" step="any" {...register('harga_satuan')} readOnly={!isPayungBA} className={!isPayungBA ? 'bg-slate-50' : ''} />
+              <p className="text-xs text-slate-400 mt-1">
+                {isPayungBA
+                  ? 'Harga komoditi berlaku pada pengiriman ini — tidak disimpan di kontrak payung.'
+                  : 'Mengikuti harga kontrak; nilai BA normal tidak mengubah nilai invoice.'}
+              </p>
               {errors.harga_satuan && <p className="text-xs text-red-500 mt-1">{errors.harga_satuan.message}</p>}
             </div>
             <div>
@@ -312,11 +345,11 @@ export default function BAPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">
-                {(currentKontrak.volume || 0) > 0 ? 'Kuota Volume Kontrak' : 'Volume Berita Acara'}
+                {isPayungBA ? 'Volume Berita Acara Payung' : 'Realisasi Pengambilan Kontrak Normal'}
               </CardTitle>
             </CardHeader>
             <CardContent className="text-sm grid grid-cols-2 gap-2">
-              {(currentKontrak.volume || 0) > 0 ? (
+              {!isPayungBA ? (
                 <>
                   <span className="text-slate-500">Volume Kontrak:</span>
                   <span>{formatCurrency(currentKontrak.volume)} {currentKontrak.satuan}</span>
@@ -325,6 +358,9 @@ export default function BAPage() {
                   <span className="text-slate-500">Sisa Kuota:</span>
                   <span className={volumeBa > sisaKuota ? 'text-red-600 font-semibold' : 'text-brand-600 font-semibold'}>
                     {formatCurrency(sisaKuota)} {currentKontrak.satuan}
+                  </span>
+                  <span className="col-span-2 text-xs text-slate-500 pt-1">
+                    Setelah disimpan, pilih BA ini pada Delivery Order untuk mengunci tanggal realisasi dan bulan buku laporan.
                   </span>
                 </>
               ) : (

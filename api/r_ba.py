@@ -38,7 +38,8 @@ def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: m
         raise HTTPException(status_code=400, detail="Volume BA harus > 0")
 
     harga_satuan = float(ba.harga_satuan or 0)
-    if harga_satuan <= 0:
+    is_payung_ba = str(getattr(db_kontrak, "tipe_alur", "STANDAR") or "STANDAR").upper() == "PAYUNG_BA"
+    if is_payung_ba and harga_satuan <= 0:
         raise HTTPException(status_code=400, detail="Harga satuan BA harus > 0")
 
     try:
