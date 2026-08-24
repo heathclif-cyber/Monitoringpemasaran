@@ -59,21 +59,18 @@
 ### Script debug (jalankan, jangan rewrite)
 | Script | Pakai untuk |
 |--------|-------------|
-| `scripts/superman_agent.py watch` | **Agent lokal** — Playwright di PC, job dari Railway |
+| `scripts/superman_agent.py watch` | **Agent lokal** — Playwright di PC/VPS lokal |
 | `scripts/test_superman_0353.py` | E2E deklarasi production (ganti `NO_INV`) |
 | `scripts/test_superman_26035.py` | Template sama, invoice lain |
 
 ---
 
-## 3. Konstanta production (jangan Grep ulang)
+## 3. Deployment aktif (jangan asumsi Railway)
 
 ```
-URL:     https://monitoringpemasaran-production.up.railway.app
-Volume:  /data  (mount Railway)
-Sesi:    SUPERMAN_STATE_PATH=/data/.superman_state.json
-Upload:  UPLOAD_DIR=/data/uploads
-Jobs:    /data/superman_jobs.json
-Region:  asia-southeast1 (Singapore)
+Platform: VPS di komputer lokal ini (bukan Railway)
+URL:      gunakan alamat VPS/host lokal yang sedang dikonfigurasi; jangan pakai URL Railway lama
+Storage:  gunakan volume/path yang dikonfigurasi pada VPS lokal
 ```
 
 Login app: `POST /api/auth/login` → Bearer token untuk semua `/api/*`.
@@ -84,10 +81,10 @@ Login app: `POST /api/auth/login` → Bearer token untuk semua `/api/*`.
 
 | Gejala UI / API | Bukan ini | Kemungkinan penyebab |
 |-----------------|-----------|----------------------|
-| **502, progress 0%** | Gagal upload Superman | `deklarasi/start` hang/timeout — cek `runner.py` start, restart Railway, hapus `superman_jobs.json` jika stuck |
+| **502, progress 0%** | Gagal upload Superman | `deklarasi/start` hang/timeout — cek `runner.py` start, restart service VPS lokal, hapus `superman_jobs.json` jika stuck |
 | **428** + captcha | Bug form | Sesi Superman habis — login captcha |
 | **409** duplikat | Error jaringan | Invoice sudah punya nomor SPP — cek `invoice.superman` |
-| **88–94% lama lalu gagal** | Isian salah | `NS_BINDING_ABORTED` / ALPN di `/spp/store` — intermittent Railway (BUG-009/012) |
+| **88–94% lama lalu gagal** | Isian salah | `NS_BINDING_ABORTED` / ALPN di `/spp/store` — gangguan koneksi ke Superman (BUG-009/012) |
 | **Job tidak ditemukan** | Bug kode | Redeploy saat job jalan (BUG-006) atau job kedaluwarsa |
 | **2/3 file upload** | Jaringan | Dokumen bukan PDF (BUG-011) |
 
@@ -109,7 +106,7 @@ Login app: `POST /api/auth/login` → Bearer token untuk semua `/api/*`.
 - Baca `CLAUDE.md` utuh jika task sudah jelas dari agent.md
 - `railway variables --json` (cetak secret ke transcript)
 - Redeploy/restart production tanpa konfirmasi user
-- Jalankan 2 deklarasi Superman paralel di Railway
+- Jalankan 2 deklarasi Superman paralel di VPS lokal
 - Ulangi netprobe/WAF jika BUG-012 sudah menyingkirkan hipotesis itu
 
 ### Ukuran respons
