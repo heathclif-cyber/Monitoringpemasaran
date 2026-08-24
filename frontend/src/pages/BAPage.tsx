@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
@@ -47,8 +46,6 @@ const baSchema = z.object({
 
 type BAFormData = z.infer<typeof baSchema>
 
-const FIXED_UNITS = ['Minahasa-Halmahera', 'Beteleme', 'Awaya-Telpaputih', 'Takalar', 'Camming', 'Kabaru']
-
 export default function BAPage() {
   const baStore = useBAStore()
   const kontrakStore = useKontrakStore()
@@ -77,6 +74,7 @@ export default function BAPage() {
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = form
   const selectedKontrak = watch('no_kontrak')
+  const selectedUnit = watch('nama_unit')
   const tanggalBa = watch('tanggal_ba')
   const volumeBa = watch('volume_ba')
   const hargaSatuan = watch('harga_satuan')
@@ -116,6 +114,21 @@ export default function BAPage() {
     [kontrakStore.data, selectedKontrak],
   )
 
+  const unitOptions = useMemo(
+    () => (currentKontrak?.units || [])
+      .map((unit) => unit.nama_unit)
+      .filter((unit): unit is string => Boolean(unit)),
+    [currentKontrak],
+  )
+  const perluPilihUnit = isPayungBA && unitOptions.length > 1
+  const currentKontrakUnit = useMemo(
+    () => currentKontrak?.units?.find((unit) => unit.nama_unit === selectedUnit),
+    [currentKontrak, selectedUnit],
+  )
+  const infoUnit = selectedUnit || currentKontrak?.kebun_produsen || unitOptions[0] || ''
+  const infoKomoditi = currentKontrakUnit?.jenis_komoditi || currentKontrakUnit?.komoditi || currentKontrak?.jenis_komoditi || currentKontrak?.komoditi || ''
+  const infoDeskripsi = currentKontrak?.deskripsi_produk || infoKomoditi
+
   const usedVolume = useMemo(() => {
     if (!selectedKontrak) return 0
     return baStore.data
@@ -137,13 +150,17 @@ export default function BAPage() {
 
   useEffect(() => {
     if (currentKontrak) {
-      if (!watch('komoditi')) setValue('komoditi', currentKontrak.komoditi || '')
-      if (!watch('nama_unit')) setValue('nama_unit', currentKontrak.kebun_produsen || '')
+      const defaultUnit = currentKontrak.kebun_produsen || unitOptions[0] || ''
+      if (!selectedUnit && defaultUnit) setValue('nama_unit', defaultUnit)
+      if (!isExisting) {
+        setValue('komoditi', infoKomoditi)
+        setValue('deskripsi', infoDeskripsi)
+      }
       if (!watch('harga_satuan') && currentKontrak.harga_satuan) {
         setValue('harga_satuan', currentKontrak.harga_satuan)
       }
     }
-  }, [currentKontrak])
+  }, [currentKontrak, infoDeskripsi, infoKomoditi, isExisting, selectedUnit, setValue, unitOptions])
 
   useEffect(() => {
     if (isExisting || !isPayungBA || !tanggalBa) return
@@ -320,32 +337,15 @@ export default function BAPage() {
                   <p className="text-xs text-slate-400 mt-1">Harga komoditi berlaku pada pengiriman ini — tidak disimpan di kontrak payung.</p>
                   {errors.harga_satuan && <p className="text-xs text-red-500 mt-1">{errors.harga_satuan.message}</p>}
                 </div>
+                {perluPilihUnit && (
                 <div>
-                  <Label className="text-xs">Unit</Label>
+                  <Label className="text-xs">Unit Pengambilan *</Label>
                   <NativeSelect {...register('nama_unit')}>
                     <option value="">-- Pilih Unit --</option>
-                    {FIXED_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                    {unitOptions.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                   </NativeSelect>
                 </div>
-                <div>
-                  <Label className="text-xs">Komoditi</Label>
-                  <Input {...register('komoditi')} />
-                </div>
-                <div className="col-span-2">
-                  <Label className="text-xs">Deskripsi</Label>
-                  <Textarea rows={2} {...register('deskripsi')} />
-                </div>
-                <div>
-                  <Label className="text-xs">Status</Label>
-                  <NativeSelect {...register('status')} disabled={isExisting}>
-                    <option value="Draft">Draft</option>
-                    <option value="Selesai">Selesai</option>
-                  </NativeSelect>
-                </div>
-                <div>
-                  <Label className="text-xs">Link BA (opsional)</Label>
-                  <Input {...register('link_berita_acara')} placeholder="https://..." />
-                </div>
+                )}
               </>
             )}
           </CardContent>
@@ -383,6 +383,10 @@ export default function BAPage() {
                 <>
                   <span className="text-slate-500">Harga Satuan (form):</span>
                   <span>{hargaSatuan > 0 ? `${formatCurrency(hargaSatuan)} / ${currentKontrak.satuan || 'Kg'}` : '—'}</span>
+                  <span className="text-slate-500">Unit:</span>
+                  <span>{infoUnit || '—'}</span>
+                  <span className="text-slate-500">Komoditi:</span>
+                  <span>{infoKomoditi || '—'}</span>
                   <span className="text-slate-500">Nilai Invoice (estimasi):</span>
                   <span className="font-semibold text-brand-600">{nilaiBA > 0 ? formatCurrency(nilaiBA) : '—'}</span>
                   <span className="text-slate-500">Total sudah di-BA:</span>
