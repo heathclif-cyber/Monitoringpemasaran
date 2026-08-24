@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, CloudUpload, Eye, Loader2, RefreshCw, Search } from 'lucide-react'
-import { client } from '@/lib/client'
+import { client, openAuthenticatedFile } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { useCanEdit } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
@@ -115,7 +115,9 @@ function CompactUpload({
             className="h-8 px-1.5 text-xs"
             onClick={() => {
               if (isDocx) setDocxOpen(true)
-              else if (viewUrl) window.open(viewUrl, '_blank', 'noopener,noreferrer')
+              else if (viewUrl) void openAuthenticatedFile(viewUrl).catch((err: unknown) => {
+                addNotification(err instanceof Error ? err.message : 'Gagal membuka dokumen', 'error')
+              })
             }}
           >
             <Eye size={12} />

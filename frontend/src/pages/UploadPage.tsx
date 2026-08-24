@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, CircleAlert, CloudUpload, Download, Eye, FolderArchive, ListFilter, Loader2, Search } from 'lucide-react'
-import { client } from '@/lib/client'
+import { client, downloadAuthenticatedFile, openAuthenticatedFile } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore, useCanEdit } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -105,12 +105,16 @@ function SlotRow({
   const fileAvailable = slot.uploaded && !fileMissing
   const canView = fileAvailable && !!viewUrl && (isDocx || BROWSER_VIEWABLE.has(ext))
 
-  const handleView = () => {
+  const handleView = async () => {
     if (!viewUrl) return
     if (isDocx) {
       setDocxOpen(true)
     } else {
-      window.open(viewUrl, '_blank', 'noopener,noreferrer')
+      try {
+        await openAuthenticatedFile(viewUrl)
+      } catch (err) {
+        addNotification(err instanceof Error ? err.message : 'Gagal membuka dokumen', 'error')
+      }
     }
   }
 
@@ -189,14 +193,14 @@ function SlotRow({
             </Button>
           )}
           {fileAvailable && slot.web_url && (
-            <a
-              href={slot.web_url}
-              download
+            <button
+              type="button"
+              onClick={() => void downloadAuthenticatedFile(slot.web_url, slot.file_name || 'dokumen')}
               className="inline-flex items-center gap-1 rounded-md px-2 h-8 text-xs text-primary hover:bg-muted transition-colors"
               title="Unduh dokumen"
             >
               <Download size={12} /> Unduh
-            </a>
+            </button>
           )}
           {canEdit && (
             <>

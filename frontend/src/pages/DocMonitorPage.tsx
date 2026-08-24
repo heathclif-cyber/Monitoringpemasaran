@@ -11,7 +11,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { client } from '@/lib/client'
+import { client, openAuthenticatedFile } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { useCanEdit } from '@/store/authStore'
 import { Card, CardContent, CardTitle } from '@/components/ui/card'
@@ -290,7 +290,9 @@ function SlotUploadRow({
             className="h-8 gap-1 text-xs"
             onClick={() => {
               if (isDocx) setDocxOpen(true)
-              else if (viewUrl) window.open(viewUrl, '_blank', 'noopener,noreferrer')
+              else if (viewUrl) void openAuthenticatedFile(viewUrl).catch((err: unknown) => {
+                addNotification(err instanceof Error ? err.message : 'Gagal membuka dokumen', 'error')
+              })
             }}
           >
             <Eye size={12} /> Lihat

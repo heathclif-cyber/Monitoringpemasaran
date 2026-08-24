@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { renderAsync } from 'docx-preview'
 import { Loader2 } from 'lucide-react'
+import { client } from '@/lib/client'
 
 interface DocxPreviewProps {
   url: string
@@ -15,11 +16,7 @@ export function DocxPreview({ url, className }: DocxPreviewProps) {
     let cancelled = false
     setError(null)
 
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.blob()
-      })
+    client.streamBlob(url)
       .then((blob) => {
         if (cancelled) return
         const container = containerRef.current

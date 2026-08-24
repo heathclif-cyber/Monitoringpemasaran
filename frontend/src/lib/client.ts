@@ -103,7 +103,10 @@ export const client = {
     const token = getToken()
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
-    return fetch(`${BASE_URL}${path}`, { headers }).then((res) => res.blob())
+    return fetch(`${BASE_URL}${path}`, { headers }).then(async (res) => {
+      if (!res.ok) await handleErrorResponse(res, path, 'GET')
+      return res.blob()
+    })
   },
 
   async uploadFormData<T>(path: string, formData: FormData): Promise<T> {
@@ -118,4 +121,32 @@ export const client = {
     }
     return res.json()
   },
+}
+
+/** Membuka file API yang dilindungi Bearer token di tab baru. */
+export async function openAuthenticatedFile(path: string): Promise<void> {
+  // Buat tab saat click event masih berlangsung agar tidak diblokir popup blocker.
+  const tab = window.open('', '_blank')
+  if (tab) tab.opener = null
+  try {
+    const blob = await client.streamBlob(path)
+    const objectUrl = URL.createObjectURL(blob)
+    if (tab) tab.location.href = objectUrl
+    else window.location.href = objectUrl
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+  } catch (error) {
+    tab?.close()
+    throw error
+  }
+}
+
+/** Mengunduh file API yang dilindungi Bearer token. */
+export async function downloadAuthenticatedFile(path: string, filename: string): Promise<void> {
+  const blob = await client.streamBlob(path)
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
 }

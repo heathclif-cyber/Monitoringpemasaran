@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CloudUpload, ExternalLink, Loader2 } from 'lucide-react'
-import { client } from '@/lib/client'
+import { client, downloadAuthenticatedFile } from '@/lib/client'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore, useCanEdit } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
@@ -123,14 +123,13 @@ export function DocumentUpload({
     return (
       <div className={cn('flex flex-col gap-1', className)}>
         {hasValidFile && latest?.web_url && (
-          <a
-            href={latest.web_url}
-            target={latest.web_url.startsWith('http') ? '_blank' : undefined}
-            rel={latest.web_url.startsWith('http') ? 'noopener noreferrer' : undefined}
+          <button
+            type="button"
+            onClick={() => void downloadAuthenticatedFile(latest.web_url, latest.file_name)}
             className="text-xs text-primary hover:underline inline-flex items-center gap-1"
           >
             <ExternalLink size={10} /> Buka
-          </a>
+          </button>
         )}
         {canEdit && (
           <input
@@ -163,14 +162,13 @@ export function DocumentUpload({
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium">{title}</p>
         {hasValidFile && latest && (
-          <a
-            href={latest.web_url}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => void downloadAuthenticatedFile(latest.web_url, latest.file_name)}
             className="text-xs text-primary hover:underline inline-flex items-center gap-1"
           >
             <ExternalLink size={12} /> Download
-          </a>
+          </button>
         )}
       </div>
       {fileMissing ? (
