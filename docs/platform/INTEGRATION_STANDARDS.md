@@ -30,6 +30,9 @@
    Keuangan sebelum kedaluwarsa.
 
 Akun `integrasi` tidak dapat membuat, mengubah, atau menghapus data transaksi.
+Pengguna manusia tidak pernah memasukkan bearer token secara manual: aplikasi
+mengirimkannya otomatis setelah login. Token integrasi adalah kredensial mesin
+yang disimpan pada secret manager/environment aplikasi pemakai.
 
 ## Endpoint: arus kas masuk Pemasaran
 

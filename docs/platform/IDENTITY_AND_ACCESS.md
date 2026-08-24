@@ -19,6 +19,36 @@ memakai aplikasi dan API apa.
 5. Satu-satunya admin aktif tidak boleh dapat dinonaktifkan atau diturunkan
    rolenya.
 
+## Arti “wajib token” bagi pengguna
+
+Token adalah bukti sesi setelah login, **bukan field yang harus diisi atau
+disalin pengguna**. Alurnya harus selalu seperti ini:
+
+```text
+Pengguna login sekali di aplikasi
+  → aplikasi menerima token sesi
+  → browser mengirim token otomatis pada setiap panggilan API
+  → token kedaluwarsa / akun dinonaktifkan
+  → aplikasi mengarahkan pengguna kembali ke login
+```
+
+Dengan demikian layar operasional tetap seamless: pengguna mengisi kontrak,
+BA, atau laporan seperti biasa. Token hanya mencegah orang yang tidak login
+membuka URL API langsung.
+
+Untuk koneksi mesin-ke-mesin, token memakai akun `integrasi` terpisah dan
+disimpan di secret aplikasi pemakai—bukan pada browser maupun oleh pegawai.
+
+## Batas seamless saat ini
+
+Pemasaran dan AsetOpt sudah memiliki alur login yang seamless **di dalam
+masing-masing aplikasi**, tetapi belum memiliki sesi tunggal lintas aplikasi.
+Artinya login di Pemasaran belum otomatis membuat pengguna login di AsetOpt.
+Ini adalah status transisi yang disengaja agar akses publik ditutup lebih dulu.
+SSO melalui identity provider Layer Zero adalah tahap berikutnya; jangan
+mengklaim single sign-on sudah aktif sebelum token pusat benar-benar dipakai
+oleh kedua aplikasi.
+
 ## Kondisi transisi
 
 Pemasaran dan AsetOpt masih memiliki user store sendiri. AsetOpt kini

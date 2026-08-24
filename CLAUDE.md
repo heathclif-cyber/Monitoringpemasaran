@@ -1,7 +1,7 @@
 # CLAUDE.md — Monitoring Pemasaran PTPN I
 
 > **Agent / debug:** lihat [agent.md](./agent.md) dan log bug [bug.md](./bug.md).
-> **Layer Zero:** standar lintas aplikasi ada di [docs/platform/README.md](./docs/platform/README.md).
+> **Layer Zero:** standar lintas aplikasi ada di [docs/platform/README.md](./docs/platform/README.md). Ringkasan status aplikasi ini ada di [LAYER_ZERO.md](./LAYER_ZERO.md). Pengguna login normal; browser yang mengirim token sesi otomatis. Jangan membuat endpoint API baru yang dapat diakses tanpa autentikasi.
 
 ## Project Overview
 
