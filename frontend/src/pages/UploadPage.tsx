@@ -195,7 +195,9 @@ function SlotRow({
           {fileAvailable && slot.web_url && (
             <button
               type="button"
-              onClick={() => void downloadAuthenticatedFile(slot.web_url, slot.file_name || 'dokumen')}
+              onClick={() => {
+                if (slot.web_url) void downloadAuthenticatedFile(slot.web_url, slot.file_name || 'dokumen')
+              }}
               className="inline-flex items-center gap-1 rounded-md px-2 h-8 text-xs text-primary hover:bg-muted transition-colors"
               title="Unduh dokumen"
             >
