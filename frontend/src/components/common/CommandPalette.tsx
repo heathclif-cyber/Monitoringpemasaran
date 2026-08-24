@@ -30,7 +30,7 @@ const NAV_COMMANDS = [
   { label: 'Cetak Invoice', to: '/invoice', icon: Receipt, group: 'Menu' },
   { label: 'Pembayaran', to: '/pembayaran', icon: Banknote, group: 'Menu' },
   { label: 'Delivery Order', to: '/delivery-order', icon: Truck, group: 'Menu' },
-  { label: 'BA Pengambilan Barang', to: '/berita-acara', icon: ClipboardList, group: 'Menu' },
+  { label: 'BA Pengambilan', to: '/berita-acara', icon: ClipboardList, group: 'Menu' },
   { label: 'Dokumen (Pantau & Upload)', to: '/upload', icon: CloudUpload, group: 'Menu' },
   { label: 'Dokumen Unit', to: '/dokumen-unit', icon: ClipboardCheck, group: 'Menu' },
   { label: 'Persediaan', to: '/stok', icon: Boxes, group: 'Menu' },

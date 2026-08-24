@@ -237,7 +237,7 @@ export default function BAPage() {
   return (
     <PageShell width="narrow">
       <PageHeader
-        title="BA Pengambilan Barang"
+        title="BA Pengambilan"
         description="Catat realisasi pengambilan dan periode pembukuan untuk kontrak normal maupun payung"
       />
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">

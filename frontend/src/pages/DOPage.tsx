@@ -545,7 +545,7 @@ export default function DOPage() {
                   <div className="space-y-2">
                     <Input type="date" {...register('rencana_pengambilan')} />
                     <div>
-                      <Label className="text-xs">BA Pengambilan Barang (opsional)</Label>
+                      <Label className="text-xs">BA Pengambilan (opsional)</Label>
                       <NativeSelect {...register('no_ba')}>
                         <option value="">-- Belum ada BA: pakai rencana pengambilan --</option>
                         {normalBAOptions.map((ba) => (
