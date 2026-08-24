@@ -138,6 +138,7 @@ export default function BAPage() {
   useEffect(() => {
     if (currentKontrak) {
       if (!watch('komoditi')) setValue('komoditi', currentKontrak.komoditi || '')
+      if (!watch('nama_unit')) setValue('nama_unit', currentKontrak.kebun_produsen || '')
       if (!watch('harga_satuan') && currentKontrak.harga_satuan) {
         setValue('harga_satuan', currentKontrak.harga_satuan)
       }
@@ -307,46 +308,46 @@ export default function BAPage() {
               </div>
             )}
             <div>
-              <Label className="text-xs">Volume BA *</Label>
+              <Label className="text-xs">{isPayungBA ? 'Volume BA *' : `Kuantitas Pengambilan (${currentKontrak?.satuan || 'Kg'}) *`}</Label>
               <Input type="number" step="any" {...register('volume_ba')} />
               {errors.volume_ba && <p className="text-xs text-red-500 mt-1">{errors.volume_ba.message}</p>}
             </div>
-            <div>
-              <Label className="text-xs">{isPayungBA ? 'Harga Satuan (saat transaksi) *' : 'Harga Satuan Kontrak'}</Label>
-              <Input type="number" step="any" {...register('harga_satuan')} readOnly={!isPayungBA} className={!isPayungBA ? 'bg-slate-50' : ''} />
-              <p className="text-xs text-slate-400 mt-1">
-                {isPayungBA
-                  ? 'Harga komoditi berlaku pada pengiriman ini — tidak disimpan di kontrak payung.'
-                  : 'Mengikuti harga kontrak; nilai BA normal tidak mengubah nilai invoice.'}
-              </p>
-              {errors.harga_satuan && <p className="text-xs text-red-500 mt-1">{errors.harga_satuan.message}</p>}
-            </div>
-            <div>
-              <Label className="text-xs">Unit</Label>
-              <NativeSelect {...register('nama_unit')}>
-                <option value="">-- Pilih Unit --</option>
-                {FIXED_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-              </NativeSelect>
-            </div>
-            <div>
-              <Label className="text-xs">Komoditi</Label>
-              <Input {...register('komoditi')} />
-            </div>
-            <div className="col-span-2">
-              <Label className="text-xs">Deskripsi</Label>
-              <Textarea rows={2} {...register('deskripsi')} />
-            </div>
-            <div>
-              <Label className="text-xs">Status</Label>
-              <NativeSelect {...register('status')} disabled={isExisting}>
-                <option value="Draft">Draft</option>
-                <option value="Selesai">Selesai</option>
-              </NativeSelect>
-            </div>
-            <div>
-              <Label className="text-xs">Link BA (opsional)</Label>
-              <Input {...register('link_berita_acara')} placeholder="https://..." />
-            </div>
+            {isPayungBA && (
+              <>
+                <div>
+                  <Label className="text-xs">Harga Satuan (saat transaksi) *</Label>
+                  <Input type="number" step="any" {...register('harga_satuan')} />
+                  <p className="text-xs text-slate-400 mt-1">Harga komoditi berlaku pada pengiriman ini — tidak disimpan di kontrak payung.</p>
+                  {errors.harga_satuan && <p className="text-xs text-red-500 mt-1">{errors.harga_satuan.message}</p>}
+                </div>
+                <div>
+                  <Label className="text-xs">Unit</Label>
+                  <NativeSelect {...register('nama_unit')}>
+                    <option value="">-- Pilih Unit --</option>
+                    {FIXED_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </NativeSelect>
+                </div>
+                <div>
+                  <Label className="text-xs">Komoditi</Label>
+                  <Input {...register('komoditi')} />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Deskripsi</Label>
+                  <Textarea rows={2} {...register('deskripsi')} />
+                </div>
+                <div>
+                  <Label className="text-xs">Status</Label>
+                  <NativeSelect {...register('status')} disabled={isExisting}>
+                    <option value="Draft">Draft</option>
+                    <option value="Selesai">Selesai</option>
+                  </NativeSelect>
+                </div>
+                <div>
+                  <Label className="text-xs">Link BA (opsional)</Label>
+                  <Input {...register('link_berita_acara')} placeholder="https://..." />
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -362,6 +363,12 @@ export default function BAPage() {
                 <>
                   <span className="text-slate-500">Volume Kontrak:</span>
                   <span>{formatCurrency(currentKontrak.volume)} {currentKontrak.satuan}</span>
+                  <span className="text-slate-500">Unit:</span>
+                  <span>{currentKontrak.kebun_produsen || '—'}</span>
+                  <span className="text-slate-500">Komoditi:</span>
+                  <span>{currentKontrak.jenis_komoditi || currentKontrak.komoditi || '—'}</span>
+                  <span className="text-slate-500">Harga Kontrak:</span>
+                  <span>{currentKontrak.harga_satuan ? `${formatCurrency(currentKontrak.harga_satuan)} / ${currentKontrak.satuan || 'Kg'}` : '—'}</span>
                   <span className="text-slate-500">Sudah di-BA:</span>
                   <span>{formatCurrency(usedVolume)} {currentKontrak.satuan}</span>
                   <span className="text-slate-500">Sisa Kuota:</span>

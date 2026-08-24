@@ -49,9 +49,14 @@ def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: m
 
     payload = ba.model_dump()
     # Kontrak normal dibukukan otomatis pada tanggal BA. Jangan simpan periode
-    # manual agar laporan selalu mengikuti tanggal realisasi BA.
+    # manual agar laporan selalu mengikuti tanggal realisasi BA. Detail harga
+    # dan material juga selalu mengikuti kontrak, bukan input ulang pengguna.
     if not is_payung_ba:
         payload["bulan_buku"] = None
+        payload["harga_satuan"] = float(db_kontrak.harga_satuan or 0)
+        payload["nama_unit"] = db_kontrak.kebun_produsen or None
+        payload["komoditi"] = db_kontrak.komoditi or None
+        payload["deskripsi"] = db_kontrak.jenis_komoditi or db_kontrak.deskripsi_produk or None
     db_ba = db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == ba.no_ba).first()
     if db_ba:
         if db_ba.status == "Ter-invoice":
