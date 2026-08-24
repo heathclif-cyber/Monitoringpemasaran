@@ -71,8 +71,10 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     nominal = float(db_pay.nominal_transfer or 0)
     payung_ba = is_payung_ba(db_kontrak)
 
+    # BA dapat dipakai oleh kontrak normal maupun payung. Pada kontrak payung,
+    # BA tetap wajib dan berasal dari invoice; pada kontrak normal sifatnya opsional.
     no_ba = do.no_ba or db_invoice.no_ba
-    db_ba = get_ba_for_entity(db, no_ba) if payung_ba else None
+    db_ba = get_ba_for_entity(db, no_ba)
 
     if payung_ba:
         if not db_ba:
@@ -81,9 +83,11 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
             raise HTTPException(status_code=400, detail="BA tidak sesuai dengan kontrak invoice")
         rencana_pengambilan = db_ba.tanggal_ba
     else:
-        if do.no_ba:
-            raise HTTPException(status_code=400, detail="no_ba hanya untuk kontrak PAYUNG_BA")
-        rencana_pengambilan = do.rencana_pengambilan
+        if db_ba and db_ba.no_kontrak != db_invoice.no_kontrak:
+            raise HTTPException(status_code=400, detail="BA tidak sesuai dengan kontrak invoice")
+        # BA pengambilan pada kontrak normal menggantikan rencana awal dengan
+        # tanggal realisasi BA. Jika belum ada BA, rencana tetap dipakai.
+        rencana_pengambilan = db_ba.tanggal_ba if db_ba else do.rencana_pengambilan
 
     volume_for_calc, _nilai_scope = resolve_volume_scope(db_kontrak, db_invoice, db_ba)
 
@@ -119,7 +123,7 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
         "rencana_pengambilan": rencana_pengambilan,
         "superman": db_invoice.superman or db_pay.superman,
     }
-    if payung_ba and db_ba:
+    if db_ba:
         do_payload["no_ba"] = db_ba.no_ba
         do_payload["rencana_pengambilan"] = db_ba.tanggal_ba
 

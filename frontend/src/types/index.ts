@@ -261,6 +261,8 @@ export interface LaporanRow {
   Sisa_Pembayaran: number
   Sisa_Volume: number
   Bulan_Buku: string
+  /** Periode pembukuan lengkap YYYY-MM-DD; dipakai untuk filter lintas tahun. */
+  Raw_Bulan_Buku?: string
   No_BA?: string
   Tanggal_BA?: string
   Rencana_Pengambilan: string

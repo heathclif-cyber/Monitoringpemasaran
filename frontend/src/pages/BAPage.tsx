@@ -85,8 +85,11 @@ export default function BAPage() {
     baStore.fetch()
   }, [])
 
-  const payungKontraks = useMemo(
-    () => kontrakStore.data.filter((k) => String(k.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA'),
+  const kontrakOptions = useMemo(
+    () => kontrakStore.data.map((k) => ({
+      value: k.no_kontrak,
+      label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''} (${String(k.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA' ? 'Payung' : 'Normal'})`,
+    })),
     [kontrakStore.data],
   )
 
@@ -117,6 +120,9 @@ export default function BAPage() {
   useEffect(() => {
     if (currentKontrak) {
       if (!watch('komoditi')) setValue('komoditi', currentKontrak.komoditi || '')
+      if (!watch('harga_satuan') && currentKontrak.harga_satuan) {
+        setValue('harga_satuan', currentKontrak.harga_satuan)
+      }
     }
   }, [currentKontrak])
 
@@ -176,8 +182,8 @@ export default function BAPage() {
   return (
     <PageShell width="narrow">
       <PageHeader
-        title="Berita Acara"
-        description="Input berita acara untuk kontrak payung"
+        title="BA Pengambilan Barang"
+        description="Catat realisasi pengambilan dan periode pembukuan untuk kontrak normal maupun payung"
       />
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
         <Card>
@@ -189,18 +195,15 @@ export default function BAPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="text-xs">No Kontrak Payung *</Label>
+              <Label className="text-xs">No Kontrak *</Label>
               <SearchableSelect
-                options={payungKontraks.map((k) => ({
-                  value: k.no_kontrak,
-                  label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''}`,
-                }))}
+                options={kontrakOptions}
                 value={watch('no_kontrak')}
                 onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
-                placeholder="-- Pilih Kontrak PAYUNG_BA --"
+                placeholder="-- Pilih Kontrak Normal atau Payung --"
               />
-              {payungKontraks.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">Belum ada kontrak dengan tipe alur Payung BA</p>
+              {kontrakOptions.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">Belum ada kontrak yang dapat dipilih</p>
               )}
               {errors.no_kontrak && <p className="text-xs text-red-500 mt-1">{errors.no_kontrak.message}</p>}
             </div>

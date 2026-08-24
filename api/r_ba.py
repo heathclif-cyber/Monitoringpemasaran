@@ -30,12 +30,6 @@ def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: m
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
 
-    if str(getattr(db_kontrak, "tipe_alur", "STANDAR")).upper() != "PAYUNG_BA":
-        raise HTTPException(
-            status_code=400,
-            detail="Berita Acara hanya untuk kontrak dengan tipe alur PAYUNG_BA",
-        )
-
     if not ba.bulan_buku:
         raise HTTPException(status_code=400, detail="Bulan buku wajib diisi")
 

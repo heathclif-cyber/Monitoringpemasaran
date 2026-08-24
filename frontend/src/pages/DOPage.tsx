@@ -163,6 +163,7 @@ export default function DOPage() {
       kepada_unit: '',
       volume_keluar: 0,
       rencana_pengambilan: '',
+      no_ba: '',
     },
   })
 
@@ -245,6 +246,7 @@ export default function DOPage() {
       setValue('volume_keluar', data.volume_do || 0)
       volumeManualRef.current = true
       setValue('rencana_pengambilan', data.rencana_pengambilan || '')
+      setValue('no_ba', data.no_ba || '')
       if (data.no_pembayaran) {
         setAvailablePembayaranRows((rows) => {
           if (rows.some((r) => r.no_pembayaran === data.no_pembayaran)) return rows
@@ -286,6 +288,15 @@ export default function DOPage() {
     () => (linkedBA ? baStore.data.find((b) => b.no_ba === linkedBA) : null),
     [baStore.data, linkedBA],
   )
+  const normalBAOptions = useMemo(() => {
+    if (isPayungBA || !currentInvoice?.no_kontrak) return []
+    return baStore.data
+      .filter((ba) => ba.no_kontrak === currentInvoice.no_kontrak)
+      .map((ba) => ({
+        value: ba.no_ba,
+        label: `${ba.no_ba} — ${ba.tanggal_ba} (Buku: ${ba.bulan_buku?.slice(0, 7) || '-'})`,
+      }))
+  }, [isPayungBA, currentInvoice?.no_kontrak, baStore.data])
 
   const maxVolume = useMemo(() => {
     if (isPayungBA) return linkedBAData?.volume_ba || 0
@@ -531,7 +542,21 @@ export default function DOPage() {
                     <p className="text-xs text-slate-400 mt-1">Otomatis dari tanggal BA (pengakuan pendapatan)</p>
                   </div>
                 ) : (
-                  <Input type="date" {...register('rencana_pengambilan')} />
+                  <div className="space-y-2">
+                    <Input type="date" {...register('rencana_pengambilan')} />
+                    <div>
+                      <Label className="text-xs">BA Pengambilan Barang (opsional)</Label>
+                      <NativeSelect {...register('no_ba')}>
+                        <option value="">-- Belum ada BA: pakai rencana pengambilan --</option>
+                        {normalBAOptions.map((ba) => (
+                          <option key={ba.value} value={ba.value}>{ba.label}</option>
+                        ))}
+                      </NativeSelect>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Jika dipilih, tanggal BA menggantikan rencana pengambilan dan Bulan Buku BA dipakai di Laporan Digital.
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
               <div className="col-span-3 border-t pt-3 grid grid-cols-1 md:grid-cols-2 gap-4">

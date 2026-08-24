@@ -59,10 +59,12 @@ function extractMonthFromDateString(dateStr: string): string {
 }
 
 export function extractPeriodKeys(row: LaporanRow, mode: 'TRANSFER' | 'RENCANA'): LaporanPeriodKeys {
-  // Kontrak payung: bulan dari Bulan_Buku, tahun dari tanggal terkait
+  // Setiap BA (normal maupun payung) memakai periode pembukuan BA.
   if (row.No_BA) {
-    const month = row.Bulan_Buku?.slice(0, 2) || ''
-    const year = extractYearFromDateString(row.Rencana_Pengambilan || '')
+    const buku = row.Raw_Bulan_Buku || ''
+    const month = extractMonthFromDateString(buku) || row.Bulan_Buku?.slice(0, 2) || ''
+    const year = extractYearFromDateString(buku)
+      || extractYearFromDateString(row.Rencana_Pengambilan || '')
       || extractYearFromDateString(row.Tanggal_BA || '')
       || extractYearFromDateString(row.Raw_Date || '')
     return { year, month }

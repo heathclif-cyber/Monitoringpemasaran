@@ -300,6 +300,13 @@ def _build_laporan_rows(db: Session):
             "Sisa_Volume": sisa_volume,
             "No_BA": ba_ref.no_ba if ba_ref else "",
             "Tanggal_BA": ba_date.strftime("%Y-%m-%d") if ba_date else "",
+            # Simpan periode lengkap untuk filter/audit. Tampilan Bulan_Buku
+            # sengaja tetap ringkas, namun periode BA tidak boleh kehilangan tahun.
+            "Raw_Bulan_Buku": (
+                (ba_buku_date or ba_date).strftime("%Y-%m-%d")
+                if ba_ref and (ba_buku_date or ba_date)
+                else ""
+            ),
             "Bulan_Buku": get_bulan_buku(
                 (ba_buku_date or ba_date) if (ba_ref and (ba_buku_date or ba_date)) else (
                     do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)
@@ -397,6 +404,7 @@ def _build_laporan_rows(db: Session):
             "Kewajiban_Pembayaran": b.nominal or 0,
             "Sisa_Pembayaran": 0,
             "Rencana_Pengambilan": b.tanggal.strftime("%Y-%m-%d") if b.tanggal else "",
+            "Raw_Bulan_Buku": b.tanggal.strftime("%Y-%m-%d") if b.tanggal else "",
             "Bulan_Buku": get_bulan_buku(b.tanggal),
             "Superman": b.superman or "",
             "Kontrak_SAP": b.kontrak_sap or "",
