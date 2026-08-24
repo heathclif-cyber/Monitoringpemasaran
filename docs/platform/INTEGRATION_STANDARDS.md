@@ -81,6 +81,25 @@ Keuangan menggunakan `id` atau `referensi.no_pembayaran` sebagai kunci
 idempoten: satu pembayaran sumber tidak boleh dibuat menjadi jurnal yang sama
 lebih dari sekali.
 
+## Endpoint: pendapatan
+
+`GET /api/integrasi/v1/revenue`
+
+Kontrak respons berlaku untuk seluruh aplikasi pemilik pendapatan. Field inti:
+`id`, `sumber`, `basis_pengakuan`, `tanggal_pengakuan`,
+`pendapatan_pokok`, `ppn`, `pendapatan_bruto`, `pph`, `mata_uang`,
+`referensi`, dan `asal_transaksi`.
+
+Pemasaran menggunakan basis `realisasi_laporan_digital`: hanya realisasi yang
+sudah memiliki DO atau pembayaran dicantumkan. Nilainya dihitung dari sumber
+Laporan Digital yang sama, sehingga endpoint ini tidak menciptakan perhitungan
+pendapatan kedua. Parameter `tanggal_mulai`, `tanggal_sampai`, `unit`, dan
+`limit` memiliki bentuk yang sama dengan endpoint Cash In.
+
+Pendapatan dan kas masuk adalah dua fakta berbeda. Keuangan boleh
+merekonsiliasikan keduanya melalui referensi, tetapi tidak boleh menyamakan
+tanggal atau nominalnya tanpa aturan akuntansi yang berlaku.
+
 ## Proses penambahan integrasi
 
 1. Tetapkan aplikasi pemilik data dan aplikasi pemakai.

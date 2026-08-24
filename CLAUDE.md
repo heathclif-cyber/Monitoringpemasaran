@@ -1,6 +1,7 @@
 # CLAUDE.md — Monitoring Pemasaran PTPN I
 
 > **Agent / debug:** lihat [agent.md](./agent.md) dan log bug [bug.md](./bug.md).
+> **Layer Zero:** standar lintas aplikasi ada di [docs/platform/README.md](./docs/platform/README.md).
 
 ## Project Overview
 

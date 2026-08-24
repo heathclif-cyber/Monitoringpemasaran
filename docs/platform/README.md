@@ -31,7 +31,10 @@ versi yang terdokumentasi.
 | Metodologi dan pemilik data | Aktif | [METHODOLOGY.md](../../METHODOLOGY.md) |
 | Standar integrasi | Aktif | [INTEGRATION_STANDARDS.md](./INTEGRATION_STANDARDS.md) |
 | Katalog data | Aktif | [DATA_CATALOG.md](./DATA_CATALOG.md) |
+| Standar desain | Aktif | [DESIGN_STANDARDS.md](./DESIGN_STANDARDS.md), diadopsi dari AsetOpt Monitor |
 | API arus kas Pemasaran | Aktif | `GET /api/integrasi/v1/cash-in` |
+| API pendapatan Pemasaran | Aktif | `GET /api/integrasi/v1/revenue` |
+| API pendapatan AsetOpt | Siap deploy | `GET /api/integrasi/v1/revenue` pada AsetOpt Monitor |
 | Identitas lintas aplikasi (SSO) | Rencana | Dimulai setelah minimal dua aplikasi memakai API |
 | Master data lintas aplikasi | Rencana | Unit, mitra, komoditi, organisasi |
 | Event/webhook dan data warehouse | Rencana | Setelah kebutuhan sinkronisasi nyata terukur |
@@ -39,8 +42,9 @@ versi yang terdokumentasi.
 ## Pola data: Pemasaran ke Keuangan
 
 ```text
-Pemasaran (pemilik pembayaran)
-  └─ API Cash In v1 ──> Keuangan (pembaca)
+Pemasaran (pemilik penjualan)
+  ├─ API Cash In v1 ──> Keuangan (pembaca)
+  └─ API Revenue v1 ──> Keuangan (pembaca)
        no_pembayaran, tanggal, nominal, unit,
        no_invoice, no_kontrak, no_BA, no_DO
 

@@ -62,7 +62,7 @@ def _resolve_ba_ref(k, inv, do, ba_by_no: dict):
     return None
 
 
-def _build_laporan_rows(db: Session):
+def _build_laporan_rows(db: Session, include_documents: bool = True):
     kontraks = db.query(models.Kontrak).options(
         joinedload(models.Kontrak.units),
         joinedload(models.Kontrak.invoices).joinedload(models.Invoice.pembayaran),
@@ -222,17 +222,18 @@ def _build_laporan_rows(db: Session):
 
         dokumen_superman: list = []
         dokumen_superman_siap = False
-        if inv and inv.no_invoice:
-            from services.superman.documents import superman_doc_requirements_for_invoice
-            dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_invoice(
-                db, inv.no_invoice
-            )
-        elif no_pembayaran_val:
-            dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_pembayaran(
-                db, no_pembayaran_val
-            )
-        elif do:
-            dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_do(db, do.no_do)
+        if include_documents:
+            if inv and inv.no_invoice:
+                from services.superman.documents import superman_doc_requirements_for_invoice
+                dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_invoice(
+                    db, inv.no_invoice
+                )
+            elif no_pembayaran_val:
+                dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_pembayaran(
+                    db, no_pembayaran_val
+                )
+            elif do:
+                dokumen_superman, dokumen_superman_siap = superman_doc_requirements_for_do(db, do.no_do)
 
         tanggal_transfer_val = do.tanggal_pembayaran if do else None
         raw_date_val = (

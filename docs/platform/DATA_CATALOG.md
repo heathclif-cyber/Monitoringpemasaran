@@ -9,9 +9,11 @@ diinput dan dipelihara ulang oleh beberapa aplikasi.
 | BA Pengambilan | Pemasaran | Keuangan, Aset/Operasional | API Pemasaran | `no_ba` |
 | Invoice penjualan | Pemasaran | Keuangan | API Pemasaran | `no_invoice` |
 | Pembayaran/kas masuk penjualan | Pemasaran | Keuangan | API Cash In Pemasaran | `no_pembayaran` |
+| Pendapatan realisasi penjualan | Pemasaran | Keuangan | API Revenue Pemasaran | `no_do` / `no_invoice` |
 | Delivery Order penjualan | Pemasaran | Keuangan, Aset/Operasional | API Pemasaran | `no_do` |
 | Jurnal dan rekonsiliasi bank | Keuangan | Pemasaran (bila diperlukan) | API Keuangan | ID jurnal Keuangan |
 | Data aset dan operasional aset | Aset/Operasional | Keuangan, Pemasaran (bila diperlukan) | API Aset/Operasional | ID aset/operasional |
+| Pendapatan akrual kerja sama aset | AsetOpt Monitor | Keuangan | API Revenue AsetOpt | ID pengakuan pendapatan |
 | Unit, mitra, komoditi, struktur organisasi | Belum ditetapkan | Semua aplikasi | Master data bersama (rencana) | ID master global |
 
 ## Aturan pembaruan katalog

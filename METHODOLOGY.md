@@ -94,3 +94,11 @@ Data bersama seperti unit, mitra, komoditi, pengguna, dan struktur organisasi
 akan memiliki pemilik yang ditetapkan pada katalog data platform. Aplikasi
 pemakai menyimpan referensi ID atau salinan baca yang dapat diperbarui, bukan
 versi data master yang dapat diedit sendiri.
+
+## Standar desain lintas aplikasi
+
+Desain aplikasi mengikuti fondasi AsetOpt Monitor: React + TypeScript, Tailwind
+dengan token HSL, shadcn/ui, Inter 14px, brand biru/navy, sidebar dan header
+konsisten, serta komponen bersama untuk status, form, tabel, empty state, dan
+konfirmasi. Rujukan normatifnya adalah
+[DESIGN_STANDARDS.md](./docs/platform/DESIGN_STANDARDS.md).

@@ -1,7 +1,9 @@
-# Design System — Monitoring Pemasaran
+# Design System — Platform PTPN I Regional 8
 
-Standar visual dan pola halaman untuk React SPA (`frontend/`).  
-Semua UI baru **wajib** mengikuti dokumen ini. Guideline ringkas lama: [DESIGN_GUIDELINES.md](./DESIGN_GUIDELINES.md).
+Standar visual ini mengadopsi fondasi **AsetOpt Monitor** agar seluruh aplikasi
+memiliki bahasa desain yang sama. Semua UI baru **wajib** mengikuti dokumen ini
+dan [standar platform](../platform/DESIGN_STANDARDS.md). Guideline ringkas lama:
+[DESIGN_GUIDELINES.md](./DESIGN_GUIDELINES.md).
 
 **Prompt siap pakai untuk redesign dengan AI lain:** [PROMPT_UI_UX_REDESIGN.md](./PROMPT_UI_UX_REDESIGN.md)
 
@@ -30,13 +32,13 @@ Semua UI baru **wajib** mengikuti dokumen ini. Guideline ringkas lama: [DESIGN_G
 | `background` / `foreground` | Latar app, teks utama |
 | `card` | Panel konten |
 | `muted` / `muted-foreground` | Latar sekunder, label |
-| `primary` | Aksi utama (brand teal/emerald) |
+| `primary` | Aksi utama (brand biru/navy AsetOpt) |
 | `destructive` | Bahaya / hapus / belum wajib |
 | `border` / `input` / `ring` | Garis & focus |
 
 Definisi: `frontend/src/index.css` + map di `frontend/tailwind.config.js`.
 
-Brand scale: `brand-50` … `brand-900` (emerald).
+Brand scale: `brand-50` … `brand-900` (biru/navy).
 
 ### Tipografi
 

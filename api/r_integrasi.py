@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 
 import models
+from api.r_laporan import _build_laporan_rows
 from database import get_db
 from services.auth import require_integration_read
 
@@ -75,6 +76,80 @@ def get_cash_in(
         "meta": {
             "schema_version": "1.0",
             "source": "pemasaran",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "count": len(data),
+        },
+        "data": data,
+    }
+
+
+@router.get("/revenue")
+def get_revenue(
+    tanggal_mulai: Optional[date] = Query(None, description="Tanggal buku minimum (YYYY-MM-DD)"),
+    tanggal_sampai: Optional[date] = Query(None, description="Tanggal buku maksimum (YYYY-MM-DD)"),
+    unit: Optional[str] = Query(None, min_length=1, description="Filter unit"),
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_integration_read),
+):
+    """Pendapatan realisasi Pemasaran, selaras dengan perhitungan Laporan Digital."""
+    rows = _build_laporan_rows(db, include_documents=False)
+    data = []
+    for row in rows:
+        no_do = (row.get("No_DO") or "").strip()
+        no_pembayaran = (row.get("No_Pembayaran") or "").strip()
+        is_bypass = no_do.startswith("BYPASS-")
+        # Kontrak/invoice tanpa realisasi belum menjadi pendapatan integrasi.
+        if is_bypass or not (no_do or no_pembayaran):
+            continue
+
+        raw_tanggal = row.get("Raw_Bulan_Buku") or row.get("Raw_Date")
+        if not raw_tanggal:
+            continue
+        tanggal_pengakuan = date.fromisoformat(raw_tanggal)
+        if tanggal_mulai and tanggal_pengakuan < tanggal_mulai:
+            continue
+        if tanggal_sampai and tanggal_pengakuan > tanggal_sampai:
+            continue
+        if unit and (row.get("Unit") or "").strip() != unit.strip():
+            continue
+
+        record_id = f"do:{no_do}" if no_do else f"invoice:{row.get('No_Invoice') or no_pembayaran}"
+        data.append(
+            {
+                "id": record_id,
+                "sumber": "pemasaran",
+                "basis_pengakuan": "realisasi_laporan_digital",
+                "tanggal_pengakuan": tanggal_pengakuan,
+                "pendapatan_pokok": float(row.get("Pendapatan_Pokok") or 0),
+                "ppn": float(row.get("Pajak_PPN") or 0),
+                "pendapatan_bruto": float(row.get("Pendapatan_Setelah_PPN") or 0),
+                "pph": float(row.get("PPh_Nominal") or 0),
+                "mata_uang": "IDR",
+                "referensi": {
+                    "no_pembayaran": no_pembayaran or None,
+                    "no_invoice": row.get("No_Invoice") or None,
+                    "no_kontrak": row.get("No_Kontrak") or None,
+                    "no_ba": row.get("No_BA") or None,
+                    "no_do": no_do or None,
+                },
+                "asal_transaksi": {
+                    "pembeli": row.get("Mitra_Pembeli") or None,
+                    "unit": row.get("Unit") or None,
+                    "komoditi": row.get("Komoditi") or None,
+                    "satuan": row.get("Satuan") or None,
+                    "volume": float(row.get("Jumlah_DO") or 0),
+                },
+            }
+        )
+        if len(data) >= limit:
+            break
+
+    return {
+        "meta": {
+            "schema_version": "1.0",
+            "source": "pemasaran",
+            "basis_pengakuan": "realisasi_laporan_digital",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "count": len(data),
         },
