@@ -283,7 +283,10 @@ def _build_laporan_rows(db: Session, include_documents: bool = True):
             "No_Kontrak": k.no_kontrak or "",
             "Unit": unit_val,
             "Komoditi": k.komoditi or "",
-            "Billing_Date": format_date(inv.tanggal_transaksi) if inv else format_date(k.tanggal_kontrak),
+            "Billing_Date": (
+                format_date(effective_buku_date) if effective_buku_date
+                else (format_date(inv.tanggal_transaksi) if inv else format_date(k.tanggal_kontrak))
+            ),
             "Tanggal_Transfer": format_date(tanggal_transfer_val) if tanggal_transfer_val else "",
             "Raw_Date": raw_date_val,
             "Jumlah_Transfer": do_nominal,
