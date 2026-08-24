@@ -34,8 +34,10 @@ versi yang terdokumentasi.
 | Standar desain | Aktif | [DESIGN_STANDARDS.md](./DESIGN_STANDARDS.md), diadopsi dari AsetOpt Monitor |
 | API arus kas Pemasaran | Aktif | `GET /api/integrasi/v1/cash-in` |
 | API pendapatan Pemasaran | Aktif | `GET /api/integrasi/v1/revenue` |
-| API pendapatan AsetOpt | Siap deploy | `GET /api/integrasi/v1/revenue` pada AsetOpt Monitor |
-| Identitas lintas aplikasi (SSO) | Rencana | Dimulai setelah minimal dua aplikasi memakai API |
+| API pendapatan AsetOpt | Implementasi siap deploy | `GET /api/integrasi/v1/revenue` pada AsetOpt Monitor |
+| Baseline keamanan API | Aktif di Pemasaran; siap deploy di AsetOpt | Semua API aplikasi perlu token; akun integrasi hanya boleh memakai endpoint integrasi |
+| Administrasi pengguna AsetOpt | Implementasi siap deploy | Admin dapat mengelola akun lokal melalui `/api/users` dan menu Kelola Pengguna |
+| Identitas lintas aplikasi (SSO) | Tahap berikutnya | Rancangan dan batasan di [IDENTITY_AND_ACCESS.md](./IDENTITY_AND_ACCESS.md) |
 | Master data lintas aplikasi | Rencana | Unit, mitra, komoditi, organisasi |
 | Event/webhook dan data warehouse | Rencana | Setelah kebutuhan sinkronisasi nyata terukur |
 
@@ -54,3 +56,17 @@ Keuangan tidak mengubah pembayaran di Pemasaran.
 
 Lihat [standar integrasi](./INTEGRATION_STANDARDS.md) sebelum membuat koneksi
 aplikasi baru.
+
+## Baseline keamanan yang wajib
+
+- Endpoint aplikasi tidak boleh dapat dibaca tanpa autentikasi. Hanya `login`,
+  `health check`, dan aset statis yang boleh publik bila diperlukan.
+- Akun manusia dan akun integrasi harus terpisah. Role `integrasi` hanya dapat
+  membuka endpoint eksplisit `/api/integrasi/v1/*`, bukan halaman atau REST API
+  operasional.
+- Frontend tidak boleh memperoleh akses database langsung dengan key `anon`.
+  Ia harus berbicara ke API aplikasi yang memeriksa token dan peran.
+- CORS produksi hanya mengizinkan origin frontend yang terdaftar. Wildcard
+  (`*`) tidak diperbolehkan untuk API yang memakai kredensial.
+- Pengelolaan pengguna, service account, dan perubahan hak akses wajib dapat
+  ditelusuri dalam audit trail. Lihat [Identity & Access](./IDENTITY_AND_ACCESS.md).

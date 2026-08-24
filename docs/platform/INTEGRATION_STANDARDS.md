@@ -7,6 +7,8 @@
   disetujui sebagai endpoint tulis.
 - Jangan memberi akses database langsung kepada aplikasi lain.
 - Gunakan akun teknis ber-role `integrasi` untuk koneksi mesin-ke-mesin.
+- Akun `integrasi` hanya diizinkan pada `/api/integrasi/v1/*`; ia tidak boleh
+  memakai endpoint aplikasi umum maupun antarmuka web.
 - Kirim `Authorization: Bearer <token>` pada setiap permintaan.
 - Simpan kredensial akun teknis hanya pada environment/secret manager aplikasi
   pemakai, bukan di kode atau spreadsheet.
@@ -21,7 +23,8 @@
 1. Administrator Pemasaran membuat user khusus, misalnya
    `svc-keuangan-pemasaran`, dengan role **Integrasi (API baca saja)**.
 2. Server Keuangan meminta token melalui `POST /api/auth/login` memakai akun
-   tersebut.
+   tersebut. Ini hanya mekanisme transisi; target Layer Zero adalah client
+   credential dari identity provider pusat.
 3. Server Keuangan memanggil endpoint integrasi dengan token tersebut.
 4. Token berlaku sesuai kebijakan aplikasi saat ini dan diperbarui oleh server
    Keuangan sebelum kedaluwarsa.

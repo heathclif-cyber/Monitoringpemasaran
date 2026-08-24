@@ -41,18 +41,33 @@ def _decode_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-) -> models.User:
-    payload = _decode_token(credentials.credentials)
+def get_active_user_from_token(token: str, db: Session) -> models.User:
+    """Resolve a bearer token to an active user for API-wide access control.
+
+    Route dependencies use the same function. Keeping the lookup here means a
+    disabled account immediately loses access, including on read-only routes
+    that do not otherwise need an authentication dependency.
+    """
+    payload = _decode_token(token)
+    try:
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
     user = db.query(models.User).filter(
-        models.User.id == int(payload["sub"]),
+        models.User.id == user_id,
         models.User.is_active == True,
     ).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> models.User:
+    return get_active_user_from_token(credentials.credentials, db)
 
 
 def require_admin(user: models.User = Depends(get_current_user)) -> models.User:

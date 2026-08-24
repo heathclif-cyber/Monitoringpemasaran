@@ -95,6 +95,18 @@ akan memiliki pemilik yang ditetapkan pada katalog data platform. Aplikasi
 pemakai menyimpan referensi ID atau salinan baca yang dapat diperbarui, bukan
 versi data master yang dapat diedit sendiri.
 
+## Identitas dan akses sebagai sumber tunggal
+
+Pengguna, role, dan kredensial integrasi juga merupakan data yang tidak boleh
+dibuat ulang sembarangan. Selama masa transisi, setiap aplikasi boleh memiliki
+administrasi akun lokal yang aman; namun role dan akun teknis harus mengikuti
+kontrak Layer Zero. Akun `integrasi` hanya boleh membaca endpoint versi
+`/api/integrasi/v1/*`, bukan data aplikasi secara umum.
+
+Targetnya adalah identity provider Layer Zero sebagai sumber tunggal identitas
+lintas aplikasi. Detail kontrol dan migrasinya ada di
+[IDENTITY_AND_ACCESS.md](./docs/platform/IDENTITY_AND_ACCESS.md).
+
 ## Standar desain lintas aplikasi
 
 Desain aplikasi mengikuti fondasi AsetOpt Monitor: React + TypeScript, Tailwind
