@@ -144,7 +144,8 @@ def _build_laporan_rows(db: Session):
 
         ba_ref = _resolve_ba_ref(k, inv, do, ba_by_no)
 
-        if is_payung_ba(k) and ba_ref:
+        is_payung_kontrak = is_payung_ba(k)
+        if is_payung_kontrak and ba_ref:
             k_harga_local = ba_effective_harga(ba_ref, k)
             k_premi = 0.0
 
@@ -168,6 +169,11 @@ def _build_laporan_rows(db: Session):
 
         ba_date = ba_ref.tanggal_ba if ba_ref else None
         ba_buku_date = ba_ref.bulan_buku if ba_ref else None
+        # Normal: tanggal BA adalah tanggal buku. Payung: gunakan periode buku
+        # yang dipilih pada BA (fallback tanggal BA untuk data lama).
+        effective_buku_date = (
+            (ba_buku_date or ba_date) if is_payung_kontrak else ba_date
+        )
 
         ppn_persen_val = (
             float(getattr(k, "ppn_persen", 0) or 0)
@@ -303,12 +309,12 @@ def _build_laporan_rows(db: Session):
             # Simpan periode lengkap untuk filter/audit. Tampilan Bulan_Buku
             # sengaja tetap ringkas, namun periode BA tidak boleh kehilangan tahun.
             "Raw_Bulan_Buku": (
-                (ba_buku_date or ba_date).strftime("%Y-%m-%d")
-                if ba_ref and (ba_buku_date or ba_date)
+                effective_buku_date.strftime("%Y-%m-%d")
+                if effective_buku_date
                 else ""
             ),
             "Bulan_Buku": get_bulan_buku(
-                (ba_buku_date or ba_date) if (ba_ref and (ba_buku_date or ba_date)) else (
+                effective_buku_date if effective_buku_date else (
                     do.rencana_pengambilan if do and getattr(do, 'rencana_pengambilan', None) else (do.tanggal_pembayaran if do else None)
                 )
             ),

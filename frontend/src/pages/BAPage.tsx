@@ -35,7 +35,7 @@ const baSchema = z.object({
   no_ba: z.string().min(1, 'No BA wajib diisi'),
   no_kontrak: z.string().min(1, 'Kontrak wajib dipilih'),
   tanggal_ba: z.string().min(1, 'Tanggal BA wajib diisi'),
-  bulan_buku: z.string().min(1, 'Bulan buku wajib diisi'),
+  bulan_buku: z.string().optional(),
   volume_ba: z.coerce.number().min(0.01, 'Volume harus > 0'),
   harga_satuan: z.coerce.number().min(0),
   nama_unit: z.string().optional(),
@@ -145,9 +145,9 @@ export default function BAPage() {
   }, [currentKontrak])
 
   useEffect(() => {
-    if (isExisting || !tanggalBa) return
+    if (isExisting || !isPayungBA || !tanggalBa) return
     setValue('bulan_buku', previousMonthFrom(tanggalBa))
-  }, [tanggalBa, isExisting, setValue])
+  }, [tanggalBa, isExisting, isPayungBA, setValue])
 
   const autoLoadBA = async () => {
     const no = form.getValues('no_ba')
@@ -160,7 +160,7 @@ export default function BAPage() {
       const kontrakBA = kontrakStore.data.find((k) => k.no_kontrak === data.no_kontrak)
       setTipeKontrak(String(kontrakBA?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA' ? 'PAYUNG_BA' : 'STANDAR')
       setValue('tanggal_ba', data.tanggal_ba)
-      setValue('bulan_buku', toMonthInput(data.bulan_buku || data.tanggal_ba))
+      setValue('bulan_buku', toMonthInput(data.bulan_buku || ''))
       setValue('volume_ba', data.volume_ba)
       setValue('harga_satuan', data.harga_satuan || 0)
       setValue('nama_unit', data.nama_unit || '')
@@ -176,14 +176,17 @@ export default function BAPage() {
 
   const onSubmit = async (data: BAFormData) => {
     try {
+      if (isPayungBA && !data.bulan_buku) {
+        addNotification('Bulan buku wajib diisi untuk kontrak payung', 'error')
+        return
+      }
       if (isPayungBA && (!data.harga_satuan || data.harga_satuan <= 0)) {
         addNotification('Harga satuan BA wajib diisi untuk kontrak payung', 'error')
         return
       }
-      const payload = {
-        ...data,
-        bulan_buku: `${data.bulan_buku}-01`,
-      }
+      const payload: any = { ...data }
+      if (isPayungBA) payload.bulan_buku = `${data.bulan_buku}-01`
+      else delete payload.bulan_buku
       if (!payload.nama_unit) delete payload.nama_unit
       if (!payload.deskripsi) delete payload.deskripsi
       if (!payload.link_berita_acara) delete payload.link_berita_acara
@@ -286,17 +289,23 @@ export default function BAPage() {
             <CardTitle className="text-sm font-semibold">Data Berita Acara</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
-            <div>
+            <div className={!isPayungBA ? 'col-span-2' : ''}>
               <Label className="text-xs">Tanggal BA *</Label>
               <Input type="date" {...register('tanggal_ba')} />
-              <p className="text-xs text-slate-400 mt-1">Tanggal dokumen akumulasi (bisa beda bulan dengan pembukuan)</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {isPayungBA
+                  ? 'Tanggal dokumen akumulasi (bisa beda bulan dengan pembukuan).'
+                  : 'Tanggal realisasi pengambilan sekaligus tanggal buku otomatis.'}
+              </p>
             </div>
-            <div>
-              <Label className="text-xs">Bulan Buku *</Label>
-              <Input type="month" {...register('bulan_buku')} />
-              <p className="text-xs text-slate-400 mt-1">Periode pembukuan transaksi — dipakai di Laporan Digital</p>
-              {errors.bulan_buku && <p className="text-xs text-red-500 mt-1">{errors.bulan_buku.message}</p>}
-            </div>
+            {isPayungBA && (
+              <div>
+                <Label className="text-xs">Bulan Buku *</Label>
+                <Input type="month" {...register('bulan_buku')} />
+                <p className="text-xs text-slate-400 mt-1">Periode pembukuan transaksi — dipakai di Laporan Digital.</p>
+                {errors.bulan_buku && <p className="text-xs text-red-500 mt-1">{errors.bulan_buku.message}</p>}
+              </div>
+            )}
             <div>
               <Label className="text-xs">Volume BA *</Label>
               <Input type="number" step="any" {...register('volume_ba')} />

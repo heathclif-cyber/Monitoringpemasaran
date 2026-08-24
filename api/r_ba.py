@@ -30,15 +30,15 @@ def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: m
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
 
-    if not ba.bulan_buku:
-        raise HTTPException(status_code=400, detail="Bulan buku wajib diisi")
+    is_payung_ba = str(getattr(db_kontrak, "tipe_alur", "STANDAR") or "STANDAR").upper() == "PAYUNG_BA"
+    if is_payung_ba and not ba.bulan_buku:
+        raise HTTPException(status_code=400, detail="Bulan buku wajib diisi untuk kontrak payung")
 
     volume_ba = float(ba.volume_ba or 0)
     if volume_ba <= 0:
         raise HTTPException(status_code=400, detail="Volume BA harus > 0")
 
     harga_satuan = float(ba.harga_satuan or 0)
-    is_payung_ba = str(getattr(db_kontrak, "tipe_alur", "STANDAR") or "STANDAR").upper() == "PAYUNG_BA"
     if is_payung_ba and harga_satuan <= 0:
         raise HTTPException(status_code=400, detail="Harga satuan BA harus > 0")
 
@@ -48,6 +48,10 @@ def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: m
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     payload = ba.model_dump()
+    # Kontrak normal dibukukan otomatis pada tanggal BA. Jangan simpan periode
+    # manual agar laporan selalu mengikuti tanggal realisasi BA.
+    if not is_payung_ba:
+        payload["bulan_buku"] = None
     db_ba = db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == ba.no_ba).first()
     if db_ba:
         if db_ba.status == "Ter-invoice":

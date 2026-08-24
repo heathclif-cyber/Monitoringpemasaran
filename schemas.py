@@ -221,7 +221,7 @@ class BeritaAcaraBase(BaseModel):
     no_ba: str
     no_kontrak: str
     tanggal_ba: date
-    bulan_buku: date
+    bulan_buku: Optional[date] = None
     volume_ba: float = 0.0
     harga_satuan: float = 0.0
     nama_unit: Optional[str] = None
