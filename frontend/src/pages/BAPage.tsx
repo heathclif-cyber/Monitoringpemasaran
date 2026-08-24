@@ -56,6 +56,7 @@ export default function BAPage() {
   const canEdit = useAuthStore((s) => s.canEdit)
   const [isExisting, setIsExisting] = useState(false)
   const [exportNo, setExportNo] = useState<string | null>(null)
+  const [tipeKontrak, setTipeKontrak] = useState<'STANDAR' | 'PAYUNG_BA'>('STANDAR')
 
   const form = useForm<BAFormData>({
     resolver: zodResolver(baSchema),
@@ -86,11 +87,13 @@ export default function BAPage() {
   }, [])
 
   const kontrakOptions = useMemo(
-    () => kontrakStore.data.map((k) => ({
-      value: k.no_kontrak,
-      label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''} (${String(k.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA' ? 'Payung' : 'Normal'})`,
-    })),
-    [kontrakStore.data],
+    () => kontrakStore.data
+      .filter((k) => String(k.tipe_alur || 'STANDAR').toUpperCase() === tipeKontrak)
+      .map((k) => ({
+        value: k.no_kontrak,
+        label: `${k.no_kontrak}${k.pembeli ? ' - ' + k.pembeli.split('\n')[0] : ''}`,
+      })),
+    [kontrakStore.data, tipeKontrak],
   )
 
   const currentKontrak: Kontrak | undefined = useMemo(
@@ -139,6 +142,8 @@ export default function BAPage() {
       setIsExisting(true)
       setExportNo(no)
       setValue('no_kontrak', data.no_kontrak)
+      const kontrakBA = kontrakStore.data.find((k) => k.no_kontrak === data.no_kontrak)
+      setTipeKontrak(String(kontrakBA?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA' ? 'PAYUNG_BA' : 'STANDAR')
       setValue('tanggal_ba', data.tanggal_ba)
       setValue('bulan_buku', toMonthInput(data.bulan_buku || data.tanggal_ba))
       setValue('volume_ba', data.volume_ba)
@@ -190,17 +195,37 @@ export default function BAPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <ClipboardList size={15} className="text-brand-600" />
-              Pilih Berita Acara
+              Pilih Alur BA
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs">Jenis Kontrak *</Label>
+              <NativeSelect
+                value={tipeKontrak}
+                disabled={isExisting}
+                onChange={(event) => {
+                  const next = event.target.value as 'STANDAR' | 'PAYUNG_BA'
+                  setTipeKontrak(next)
+                  setValue('no_kontrak', '')
+                }}
+              >
+                <option value="STANDAR">Kontrak Normal</option>
+                <option value="PAYUNG_BA">Kontrak Payung</option>
+              </NativeSelect>
+              <p className="text-xs text-slate-400 mt-1">
+                {tipeKontrak === 'PAYUNG_BA'
+                  ? 'BA menjadi dasar volume, harga, dan invoice kontrak payung.'
+                  : 'BA mencatat realisasi pengambilan dan bulan buku kontrak normal.'}
+              </p>
+            </div>
             <div>
               <Label className="text-xs">No Kontrak *</Label>
               <SearchableSelect
                 options={kontrakOptions}
                 value={watch('no_kontrak')}
                 onChange={(v) => setValue('no_kontrak', v, { shouldValidate: true })}
-                placeholder="-- Pilih Kontrak Normal atau Payung --"
+                placeholder={`-- Pilih Kontrak ${tipeKontrak === 'PAYUNG_BA' ? 'Payung' : 'Normal'} --`}
               />
               {kontrakOptions.length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">Belum ada kontrak yang dapat dipilih</p>
