@@ -23,7 +23,7 @@ export function Header() {
 
   return (
     <header
-      className="fixed top-0 right-0 left-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur-sm sm:px-5 lg:left-[var(--sidebar-width)] lg:px-6"
+      className="fixed top-0 right-0 left-0 z-40 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-5 lg:left-[var(--sidebar-width)]"
     >
       <div className="flex min-w-0 items-center gap-2">
         <Button
@@ -37,9 +37,9 @@ export function Header() {
         </Button>
         <div className="min-w-0">
           {meta.breadcrumb && (
-            <p className="truncate text-xs font-medium text-muted-foreground">{meta.breadcrumb}</p>
+            <p className="truncate text-xs font-medium text-gray-500">{meta.breadcrumb}</p>
           )}
-          <p className="truncate text-sm font-semibold leading-tight text-foreground">{meta.title}</p>
+          <p className="truncate text-sm font-semibold leading-tight text-gray-800">{meta.title}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">

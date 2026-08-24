@@ -26,6 +26,10 @@ Monitor dan berlaku untuk Monitoring Pemasaran maupun aplikasi berikutnya.
 | Error | merah |
 | Radius | `0.5rem` |
 | Konten | padding `p-5`; jarak section `space-y-6` |
+| Judul halaman | `text-lg font-bold`; analitik dapat `text-xl font-bold` |
+| Form | label `text-xs`, input/select `h-10 text-sm`, textarea minimum 80px |
+| Card | `rounded-lg`, header `px-5 py-4`, isi `px-5 pb-4` |
+| Navigasi | sidebar 224px, header 56px, item 13px dengan ikon 15–16px |
 | Ikon menu | Lucide 15–16 px, selalu dengan label |
 
 Warna status bersifat semantik: hijau tidak dipakai sebagai brand utama. Warna
@@ -34,7 +38,8 @@ navigasi memakai biru/navy.
 
 ## Pola interaksi
 
-- Sidebar tetap di kiri dan header tetap di atas pada layar desktop.
+- Sidebar tetap di kiri dan header tetap di atas pada layar desktop; sidebar
+  memakai gradient navy dan status aktif putih transparan.
 - Navigasi dideklarasikan sebagai data; grup menu dapat dibuka/tutup.
 - Halaman memiliki satu aksi primer yang jelas.
 - Form memakai primitive shadcn dan validasi eksplisit; fakta dari entitas

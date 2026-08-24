@@ -79,7 +79,7 @@ npx tsc --noEmit # type-check
 |-----------|---------------------|
 | Wrapper halaman | `PageShell` — `@/components/patterns` |
 | Judul + deskripsi + actions | `PageHeader` |
-| Bar filter | `FilterToolbar` (+ kontrol `h-8` / `h-9`) |
+| Bar filter | `FilterToolbar` (+ kontrol `h-10`; `h-8` hanya toolbar padat) |
 | Ringkasan angka 1 baris | `StatPills` |
 | KPI dashboard besar | `StatCard` — `@/components/common` |
 | List + loading + empty | `ListPanel` (+ `EmptyState` / `LoadingSkeleton`) |

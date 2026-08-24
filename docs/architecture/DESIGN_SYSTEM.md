@@ -43,7 +43,7 @@ Brand scale: `brand-50` … `brand-900` (biru/navy).
 ### Tipografi
 
 - Font: **Inter** (`font-sans`)
-- Judul halaman: `text-base font-semibold` (page padat) atau `text-lg font-semibold`
+- Judul halaman: `text-lg font-bold`; dashboard/halaman analitik boleh `text-xl font-bold`
 - Deskripsi: `text-sm text-muted-foreground` atau `text-xs`
 - Label form/filter: `text-xs font-medium text-muted-foreground`
 - Angka: selalu `tabular-nums`
@@ -52,11 +52,11 @@ Brand scale: `brand-50` … `brand-900` (biru/navy).
 
 | Elemen | Standar |
 |--------|---------|
-| Konten main | `max-w-[1600px] p-5 lg:p-6` (layout) |
+| Konten main | `max-w-[1600px] p-5` (layout) |
 | Halaman padat/opsional sempit | `PageShell width="narrow"` → `max-w-5xl` |
-| Stack vertikal section | `space-y-4` (default), `space-y-3` (padat) |
+| Stack vertikal section | `space-y-6` (default), `space-y-4` (padat) |
 | Gap filter | `gap-2` |
-| Tinggi kontrol | `h-8` atau `h-9` (form) |
+| Tinggi kontrol | `h-10` (form), `h-8` hanya untuk filter padat yang sudah ada |
 
 ---
 
@@ -163,7 +163,7 @@ Pola: filter bar + `DataTable` / tabel + aksi download/preview (`DocxPreview`).
 ## 5. Checklist page baru
 
 - [ ] Bungkus dengan `PageShell` (+ `PageHeader` jika perlu judul lokal)
-- [ ] Filter pakai `FilterToolbar` + kontrol `h-8`/`h-9`
+- [ ] Filter pakai `FilterToolbar` + kontrol `h-10` (atau `h-8` pada toolbar padat)
 - [ ] Ringkasan angka: `StatPills` atau `StatCard` (dashboard)
 - [ ] List: `ListPanel` + baris padat, status via `Badge`/`StatusPill`
 - [ ] Empty/loading: `EmptyState` / `LoadingSkeleton`
@@ -180,7 +180,7 @@ Pola: filter bar + `DataTable` / tabel + aksi download/preview (`DocxPreview`).
 | Hero gradient + ring chart di halaman unit | `PageHeader` + `StatPills` |
 | Duplikat deskripsi panjang | Meta di `pageMeta` atau 1 baris di header |
 | Warna hex/rose acak di mana-mana | Token + `StatusPill` tones |
-| Input height beda-beda | `h-8` (toolbar) / `h-9` (form) |
+| Input height beda-beda | `h-10` (form) / `h-8` (toolbar padat) |
 | Empty state teks polos | `EmptyState` |
 | Copy-paste layout 3 halaman | Import pattern components |
 

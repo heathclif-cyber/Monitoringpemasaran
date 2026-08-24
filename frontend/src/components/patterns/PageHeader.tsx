@@ -17,13 +17,13 @@ export function PageHeader({ title, description, eyebrow, actions, className }: 
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between',
+        'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between',
         className,
       )}
     >
       <div className="min-w-0 space-y-1">
         {eyebrow}
-        <h1 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+        <h1 className="text-lg font-bold tracking-tight text-foreground">
           {title}
         </h1>
         {description ? (
