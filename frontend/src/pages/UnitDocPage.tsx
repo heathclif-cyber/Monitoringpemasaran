@@ -93,7 +93,7 @@ function CompactUpload({
     setUploading(true)
     try {
       await client.uploadFormData<DocumentUpload>('/api/documents/upload', formData)
-      addNotification('BA Serah Terima berhasil di-upload', 'success')
+      addNotification(`${slot.label} berhasil di-upload`, 'success')
       onUploaded()
     } catch (err: unknown) {
       addNotification(err instanceof Error ? err.message : 'Upload gagal', 'error')
@@ -180,7 +180,7 @@ function CompactUpload({
         onClick={() => inputRef.current?.click()}
       >
         {uploading ? <Loader2 size={12} className="animate-spin" /> : <CloudUpload size={12} />}
-        {fileMissing ? 'Upload ulang' : 'Upload BA Serah Terima'}
+        {fileMissing ? 'Upload ulang' : `Upload ${slot.label}`}
       </Button>
     </>
   )
@@ -188,68 +188,80 @@ function CompactUpload({
 
 function UnitRow({ row, onUploaded }: { row: DocumentPipelineRow; onUploaded: () => void }) {
   const baSt = row.slots.find((s) => s.slot_key === 'ba_serah_terima')
+  const baAmbil = row.slots.find((s) => s.slot_key === 'ba_pengambilan' && s.entity_id)
   const done = Boolean(baSt?.uploaded) || row.unit_complete !== false
   const needBaSt = Boolean(baSt && !baSt.uploaded)
   const volLabel = formatVolumeLabel(row.volume, row.satuan)
 
   return (
-    <div
-      className={cn(
-        'flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3',
-        'border-b border-border/70 px-3 py-2.5 last:border-0',
-        needBaSt && 'bg-destructive/5',
-      )}
-    >
-      <div className="min-w-0 sm:w-[40%] sm:shrink-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <p className="text-sm font-semibold truncate">{row.no_do}</p>
-          {needBaSt ? (
-            <StatusPill tone="action" icon={false}>
-              Aksi
-            </StatusPill>
+    <div className={cn('border-b border-border/70 last:border-0', needBaSt && 'bg-destructive/5')}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-3 py-2.5">
+        <div className="min-w-0 sm:w-[40%] sm:shrink-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className="text-sm font-semibold truncate">{row.no_do}</p>
+            {needBaSt ? (
+              <StatusPill tone="action" icon={false}>
+                Aksi
+              </StatusPill>
+            ) : (
+              <StatusPill tone="success" icon={false}>
+                OK
+              </StatusPill>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {safe(row.unit)}
+            {row.tanggal ? ` · ${formatDate(row.tanggal)}` : ''}
+            {row.no_invoice ? ` · Inv ${row.no_invoice}` : ''}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1 sm:flex-1 min-w-0">
+          <p className="text-xs font-medium text-foreground">
+            BA Serah Terima Barang
+            <span className="ml-1.5 text-[10px] font-medium text-destructive">wajib</span>
+          </p>
+          {volLabel ? (
+            <div className="inline-flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-bold tabular-nums">
+                Vol. {volLabel}
+              </span>
+              {row.komoditi ? (
+                <span className="text-xs text-muted-foreground truncate">{row.komoditi}</span>
+              ) : null}
+            </div>
           ) : (
-            <StatusPill tone="success" icon={false}>
-              OK
+            <StatusPill tone="warning" icon={false}>
+              Volume DO kosong
             </StatusPill>
           )}
         </div>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">
-          {safe(row.unit)}
-          {row.tanggal ? ` · ${formatDate(row.tanggal)}` : ''}
-          {row.no_invoice ? ` · Inv ${row.no_invoice}` : ''}
-        </p>
+
+        <div className="flex items-center gap-1.5 sm:justify-end sm:shrink-0">
+          {baSt ? (
+            <CompactUpload slot={baSt} onUploaded={onUploaded} />
+          ) : done ? (
+            <StatusPill tone="success">OK</StatusPill>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-col gap-1 sm:flex-1 min-w-0">
-        <p className="text-xs font-medium text-foreground">
-          BA Serah Terima Barang
-          <span className="ml-1.5 text-[10px] font-medium text-destructive">wajib</span>
-        </p>
-        {volLabel ? (
-          <div className="inline-flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-bold tabular-nums">
-              Vol. {volLabel}
-            </span>
-            {row.komoditi ? (
-              <span className="text-xs text-muted-foreground truncate">{row.komoditi}</span>
-            ) : null}
+      {baAmbil && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-3 pb-2.5 -mt-1">
+          <div className="min-w-0 sm:w-[40%] sm:shrink-0" />
+          <div className="flex flex-col gap-1 sm:flex-1 min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">
+              BA Pengambilan
+              <span className="ml-1.5 text-[10px] font-medium text-muted-foreground">opsional · {baAmbil.entity_id}</span>
+            </p>
           </div>
-        ) : (
-          <StatusPill tone="warning" icon={false}>
-            Volume DO kosong
-          </StatusPill>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1.5 sm:justify-end sm:shrink-0">
-        {baSt ? (
-          <CompactUpload slot={baSt} onUploaded={onUploaded} />
-        ) : done ? (
-          <StatusPill tone="success">OK</StatusPill>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
-      </div>
+          <div className="flex items-center gap-1.5 sm:justify-end sm:shrink-0">
+            <CompactUpload slot={baAmbil} onUploaded={onUploaded} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

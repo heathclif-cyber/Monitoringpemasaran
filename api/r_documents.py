@@ -683,6 +683,7 @@ def _superman_status_for_row(
 
 _PIPELINE_MISSING_SLOTS = {
     "ba_serah_terima",
+    "ba_pengambilan",
     "do",
     "deklarasi",
     "kontrak",
@@ -978,6 +979,21 @@ def document_pipeline(
                     )
                     if no_do
                     else "BA Serah Terima diunggah per DO (Unit)"
+                ),
+                responsibility="unit",
+            ),
+            _pipeline_slot(
+                slot_key="ba_pengambilan",
+                label="BA Pengambilan",
+                required=False,
+                entity_type="ba" if no_ba else None,
+                entity_id=no_ba,
+                doc_type="berita_acara" if no_ba else None,
+                cache=cache,
+                note=(
+                    "Opsional · Unit — dokumen realisasi pengambilan (BA payung/normal)"
+                    if no_ba
+                    else "Belum ada BA terkait transaksi ini"
                 ),
                 responsibility="unit",
             ),
