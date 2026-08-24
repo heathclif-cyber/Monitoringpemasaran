@@ -12,6 +12,43 @@ from services.ba_utils import validate_ba_volume_quota
 router = APIRouter(prefix="/api/ba", tags=["Berita Acara"])
 
 
+def _contract_snapshot(kontrak: models.Kontrak, requested_unit: str | None) -> dict:
+    """Metadata BA berasal dari kontrak; hanya unit multi-unit yang boleh dipilih."""
+    units = list(getattr(kontrak, "units", None) or [])
+    requested_unit = (requested_unit or "").strip()
+    matched_unit = None
+    if requested_unit and units:
+        matched_unit = next((unit for unit in units if unit.nama_unit == requested_unit), None)
+        if not matched_unit:
+            raise ValueError(f"Unit '{requested_unit}' tidak ditemukan dalam kontrak")
+
+    if not requested_unit:
+        requested_unit = (kontrak.kebun_produsen or "").strip()
+    if not requested_unit and len(units) == 1:
+        requested_unit = units[0].nama_unit or ""
+        matched_unit = units[0]
+    if matched_unit is None and requested_unit and units:
+        matched_unit = next((unit for unit in units if unit.nama_unit == requested_unit), None)
+
+    komoditi = (
+        getattr(matched_unit, "komoditi", None)
+        or kontrak.komoditi
+        or None
+    )
+    deskripsi = (
+        getattr(matched_unit, "jenis_komoditi", None)
+        or getattr(matched_unit, "deskripsi_produk", None)
+        or kontrak.jenis_komoditi
+        or kontrak.deskripsi_produk
+        or komoditi
+    )
+    return {
+        "nama_unit": requested_unit or None,
+        "komoditi": komoditi,
+        "deskripsi": deskripsi,
+    }
+
+
 def _sync_ba_status(db: Session, ba: models.BeritaAcara) -> None:
     linked_invoice = (
         db.query(models.Invoice)
@@ -48,15 +85,19 @@ def create_ba(ba: schemas.BeritaAcaraCreate, db: Session = Depends(get_db), _: m
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     payload = ba.model_dump()
+    if is_payung_ba and len(list(db_kontrak.units or [])) > 1 and not (payload.get("nama_unit") or "").strip():
+        raise HTTPException(status_code=400, detail="Unit wajib dipilih untuk kontrak payung multi-unit")
+    try:
+        payload.update(_contract_snapshot(db_kontrak, payload.get("nama_unit")))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     # Kontrak normal dibukukan otomatis pada tanggal BA. Jangan simpan periode
-    # manual agar laporan selalu mengikuti tanggal realisasi BA. Detail harga
-    # dan material juga selalu mengikuti kontrak, bukan input ulang pengguna.
+    # manual agar laporan selalu mengikuti tanggal realisasi BA. Harga normal
+    # mengikuti kontrak; harga payung tetap harga transaksi yang diisi di BA.
     if not is_payung_ba:
         payload["bulan_buku"] = None
         payload["harga_satuan"] = float(db_kontrak.harga_satuan or 0)
-        payload["nama_unit"] = db_kontrak.kebun_produsen or None
-        payload["komoditi"] = db_kontrak.komoditi or None
-        payload["deskripsi"] = db_kontrak.jenis_komoditi or db_kontrak.deskripsi_produk or None
     db_ba = db.query(models.BeritaAcara).filter(models.BeritaAcara.no_ba == ba.no_ba).first()
     if db_ba:
         if db_ba.status == "Ter-invoice":
