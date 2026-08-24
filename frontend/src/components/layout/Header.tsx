@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/authStore'
 import { useAppStore } from '@/store/appStore'
 
-const ROLE_LABELS: Record<string, string> = { admin: 'Admin', staff: 'Staff', tamu: 'Tamu' }
+const ROLE_LABELS: Record<string, string> = { admin: 'Admin', staff: 'Staff', tamu: 'Tamu', integrasi: 'Integrasi' }
 
 export function Header() {
   const location = useLocation()

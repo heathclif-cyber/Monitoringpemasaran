@@ -62,7 +62,14 @@ def require_admin(user: models.User = Depends(get_current_user)) -> models.User:
 
 
 def require_write(user: models.User = Depends(get_current_user)) -> models.User:
-    """Izinkan admin dan staff; tolak tamu."""
-    if user.role == "tamu":
+    """Izinkan hanya admin dan staff untuk mengubah transaksi."""
+    if user.role not in {"admin", "staff"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Read-only access")
+    return user
+
+
+def require_integration_read(user: models.User = Depends(get_current_user)) -> models.User:
+    """Akses baca untuk aplikasi internal dan akun integrasi khusus."""
+    if user.role not in {"admin", "staff", "integrasi"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Integration access required")
     return user

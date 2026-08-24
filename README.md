@@ -11,6 +11,7 @@ Sistem otomatisasi dokumen penjualan dan pelaporan.
 - `scripts/`: skrip data, diagnosa, migrasi, deployment, dan arsip skrip satu-kali-pakai. Lihat [panduan skrip](scripts/README.md).
 - `docs/`: dokumentasi arsitektur, deployment, operasi, dan catatan. Lihat [indeks dokumentasi](docs/README.md).
 - `METHODOLOGY.md`: panduan dan prinsip aplikasi, termasuk sumber data tunggal serta alur BA.
+- `docs/platform/`: fondasi Layer Zero untuk standar integrasi dan kepemilikan data lintas aplikasi.
 
 ## Konfigurasi
 

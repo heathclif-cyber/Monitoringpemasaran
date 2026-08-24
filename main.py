@@ -27,6 +27,7 @@ from api.r_superman import router as superman_router
 from api.r_piutang import router as piutang_router
 from api.r_auth import router as auth_router
 from api.r_users import router as users_router
+from api.r_integrasi import router as integrasi_router
 
 # --- App Initialization ---
 app = FastAPI(title="PTPN I - Sales Document Automation")
@@ -81,6 +82,7 @@ templates = Jinja2Templates(directory="templates")
 # --- Include Routers ---
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(integrasi_router)
 app.include_router(kontrak_router)
 app.include_router(invoice_router)
 app.include_router(pembayaran_router)

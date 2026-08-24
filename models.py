@@ -12,7 +12,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     nama_lengkap = Column(String, nullable=False)
     jabatan = Column(String, nullable=True)
-    # role: admin | staff | tamu
+    # role: admin | staff | tamu | integrasi
     role = Column(String, nullable=False, default="staff")
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

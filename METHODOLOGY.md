@@ -82,3 +82,15 @@ Sebelum menambah field pada form atau API, jawab pertanyaan berikut.
    entitas transaksi yang paling dekat dengan kejadiannya.
 3. Apakah API tetap benar bila dipanggil tanpa antarmuka? Jika tidak, tambahkan
    validasi atau derivasi di server sebelum mengubah UI.
+
+## Integrasi antar aplikasi
+
+Setiap aplikasi adalah pemilik domainnya sendiri. Aplikasi lain mengambil data
+melalui API yang terdokumentasi, bukan dengan membaca atau menulis database
+aplikasi pemilik secara langsung. ID bisnis sumber, misalnya nomor pembayaran,
+invoice, dan kontrak, harus selalu disertakan agar transaksi dapat ditelusuri.
+
+Data bersama seperti unit, mitra, komoditi, pengguna, dan struktur organisasi
+akan memiliki pemilik yang ditetapkan pada katalog data platform. Aplikasi
+pemakai menyimpan referensi ID atau salinan baca yang dapat diperbarui, bukan
+versi data master yang dapat diedit sendiri.

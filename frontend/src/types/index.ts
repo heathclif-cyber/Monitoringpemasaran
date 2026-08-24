@@ -767,7 +767,7 @@ export interface StokInput {
 // Auth
 // ============================================================
 
-export type UserRole = 'admin' | 'staff' | 'tamu'
+export type UserRole = 'admin' | 'staff' | 'tamu' | 'integrasi'
 
 export interface User {
   id: number

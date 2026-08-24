@@ -24,8 +24,8 @@ def create_user(
     db: Session = Depends(get_db),
     _: models.User = Depends(require_admin),
 ):
-    if body.role not in ("admin", "staff", "tamu"):
-        raise HTTPException(status_code=400, detail="Role tidak valid (admin/staff/tamu)")
+    if body.role not in ("admin", "staff", "tamu", "integrasi"):
+        raise HTTPException(status_code=400, detail="Role tidak valid (admin/staff/tamu/integrasi)")
     existing = db.query(models.User).filter(models.User.username == body.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username sudah digunakan")
@@ -52,8 +52,8 @@ def update_user(
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
-    if body.role is not None and body.role not in ("admin", "staff", "tamu"):
-        raise HTTPException(status_code=400, detail="Role tidak valid (admin/staff/tamu)")
+    if body.role is not None and body.role not in ("admin", "staff", "tamu", "integrasi"):
+        raise HTTPException(status_code=400, detail="Role tidak valid (admin/staff/tamu/integrasi)")
     if body.nama_lengkap is not None:
         user.nama_lengkap = body.nama_lengkap
     if body.jabatan is not None:

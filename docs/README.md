@@ -8,6 +8,7 @@
   - Konsep murni (tanpa multi-agent): [deployment/KANTOR_MURNI.md](./deployment/KANTOR_MURNI.md)
 - `operations/`: prosedur operasional Superman (agent desktop = legacy).
 - `notes/`: catatan dan temuan historis.
+- `platform/`: standar Layer Zero untuk integrasi, katalog data, dan aplikasi lintas domain.
 
 Panduan dan prinsip aplikasi tersedia di [METHODOLOGY.md](../METHODOLOGY.md).
 Dokumen konfigurasi untuk asisten pengembang (`CLAUDE.md` dan `agent.md`) sengaja tetap berada di root proyek.

@@ -21,12 +21,14 @@ const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
   staff: 'Staff',
   tamu: 'Tamu',
+  integrasi: 'Integrasi',
 }
 
 const ROLE_COLORS: Record<UserRole, string> = {
   admin: 'bg-primary/10 text-primary',
   staff: 'bg-green-500/10 text-green-600',
   tamu: 'bg-muted text-muted-foreground',
+  integrasi: 'bg-blue-500/10 text-blue-600',
 }
 
 export default function UsersPage() {
@@ -220,6 +222,7 @@ export default function UsersPage() {
                 <option value="admin">Admin</option>
                 <option value="staff">Staff</option>
                 <option value="tamu">Tamu</option>
+                <option value="integrasi">Integrasi (API baca saja)</option>
               </select>
             </div>
           </div>
@@ -253,6 +256,7 @@ export default function UsersPage() {
                 <option value="admin">Admin</option>
                 <option value="staff">Staff</option>
                 <option value="tamu">Tamu</option>
+                <option value="integrasi">Integrasi (API baca saja)</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
