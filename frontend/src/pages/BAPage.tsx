@@ -236,14 +236,14 @@ export default function BAPage() {
               <button
                 type="button"
                 onClick={() => selectTab('STANDAR')}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${!isPayungBA ? 'bg-background text-brand-700 shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${!isPayungBA ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 Kontrak Normal
               </button>
               <button
                 type="button"
                 onClick={() => selectTab('PAYUNG_BA')}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${isPayungBA ? 'bg-background text-brand-700 shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${isPayungBA ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 Kontrak Payung
               </button>
