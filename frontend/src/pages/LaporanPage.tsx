@@ -49,7 +49,6 @@ import {
 } from '@/utils/laporanUtils'
 import { formatCurrency, formatNumber, formatDate, safe, cn } from '@/lib/utils'
 import type { LaporanRow } from '@/types'
-import { exportLaporanExcel } from '@/utils/laporanExport'
 import { exportLaporanHO } from '@/utils/laporanHoExport'
 
 /** Kepadatan seimbang — antara padat & lega, nominal penuh tanpa ellipsis */
@@ -239,7 +238,8 @@ export default function LaporanPage() {
     setDeleteId(null)
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const { exportLaporanExcel } = await import('@/utils/laporanExport')
     exportLaporanExcel(
       sorted,
       `Laporan_Digital_${periodLabel.replace(/\s+/g, '_')}.xlsx`,
