@@ -58,13 +58,15 @@ const TD = 'px-3 py-2 text-[13px] align-middle leading-normal'
 const TD_MONEY = 'px-3 py-2 text-[13px] text-right whitespace-nowrap tabular-nums min-w-[10.5rem] align-middle'
 const TD_INPUT = 'w-full min-w-[6.5rem] h-8 text-[13px] border border-border/60 hover:border-border rounded-md px-2.5 py-1.5 bg-background text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring/30'
 
-/** Kolom identitas dibekukan saat scroll horizontal (DO + Invoice + Kontrak) */
+/** Kolom identitas dibekukan saat scroll horizontal (Kontrak + Unit + Mitra Pembeli — No. DO & No. Invoice ikut scroll biasa) */
 const FROZEN_W_DO = 'w-[12rem] min-w-[12rem] max-w-[12rem]'
-const FROZEN_W_INV = 'w-[11rem] min-w-[11rem] max-w-[11rem]'
+const W_INV = 'w-[11rem] min-w-[11rem] max-w-[11rem]'
 const FROZEN_W_KONTRAK = 'w-[13rem] min-w-[13rem] max-w-[13rem]'
-const STICKY_LEFT_DO = 'left-0'
-const STICKY_LEFT_INV = 'left-[12rem]'
-const STICKY_LEFT_KONTRAK = 'left-[23rem]'
+const FROZEN_W_UNIT = 'w-[9rem] min-w-[9rem] max-w-[9rem]'
+const FROZEN_W_MITRA = 'w-[11rem] min-w-[11rem] max-w-[11rem]'
+const STICKY_LEFT_KONTRAK = 'left-0'
+const STICKY_LEFT_UNIT = 'left-[13rem]'
+const STICKY_LEFT_MITRA = 'left-[22rem]'
 const STICKY_SHADOW = 'shadow-[4px_0_6px_-2px_rgba(0,0,0,0.12)]'
 const STICKY_TH = 'sticky top-0 z-30 bg-muted border-b border-border'
 const STICKY_TH_FROZEN = 'sticky top-0 z-40 bg-muted border-b border-border'
@@ -557,10 +559,11 @@ export default function LaporanPage() {
               <table className="text-[13px] border-separate border-spacing-0 w-full" style={{ minWidth: '4420px' }}>
                 <thead>
                   <tr className="text-muted-foreground">
-                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_DO, FROZEN_W_DO, 'text-left')}>No. DO</th>
-                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_INV, FROZEN_W_INV, 'text-left')}>No Invoice</th>
-                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_KONTRAK, STICKY_SHADOW, FROZEN_W_KONTRAK, 'text-left')}>No Kontrak</th>
-                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Unit</th>
+                    <th className={cn(TH, STICKY_TH, FROZEN_W_DO, 'text-left')}>No. DO</th>
+                    <th className={cn(TH, STICKY_TH, W_INV, 'text-left')}>No Invoice</th>
+                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_KONTRAK, FROZEN_W_KONTRAK, 'text-left')}>No Kontrak</th>
+                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_UNIT, FROZEN_W_UNIT, 'text-left')}>Unit</th>
+                    <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_MITRA, STICKY_SHADOW, FROZEN_W_MITRA, 'text-left')}>Mitra Pembeli</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[7.5rem]')}>Komoditi</th>
                     <th className={cn(TH, STICKY_TH, 'text-center min-w-[4.5rem]')}>Satuan</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Billing Date</th>
@@ -568,7 +571,6 @@ export default function LaporanPage() {
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[11rem]')}>Kewajiban Pembayaran (Inc. PPh)</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[11rem]')}>Kewajiban Transfer (Cash In)</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jumlah Transfer</th>
-                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[11rem]')}>Mitra Pembeli</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[12rem]')}>Jenis Material</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jml Invoice</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Harga Satuan</th>
@@ -656,8 +658,6 @@ function LaporanTableRow({
     )}>
       <td className={cn(
         TD,
-        STICKY_TD,
-        STICKY_LEFT_DO,
         FROZEN_W_DO,
         'font-medium whitespace-normal break-words',
         isBypass
@@ -682,23 +682,11 @@ function LaporanTableRow({
           <span className="text-muted-foreground text-[12px]">—</span>
         )}
       </td>
-      <td className={cn(
-        TD,
-        STICKY_TD,
-        STICKY_LEFT_INV,
-        FROZEN_W_INV,
-        'whitespace-normal break-words',
-        isBypass
-          ? 'bg-amber-50 group-hover:bg-amber-100 dark:bg-amber-950 dark:group-hover:bg-amber-900'
-          : 'bg-card group-hover:bg-muted',
-      )}>
-        {row.No_Invoice}
-      </td>
+      <td className={cn(TD, W_INV, 'whitespace-normal break-words')}>{row.No_Invoice}</td>
       <td className={cn(
         TD,
         STICKY_TD,
         STICKY_LEFT_KONTRAK,
-        STICKY_SHADOW,
         FROZEN_W_KONTRAK,
         'font-medium text-primary whitespace-normal break-words',
         isBypass
@@ -707,7 +695,31 @@ function LaporanTableRow({
       )}>
         {row.No_Kontrak}
       </td>
-      <td className={cn(TD, 'min-w-[8rem] whitespace-normal break-words')}>{row.Unit}</td>
+      <td className={cn(
+        TD,
+        STICKY_TD,
+        STICKY_LEFT_UNIT,
+        FROZEN_W_UNIT,
+        'whitespace-normal break-words',
+        isBypass
+          ? 'bg-amber-50 group-hover:bg-amber-100 dark:bg-amber-950 dark:group-hover:bg-amber-900'
+          : 'bg-card group-hover:bg-muted',
+      )}>
+        {row.Unit}
+      </td>
+      <td className={cn(
+        TD,
+        STICKY_TD,
+        STICKY_LEFT_MITRA,
+        STICKY_SHADOW,
+        FROZEN_W_MITRA,
+        'whitespace-normal break-words',
+        isBypass
+          ? 'bg-amber-50 group-hover:bg-amber-100 dark:bg-amber-950 dark:group-hover:bg-amber-900'
+          : 'bg-card group-hover:bg-muted',
+      )}>
+        {safe(row.Mitra_Pembeli)}
+      </td>
       <td className={cn(TD, 'min-w-[7.5rem] whitespace-normal break-words')}>{row.Komoditi}</td>
       <td className={cn(TD, 'text-center min-w-[4.5rem]')}>{normalizeSatuan(row.Satuan)}</td>
       <td className={cn(TD, 'whitespace-nowrap min-w-[8rem]')}>{formatDate(row.Billing_Date)}</td>
@@ -715,7 +727,6 @@ function LaporanTableRow({
       <MoneyCell value={row.Pelunasan} className="text-blue-600 dark:text-blue-400 font-medium" />
       <MoneyCell value={row.Kewajiban_Pembayaran} className="font-semibold" />
       <MoneyCell value={row.Jumlah_Transfer} className="text-emerald-600 dark:text-emerald-400 font-medium" />
-      <td className={cn(TD, 'min-w-[11rem] whitespace-normal break-words')}>{safe(row.Mitra_Pembeli)}</td>
       <td className={cn(TD, 'min-w-[12rem] whitespace-normal break-words')}>{safe(row.Deskripsi_Produk)}</td>
       <td className={TD_MONEY} title={row.Jumlah_Invoice > 0 ? formatCurrency(row.Jumlah_Invoice) : undefined}>
         {row.Jumlah_Invoice > 0 ? formatCurrency(row.Jumlah_Invoice) : '-'}

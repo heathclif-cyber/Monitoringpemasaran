@@ -1,0 +1,1 @@
+import{j as t,l as u}from"./index-DBK8Tiov.js";const f={default:"w-full",narrow:"max-w-5xl",wide:"max-w-[1600px] w-full",full:"w-full max-w-none"};function o({children:a,className:l,width:e="default",density:s="default"}){return t.jsx("div",{className:u(f[e],s==="compact"?"space-y-4":"space-y-6",l),children:a})}export{o as P};
