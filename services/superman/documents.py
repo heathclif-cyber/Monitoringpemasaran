@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -159,6 +160,23 @@ def _kuitansi_optional_sources(no_invoice: str) -> list[SupportSource]:
     ]
 
 
+def _faktur_pajak_optional_sources(no_invoice: str) -> list[SupportSource]:
+    return [
+        ("invoice", no_invoice, "faktur_pajak", "E-Faktur"),
+    ]
+
+
+def _do_optional_sources(delivery_orders: list) -> list[SupportSource]:
+    """Dokumen DO + BA serah terima barang per Delivery Order terkait invoice."""
+    sources: list[SupportSource] = []
+    for do in delivery_orders:
+        if not do.no_do:
+            continue
+        sources.append(("do", do.no_do, "do", "Delivery Order"))
+        sources.append(("do", do.no_do, "berita_acara", "BA Serah Terima Barang"))
+    return sources
+
+
 def _standar_mandatory_sources(kontrak_id: str, no_invoice: str) -> list[SupportSource]:
     return [
         ("kontrak", kontrak_id, "kontrak", "Dokumen Kontrak"),
@@ -184,6 +202,28 @@ def _standar_support_sources(kontrak_id: str, no_invoice: str) -> list[SupportSo
 def _payung_ba_support_sources(no_ba: str, no_invoice: str) -> list[SupportSource]:
     """Alias: dokumen wajib payung BA (BA + invoice)."""
     return _payung_ba_mandatory_sources(no_ba, no_invoice)
+
+
+def _resolve_optional_docs(
+    db: Session,
+    sources: list[SupportSource],
+) -> list[ResolvedSupportDoc]:
+    """Ambil dokumen yang tersedia; lewati yang belum diupload tanpa error."""
+    resolved: list[ResolvedSupportDoc] = []
+    for entity_type, entity_id, doc_type, label in sources:
+        try:
+            resolved.append(
+                _resolve_upload(
+                    db,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    doc_type=doc_type,
+                    label=label,
+                )
+            )
+        except FileNotFoundError:
+            continue
+    return resolved
 
 
 def _resolve_first_available(
@@ -746,3 +786,127 @@ def superman_doc_requirements_for_pembayaran(
         _standar_mandatory_sources(kontrak_id, no_invoice),
         _kuitansi_optional_sources(no_invoice),
     )
+
+
+# --- Bundle upload Superman SPPb: field terpisah untuk Kontrak Perjanjian,
+# Invoice/Nota Pembayaran, E-Faktur (opsional) + satu PDF gabungan untuk
+# "Upload Dokumen Pendukung" (kontrak, invoice, DO, rekening koran, faktur,
+# BA serah terima barang), agar tinggal 1x upload/download. ---
+
+_MERGE_ORDER = {
+    "kontrak": 0,
+    "invoice": 1,
+    "do": 2,
+    "rekening_koran": 3,
+    "faktur_pajak": 4,
+    "berita_acara": 5,
+    "ba_panen": 5,
+}
+
+
+def build_merged_support_pdf(docs: list[ResolvedSupportDoc]) -> Path:
+    """Gabungkan semua dokumen pendukung (PDF) jadi satu file untuk field
+    'Upload Dokumen Pendukung' Superman, urut sesuai _MERGE_ORDER."""
+    from pypdf import PdfWriter
+
+    ordered = sorted(docs, key=lambda d: _MERGE_ORDER.get(d.doc_type, 9))
+    pdf_paths = [d.path for d in ordered if d.path.suffix.lower() == ".pdf"]
+    if not pdf_paths:
+        raise FileNotFoundError("Tidak ada dokumen PDF untuk digabung ke Dokumen Pendukung.")
+
+    tmp_dir = Path(tempfile.mkdtemp(prefix="superman_merge_"))
+    out_path = tmp_dir / "dokumen_pendukung_gabungan.pdf"
+    writer = PdfWriter()
+    try:
+        for path in pdf_paths:
+            writer.append(str(path))
+        with open(out_path, "wb") as fh:
+            writer.write(fh)
+    finally:
+        writer.close()
+    return out_path
+
+
+@dataclass
+class SupermanUploadBundle:
+    all_docs: list[ResolvedSupportDoc]
+    merged_path: Path
+    kontrak_doc: ResolvedSupportDoc | None
+    invoice_doc: ResolvedSupportDoc | None
+    efaktur_doc: ResolvedSupportDoc | None
+
+    def extra_single_docs(self) -> dict[str, Path]:
+        """Path per field tunggal SPPb (Kontrak Perjanjian, Invoice/Nota, E-Faktur)."""
+        out: dict[str, Path] = {}
+        if self.kontrak_doc:
+            out["kontrak_perjanjian"] = self.kontrak_doc.path
+        if self.invoice_doc:
+            out["invoice_nota"] = self.invoice_doc.path
+        if self.efaktur_doc:
+            out["efaktur"] = self.efaktur_doc.path
+        return out
+
+
+def resolve_superman_upload_bundle_for_invoice(db: Session, no_invoice: str) -> SupermanUploadBundle:
+    invoice = (
+        db.query(models.Invoice)
+        .options(
+            joinedload(models.Invoice.kontrak),
+            joinedload(models.Invoice.berita_acara),
+            joinedload(models.Invoice.delivery_orders),
+        )
+        .filter(models.Invoice.no_invoice == no_invoice)
+        .first()
+    )
+    if not invoice:
+        raise ValueError(f"Invoice tidak ditemukan: {no_invoice}")
+
+    kontrak = invoice.kontrak
+    if not kontrak:
+        raise ValueError(f"Kontrak tidak ditemukan untuk invoice: {no_invoice}")
+
+    if is_payung_ba(kontrak):
+        no_ba = invoice.no_ba
+        if not no_ba and invoice.berita_acara:
+            no_ba = invoice.berita_acara.no_ba
+        if not no_ba:
+            raise ValueError(
+                f"Invoice {no_invoice} kontrak payung tanpa nomor BA. "
+                "Pastikan invoice terhubung ke Berita Acara."
+            )
+        mandatory_sources = _payung_ba_mandatory_sources(no_ba, no_invoice)
+    else:
+        mandatory_sources = _standar_mandatory_sources(kontrak.no_kontrak, no_invoice)
+
+    mandatory_docs = _resolve_mandatory_support_docs(db, mandatory_sources)
+
+    optional_sources = [
+        *_faktur_pajak_optional_sources(no_invoice),
+        *_do_optional_sources(list(invoice.delivery_orders or [])),
+    ]
+    optional_docs = _resolve_optional_docs(db, optional_sources)
+
+    all_docs = mandatory_docs + optional_docs
+    merged_path = build_merged_support_pdf(all_docs)
+
+    kontrak_doc = next((d for d in mandatory_docs if d.doc_type == "kontrak"), None)
+    invoice_doc = next((d for d in mandatory_docs if d.doc_type == "invoice"), None)
+    efaktur_doc = next((d for d in optional_docs if d.doc_type == "faktur_pajak"), None)
+
+    return SupermanUploadBundle(
+        all_docs=all_docs,
+        merged_path=merged_path,
+        kontrak_doc=kontrak_doc,
+        invoice_doc=invoice_doc,
+        efaktur_doc=efaktur_doc,
+    )
+
+
+def resolve_superman_upload_bundle_from_invoice(no_invoice: str) -> SupermanUploadBundle:
+    from database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return resolve_superman_upload_bundle_for_invoice(db, no_invoice)
+    finally:
+        db.close()

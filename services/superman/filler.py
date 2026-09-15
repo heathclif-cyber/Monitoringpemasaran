@@ -413,7 +413,31 @@ def _wait_uploaded_docs(page: Page, input_selector: str, expected: int, *, timeo
     return uploaded
 
 
-def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool) -> None:
+_SINGLE_FIELD_SELECTORS = {
+    "kontrak_perjanjian": "#kontrak_perjanjian_sppb",
+    "invoice_nota": "#invoice_sppb",
+    "efaktur": "#efaktur_sppb",
+}
+
+
+def _upload_single_support_docs(page: Page, extra_docs: dict[str, Path]) -> None:
+    """Upload dokumen SPPb 1 file per field: Kontrak Perjanjian / Dokumen
+    Sejenis, Invoice / Nota Pembayaran, E-Faktur. Semua opsional di Superman —
+    field yang tidak punya dokumen (mis. E-Faktur belum diupload) dilewati saja."""
+    for key, path in extra_docs.items():
+        selector = _SINGLE_FIELD_SELECTORS.get(key)
+        if not selector or not path or not page.locator(selector).count():
+            continue
+        _upload_files_to_input(page, selector, [str(path)])
+
+
+def _upload_support_docs(
+    page: Page,
+    support_docs: list[Path],
+    *,
+    combined: bool,
+    extra_single_docs: dict[str, Path] | None = None,
+) -> None:
     missing = [path for path in support_docs if not path.exists()]
     paths = [str(path) for path in support_docs if path.exists()]
     if missing:
@@ -440,6 +464,8 @@ def _upload_support_docs(page: Page, support_docs: list[Path], *, combined: bool
                 f"Dokumen pendukung SPPb belum terlampir ({sppb_uploaded}/{len(paths)} file). "
                 f"Upload ulang dokumen di Input Pembayaran.{hint}"
             )
+        if extra_single_docs:
+            _upload_single_support_docs(page, extra_single_docs)
         page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
         page.wait_for_timeout(500)
         _upload_files_to_input(page, "#dokumen_pendukung_sppn", paths)
@@ -477,6 +503,7 @@ def fill_sppn_draft(
     payload: DeklarasiPayload,
     *,
     support_docs: list[Path] | None = None,
+    extra_single_docs: dict[str, Path] | None = None,
     on_progress: ProgressCallback | None = None,
 ) -> None:
     def report(percent: int, stage: str) -> None:
@@ -494,7 +521,7 @@ def fill_sppn_draft(
 
     if support_docs:
         report(45, "Mengunggah dokumen pendukung")
-        _upload_support_docs(page, support_docs, combined=combined)
+        _upload_support_docs(page, support_docs, combined=combined, extra_single_docs=extra_single_docs)
 
     if combined and payload.sppb_item:
         report(55, "Mengisi baris SPPb (PPh)")
@@ -516,7 +543,7 @@ def fill_sppn_draft(
 
     report(82, "Memvalidasi isian form")
     if support_docs:
-        _upload_support_docs(page, support_docs, combined=combined)
+        _upload_support_docs(page, support_docs, combined=combined, extra_single_docs=extra_single_docs)
 
     page.locator('a[href="#tab-informasi-sppn"]').click(force=True)
     page.wait_for_timeout(600)

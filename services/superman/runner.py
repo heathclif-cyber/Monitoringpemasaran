@@ -1150,14 +1150,15 @@ def submit_deklarasi_invoice(
     ensure_session(cfg)
 
     payload = build_payload_from_invoice(no_invoice)
+    extra_single_docs: dict[str, Path] | None = None
     # Agent path: dokumen sudah diunduh ke disk lokal — jangan resolve path Railway/volume.
     if support_doc_paths:
-        support_paths = [Path(p) for p in support_doc_paths if Path(p).is_file()]
-        if not support_paths:
+        agent_paths = [Path(p) for p in support_doc_paths if Path(p).is_file()]
+        if not agent_paths:
             raise FileNotFoundError(
                 "Daftar dokumen pendukung agent kosong atau file tidak ditemukan di disk lokal."
             )
-        from services.superman.documents import ResolvedSupportDoc
+        from services.superman.documents import ResolvedSupportDoc, build_merged_support_pdf
 
         supports = [
             ResolvedSupportDoc(
@@ -1168,11 +1169,18 @@ def submit_deklarasi_invoice(
                 file_name=p.name,
                 label=f"Dokumen agent ({p.name})",
             )
-            for p in support_paths
+            for p in agent_paths
         ]
+        # Field per-jenis (Kontrak Perjanjian/Invoice/E-Faktur) tidak bisa dipisah di
+        # jalur agent karena doc_type tidak terbawa — cukup gabungkan semua jadi 1 PDF.
+        support_paths = [build_merged_support_pdf(supports)]
     else:
-        supports = resolve_support_doc_from_invoice(no_invoice)
-        support_paths = [doc.path for doc in supports]
+        from services.superman.documents import resolve_superman_upload_bundle_from_invoice
+
+        bundle = resolve_superman_upload_bundle_from_invoice(no_invoice)
+        supports = bundle.all_docs
+        support_paths = [bundle.merged_path]
+        extra_single_docs = bundle.extra_single_docs()
 
     report(20, "Membuka browser Superman")
     store_sppb: str | None = None
@@ -1194,6 +1202,7 @@ def submit_deklarasi_invoice(
             cfg,
             payload,
             support_docs=support_paths,
+            extra_single_docs=extra_single_docs,
             on_progress=on_progress,
         )
         before_todo_ids = _snapshot_todo_ids(page, cfg.base_url)
