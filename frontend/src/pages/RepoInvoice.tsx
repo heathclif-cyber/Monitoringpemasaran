@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Edit, FileDown, Trash2, Receipt, Eye } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { downloadAuthenticatedFile } from '@/lib/client'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -167,11 +168,18 @@ export default function RepoInvoice() {
                 <DocxPreview url={`/api/invoice/export?no_invoice=${encodeURIComponent(invPreviewItem.no_invoice)}`} />
               </div>
               <div className="flex justify-end">
-                <a href={`/api/invoice/export?no_invoice=${encodeURIComponent(invPreviewItem.no_invoice)}`} target="_blank" rel="noreferrer">
-                  <Button variant="secondary" className="gap-2">
-                    <FileDown size={14} /> Download Invoice .docx
-                  </Button>
-                </a>
+                <Button
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={() => {
+                    const filename = `${invPreviewItem.no_invoice.replace(/[/\\]/g, '-')}.docx`
+                    void downloadAuthenticatedFile(`/api/invoice/export?no_invoice=${encodeURIComponent(invPreviewItem.no_invoice)}`, filename).catch((err: unknown) => {
+                      addNotification(err instanceof Error ? err.message : 'Gagal mengunduh invoice', 'error')
+                    })
+                  }}
+                >
+                  <FileDown size={14} /> Download Invoice .docx
+                </Button>
               </div>
             </>
           )}
@@ -192,11 +200,18 @@ export default function RepoInvoice() {
                 <DocxPreview url={`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(kwPreviewItem.no_invoice)}`} />
               </div>
               <div className="flex justify-end">
-                <a href={`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(kwPreviewItem.no_invoice)}`} target="_blank" rel="noreferrer">
-                  <Button variant="secondary" className="gap-2">
-                    <FileDown size={14} /> Download Kuitansi .docx
-                  </Button>
-                </a>
+                <Button
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={() => {
+                    const filename = `Kuitansi-${kwPreviewItem.no_invoice.replace(/[/\\]/g, '-')}.docx`
+                    void downloadAuthenticatedFile(`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(kwPreviewItem.no_invoice)}`, filename).catch((err: unknown) => {
+                      addNotification(err instanceof Error ? err.message : 'Gagal mengunduh kuitansi', 'error')
+                    })
+                  }}
+                >
+                  <FileDown size={14} /> Download Kuitansi .docx
+                </Button>
               </div>
             </>
           )}

@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { FileDown, RotateCcw, Save } from 'lucide-react'
+import { openAuthenticatedFile } from '@/lib/client'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useBAStore } from '@/store/baStore'
@@ -448,11 +449,17 @@ export default function InvoicePage() {
   }
 
   const handleExport = () => {
-    if (exportNo) window.open(`/api/invoice/export?no_invoice=${encodeURIComponent(exportNo)}`, '_blank')
+    if (!exportNo) return
+    void openAuthenticatedFile(`/api/invoice/export?no_invoice=${encodeURIComponent(exportNo)}`).catch((err: unknown) => {
+      addNotification(err instanceof Error ? err.message : 'Gagal membuka invoice', 'error')
+    })
   }
 
   const handleExportKuitansi = () => {
-    if (exportNo) window.open(`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(exportNo)}`, '_blank')
+    if (!exportNo) return
+    void openAuthenticatedFile(`/api/invoice/export-kuitansi?no_invoice=${encodeURIComponent(exportNo)}`).catch((err: unknown) => {
+      addNotification(err instanceof Error ? err.message : 'Gagal membuka kuitansi', 'error')
+    })
   }
 
   // Read ?edit= param to auto-load invoice for editing
