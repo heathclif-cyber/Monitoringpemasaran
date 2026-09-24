@@ -27,6 +27,8 @@ function buildPesan(nama: string, inv: Invoice, k: Kontrak, hargaSatuan: number)
   const ppn = total - dpp
   const satuan = k.satuan || 'Kg'
   const pembeli = (k.pembeli || '-').split('\n')[0]
+  // Invoice lama belum punya volume tersimpan → turunkan dari DPP / harga satuan
+  const volume = Number(inv.volume) || (hargaSatuan > 0 ? dpp / hargaSatuan : 0)
 
   const lines = [
     `Yth. Bapak/Ibu ${nama},`,
@@ -41,13 +43,13 @@ function buildPesan(nama: string, inv: Invoice, k: Kontrak, hargaSatuan: number)
     `Komoditi : ${k.jenis_komoditi || k.komoditi || '-'}`,
     ...(inv.nama_unit ? [`Unit : ${inv.nama_unit}`] : []),
     ...(inv.no_ba ? [`No. BA : ${inv.no_ba}`] : []),
-    `Volume : ${(Number(inv.volume) || 0).toLocaleString('id-ID')} ${satuan}`,
+    `Volume : ${volume.toLocaleString('id-ID', { maximumFractionDigits: 2 })} ${satuan}`,
     `Harga Satuan : ${formatCurrency(hargaSatuan)} / ${satuan}`,
     `DPP : ${formatCurrency(dpp)}`,
     `PPN${isPpn ? ` (${ppnPct}%)` : ''} : ${isPpn ? formatCurrency(ppn) : 'Tidak dikenakan'}`,
     `Total Invoice : ${formatCurrency(total)}`,
     '',
-    'File invoice terlampir. Terima kasih.',
+    'File pendukung terlampir. Terima kasih.',
   ]
   return lines.join('\n')
 }
@@ -172,7 +174,7 @@ export function KirimPajakWaDialog({ open, onOpenChange, invoice, kontrak, harga
               className="min-h-[260px] font-mono text-xs"
             />
             <p className="text-xs text-muted-foreground">
-              WhatsApp akan terbuka dengan pesan ini. Lampirkan file invoice (Export .docx) secara manual sebelum mengirim.
+              WhatsApp akan terbuka dengan pesan ini. Lampirkan file pendukung (invoice, kontrak/BA) secara manual sebelum mengirim.
             </p>
           </div>
 
