@@ -27,6 +27,7 @@ from api.r_piutang import router as piutang_router
 from api.r_auth import router as auth_router
 from api.r_users import router as users_router
 from api.r_integrasi import router as integrasi_router
+from api.r_kontak_pajak import router as kontak_pajak_router
 from database import SessionLocal
 from services.auth import get_active_user_from_token
 
@@ -128,6 +129,7 @@ app.include_router(ba_router)
 app.include_router(stok_router)
 app.include_router(superman_router)
 app.include_router(piutang_router)
+app.include_router(kontak_pajak_router)
 
 
 # --- Root Page: serve React SPA or fallback to Jinja2 ---

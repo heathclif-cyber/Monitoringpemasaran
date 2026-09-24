@@ -471,3 +471,20 @@ class StokSaldoOut(BaseModel):
     jenis_material: str
     satuan: str
     saldo: float
+
+
+# --- Kontak Pajak (WhatsApp faktur pajak) ---
+class KontakPajakIn(BaseModel):
+    nama: str
+    no_wa: str
+    keterangan: Optional[str] = None
+
+
+class KontakPajakOut(BaseModel):
+    id: int
+    nama: str
+    no_wa: str
+    keterangan: Optional[str] = None
+
+    class Config:
+        from_attributes = True

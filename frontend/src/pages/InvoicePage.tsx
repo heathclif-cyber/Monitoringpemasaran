@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { FileDown, RotateCcw, Save } from 'lucide-react'
+import { FileDown, MessageCircle, RotateCcw, Save } from 'lucide-react'
 import { openAuthenticatedFile } from '@/lib/client'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useKontrakStore } from '@/store/kontrakStore'
@@ -24,7 +24,8 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { terbilangRupiah } from '@/utils/terbilang'
 import { calculateKontrakPricing, calculateJatuhTempo, isPayungBA as isPayungBAKontrak } from '@/utils/kontrakUtils'
 import { calculateBAInvoiceAmount } from '@/utils/baUtils'
-import type { Kontrak } from '@/types'
+import { KirimPajakWaDialog } from '@/components/feature/KirimPajakWaDialog'
+import type { Invoice, Kontrak } from '@/types'
 
 // Exact replica of forms.js buildInvoicePreview() format
 function InvoicePreviewContent({ noInv, noK, tgl, k, pricing: _p, jumlahPembayaran, baVolume, baHarga }: {
@@ -184,6 +185,9 @@ export default function InvoicePage() {
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [exportNo, setExportNo] = useState<string | null>(null)
+  // Invoice tersimpan — sumber data pesan WA ke personil pajak
+  const [waInvoice, setWaInvoice] = useState<Invoice | null>(null)
+  const [waOpen, setWaOpen] = useState(false)
   const [isExisting, setIsExisting] = useState(false)
   const [liveJumlah, setLiveJumlah] = useState(0)
 
@@ -236,6 +240,7 @@ export default function InvoicePage() {
     if (data) {
       setIsExisting(true)
       setExportNo(no)
+      setWaInvoice(data)
       setValue('no_kontrak', data.no_kontrak)
       setValue('nama_unit', data.nama_unit || '')
       setValue('no_ba', data.no_ba || '')
@@ -246,6 +251,7 @@ export default function InvoicePage() {
     } else {
       setIsExisting(false)
       setExportNo(null)
+      setWaInvoice(null)
     }
   }
 
@@ -431,10 +437,14 @@ export default function InvoicePage() {
         addNotification('Isi volume invoice (kg/satuan fisik) terlebih dahulu', 'error')
         return
       }
-      await invoiceStore.save(payload)
+      const saved = await invoiceStore.save(payload)
+      const isNew = !isExisting
       setExportNo(data.no_invoice)
+      setWaInvoice(saved)
       setIsExisting(true)
       addNotification('Invoice berhasil disimpan', 'success')
+      // Invoice baru terbit → langsung tawarkan kirim ke personil pajak (faktur pajak)
+      if (isNew) setWaOpen(true)
       invoiceStore.fetch() // refresh untuk update existing invoices list
     } catch (err: any) {
       addNotification(err.message || 'Gagal menyimpan invoice', 'error')
@@ -445,6 +455,7 @@ export default function InvoicePage() {
     reset()
     setIsExisting(false)
     setExportNo(null)
+    setWaInvoice(null)
     setLiveJumlah(0)
   }
 
@@ -760,6 +771,9 @@ export default function InvoicePage() {
                 <Button type="button" variant="secondary" onClick={handleExportKuitansi} className="gap-2">
                   <FileDown size={14} /> Export Kuitansi
                 </Button>
+                <Button type="button" variant="secondary" onClick={() => setWaOpen(true)} disabled={!waInvoice} className="gap-2">
+                  <MessageCircle size={14} /> Kirim ke Pajak (WA)
+                </Button>
               </>
             )}
             <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
@@ -785,6 +799,14 @@ export default function InvoicePage() {
           baHarga={isPayungBA ? selectedBAObj?.harga_satuan : undefined}
         />
       </PreviewPanel>
+
+      <KirimPajakWaDialog
+        open={waOpen}
+        onOpenChange={setWaOpen}
+        invoice={waInvoice}
+        kontrak={k ?? null}
+        hargaSatuan={(isPayungBA ? selectedBAObj?.harga_satuan : k?.harga_satuan) || 0}
+      />
       </div>
     </PageShell>
   )

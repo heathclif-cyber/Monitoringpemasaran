@@ -252,3 +252,14 @@ class StokLedger(Base):
     referensi_id = Column(String, nullable=True, index=True)
     catatan = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class KontakPajak(Base):
+    """Personil pajak tujuan WhatsApp saat invoice terbit (minta faktur pajak)."""
+    __tablename__ = "kontak_pajak"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    nama = Column(String, nullable=False)
+    no_wa = Column(String, nullable=False)  # format internasional tanpa '+', mis. 6281234567890
+    keterangan = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

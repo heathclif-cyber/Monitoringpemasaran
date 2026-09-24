@@ -920,3 +920,18 @@ export interface NavItem {
   icon: string // lucide icon name
   children?: NavItem[]
 }
+
+/** Personil pajak tujuan WhatsApp (permintaan faktur pajak saat invoice terbit). */
+export interface KontakPajak {
+  id: number
+  nama: string
+  /** Format internasional tanpa '+', mis. 6281234567890 */
+  no_wa: string
+  keterangan?: string | null
+}
+
+export interface KontakPajakInput {
+  nama: string
+  no_wa: string
+  keterangan?: string | null
+}
