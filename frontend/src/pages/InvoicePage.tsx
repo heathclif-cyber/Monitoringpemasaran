@@ -420,7 +420,7 @@ export default function InvoicePage() {
       if (data.jumlah_pembayaran && data.jumlah_pembayaran > 0) {
         payload.jumlah_pembayaran = data.jumlah_pembayaran
       } else {
-        delete payload.jumlah_pembayaran // backend will use full/unit value
+        delete payload.jumlah_pembayaran // backend: proportional to volume, capped at remaining value
       }
       // Volume fisik — wajib untuk klop dengan DO/laporan
       if (data.volume && data.volume > 0) {
@@ -586,7 +586,7 @@ export default function InvoicePage() {
                       <span className="text-slate-500">BA Dipilih:</span>
                       <span className="font-medium text-brand-600">{selectedBA}</span>
                       <span className="text-slate-500">Volume BA:</span>
-                      <span>{formatCurrency(selectedBAObj.volume_ba)} {k.satuan}</span>
+                      <span>{(Number(selectedBAObj.volume_ba) || 0).toLocaleString('id-ID')} {k.satuan}</span>
                       <span className="text-slate-500">Harga Satuan BA:</span>
                       <span>{formatCurrency(selectedBAObj.harga_satuan)} / {k.satuan}</span>
                       <span className="text-slate-500">Nilai Invoice (BA):</span>
@@ -595,7 +595,7 @@ export default function InvoicePage() {
                   ) : (
                     <>
                       <span className="text-slate-500">Volume:</span>
-                      <span>{formatCurrency(k.volume)} {k.satuan}</span>
+                      <span>{(Number(k.volume) || 0).toLocaleString('id-ID')} {k.satuan}</span>
                       <span className="text-slate-500">Nilai Kontrak:</span>
                       <span className="font-bold text-brand-600">{formatCurrency(kontrakMax)}</span>
                     </>
@@ -704,7 +704,7 @@ export default function InvoicePage() {
                     })()}
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
-                    Kosongkan untuk auto (nilai penuh{isPayungBA ? ' BA' : selectedUnit ? ` unit ${selectedUnit}` : ' kontrak'}). Maks: {formatCurrency(sisaKontrak)}
+                    Kosongkan untuk auto (proporsional volume invoice, maks sisa{isPayungBA ? ' BA' : selectedUnit ? ` unit ${selectedUnit}` : ' kontrak'}). Maks: {formatCurrency(sisaKontrak)}
                   </p>
                   {Number(watch('jumlah_pembayaran')) > 0 && kontrakMax > 0 && (
                     <p className="text-xs text-slate-500 mt-1">
