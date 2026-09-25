@@ -456,14 +456,19 @@ export default function UploadPage() {
                   <p className="text-xs text-muted-foreground mb-2">
                     Download semua dokumen terkait kontrak ini (invoice, DO, berita acara, deklarasi) dalam 1 file ZIP.
                   </p>
-                  <a
-                    href={`/api/documents/bundle/kontrak?no_kontrak=${encodeURIComponent(entityId)}`}
-                    download
-                    className="inline-flex items-center gap-2 rounded-md bg-primary px-3 h-8 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  <Button
+                    size="sm"
+                    className="gap-2 h-8 text-xs"
+                    onClick={() => {
+                      const filename = `Bundle-${entityId.replace(/[/\\]/g, '-')}.zip`
+                      void downloadAuthenticatedFile(`/api/documents/bundle/kontrak?no_kontrak=${encodeURIComponent(entityId)}`, filename).catch((err: unknown) => {
+                        addNotification(err instanceof Error ? err.message : 'Gagal mengunduh bundle dokumen', 'error')
+                      })
+                    }}
                   >
                     <FolderArchive size={13} />
                     Download Bundle Dokumen
-                  </a>
+                  </Button>
                 </div>
               )}
             </CardContent>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Edit, FileDown, Trash2, Eye, GitBranch } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { downloadAuthenticatedFile } from '@/lib/client'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -218,12 +219,19 @@ export default function RepoKontrak() {
                 <DocxPreview url={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} />
               </div>
               <div className="flex justify-end">
-                <a href={`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`} target="_blank" rel="noreferrer">
-                  <Button variant="secondary" className="gap-2">
-                    <FileDown size={14} />
-                    Download Kontrak .docx
-                  </Button>
-                </a>
+                <Button
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={() => {
+                    const filename = `${previewData.no_kontrak.replace(/[/\\]/g, '-')}.docx`
+                    void downloadAuthenticatedFile(`/api/kontrak/export?no_kontrak=${encodeURIComponent(previewData.no_kontrak)}`, filename).catch((err: unknown) => {
+                      addNotification(err instanceof Error ? err.message : 'Gagal mengunduh kontrak', 'error')
+                    })
+                  }}
+                >
+                  <FileDown size={14} />
+                  Download Kontrak .docx
+                </Button>
               </div>
             </>
           )}

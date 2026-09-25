@@ -4,6 +4,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { FileDown, RotateCcw, Plus, X } from 'lucide-react'
+import { openAuthenticatedFile } from '@/lib/client'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -364,9 +365,10 @@ export default function KontrakPage() {
 
   // Export
   const handleExport = () => {
-    if (exportNo) {
-      window.open(`/api/kontrak/export?no_kontrak=${encodeURIComponent(exportNo)}`, '_blank')
-    }
+    if (!exportNo) return
+    void openAuthenticatedFile(`/api/kontrak/export?no_kontrak=${encodeURIComponent(exportNo)}`).catch((err: unknown) => {
+      addNotification(err instanceof Error ? err.message : 'Gagal membuka kontrak', 'error')
+    })
   }
 
   // Read ?edit= param to auto-load kontrak for editing

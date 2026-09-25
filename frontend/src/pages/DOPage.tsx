@@ -22,7 +22,7 @@ import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { PageHeader, PageShell } from '@/components/patterns'
-import { client } from '@/lib/client'
+import { client, openAuthenticatedFile } from '@/lib/client'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import type { DeliveryOrderInput, StokSaldo } from '@/types'
 import {
@@ -399,7 +399,10 @@ export default function DOPage() {
   }
 
   const handleExport = () => {
-    if (exportNo) window.open(`/api/do/export?no_do=${encodeURIComponent(exportNo)}`, '_blank')
+    if (!exportNo) return
+    void openAuthenticatedFile(`/api/do/export?no_do=${encodeURIComponent(exportNo)}`).catch((err: unknown) => {
+      addNotification(err instanceof Error ? err.message : 'Gagal membuka DO', 'error')
+    })
   }
 
   // Read ?edit= param to auto-load DO for editing

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Edit, FileDown, Trash2, Eye } from 'lucide-react'
 
 import { useNavigate } from 'react-router-dom'
+import { downloadAuthenticatedFile } from '@/lib/client'
 import { useDOStore } from '@/store/doStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -168,12 +169,19 @@ export default function RepoDO() {
                 <DocxPreview url={`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`} />
               </div>
               <div className="flex justify-end">
-                <a href={`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`} target="_blank" rel="noreferrer">
-                  <Button variant="secondary" className="gap-2">
-                    <FileDown size={14} />
-                    Download DO .docx
-                  </Button>
-                </a>
+                <Button
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={() => {
+                    const filename = `${previewDO.no_do.replace(/[/\\]/g, '-')}.docx`
+                    void downloadAuthenticatedFile(`/api/do/export?no_do=${encodeURIComponent(previewDO.no_do)}`, filename).catch((err: unknown) => {
+                      addNotification(err instanceof Error ? err.message : 'Gagal mengunduh DO', 'error')
+                    })
+                  }}
+                >
+                  <FileDown size={14} />
+                  Download DO .docx
+                </Button>
               </div>
             </>
           )}
