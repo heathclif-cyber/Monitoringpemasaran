@@ -190,6 +190,11 @@ volume_do = (nominal_transfer / invoice.jumlah_pembayaran) × kontrak.volume
 selisih = invoice.jumlah_pembayaran - nominal_transfer
 ```
 
+### Superman (SPPn/SPPb) — TIDAK wajib lunas
+- **Deklarasi Superman boleh dibuat walaupun invoice belum lunas.** Syarat hanya: dokumen wajib lengkap + ada transfer (cash in) tercatat.
+- Nilai SPPn/SPPb proporsional terhadap total transfer yang sudah tercatat (`services/superman/payload.py`), bukan nilai penuh invoice.
+- **JANGAN menambahkan kembali syarat "harus lunas"** (backend `payload.py`/`preflight.py` maupun tombol/pesan di `PembayaranPage.tsx`) — sudah berulang kali diminta user.
+
 ### Laporan
 - Semua agregasi iterasi per-DO melalui Invoice → Kontrak
 - Harga rata-rata: DPP_Pokok / volume (excl. PPN)

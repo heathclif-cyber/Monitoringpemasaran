@@ -114,7 +114,7 @@ export default function RepoPembayaran() {
                   header: 'Superman (Invoice)',
                   render: (p: Pembayaran) => (
                     <span className={cn('text-xs', p.superman ? 'text-emerald-700' : 'text-amber-700')}>
-                      {p.superman || 'Menunggu pelunasan / Superman'}
+                      {p.superman || 'Menunggu Superman'}
                     </span>
                   ),
                 },

@@ -230,15 +230,15 @@ export default function PembayaranPage() {
   const { surplus: surplusPaidAll } = paymentBalance(paidTotalAll, invoiceTotal)
   const progressPct = paymentProgressPercent(paidTotalAll, invoiceTotal)
   const afterThisPct = paymentProgressPercent(totalAfterSave, invoiceTotal)
-  const willCompleteInvoice = isInvoicePaid(totalAfterSave, invoiceTotal)
   const isInvoiceFullyPaid = isInvoicePaid(paidTotalAll, invoiceTotal)
+  // Superman boleh dibuat walaupun belum lunas — cukup ada transfer tercatat.
+  const hasRecordedPayment = paidTotalAll > 0
   const isPayung = isPayungBA(currentKontrak?.tipe_alur)
   const baNo = (currentInvoice?.no_ba || '').trim()
   const isInvoiceLocked = Boolean(invoiceSuperman)
 
   // Jangan auto-isi nominal_transfer dengan sisa pelunasan.
-  // User mengisi transfer aktual; sisa tetap untuk termin berikutnya
-  // (dan Superman baru setelah ada pembayaran atas sisa/kurang bayar).
+  // User mengisi transfer aktual; sisa tetap untuk termin berikutnya.
   // Opt-in via tombol "Gunakan pas-pasan" di bawah field nominal.
 
   const resetSupermanProgress = () => {
@@ -506,7 +506,7 @@ export default function PembayaranPage() {
       await fetchInvoiceContext(data.no_invoice)
 
       if (triggerSuperman) {
-        addNotification('Invoice lunas — memulai deklarasi Superman...', 'info')
+        addNotification('Memulai deklarasi Superman...', 'info')
         await startSupermanFlow(data.no_invoice)
       }
     } catch (err: unknown) {
@@ -559,7 +559,8 @@ export default function PembayaranPage() {
     return 'Catat Pembayaran'
   })()
 
-  const showSupermanSaveOption = willCompleteInvoice && !invoiceSuperman && canEdit()
+  const showSupermanSaveOption =
+    !invoiceSuperman && canEdit() && (Number(nominalTransfer) > 0 || hasRecordedPayment)
   const actionsBusy = isSubmitting || supermanRunning
 
   return (
@@ -589,19 +590,14 @@ export default function PembayaranPage() {
                 <p className="text-xs text-slate-500">Nomor Dokumen Superman</p>
                 <p className={cn(
                   'text-sm font-medium',
-                  invoiceSuperman ? 'text-emerald-800' : isInvoiceFullyPaid ? 'text-amber-700' : 'text-slate-600',
+                  invoiceSuperman ? 'text-emerald-800' : hasRecordedPayment ? 'text-amber-700' : 'text-slate-600',
                 )}>
-                  {invoiceSuperman || (isInvoiceFullyPaid ? 'Menunggu Superman' : 'Belum lunas')}
+                  {invoiceSuperman || (hasRecordedPayment ? 'Menunggu Superman' : 'Belum ada pembayaran')}
                 </p>
-                {!invoiceSuperman && !isInvoiceFullyPaid && (
+                {!invoiceSuperman && (
                   <p className="text-xs text-slate-400 mt-1">
-                    Isi nominal transfer aktual (boleh sebagian). Sisa kurang bayar tetap;
-                    Superman dibuat setelah lunas — termasuk jika dilunasi lewat termin berikutnya.
-                  </p>
-                )}
-                {!invoiceSuperman && isInvoiceFullyPaid && (
-                  <p className="text-xs text-amber-700 mt-1">
-                    Invoice sudah lunas — klik Buat Deklarasi Superman setelah dokumen wajib siap.
+                    Isi nominal transfer aktual (boleh sebagian). Superman tetap bisa dibuat walaupun
+                    invoice belum lunas — nilai SPPn mengikuti transfer yang sudah tercatat.
                   </p>
                 )}
               </div>
@@ -876,20 +872,13 @@ export default function PembayaranPage() {
           </Card>
         )}
 
-        {docsReady && !willCompleteInvoice && !isInvoiceFullyPaid && !invoiceSuperman && selectedInvoice && (
-          <Card>
-            <CardContent className="py-4 text-sm text-amber-800">
-              Dokumen sudah lengkap, tetapi invoice belum lunas
-              {sisaAfterSave > PAYMENT_LUNAS_TOLERANCE && <> (sisa {formatCurrency(sisaAfterSave)})</>}.
-            </CardContent>
-          </Card>
-        )}
-
-        {isInvoiceFullyPaid && !invoiceSuperman && selectedInvoice && (
+        {hasRecordedPayment && !invoiceSuperman && selectedInvoice && (
           <Card>
             <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-amber-800">
-                Invoice sudah lunas tetapi deklarasi Superman belum dibuat.
+                {isInvoiceFullyPaid
+                  ? 'Invoice sudah lunas tetapi deklarasi Superman belum dibuat.'
+                  : <>Invoice belum lunas (sisa {formatCurrency(Math.max(0, invoiceTotal - paidTotalAll))}) — deklarasi Superman tetap bisa dibuat atas transfer yang sudah tercatat.</>}
               </p>
               <Button
                 type="button"

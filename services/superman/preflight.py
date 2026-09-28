@@ -8,7 +8,10 @@ from services.superman.payload import build_payload_from_invoice
 
 
 def validate_deklarasi_ready(no_invoice: str) -> None:
-    """Pastikan dokumen lengkap dan invoice lunas sebelum buka browser Superman."""
+    """Pastikan dokumen lengkap dan ada pembayaran tercatat sebelum buka browser Superman.
+
+    Invoice tidak wajib lunas — Superman boleh dibuat atas transfer yang sudah masuk.
+    """
     ref = no_invoice.strip()
     if not ref:
         raise ValueError("no_invoice wajib diisi")
@@ -27,5 +30,5 @@ def validate_deklarasi_ready(no_invoice: str) -> None:
     finally:
         db.close()
 
-    # Memuat payload sekaligus memvalidasi lunas + relasi invoice/kontrak.
+    # Memuat payload sekaligus memvalidasi cash in + relasi invoice/kontrak.
     build_payload_from_invoice(ref)

@@ -500,15 +500,8 @@ def build_payload_from_invoice(no_invoice: str) -> DeklarasiPayload:
             invoice.pembayaran or [],
             key=lambda p: (p.tanggal_pembayaran or "", p.no_pembayaran or ""),
         )
-        from services.pembayaran_utils import is_invoice_paid, pembayaran_paid_total
-
-        pay_total = pembayaran_paid_total(pay_rows, kontrak)
-        if not is_invoice_paid(pay_total, inv_gross):
-            raise ValueError(
-                f"Invoice {no_invoice} belum lunas. "
-                f"Total pembayaran: Rp {pay_total:,.0f}, kewajiban: Rp {inv_gross:,.0f}"
-            )
-
+        # Superman boleh dibuat walaupun invoice belum lunas — nilai SPPn/SPPb
+        # proporsional terhadap transfer (cash in) yang sudah tercatat.
         latest_pay = pay_rows[-1] if pay_rows else None
         cash_in = sum(float(p.nominal_transfer or 0) for p in pay_rows)
         if cash_in <= 0:
