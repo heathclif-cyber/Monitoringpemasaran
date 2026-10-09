@@ -5,10 +5,10 @@ import type { LaporanRekapDimension, LaporanRekapRow } from '@/types'
 
 export const REKAP_DIMENSIONS: { value: LaporanRekapDimension; label: string }[] = [
   { value: 'komoditi', label: 'Komoditi' },
-  { value: 'produk', label: 'Produk' },
+  { value: 'produk', label: 'Jenis Material' },
   { value: 'unit', label: 'Unit' },
-  { value: 'pembeli', label: 'Pembeli' },
-  { value: 'bulan', label: 'Bulan' },
+  { value: 'pembeli', label: 'Mitra Pembeli' },
+  { value: 'bulan', label: 'Bulan Buku' },
 ]
 
 function volumeText(kg: number, ea: number): string {
@@ -36,22 +36,13 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
   const isPeriod = dimension === 'bulan'
   const th = 'border-b px-3 py-2 text-xs font-semibold whitespace-nowrap'
   const td = 'border-b px-3 py-2 text-[13px] whitespace-nowrap tabular-nums text-right'
-  const maxSales = Math.max(...groups.map((g) => g.sales), 0)
 
   const cells = (r: LaporanRekapRow, isTotal = false) => (
     <>
       <td className={td}>{volumeText(r.volumeKg, r.volumeEa)}</td>
       <td className={td}>
         <p className="font-semibold">{formatCurrency(r.sales)}</p>
-        {r.salesRencana > 0 && <p className="text-[11px] font-normal text-muted-foreground">rencana {formatCurrency(r.salesRencana)}</p>}
-      </td>
-      <td className={cn(td, 'w-36')}>
-        {total.sales > 0 && (
-          <div className="flex items-center justify-end gap-2">
-            {!isTotal && <div className="h-1.5 w-16 rounded-full bg-muted"><div className="h-1.5 rounded-full bg-primary" style={{ width: `${maxSales > 0 ? (r.sales / maxSales) * 100 : 0}%` }} /></div>}
-            <span className="w-11">{Math.round((r.sales / total.sales) * 100)}%</span>
-          </div>
-        )}
+        {r.salesRencana > 0 && <p className="text-[11px] font-normal text-muted-foreground">rencana DO {formatCurrency(r.salesRencana)}</p>}
       </td>
       <td className={td}>{priceText(r)}</td>
       <td className={td}>
@@ -88,13 +79,12 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
           <thead className="sticky top-0 z-10 bg-muted">
             <tr>
               <th className={cn(th, 'text-left')}>{REKAP_DIMENSIONS.find((d) => d.value === dimension)?.label}</th>
-              <th className={cn(th, 'text-right')}>Volume</th>
-              <th className={cn(th, 'text-right')}>Penjualan</th>
-              <th className={cn(th, 'text-right')}>Porsi</th>
-              <th className={cn(th, 'text-right')}>Harga Rata-rata</th>
+              <th className={cn(th, 'text-right')}>Volume BA / Rencana DO</th>
+              <th className={cn(th, 'text-right')}>Pendapatan Pokok</th>
+              <th className={cn(th, 'text-right')}>Harga Rata-Rata</th>
               <th className={cn(th, 'text-right')}>Cash In</th>
-              {!isPeriod && <th className={cn(th, 'text-right')}>Kurang Bayar</th>}
-              {!isPeriod && <th className={cn(th, 'text-right')}>Belum Diambil</th>}
+              {!isPeriod && <th className={cn(th, 'text-right')}>Sisa Kurang Bayar</th>}
+              {!isPeriod && <th className={cn(th, 'text-right')}>Outstanding Pengambilan</th>}
             </tr>
           </thead>
           <tbody>

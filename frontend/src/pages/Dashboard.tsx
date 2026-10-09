@@ -441,7 +441,7 @@ function RekapPenjualan() {
   return (
     <Card>
       <CardHeader className="pb-0">
-        <CardTitle className="text-sm font-semibold">Rekap Penjualan {filters.year}</CardTitle>
+        <CardTitle className="text-sm font-semibold">Rekap Pendapatan Pokok {filters.year}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         {rows.length === 0 ? (

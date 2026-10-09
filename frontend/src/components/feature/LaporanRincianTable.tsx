@@ -14,19 +14,11 @@ const ROW_TYPE: Record<string, { label: string; tone: StatusPillTone }> = {
   BYPASS: { label: 'Bypass', tone: 'neutral' },
 }
 
-function PaymentStatus({ row, balances }: { row: LaporanRow; balances: PiutangRow[] | null }) {
+function Shortfall({ row, balances }: { row: LaporanRow; balances: PiutangRow[] | null }) {
   if (!row.No_Invoice || row.No_Invoice === '-' || row.No_DO.startsWith('BYPASS-')) return <span className="text-muted-foreground">—</span>
   if (!balances) return <span className="text-xs text-muted-foreground">…</span>
-  const balance = balances.find((b) => b.no_invoice === row.No_Invoice)
-  const shortfall = balance?.piutang_pokok ?? 0
-  if (shortfall <= 0) return <StatusPill tone="success">Lunas</StatusPill>
-  const paid = (balance?.total_dibayar_efektif ?? 0) > 0
-  return (
-    <div className="space-y-0.5">
-      <StatusPill tone={paid ? 'warning' : 'danger'}>{paid ? 'Sebagian' : 'Belum bayar'}</StatusPill>
-      <p className="text-[11px] tabular-nums text-destructive">sisa {formatCurrency(shortfall)}</p>
-    </div>
-  )
+  const shortfall = balances.find((b) => b.no_invoice === row.No_Invoice)?.piutang_pokok ?? 0
+  return <span className={shortfall > 0 ? 'font-semibold text-destructive' : 'text-muted-foreground'}>{formatCurrency(shortfall)}</span>
 }
 
 export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDetail }: {
@@ -46,17 +38,18 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
           <tr>
             <th className={cn(th, 'text-left')}>
               <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={onToggleSort}>
-                Tanggal {sort === 'DESC' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+                Tanggal Acuan Laporan {sort === 'DESC' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
               </button>
             </th>
-            <th className={cn(th, 'text-left')}>Pembeli / Invoice</th>
+            <th className={cn(th, 'text-left')}>Mitra Pembeli / Invoice</th>
             <th className={cn(th, 'text-left')}>Unit</th>
-            <th className={cn(th, 'text-left')}>Produk</th>
-            <th className={cn(th, 'text-right')}>Volume</th>
-            <th className={cn(th, 'text-right')}>Harga</th>
-            <th className={cn(th, 'text-right')}>Penjualan</th>
+            <th className={cn(th, 'text-left')}>Komoditi / Material</th>
+            <th className={cn(th, 'text-right')}>Volume BA / Rencana DO</th>
+            <th className={cn(th, 'text-right')}>Harga per Satuan</th>
+            <th className={cn(th, 'text-right')}>Pendapatan Pokok</th>
             <th className={cn(th, 'text-right')}>Cash In</th>
-            <th className={cn(th, 'text-left')}>Status Bayar</th>
+            <th className={cn(th, 'text-left')}>Tgl Transfer</th>
+            <th className={cn(th, 'text-right')}>Sisa Kurang Bayar</th>
             <th className={th} />
           </tr>
         </thead>
@@ -95,11 +88,9 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
                 <td className={num}>{g.volume > 0 ? `${formatNumber(g.volume)} ${unit}` : '—'}</td>
                 <td className={num}>{g.sales > 0 ? formatCurrency(row.Harga_Satuan) : '—'}</td>
                 <td className={cn(num, 'font-medium')}>{g.sales > 0 ? formatCurrency(g.sales) : '—'}</td>
-                <td className={num}>
-                  <p>{g.cashIn > 0 ? formatCurrency(g.cashIn) : '—'}</p>
-                  {g.cashIn > 0 && g.cashDate && <p className="text-[11px] text-muted-foreground">{formatDate(g.cashDate)}</p>}
-                </td>
-                <td className={td}><PaymentStatus row={row} balances={balances} /></td>
+                <td className={num}>{g.cashIn > 0 ? formatCurrency(g.cashIn) : '—'}</td>
+                <td className={cn(td, 'whitespace-nowrap')}>{g.cashIn > 0 && g.cashDate ? formatDate(g.cashDate) : '—'}</td>
+                <td className={num}><Shortfall row={row} balances={balances} /></td>
                 <td className={cn(td, 'text-right')}>
                   <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => onDetail(row)}>Detail</Button>
                 </td>

@@ -236,7 +236,7 @@ export default function LaporanPage() {
   return (
     <PageShell width="full" density="compact">
       <PageHeader
-        title="Laporan Penjualan"
+        title="Laporan Digital"
         description={isLoading ? 'Memuat data...' : `${periodLabel} · ${invoiceGroups.length} invoice/transaksi`}
         actions={
           <div className="flex shrink-0 flex-wrap gap-2">
@@ -266,7 +266,7 @@ export default function LaporanPage() {
           <>
             <Button variant={showAdvanced ? 'secondary' : 'outline'} size="sm" className="h-9 gap-1.5" onClick={() => setShowAdvanced((v) => !v)}>
               {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              Lainnya{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ''}
+              Filter lanjutan{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ''}
             </Button>
             <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={handleResetFilters}>Reset</Button>
           </>
@@ -285,17 +285,17 @@ export default function LaporanPage() {
           selected={filters.komoditi} onChange={(komoditi) => setFilters((f) => ({ ...f, komoditi }))} className="w-40" />
         <MultiSelectFilter label="Unit" allLabel="Semua Unit" options={units}
           selected={filters.unit} onChange={(unit) => setFilters((f) => ({ ...f, unit }))} className="w-44" />
-        <MultiSelectFilter label="Pembeli" allLabel="Semua Pembeli" options={pembelis} contentWidth="w-72"
+        <MultiSelectFilter label="Pembeli" allLabel="Semua Mitra Pembeli" options={pembelis} contentWidth="w-72"
           selected={filters.pembeli} onChange={(pembeli) => setFilters((f) => ({ ...f, pembeli }))} className="w-48" />
         <SearchInput
           value={filters.search}
           onChange={(v) => setFilters((f) => ({ ...f, search: v }))}
-          placeholder="Cari no. kontrak/invoice/DO, pembeli, SAP..."
+          placeholder="Cari No DO, Invoice, Kontrak, Mitra Pembeli, SAP..."
           className="min-w-[220px]"
         />
         {showAdvanced && (
           <div className="flex w-full flex-wrap items-center gap-2 border-t pt-2">
-            <MultiSelectFilter label="Produk" allLabel="Semua Produk" options={jenisKomoditas} contentWidth="w-72"
+            <MultiSelectFilter label="Material" allLabel="Semua Jenis Material" options={jenisKomoditas} contentWidth="w-72"
               selected={filters.jenisKomoditi} onChange={(jenisKomoditi) => setFilters((f) => ({ ...f, jenisKomoditi }))} className="w-48" />
             <FilterSelect
               value={filters.statusBayar}
@@ -337,20 +337,20 @@ export default function LaporanPage() {
       </FilterToolbar>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <StatCard fitValue label="Penjualan (sebelum PPN)" value={formatCurrency(total.sales)}
-          subtitle={total.salesRencana > 0 ? `Termasuk rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya realisasi BA'} icon={TrendingUp} />
-        <StatCard fitValue label="Volume Terjual" value={volumeLabel(total.volumeKg, total.volumeEa)} subtitle="BA selesai + rencana DO" icon={Scale} />
-        <StatCard fitValue label="Harga Rata-rata"
+        <StatCard fitValue label="Pendapatan Pokok" value={formatCurrency(total.sales)}
+          subtitle={total.salesRencana > 0 ? `Termasuk rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya dari BA'} icon={TrendingUp} />
+        <StatCard fitValue label="Volume BA / Rencana DO" value={volumeLabel(total.volumeKg, total.volumeEa)} subtitle="Sebelum PPN · BA selesai + rencana DO" icon={Scale} />
+        <StatCard fitValue label="Harga Rata-Rata"
           value={total.komoditiCount > 1 ? 'Lihat rekap' : averagePrice ? `${formatCurrency(averagePrice.value)}/${averagePrice.unit}` : '—'}
-          subtitle={total.komoditiCount > 1 ? `${total.komoditiCount} komoditi — pilih satu komoditi` : 'Penjualan ÷ volume'} icon={BarChart3} />
-        <StatCard fitValue label="Cash In" value={formatCurrency(total.cashIn)} subtitle={`${total.transferCount} transfer diterima`} icon={Wallet} />
-        <StatCard fitValue label="Kurang Bayar" value={total.shortfall == null ? (balanceError ? 'Gagal dimuat' : '…') : formatCurrency(total.shortfall)}
+          subtitle={total.komoditiCount > 1 ? `${total.komoditiCount} komoditi — pilih satu komoditi` : 'Pendapatan Pokok ÷ volume'} icon={BarChart3} />
+        <StatCard fitValue label="Total Cash In" value={formatCurrency(total.cashIn)} subtitle={`${total.transferCount} transfer diterima`} icon={Wallet} />
+        <StatCard fitValue label="Sisa Kurang Bayar" value={total.shortfall == null ? (balanceError ? 'Gagal dimuat' : '…') : formatCurrency(total.shortfall)}
           subtitle={`${total.unpaidInvoices} invoice belum lunas · posisi saat ini`} icon={AlertTriangle} />
-        <StatCard fitValue label="Belum Diambil" value={volumeLabel(total.pickupOutstandingKg, total.pickupOutstandingEa)} subtitle="DO terbit − BA selesai" icon={Package} />
+        <StatCard fitValue label="Outstanding Pengambilan" value={volumeLabel(total.pickupOutstandingKg, total.pickupOutstandingEa)} subtitle="DO terbit − BA selesai" icon={Package} />
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Rekap per komoditi/unit/pembeli ada di Dashboard. Penjualan dihitung pada tanggal BA (realisasi) atau rencana DO bila belum ada BA. Cash in dihitung pada tanggal transfer.
+        Rekap per komoditi/unit/mitra pembeli ada di Dashboard. Pendapatan Pokok dihitung pada tanggal BA (realisasi) atau rencana DO bila belum ada BA. Cash in dihitung pada tanggal transfer.
         Kurang bayar dan sisa ambil adalah posisi saat ini untuk invoice yang tampil.
         {undatedSales > 0 && <span className="text-amber-700 dark:text-amber-400"> {undatedSales} DO belum punya tanggal rencana/BA sehingga tidak masuk periode ini.</span>}
         {balanceError && <span className="text-destructive"> Data piutang gagal dimuat, klik Refresh.</span>}
@@ -375,7 +375,7 @@ export default function LaporanPage() {
             <div>
               <p className="text-sm font-semibold">Rincian Transaksi</p>
               <p className="text-xs text-muted-foreground">
-                {showFullTable ? 'Semua kolom · nomor SAP dapat diisi langsung.' : 'Satu baris per invoice; penjualan dan pembayaran dari periode terpilih digabung.'}
+                {showFullTable ? 'Semua kolom · nomor SAP dapat diisi langsung.' : 'Satu baris per invoice; Pendapatan Pokok (BA / rencana DO) dan Cash In dari periode terpilih digabung.'}
               </p>
             </div>
             <div className="flex items-center gap-2">
