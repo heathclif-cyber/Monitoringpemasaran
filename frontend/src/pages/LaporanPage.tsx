@@ -26,12 +26,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { LaporanRekapTable } from '@/components/feature/LaporanRekapTable'
 import { LaporanRincianTable } from '@/components/feature/LaporanRincianTable'
 import { SapReconciliationDialog } from '@/components/feature/SapReconciliationDialog'
 import { InvoiceOutstanding } from '@/components/feature/InvoiceOutstanding'
 import { client } from '@/lib/client'
-import type { LaporanRekapDimension, LaporanRekapRow, PiutangRow, PiutangResponse } from '@/types'
+import type { PiutangRow, PiutangResponse } from '@/types'
 import { StatCard } from '@/components/common/StatCard'
 import { SearchInput } from '@/components/common/SearchInput'
 import { MultiSelectFilter } from '@/components/common/MultiSelectFilter'
@@ -80,14 +79,6 @@ const STICKY_TH = 'sticky top-0 z-30 bg-muted border-b border-border'
 const STICKY_TH_FROZEN = 'sticky top-0 z-40 bg-muted border-b border-border'
 const STICKY_TD = 'sticky z-20 bg-card'
 
-/** Field filter yang diisi saat baris rekap diklik */
-const REKAP_FILTER_FIELD: Record<Exclude<LaporanRekapDimension, 'bulan'>, 'komoditi' | 'jenisKomoditi' | 'unit' | 'pembeli'> = {
-  komoditi: 'komoditi',
-  produk: 'jenisKomoditi',
-  unit: 'unit',
-  pembeli: 'pembeli',
-}
-
 function volumeLabel(kg: number, ea: number): string {
   if (kg <= 0 && ea <= 0) return '0 Kg'
   return [kg > 0 && `${formatNumber(Math.round(kg))} Kg`, ea > 0 && `${formatNumber(Math.round(ea))} EA`].filter(Boolean).join(' + ')
@@ -102,7 +93,6 @@ export default function LaporanPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [isExportingHo, setIsExportingHo] = useState(false)
   const [showFullTable, setShowFullTable] = useState(false)
-  const [dimension, setDimension] = useState<LaporanRekapDimension>('komoditi')
   const [detailKey, setDetailKey] = useState<string | null>(null)
   const [sapReconciliationOpen, setSapReconciliationOpen] = useState(false)
   const [balances, setBalances] = useState<PiutangRow[] | null>(null)
@@ -133,7 +123,7 @@ export default function LaporanPage() {
   }, [rows, filters.modeTanggal])
 
   const filtered = useMemo(() => filterLaporanRows(rows, filters), [rows, filters])
-  const rekap = useMemo(() => buildLaporanRekap(filtered, dimension, balances), [filtered, dimension, balances])
+  const rekap = useMemo(() => buildLaporanRekap(filtered, 'komoditi', balances), [filtered, balances])
   const total = rekap.total
   const averagePrice = rekapAveragePrice(total)
 
@@ -173,36 +163,12 @@ export default function LaporanPage() {
     return monthPart
   }, [filters.year, filters.months])
 
-  const activeRekapKeys = useMemo(() => {
-    if (dimension === 'bulan') {
-      return filters.year ? filters.months.map((m) => `${filters.year}-${m}`) : []
-    }
-    return filters[REKAP_FILTER_FIELD[dimension]]
-  }, [dimension, filters])
-
   const advancedFilterCount = [
     filters.jenisKomoditi.length > 0,
     filters.tipe !== 'ALL',
     filters.sap !== 'ALL',
     filters.statusBayar !== 'ALL',
   ].filter(Boolean).length
-
-  /** Klik baris rekap → filter ke nilai itu (klik lagi untuk melepas) */
-  const handleRekapSelect = (group: LaporanRekapRow) => {
-    if (!group.key) return
-    if (dimension === 'bulan') {
-      const year = group.key.slice(0, 4)
-      const month = group.key.slice(5, 7)
-      const isOnly = filters.year === year && filters.months.length === 1 && filters.months[0] === month
-      setFilters((f) => ({ ...f, year, months: isOnly ? [] : [month] }))
-      return
-    }
-    const field = REKAP_FILTER_FIELD[dimension]
-    const current = filters[field]
-    const isOnly = current.length === 1 && current[0] === group.key
-    setFilters((f) => ({ ...f, [field]: isOnly ? [] : [group.key] }))
-    if (dimension === 'produk' && !isOnly) setShowAdvanced(true)
-  }
 
   const handleSapSave = async (row: LaporanRow, field: string, value: string) => {
     if (!canSaveSapFields(row)) {
@@ -384,35 +350,24 @@ export default function LaporanPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Penjualan dihitung pada tanggal BA (realisasi) atau rencana DO bila belum ada BA. Cash in dihitung pada tanggal transfer.
+        Rekap per komoditi/unit/pembeli ada di Dashboard. Penjualan dihitung pada tanggal BA (realisasi) atau rencana DO bila belum ada BA. Cash in dihitung pada tanggal transfer.
         Kurang bayar dan sisa ambil adalah posisi saat ini untuk invoice yang tampil.
         {undatedSales > 0 && <span className="text-amber-700 dark:text-amber-400"> {undatedSales} DO belum punya tanggal rencana/BA sehingga tidak masuk periode ini.</span>}
         {balanceError && <span className="text-destructive"> Data piutang gagal dimuat, klik Refresh.</span>}
       </p>
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-4"><TableSkeleton rows={6} cols={7} /></div>
-          ) : sorted.length === 0 ? (
-            <div className="py-8">
-              <EmptyState title="Tidak ada data" description={`Tidak ada transaksi untuk ${periodLabel}. Ubah filter atau reset.`} />
-              <div className="mt-4 flex justify-center">
-                <Button variant="outline" size="sm" onClick={handleResetFilters}>Reset Filter</Button>
-              </div>
+      {isLoading ? (
+        <Card><CardContent className="p-4"><TableSkeleton rows={6} cols={7} /></CardContent></Card>
+      ) : sorted.length === 0 ? (
+        <Card>
+          <CardContent className="py-8">
+            <EmptyState title="Tidak ada data" description={`Tidak ada transaksi untuk ${periodLabel}. Ubah filter atau reset.`} />
+            <div className="mt-4 flex justify-center">
+              <Button variant="outline" size="sm" onClick={handleResetFilters}>Reset Filter</Button>
             </div>
-          ) : (
-            <LaporanRekapTable
-              dimension={dimension}
-              onDimensionChange={setDimension}
-              groups={rekap.groups}
-              total={total}
-              activeKeys={activeRekapKeys}
-              onSelect={handleRekapSelect}
-            />
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {!isLoading && sorted.length > 0 && (
         <Card>

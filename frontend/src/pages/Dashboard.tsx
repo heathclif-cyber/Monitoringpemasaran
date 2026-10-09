@@ -16,6 +16,11 @@ import {
 } from 'recharts'
 import { TrendingUp, Wallet, Box, FileText, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useDashboardStore } from '@/store/dashboardStore'
+import { useLaporanStore } from '@/store/laporanStore'
+import { client } from '@/lib/client'
+import { LaporanRekapTable } from '@/components/feature/LaporanRekapTable'
+import { buildLaporanRekap, createDefaultLaporanFilters, filterLaporanRows } from '@/utils/laporanUtils'
+import type { LaporanRekapDimension, PiutangResponse, PiutangRow } from '@/types'
 import { useAppStore } from '@/store/appStore'
 import { StatCard } from '@/components/common/StatCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -411,6 +416,44 @@ function SapStatus() {
   )
 }
 
+/** Rekap penjualan per komoditi/produk/unit/pembeli/bulan — mengikuti filter Dashboard */
+function RekapPenjualan() {
+  const rows = useLaporanStore((s) => s.rows)
+  const filters = useDashboardStore((s) => s.filters)
+  const [dimension, setDimension] = useState<LaporanRekapDimension>('komoditi')
+  const [balances, setBalances] = useState<PiutangRow[] | null>(null)
+
+  useEffect(() => {
+    if (rows.length === 0) void useLaporanStore.getState().fetch({ silent: true })
+    client.get<PiutangResponse>('/api/piutang').then((d) => setBalances(d.rows)).catch(() => setBalances(null))
+  }, [])
+
+  const rekap = useMemo(() => {
+    const f = {
+      ...createDefaultLaporanFilters(),
+      year: String(filters.year),
+      unit: filters.unit === 'ALL' ? [] : [filters.unit],
+      komoditi: filters.komoditi === 'ALL' ? [] : [filters.komoditi],
+    }
+    return buildLaporanRekap(filterLaporanRows(rows, f), dimension, balances)
+  }, [rows, filters, dimension, balances])
+
+  return (
+    <Card>
+      <CardHeader className="pb-0">
+        <CardTitle className="text-sm font-semibold">Rekap Penjualan {filters.year}</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {rows.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">Memuat rekap…</p>
+        ) : (
+          <LaporanRekapTable dimension={dimension} onDimensionChange={setDimension} groups={rekap.groups} total={rekap.total} />
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function Dashboard() {
   const { data, filters, isLoading, fetch, setFilters } = useDashboardStore()
   const { availableYears, availableUnits, availableKomoditas, fetchDropdownData } = useAppStore()
@@ -507,6 +550,7 @@ export default function Dashboard() {
             <p>Periksa BA berpotensi ganda dan tautan lama melalui Laporan → Detail → Document Flow. Rencana DO belum merupakan realisasi.</p>
           </div> : null}
           <StatCards />
+          <RekapPenjualan />
           <SapStatus />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

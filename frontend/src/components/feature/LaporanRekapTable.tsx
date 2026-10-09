@@ -30,8 +30,8 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
   onDimensionChange: (dimension: LaporanRekapDimension) => void
   groups: LaporanRekapRow[]
   total: LaporanRekapRow
-  activeKeys: string[]
-  onSelect: (row: LaporanRekapRow) => void
+  activeKeys?: string[]
+  onSelect?: (row: LaporanRekapRow) => void
 }) {
   const isPeriod = dimension === 'bulan'
   const th = 'border-b px-3 py-2 text-xs font-semibold whitespace-nowrap'
@@ -81,7 +81,7 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
             </Button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">Klik baris untuk memfilter · nilai sebelum PPN</p>
+        <p className="text-xs text-muted-foreground">{onSelect ? 'Klik baris untuk memfilter · ' : ''}nilai sebelum PPN</p>
       </div>
       <div className="max-h-[60vh] overflow-auto">
         <table className="w-full min-w-[960px] border-separate border-spacing-0">
@@ -101,8 +101,8 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
             {groups.map((r) => (
               <tr
                 key={r.key || '__empty__'}
-                className={cn('cursor-pointer hover:bg-muted/50', activeKeys.includes(r.key) && 'bg-primary/5')}
-                onClick={() => onSelect(r)}
+                className={cn('hover:bg-muted/50', onSelect && 'cursor-pointer', activeKeys?.includes(r.key) && 'bg-primary/5')}
+                onClick={onSelect ? () => onSelect(r) : undefined}
               >
                 <td className="border-b px-3 py-2 text-[13px] font-medium">{r.label}</td>
                 {cells(r)}
