@@ -17,6 +17,7 @@ import { FormStepper, FormStepActions, type FormStep } from '@/components/common
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { KontrakPreview } from '@/components/feature/KontrakPreview'
+import { TransactionTaxSummary } from '@/components/feature/TransactionTaxSummary'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -736,6 +737,11 @@ export default function KontrakPage() {
                 </div>
                 <div><Label className="text-xs">PPh %</Label><Input type="number" step="any" {...register('pph_persen')}  /></div>
               </div>
+              <TransactionTaxSummary input={{ document: 'contract', partner: watchedFields.pembeli,
+                commodity: watchedFields.komoditi, material: unitList.filter(u => u.nama_unit.trim()).map(u => u.jenis_komoditi).filter(Boolean).join(' / ') || watchedFields.jenis_komoditi,
+                multipleMaterials: new Set(unitList.filter(u => u.nama_unit.trim()).map(u => `${u.komoditi}|${u.jenis_komoditi}`)).size > 1,
+                date: watchedFields.tanggal_kontrak, isVat: watchedFields.is_ppn, vatRate: Number(watchedFields.ppn_persen),
+                isWithholding: watchedFields.is_pph, withholdingRate: Number(watchedFields.pph_persen), priceBeforeVat: payungMode ? null : pricing.pokok }} />
             </CardContent>
           </Card>
           )}

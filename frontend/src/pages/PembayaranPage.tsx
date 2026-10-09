@@ -842,14 +842,14 @@ export default function PembayaranPage() {
                   )}
                 </div>
                 <div>
-                  <Label className="text-xs">PPh Disetor</Label>
+                  <Label className="text-xs">Penandaan Setor PPh (Manual)</Label>
                   <NativeSelect {...register('is_pph_disetor')}>
-                    <option value="false">Belum</option>
-                    <option value="true">Sudah</option>
+                    <option value="false">Belum ditandai disetor</option>
+                    <option value="true">Ditandai disetor — belum diverifikasi</option>
                   </NativeSelect>
                   {currentKontrak?.is_pph === 'true' && (
                     <p className="text-xs text-slate-500 mt-1">
-                      Status setor PPh ke KPP — tampil di Laporan Digital. Tidak mempengaruhi lunas/Superman.
+                      Pernyataan manual, bukan verifikasi bukti potong/pungut atau bukti setor/NTPN. Tampil di Laporan Digital; bukan syarat deklarasi Superman.
                     </p>
                   )}
                 </div>
@@ -863,6 +863,27 @@ export default function PembayaranPage() {
             </Card>
           </fieldset>
         </ReadOnlyFieldset>
+
+        {invoiceSuperman && currentKontrak?.is_pph === 'true' && invoicePembayaran.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm">Status Setor PPh per Termin</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">Status manual dapat diperbarui setelah Superman. Nominal dan tanggal transfer tetap dikunci; bukan verifikasi bukti setor.</p>
+              {invoicePembayaran.map(payment => <div key={payment.no_pembayaran} className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 text-xs">
+                <span className="break-all">{payment.no_pembayaran} · {formatCurrency(payment.nominal_transfer)}</span>
+                <Button type="button" size="sm" variant="outline" disabled={!canEdit() || isSubmitting} onClick={async () => {
+                  try {
+                    await pembayaranStore.save({ no_pembayaran: payment.no_pembayaran, no_invoice: payment.no_invoice,
+                      tanggal_pembayaran: payment.tanggal_pembayaran, nominal_transfer: payment.nominal_transfer,
+                      is_pph_disetor: payment.is_pph_disetor === 'true' ? 'false' : 'true' })
+                    setInvoicePembayaran(await pembayaranStore.fetchByInvoice(selectedInvoice))
+                    addNotification('Status setor PPh diperbarui', 'success')
+                  } catch (error) { addNotification(error instanceof Error ? error.message : 'Gagal memperbarui PPh', 'error') }
+                }}>{payment.is_pph_disetor === 'true' ? 'Ditandai setor · batalkan tanda' : 'Belum ditandai · tandai setor'}</Button>
+              </div>)}
+            </CardContent>
+          </Card>
+        )}
 
         {isPayung && !baNo && selectedInvoice && (
           <Card>

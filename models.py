@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, Boolean, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -15,6 +15,47 @@ class User(Base):
     # role: admin | staff | tamu | integrasi
     role = Column(String, nullable=False, default="staff")
     is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class TaxProfile(Base):
+    __tablename__ = "tax_profile"
+    __table_args__ = (UniqueConstraint('kind', 'source_key', 'revision', name='uq_tax_profile_revision'),)
+    id = Column(Integer, primary_key=True)
+    kind = Column(String, nullable=False, index=True)
+    source_key = Column(String, nullable=False, index=True)
+    label = Column(String, nullable=False)
+    verified = Column(Boolean, nullable=False, default=False)
+    effective_from = Column(Date, nullable=False)
+    effective_until = Column(Date, nullable=True)
+    evidence = Column(String, nullable=False, default="")
+    settings = Column(JSON, nullable=False)
+    revision = Column(Integer, nullable=False, default=1)
+
+
+class TaxDecision(Base):
+    __tablename__ = "tax_decision"
+    no_invoice = Column(String, ForeignKey("invoice.no_invoice", ondelete="CASCADE"), primary_key=True)
+    mode = Column(String, nullable=False)
+    result = Column(JSON, nullable=False)
+    automatic_snapshot = Column(JSON, nullable=False)
+    source_snapshot = Column(JSON, nullable=False)
+    reason = Column(String, nullable=False)
+    actor = Column(String, nullable=False)
+    revision = Column(Integer, nullable=False, default=1)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class TaxAudit(Base):
+    __tablename__ = "tax_audit"
+    id = Column(Integer, primary_key=True)
+    entity = Column(String, nullable=False, index=True)
+    entity_key = Column(String, nullable=False, index=True)
+    actor = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    before = Column(JSON, nullable=True)
+    after = Column(JSON, nullable=False)
+    reason = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Kontrak(Base):
@@ -188,6 +229,8 @@ class BeritaAcara(Base):
 
     no_ba = Column(String, primary_key=True, index=True)
     no_kontrak = Column(String, ForeignKey("kontrak.no_kontrak", ondelete="CASCADE"), nullable=False)
+    # Normal flow: many pickup BAs may reference the same issued DO.
+    no_do = Column(String, ForeignKey("delivery_order.no_do"), nullable=True, index=True)
     tanggal_ba = Column(Date, nullable=False)
     bulan_buku = Column(Date, nullable=True)  # periode pembukuan (biasanya ≠ bulan tanggal BA)
     volume_ba = Column(Float, default=0.0)

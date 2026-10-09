@@ -2,7 +2,7 @@
 
 Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini sebelum debug Superman atau Input Pembayaran — lihat juga [agent.md](./agent.md).
 
-**Terakhir diperbarui:** 2026-07-28
+**Terakhir diperbarui:** 2026-10-09
 
 ---
 
@@ -10,6 +10,10 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 
 | ID | Area | Severity | Status |
 |----|------|----------|--------|
+| BUG-SALES-FLOW-002 | Laporan / HO / dashboard / document flow | High | Fixed & deployed 2026-10-09 — sumber event BA/rencana DO dan pembayaran dipisahkan; BA payung belum invoice tampil; document flow dan harga satuan tersedia; keamanan tautan diperketat |
+| BUG-BA-LINK-001 | BA / DO / Invoice / Kontrak | High | Fixed & deployed 2026-10-08 — BA standar memilih/otomatis menautkan DO tunggal; beberapa BA per DO dengan validasi volume; payung tetap BA → Invoice → DO; Draft dipisahkan dari realisasi; 20 tes backend dan build lolos |
+| BUG-PICKUP-001 | Laporan ringkas | High | Fixed — outstanding hanya total DO terbit dikurangi BA selesai terkait; tanpa DO = 0 dan tampil Belum ada DO. Warna sisa ≥50% merah, >10% merah redup, ≤10% netral; deduplikasi invoice |
+| BUG-HO-001 | Export HO | High | Fixed 2026-10-07 — HO memakai tanggal BA langsung (termasuk payung), bukan bulan_buku; tanpa BA memakai rencana pengambilan DO sesuai arahan user; 8 regression tests |
 | [BUG-001](#bug-001-pembayaran-pph--validasi-sisa-menyesatkan) | Pembayaran | High | Fixed |
 | [BUG-002](#bug-002-pembayaran--kelebihan-transfer-tidak-tercatat) | Pembayaran | Medium | Fixed |
 | [BUG-003](#bug-003-superman--upload-detection-bootstrap-fileinput) | Superman | High | Fixed |
@@ -28,6 +32,41 @@ Daftar bug yang ditemukan saat development/operasional. **Agent:** baca file ini
 | [BUG-016](#bug-016-superman--captcha-loading-500--jaringan-railway-ke-portal) | Superman / Railway | Critical | Mitigated 2026-07-28 — captcha httpx; jaringan datacenter tetap intermittent |
 
 ---
+
+## BUG-BA-LINK-001: BA pengambilan tidak terhubung ke DO
+
+### Deploy lanjutan 2026-10-09
+
+- Revisi UI berikutnya: badge "Invoice belum DO" dihapus tanpa mengganti data/status invoice. Build dan 26 tes frontend lulus. Image `monpem-sales-flow-preview-20261009-label` dipromosikan ke produksi atas permintaan deploy; container sebelumnya disimpan sebagai `monpem-app-rollback-20261009-label`.
+- Revisi berikutnya menghapus juga badge "Kontrak belum invoice". Badge hanya dirender untuk event realisasi, rencana, dan pembayaran; tidak ada penggantian label kosong dengan status kontrak. Data kontrak/invoice tetap disimpan dan ditampilkan. Deployed atas permintaan pengguna: `monpem-sales-flow-preview-20261009-no-pending-labels`; health 200, tidak ada job Superman aktif. Versi sebelumnya disimpan sebagai `monpem-app-rollback-20261009-no-pending`.
+- Koreksi berdasarkan screenshot pengguna: hapus seluruh badge jenis event di kolom dokumen (Realisasi BA/Pembayaran/Rencana), bukan hanya badge invoice/kontrak tertunda. Nomor BA, invoice, kontrak dan DO serta logika data tidak berubah. Deployed atas permintaan pengguna: `monpem-sales-flow-preview-20261009-no-event-badges`; health 200, tidak ada job Superman aktif. Versi sebelumnya disimpan sebagai `monpem-app-rollback-20261009-no-event`.
+- Image produksi `monpem-sales-flow-release-20261009` dibangun dari konteks release terpilih, bukan seluruh worktree yang masih memiliki perubahan lain. Laporan/HO/dashboard/document flow dan harga per satuan dari preview dipromosikan.
+- Submit utama form BA selalu mengirim `Selesai` (termasuk submit keyboard); `Draft` hanya melalui tombol Simpan Draft. Status BA lama tidak dimigrasikan otomatis. Pemeriksaan setelah deploy menemukan BA kopra `AW/BAPB/2026.09.30-1` sudah Selesai: realisasi 8.000 kg, outstanding 0, tanggal 30 September. Pengujian browser mencegat seluruh POST agar tidak mengubah data produksi.
+- Build dan 26 tes frontend serta 32 tes backend pada database terisolasi lulus. Tidak ada job Superman pending/running saat deploy. Public health 200; API tanpa token tetap 401.
+- Browser produksi memverifikasi submit Realisasi/Draft yang dicegat, harga satuan, document flow dan BA sawit September tanpa error JavaScript.
+- Backup database: `/home/apps-server/monpem-backup-20261009.i14pfv5s/before.dump`. Container versi sebelumnya dipertahankan berhenti sebagai `monpem-app-rollback-20261009`.
+
+### Audit lanjutan BUG-SALES-FLOW-002 — perbaikan lokal 2026-10-08
+
+- Sumber penjualan di `services/sales_reporting.py`: satu event per BA selesai, termasuk BA payung belum invoice; tanpa BA, DO memakai rencana pengambilan dan ditandai belum realisasi. Cash in berasal dari setiap pembayaran, bukan salinan nominal DO. Event pembayaran pada tanggal sama dapat digabung sekali ke baris penjualan.
+- Tabel, dashboard, HO dan integrasi pendapatan memakai sumber yang sama. Integrasi pendapatan hanya BA realisasi; HO mempertahankan fallback rencana DO. BA parsial lintas bulan tidak dipindahkan ke tanggal BA terakhir. Rekonsiliasi SAP tetap membandingkan kuantitas DO terbit, bukan kuantitas satu BA parsial.
+- Outstanding tetap per invoice berdasarkan DO terbit; kuantitas pengambilan per baris BA, bukan total invoice berulang. Ekspor Excel memakai nilai sumber termasuk premi, dan total invoice tidak dijumlah ulang per event.
+- Invoice berbayar/Superman tidak dapat dihapus. Dasar transaksi invoice/kontrak yang memiliki turunan dikunci. BA normal tidak dapat dipakai pada DO kedua, Draft tidak boleh menjadi realisasi DO, dan BA selesai tidak dapat dikembalikan menjadi Draft.
+- Penandaan setor PPh boleh diubah melalui endpoint pembayaran lama setelah Superman, tetapi nominal/tanggal tetap dikunci dan tanda pada DO disinkronkan. UI menyediakan aksi khusus per termin, dengan keterangan manual/belum diverifikasi.
+- Document flow pada endpoint trace lama dan halaman Trace Kontrak: pohon tautan aktual normal/payung, semua BA termasuk Draft/belum invoice, pembayaran belum DO, dan peringatan BA ganda/volume melebihi kontrak/tautan lama. Akses dari detail laporan dan repositori kontrak.
+- BA yang dicurigai ganda tetap disimpan/dihitung sebagai record terpisah, dengan peringatan di tabel, dashboard, flow dan sheet Pemeriksaan Data HO. Angka belum final sebelum identitas dokumen lama direkonsiliasi; tidak ada penghapusan/penyatuan otomatis.
+- Persediaan tetap saldo tersedia setelah alokasi DO; UI diperjelas bahwa ini bukan realisasi pengambilan fisik. BA adalah sumber volume fisik di laporan.
+- Verifikasi image `monpem-sales-flow-preview-20261008`: 32 tes backend, 26 tes frontend, build, browser flow/payung dan sawit September tanpa error. Salinan data produksi: sawit September 46.660 kg / Rp147.513.650; total penjualan September tabel=HO Rp1.841.113.650; seluruh cash in=catatan pembayaran Rp42.457.005.136; dashboard sawit September=tabel. Auth preview 401 tanpa token.
+- Preview terpisah di `127.0.0.1:8014`; production tetap `monpem-ba-workflow-20261008`, belum deploy. Tidak ada perubahan data produksi/migrasi pada perbaikan lanjutan ini.
+
+**Fixed & deployed:** 2026-10-08, image `monpem-ba-workflow-20261008`.
+
+- BA standar menyimpan `no_do`, otomatis bila satu kandidat memenuhi volume; realisasi wajib terhubung ke DO. Beberapa BA dapat mengacu satu DO, dengan batas volume kumulatif.
+- Kontrak payung tetap dimulai dari BA realisasi; invoice mengacu BA, DO mewarisi BA invoice. Draft tidak boleh dijadikan invoice payung.
+- Perubahan/penghapusan dokumen yang memutus rantai diblokir. Draft tidak dihitung sebagai pengambilan; tombol Simpan Realisasi dibuat eksplisit.
+- Laporan menduplikasi referensi BA secara unik, memakai tanggal BA, dan ekspor HO tidak menghitung ulang rencana DO yang sudah memiliki BA realisasi.
+- Migrasi menautkan dua BA standar lama yang cocok tunggal; keduanya tetap Draft. Satu penanda Ter-invoice tanpa invoice diperbaiki menjadi Selesai, tanpa mengubah volume/tanggal. Backup dan catatan migrasi tersimpan di `/home/apps-server/monpem-backup-20261008.erz4FA/`.
+- Verifikasi: 10 tes workflow + 10 tes laporan, build frontend; health/laporan/ekspor HO September 200, API tanpa login 401. Ikon tanggal custom dihapus agar tidak menduplikasi ikon native.
 
 ## BUG-001: Pembayaran PPh — validasi sisa menyesatkan
 

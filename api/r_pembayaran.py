@@ -134,13 +134,28 @@ def create_pembayaran(
     db: Session = Depends(get_db),
     _: models.User = Depends(require_write),
 ):
+    if pembayaran.is_pph_disetor not in ("true", "false", None):
+        raise HTTPException(status_code=400, detail="Status setor PPh tidak valid")
     db_invoice = db.query(models.Invoice).filter(
         models.Invoice.no_invoice == pembayaran.no_invoice
-    ).first()
+    ).with_for_update().first()
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     if _invoice_has_superman(db_invoice):
+        existing = db.query(models.Pembayaran).filter_by(no_pembayaran=pembayaran.no_pembayaran).first() if pembayaran.no_pembayaran else None
+        if existing and existing.no_invoice == pembayaran.no_invoice and (
+            existing.tanggal_pembayaran == pembayaran.tanggal_pembayaran
+            and abs(float(existing.nominal_transfer or 0) - float(pembayaran.nominal_transfer or 0)) < 0.01
+        ):
+            # Settlement tracking may change after declaration, never the cash facts.
+            existing.is_pph_disetor = pembayaran.is_pph_disetor
+            if existing.delivery_order:
+                existing.delivery_order.is_pph_disetor = pembayaran.is_pph_disetor
+            db.commit()
+            from services.cache import api_cache
+            api_cache.invalidate_reporting()
+            return _pembayaran_out(existing)
         raise HTTPException(
             status_code=400,
             detail="Invoice sudah punya nomor Superman — pembayaran tidak bisa diubah",
@@ -164,6 +179,8 @@ def create_pembayaran(
                 status_code=400,
                 detail="Pembayaran sudah terhubung DO — invoice tidak bisa diubah",
             )
+        if existing_do and (db_pay.tanggal_pembayaran != pembayaran.tanggal_pembayaran or abs(float(db_pay.nominal_transfer or 0) - nominal) > 0.01):
+            raise HTTPException(status_code=400, detail="Pembayaran sudah memiliki DO; nominal dan tanggal tidak dapat diubah")
         db_pay.no_invoice = pembayaran.no_invoice
         db_pay.tanggal_pembayaran = pembayaran.tanggal_pembayaran
         db_pay.nominal_transfer = nominal
@@ -197,6 +214,8 @@ def create_pembayaran(
     )
 
     db.commit()
+    from services.cache import api_cache
+    api_cache.invalidate_reporting()
     db.refresh(saved)
     return _pembayaran_out(
         db.query(models.Pembayaran)
@@ -298,4 +317,6 @@ def delete_pembayaran(
 
     db.delete(db_pay)
     db.commit()
+    from services.cache import api_cache
+    api_cache.invalidate_reporting()
     return {"success": True, "message": "Pembayaran deleted successfully"}

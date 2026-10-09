@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton'
 import { Toast } from '@/components/common/Toast'
@@ -42,6 +42,7 @@ export default function App() {
             <Route path="/pembayaran" element={<PembayaranPage />} />
             <Route path="/delivery-order" element={<DOPage />} />
             <Route path="/laporan" element={<LaporanPage />} />
+            <Route path="/pajak" element={<Navigate to="/kontrak" replace />} />
             <Route path="/piutang" element={<PiutangPage />} />
             <Route path="/bypass" element={<BypassPage />} />
             <Route path="/berita-acara" element={<BAPage />} />

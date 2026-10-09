@@ -175,6 +175,7 @@ export interface DeliveryOrder {
 export interface BeritaAcara {
   no_ba: string
   no_kontrak: string
+  no_do?: string | null
   tanggal_ba: string
   bulan_buku: string | null
   volume_ba: number
@@ -232,6 +233,12 @@ export interface SupermanDocRequirement {
 }
 
 export interface LaporanRow {
+  Row_ID?: string
+  Row_Type?: 'REALISASI' | 'RENCANA' | 'PEMBAYARAN' | 'INVOICE' | 'KONTRAK' | 'BYPASS'
+  Report_Date?: string
+  Reporting_Warnings?: string[]
+  Volume_Pengambilan_Invoice?: number
+  Volume_DO_Dokumen?: number
   No_DO: string
   No_Pembayaran?: string
   No_Invoice: string
@@ -249,6 +256,11 @@ export interface LaporanRow {
   Harga_Satuan: number
   Volume_Invoice: number
   Jumlah_DO: number
+  /** Total BA selesai terkait invoice/DO; berulang antar-DO, null jika belum tercatat. */
+  Volume_Pengambilan?: number | null
+  Outstanding_Pengambilan?: number
+  /** Total volume semua DO terbit pada invoice, untuk acuan outstanding. */
+  Volume_DO_Invoice?: number
   PPN_Persen?: number
   PPh_Persen?: number
   Pendapatan_Pokok: number
@@ -276,6 +288,83 @@ export interface LaporanRow {
   Link_Berita_Acara_Serah_Terima: string
   Dokumen_Superman?: SupermanDocRequirement[]
   Dokumen_Superman_Siap?: boolean
+}
+
+/** Dimensi pengelompokan rekap Laporan */
+export type LaporanRekapDimension = 'komoditi' | 'produk' | 'unit' | 'pembeli' | 'bulan'
+
+/** Satu baris rekap Laporan (nilai penjualan sebelum PPN) */
+export interface LaporanRekapRow {
+  key: string
+  label: string
+  /** Penjualan = realisasi BA + rencana DO + bypass */
+  sales: number
+  /** Bagian penjualan yang masih rencana DO (belum BA) */
+  salesRencana: number
+  salesKg: number
+  salesEa: number
+  volumeKg: number
+  volumeEa: number
+  cashIn: number
+  transferCount: number
+  /** Kurang bayar invoice terkait (null = data piutang belum dimuat) */
+  shortfall: number | null
+  unpaidInvoices: number
+  pickupOutstandingKg: number
+  pickupOutstandingEa: number
+  komoditiCount: number
+}
+
+/** Satu invoice (atau baris tunggal tanpa invoice) pada rincian Laporan */
+export interface LaporanInvoiceGroup {
+  key: string
+  /** Baris acuan untuk detail: kejadian penjualan bila ada, selain itu pembayaran */
+  main: LaporanRow
+  rows: LaporanRow[]
+  sales: number
+  volume: number
+  cashIn: number
+  salesDate: string
+  cashDate: string
+  sortDate: string
+  rowTypes: string[]
+  warnings: string[]
+}
+
+export type SapImportScope = 'billing' | 'delivery'
+export type SapImportCell = string | number
+export type SapImportField =
+  | 'documentNumber' | 'localInvoice' | 'localDo' | 'salesOrder'
+  | 'quantity' | 'unit' | 'unitPrice' | 'pricingUnit' | 'currency' | 'grossAmount'
+  | 'netAmount' | 'vatAmount' | 'withholdingAmount'
+  | 'documentDate' | 'pricingDate' | 'plannedGiDate' | 'actualGiDate'
+  | 'billingDate' | 'giStatus' | 'billingStatus'
+export type SapImportMapping = Partial<Record<SapImportField, number>>
+export interface SapImportSheet {
+  name: string
+  rows: SapImportCell[][]
+}
+export interface SapFieldGuide {
+  key: SapImportField
+  label: string
+  help: string
+  aliases: string[]
+}
+export interface SapReconciliationCheck {
+  label: string
+  local: string
+  sap: string
+  state: 'match' | 'difference' | 'info' | 'pending'
+  message?: string
+}
+export interface SapReconciliationResult {
+  sourceRow: number
+  documentNumber: string
+  localInvoice: string
+  localDo: string
+  status: 'matched' | 'difference' | 'partial' | 'unmatched' | 'ambiguous' | 'invalid'
+  message: string
+  checks: SapReconciliationCheck[]
 }
 
 export interface DocumentUpload {
@@ -442,6 +531,7 @@ export interface SapStats {
 }
 
 export interface DashboardSummary {
+  reporting_warnings?: string[]
   total_kontrak: number
   total_invoice: number
   total_do: number
@@ -570,6 +660,7 @@ export interface InvoiceInput {
 export interface BeritaAcaraInput {
   no_ba: string
   no_kontrak: string
+  no_do?: string | null
   tanggal_ba: string
   bulan_buku?: string
   volume_ba: number
@@ -661,6 +752,7 @@ export interface TraceInvoice {
 }
 
 export interface KontrakTraceSummary {
+  volume_pengambilan?: number
   total_nilai: number
   total_terbayar: number
   sisa_pembayaran: number
@@ -675,6 +767,7 @@ export interface KontrakTraceSummary {
 }
 
 export interface KontrakTrace {
+  document_flow?: DocumentFlow
   no_kontrak: string
   tanggal_kontrak: string | null
   jatuh_tempo_pembayaran: string | null
@@ -686,6 +779,24 @@ export interface KontrakTrace {
   kebun_produsen: string | null
   summary: KontrakTraceSummary
   invoices: TraceInvoice[]
+}
+
+export interface DocumentFlowNode {
+  unit_price?: number | null
+  id: string
+  kind: 'KONTRAK' | 'BA' | 'INVOICE' | 'PEMBAYARAN' | 'DO'
+  number: string
+  date: string | null
+  status: string
+  volume: number
+  amount: number
+}
+
+export interface DocumentFlow {
+  mode: 'STANDAR' | 'PAYUNG_BA'
+  nodes: DocumentFlowNode[]
+  edges: { source: string; target: string }[]
+  warnings: string[]
 }
 
 export interface PiutangRow {
@@ -934,4 +1045,133 @@ export interface KontakPajakInput {
   nama: string
   no_wa: string
   keterangan?: string | null
+}
+// Tax assessment is separate from posted invoice amounts and deposit evidence.
+export interface TaxSettings {
+  pph22_agri_eligible: boolean
+  role: 'unknown' | 'industry_exporter' | 'trader' | 'government' | 'designated'
+  industrial_use: boolean
+  domestic: boolean
+  tax_identity_confirmed: boolean
+  seller_pkp_confirmed: boolean
+  bhpt_election_confirmed: boolean
+  vat_scheme: 'unknown' | 'general_nonluxury' | 'bhpt_specific' | 'exempt_sugar' | 'exempt_livestock'
+  manufacturing: 'unknown' | 'unprocessed' | 'processed'
+  specification_confirmed: boolean
+}
+export interface TaxProfile {
+  kind: 'partner' | 'product'
+  source_key: string
+  label: string
+  verified: boolean
+  effective_from: string
+  effective_until: string | null
+  evidence: string
+  settings: TaxSettings
+  revision: number
+}
+export interface TaxSource {
+  no_invoice: string
+  no_kontrak: string
+  partner: string
+  product: string
+  partner_key: string
+  product_key: string
+  reference_date: string
+  price_before_vat: number
+  ambiguous_product: boolean
+  stored_vat_rate: number
+  stored_pph_rate: number
+  basis_note: string
+}
+export interface TaxResult {
+  rule_version: string
+  status: 'review' | 'automatic' | 'manual'
+  vat_scheme: string | null
+  vat_rate: number | null
+  statutory_vat_rate: number | null
+  fiscal_dpp: number | null
+  vat_amount: number | null
+  pph_type: string | null
+  pph_rate: number | null
+  pph_amount: number | null
+  collector: string | null
+  legal_basis: string[]
+  warnings: string[]
+}
+export interface TaxDecision {
+  mode: 'automatic' | 'manual'
+  result: TaxResult
+  automatic_snapshot: TaxResult
+  source_snapshot: TaxSource
+  reason: string
+  actor: string
+  revision: number
+  updated_at: string
+}
+export interface TaxRow {
+  source: TaxSource
+  result: TaxResult
+  automatic: TaxResult
+  decision: TaxDecision | null
+  changed_since_decision: boolean
+}
+export interface TaxResponse {
+  rule_version: string
+  legal_sources: Record<string, string>
+  profiles: TaxProfile[]
+  rows: TaxRow[]
+}
+export interface TaxAuditEntry {
+  id: number
+  actor: string
+  action: string
+  reason: string
+  created_at: string
+  before: unknown
+  after: unknown
+}
+export interface TaxStore {
+  data: TaxResponse | null
+  loading: boolean
+  error: string | null
+  fetch: () => Promise<void>
+  saveProfile: (body: TaxProfile & { reason: string }) => Promise<void>
+  saveDecision: (body: TaxDecisionInput) => Promise<void>
+}
+export interface TaxDecisionInput {
+  no_invoice: string
+  revision: number
+  mode: 'automatic' | 'manual'
+  reason: string
+  manual?: {
+    vat_scheme: 'general_nonluxury' | 'bhpt_specific' | 'exempt' | 'other'
+    vat_rate: number
+    pph_type: 'PPh 22' | 'Tidak dipungut' | 'Lainnya'
+    pph_rate: number
+    legal_basis: string
+  }
+}
+export interface TransactionTaxInput {
+  partner?: string | null
+  commodity?: string | null
+  material?: string | null
+  date?: string | null
+  isVat?: string | null
+  vatRate?: number | null
+  isWithholding?: string | null
+  withholdingRate?: number | null
+  priceBeforeVat?: number | null
+  multipleMaterials?: boolean
+  document: 'contract' | 'invoice'
+}
+export interface TransactionTaxConclusion {
+  category: string
+  indications: string[]
+  vat: string
+  withholding: string
+  vatAmount: number | null
+  withholdingAmount: number | null
+  notes: string[]
+  references: { label: string; url: string }[]
 }

@@ -10,7 +10,8 @@ from database import get_db
 from services.auth import require_write
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba, get_ba_for_entity
-from services.volume_utils import compute_volume_for_transfer, resolve_volume_scope
+from services.volume_utils import compute_volume_for_transfer, compute_volume_for_invoice, resolve_volume_scope
+from services.ba_linkage import linked_pickup_bas
 from services.stok_utils import (
     record_stok_keluar_do,
     resolve_do_stock_context,
@@ -38,18 +39,19 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
         raise HTTPException(status_code=404, detail="Pembayaran not found")
 
     no_invoice = do.no_invoice or db_pay.no_invoice
-    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
+    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).with_for_update().first()
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     if not (db_invoice.superman or "").strip():
         raise HTTPException(
             status_code=400,
-            detail="Invoice belum punya nomor Superman. Lunasi pembayaran dan buat deklarasi Superman terlebih dahulu.",
+            detail="Invoice belum punya nomor Superman. Catat pembayaran dan buat deklarasi Superman terlebih dahulu.",
         )
 
     if db_pay.no_invoice != no_invoice:
         raise HTTPException(status_code=400, detail="Pembayaran tidak sesuai dengan invoice")
+    db.query(models.DeliveryOrder).filter_by(no_do=do.no_do).with_for_update().first()
 
     existing_do_for_pay = db.query(models.DeliveryOrder).filter(
         models.DeliveryOrder.no_pembayaran == do.no_pembayaran,
@@ -79,6 +81,8 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
         raise HTTPException(status_code=404, detail="Berita Acara tidak ditemukan")
 
     if payung_ba:
+        if do.no_ba and do.no_ba != db_invoice.no_ba:
+            raise HTTPException(status_code=400, detail="BA DO payung harus sama dengan BA invoice")
         if not db_ba:
             raise HTTPException(status_code=400, detail="Kontrak payung wajib memilih Berita Acara (no_ba)")
         if db_ba.no_kontrak != db_invoice.no_kontrak:
@@ -87,6 +91,17 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
     else:
         if db_ba and db_ba.no_kontrak != db_invoice.no_kontrak:
             raise HTTPException(status_code=400, detail="BA tidak sesuai dengan kontrak invoice")
+        if db_ba:
+            if db_ba.status not in ("Selesai", "Ter-invoice"):
+                raise HTTPException(status_code=400, detail="BA Draft tidak boleh dijadikan realisasi DO")
+            if db_ba.no_do and db_ba.no_do != do.no_do:
+                raise HTTPException(status_code=400, detail="BA sudah terhubung ke DO lain")
+            other_ba_do = db.query(models.DeliveryOrder).filter(
+                models.DeliveryOrder.no_ba == db_ba.no_ba,
+                models.DeliveryOrder.no_do != do.no_do,
+            ).first()
+            if other_ba_do:
+                raise HTTPException(status_code=400, detail="BA sudah terhubung ke DO lain")
         # BA pengambilan pada kontrak normal menggantikan rencana awal dengan
         # tanggal realisasi BA. Jika belum ada BA, rencana tetap dipakai.
         rencana_pengambilan = db_ba.tanggal_ba if db_ba else do.rencana_pengambilan
@@ -103,7 +118,24 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
             db_kontrak, db_invoice, db_ba, nominal, round_result=False
         )
 
-    max_volume = volume_for_calc
+    max_volume = compute_volume_for_invoice(db_kontrak, db_invoice, db_ba)
+    if not payung_ba and db_ba and float(db_ba.volume_ba or 0) > volume_do + 1e-6:
+        raise HTTPException(status_code=400, detail="Volume DO lebih kecil dari BA pengambilan")
+    other_dos = db.query(models.DeliveryOrder).filter(
+        models.DeliveryOrder.no_invoice == no_invoice,
+        models.DeliveryOrder.no_do != do.no_do,
+    ).all()
+    if sum(float(other.volume_do or 0) for other in other_dos) + volume_do > max_volume + 0.5:
+        raise HTTPException(status_code=400, detail="Total volume semua DO melebihi volume invoice")
+    pickup_bas = linked_pickup_bas(db, do.no_do)
+    if db_ba and not payung_ba and db_ba.no_ba not in {b.no_ba for b in pickup_bas}:
+        pickup_bas.append(db_ba)
+    if pickup_bas:
+        old_do = db.query(models.DeliveryOrder).filter_by(no_do=do.no_do).first()
+        if old_do and old_do.no_invoice != no_invoice:
+            raise HTTPException(status_code=400, detail="DO sudah memiliki BA; invoice tidak dapat diganti")
+        if not payung_ba and sum(float(b.volume_ba or 0) for b in pickup_bas) > volume_do + 1e-6:
+            raise HTTPException(status_code=400, detail="Volume DO tidak boleh lebih kecil dari BA pengambilan terkait")
     if max_volume > 0 and volume_do > max_volume + 0.5:
         raise HTTPException(
             status_code=400,
@@ -155,6 +187,10 @@ def create_do(do: schemas.DeliveryOrderCreate, db: Session = Depends(get_db), _:
             volume_do=rounded_volume,
         )
         db.add(saved_do)
+
+    if db_ba and not payung_ba:
+        db.flush()
+        db_ba.no_do = saved_do.no_do
 
     ctx = resolve_do_stock_context(saved_do, db_invoice, db_kontrak)
     if not ctx["jenis_material"]:
@@ -223,6 +259,8 @@ def delete_do(no_do: str, db: Session = Depends(get_db), _: models.User = Depend
     if not db_do:
         raise HTTPException(status_code=404, detail="DO not found")
 
+    if linked_pickup_bas(db, no_do):
+        raise HTTPException(status_code=400, detail="DO masih terhubung dengan BA; tidak dapat dihapus")
     reverse_stok_do(db, no_do)
     db.delete(db_do)
     db.commit()

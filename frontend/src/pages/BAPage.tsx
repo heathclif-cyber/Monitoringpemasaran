@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { ClipboardList, RotateCcw, Save } from 'lucide-react'
 import { useBAStore } from '@/store/baStore'
 import { useKontrakStore } from '@/store/kontrakStore'
+import { useDOStore } from '@/store/doStore'
+import { useInvoiceStore } from '@/store/invoiceStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
@@ -16,7 +18,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { DocumentUpload } from '@/components/common/DocumentUpload'
 import { ReadOnlyFieldset } from '@/components/common/ReadOnlyFieldset'
 import { PageHeader, PageShell } from '@/components/patterns'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatNumber } from '@/lib/utils'
 import { calculateBAInvoiceAmount } from '@/utils/baUtils'
 import type { Kontrak } from '@/types'
 
@@ -33,6 +35,7 @@ function toMonthInput(isoDate: string): string {
 const baSchema = z.object({
   no_ba: z.string().min(1, 'No BA wajib diisi'),
   no_kontrak: z.string().min(1, 'Kontrak wajib dipilih'),
+  no_do: z.string().optional(),
   tanggal_ba: z.string().min(1, 'Tanggal BA wajib diisi'),
   bulan_buku: z.string().optional(),
   volume_ba: z.coerce.number().min(0.01, 'Volume harus > 0'),
@@ -49,6 +52,8 @@ type BAFormData = z.infer<typeof baSchema>
 export default function BAPage() {
   const baStore = useBAStore()
   const kontrakStore = useKontrakStore()
+  const doStore = useDOStore()
+  const invoiceStore = useInvoiceStore()
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [isExisting, setIsExisting] = useState(false)
@@ -60,6 +65,7 @@ export default function BAPage() {
     defaultValues: {
       no_ba: '',
       no_kontrak: '',
+      no_do: '',
       tanggal_ba: new Date().toISOString().split('T')[0],
       bulan_buku: previousMonthFrom(new Date().toISOString().split('T')[0]),
       volume_ba: 0,
@@ -83,6 +89,8 @@ export default function BAPage() {
   useEffect(() => {
     kontrakStore.fetch()
     baStore.fetch()
+    doStore.fetch()
+    invoiceStore.fetch()
   }, [])
 
   const kontrakOptions = useMemo(
@@ -113,6 +121,13 @@ export default function BAPage() {
     () => kontrakStore.data.find((k) => k.no_kontrak === selectedKontrak),
     [kontrakStore.data, selectedKontrak],
   )
+  const pickupDOOptions = useMemo(() => {
+    const invoices = new Set(invoiceStore.data.filter(i => i.no_kontrak === selectedKontrak).map(i => i.no_invoice))
+    return doStore.data.filter(d => invoices.has(d.no_invoice)).map(d => ({
+      value: d.no_do,
+      label: `${d.no_do} — Invoice ${d.no_invoice} — ${formatNumber(d.volume_do)} ${currentKontrak?.satuan || 'Kg'}`,
+    }))
+  }, [doStore.data, invoiceStore.data, selectedKontrak, currentKontrak])
 
   const unitOptions = useMemo(
     () => (currentKontrak?.units || [])
@@ -175,6 +190,7 @@ export default function BAPage() {
       setIsExisting(true)
       setExportNo(no)
       setValue('no_kontrak', data.no_kontrak)
+      setValue('no_do', data.no_do || '')
       const kontrakBA = kontrakStore.data.find((k) => k.no_kontrak === data.no_kontrak)
       setTipeKontrak(String(kontrakBA?.tipe_alur || 'STANDAR').toUpperCase() === 'PAYUNG_BA' ? 'PAYUNG_BA' : 'STANDAR')
       setValue('tanggal_ba', data.tanggal_ba)
@@ -194,21 +210,19 @@ export default function BAPage() {
 
   const onSubmit = async (data: BAFormData) => {
     try {
-      if (isPayungBA && !data.bulan_buku) {
-        addNotification('Bulan buku wajib diisi untuk kontrak payung', 'error')
-        return
-      }
       if (isPayungBA && (!data.harga_satuan || data.harga_satuan <= 0)) {
         addNotification('Harga satuan BA wajib diisi untuk kontrak payung', 'error')
         return
       }
       const payload: any = { ...data }
-      if (isPayungBA) payload.bulan_buku = `${data.bulan_buku}-01`
-      else delete payload.bulan_buku
+      payload.bulan_buku = data.tanggal_ba
+      payload.no_do = isPayungBA ? null : data.no_do || null
       if (!payload.nama_unit) delete payload.nama_unit
       if (!payload.deskripsi) delete payload.deskripsi
       if (!payload.link_berita_acara) delete payload.link_berita_acara
-      await baStore.save(payload)
+      const savedBA = await baStore.save(payload)
+      setValue('no_do', savedBA.no_do || '')
+      setValue('status', savedBA.status)
       setExportNo(data.no_ba)
       setIsExisting(true)
       addNotification('Berita Acara berhasil disimpan', 'success')
@@ -238,9 +252,9 @@ export default function BAPage() {
     <PageShell width="narrow">
       <PageHeader
         title="BA Pengambilan"
-        description="Catat realisasi pengambilan dan periode pembukuan untuk kontrak normal maupun payung"
+        description="Normal: BA terhubung ke DO. Payung: BA menjadi dasar invoice, lalu diwarisi DO."
       />
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
+      <form onSubmit={handleSubmit((data) => onSubmit({ ...data, status: data.status === 'Ter-invoice' ? data.status : 'Selesai' }))} className="space-y-6" autoComplete="off">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -268,7 +282,7 @@ export default function BAPage() {
             <p className="text-xs text-slate-500">
               {isPayungBA
                 ? 'BA menjadi dasar volume, harga, dan invoice kontrak payung.'
-                : 'BA mencatat realisasi pengambilan. Saat dipilih di DO, tanggal BA menggantikan rencana pengambilan dan Bulan Buku BA masuk Laporan Digital.'}
+                : 'BA mencatat realisasi pengambilan dan ditautkan ke DO. Setiap BA selesai masuk laporan sesuai tanggal BA; Draft belum dihitung sebagai pengambilan.'}
             </p>
             <div className="grid grid-cols-2 gap-4">
             <div>
@@ -307,23 +321,19 @@ export default function BAPage() {
             <CardTitle className="text-sm font-semibold">Data Berita Acara</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
+            {!isPayungBA && <div className="col-span-2">
+              <Label className="text-xs">DO Pengambilan</Label>
+              <SearchableSelect value={watch('no_do') || ''} onChange={v => setValue('no_do', v)} options={pickupDOOptions} placeholder="Pilih DO · otomatis jika hanya satu kandidat sesuai" />
+              <p className="text-xs text-muted-foreground mt-1">Pilih DO untuk menghubungkan BA lama atau pengambilan bertahap. Realisasi wajib memiliki DO yang sesuai.</p>
+            </div>}
+            <div className="col-span-2 text-xs text-muted-foreground">Status: {watch('status') || 'Draft'} · Draft belum dihitung sebagai pengambilan.</div>
             <div className={!isPayungBA ? 'col-span-2' : ''}>
               <Label className="text-xs">Tanggal BA *</Label>
               <Input type="date" {...register('tanggal_ba')} />
               <p className="text-xs text-slate-400 mt-1">
-                {isPayungBA
-                  ? 'Tanggal dokumen akumulasi (bisa beda bulan dengan pembukuan).'
-                  : 'Tanggal realisasi pengambilan sekaligus tanggal buku otomatis.'}
+                Tanggal realisasi pengambilan; otomatis menjadi tanggal acuan laporan.
               </p>
             </div>
-            {isPayungBA && (
-              <div>
-                <Label className="text-xs">Bulan Buku *</Label>
-                <Input type="month" {...register('bulan_buku')} />
-                <p className="text-xs text-slate-400 mt-1">Periode pembukuan transaksi — dipakai di Laporan Digital.</p>
-                {errors.bulan_buku && <p className="text-xs text-red-500 mt-1">{errors.bulan_buku.message}</p>}
-              </div>
-            )}
             <div>
               <Label className="text-xs">{isPayungBA ? 'Volume BA *' : `Kuantitas Pengambilan (${currentKontrak?.satuan || 'Kg'}) *`}</Label>
               <Input type="number" step="any" {...register('volume_ba')} />
@@ -376,7 +386,7 @@ export default function BAPage() {
                     {formatCurrency(sisaKuota)} {currentKontrak.satuan}
                   </span>
                   <span className="col-span-2 text-xs text-slate-500 pt-1">
-                    Setelah disimpan, pilih BA ini pada Delivery Order untuk mengunci tanggal realisasi dan bulan buku laporan.
+                    Simpan Realisasi untuk menghitung pengambilan pada DO terkait. Satu DO dapat memiliki beberapa BA.
                   </span>
                 </>
               ) : (
@@ -418,10 +428,11 @@ export default function BAPage() {
         </ReadOnlyFieldset>
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={isSubmitting || !canEdit()}>
+          <Button type="submit" disabled={isSubmitting || !canEdit() || watch('status') === 'Ter-invoice'}>
             <Save size={15} className="mr-1.5" />
-            {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : 'Simpan BA'}
+            {isSubmitting ? 'Menyimpan...' : !canEdit() ? 'Read-Only (Tamu)' : 'Simpan Realisasi'}
           </Button>
+          <Button type="button" variant="outline" onClick={handleSubmit((data) => onSubmit({ ...data, status: 'Draft' }))} disabled={isSubmitting || !canEdit() || watch('status') === 'Ter-invoice'}>Simpan Draft</Button>
           <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()}>
             <RotateCcw size={15} className="mr-1.5" />
             Reset

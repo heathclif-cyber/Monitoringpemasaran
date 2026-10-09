@@ -29,7 +29,7 @@ def _default_jumlah(nilai_scope: float, total_existing: float, volume, volume_sc
 
 @router.post("", response_model=schemas.InvoiceOut)
 def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
-    db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == invoice.no_kontrak).first()
+    db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == invoice.no_kontrak).with_for_update().first()
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
 
@@ -43,6 +43,10 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
             raise HTTPException(status_code=404, detail="Berita Acara tidak ditemukan")
         if db_ba.no_kontrak != invoice.no_kontrak:
             raise HTTPException(status_code=400, detail="BA tidak sesuai dengan kontrak yang dipilih")
+        if db_ba.status not in ("Selesai", "Ter-invoice"):
+            raise HTTPException(status_code=400, detail="Simpan BA sebagai Realisasi sebelum membuat invoice payung")
+        if invoice.nama_unit and db_ba.nama_unit and invoice.nama_unit != db_ba.nama_unit:
+            raise HTTPException(status_code=400, detail="Unit invoice harus sesuai BA payung")
         existing_ba_invoice = db.query(models.Invoice).filter(
             models.Invoice.no_ba == invoice.no_ba,
             models.Invoice.no_invoice != invoice.no_invoice,
@@ -72,7 +76,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
     # Jika invoice untuk unit tertentu, hitung batas nilai per-unit
     # Hitungan pakai desimal (sen); tampilan UI yang membulatkan ke rupiah.
     nama_unit = invoice.nama_unit
-    if nama_unit:
+    if nama_unit and not payung_ba:
         db_unit = next((u for u in db_kontrak.units if u.nama_unit == nama_unit), None)
         if not db_unit:
             raise HTTPException(status_code=400, detail=f"Unit '{nama_unit}' tidak ditemukan dalam kontrak")
@@ -224,6 +228,20 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
 
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == invoice.no_invoice).first()
     if db_invoice:
+        previous_ba = db_invoice.no_ba
+        if db_invoice.pembayaran and (
+            db_invoice.no_kontrak != invoice.no_kontrak or db_invoice.no_ba != invoice.no_ba
+            or abs(float(db_invoice.jumlah_pembayaran or 0) - jumlah_pembayaran) > 0.01
+            or abs(float(db_invoice.volume or 0) - volume_invoice) > 1e-6
+            or db_invoice.nama_unit != invoice.nama_unit
+        ):
+            raise HTTPException(status_code=400, detail="Invoice sudah memiliki pembayaran; dasar transaksi tidak boleh diganti")
+        if db_invoice.delivery_orders and (
+            db_invoice.no_kontrak != invoice.no_kontrak or db_invoice.no_ba != invoice.no_ba
+            or abs(float(db_invoice.volume or 0) - float(volume_invoice or 0)) > 1e-6
+            or db_invoice.nama_unit != invoice.nama_unit
+        ):
+            raise HTTPException(status_code=400, detail="Invoice sudah memiliki DO; kontrak, BA, unit dan volume tidak boleh diganti")
         for key, value in invoice.model_dump().items():
             setattr(db_invoice, key, value)
         db_invoice.jumlah_pembayaran = jumlah_pembayaran
@@ -231,6 +249,11 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
         db_invoice.terbilang_invoice = terbilang_invoice
         if payung_ba and db_ba:
             db_ba.status = "Ter-invoice"
+        if previous_ba and previous_ba != invoice.no_ba:
+            old_ba = db.query(models.BeritaAcara).filter_by(no_ba=previous_ba).first()
+            still_used = db.query(models.Invoice).filter_by(no_ba=previous_ba).first()
+            if old_ba and not still_used and old_ba.status == "Ter-invoice":
+                old_ba.status = "Selesai"
         db.commit()
         api_cache.invalidate_reporting()
         db.refresh(db_invoice)
@@ -325,7 +348,10 @@ def delete_invoice(no_invoice: str, db: Session = Depends(get_db), _: models.Use
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).first()
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    
+    if db_invoice.delivery_orders:
+        raise HTTPException(status_code=400, detail="Invoice masih memiliki DO; tidak dapat dihapus")
+    if db_invoice.pembayaran or (db_invoice.superman or "").strip():
+        raise HTTPException(status_code=400, detail="Invoice memiliki pembayaran atau deklarasi Superman; tidak dapat dihapus")
     no_ba = db_invoice.no_ba
     db.delete(db_invoice)
     if no_ba:

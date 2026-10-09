@@ -1,6 +1,48 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import date, datetime
+
+
+class TaxProfileSettings(BaseModel):
+    role: Literal['unknown', 'industry_exporter', 'trader', 'government', 'designated'] = 'unknown'
+    industrial_use: bool = False
+    domestic: bool = False
+    tax_identity_confirmed: bool = False
+    seller_pkp_confirmed: bool = False
+    bhpt_election_confirmed: bool = False
+    vat_scheme: Literal['unknown', 'general_nonluxury', 'bhpt_specific', 'exempt_sugar', 'exempt_livestock'] = 'unknown'
+    manufacturing: Literal['unknown', 'unprocessed', 'processed'] = 'unknown'
+    specification_confirmed: bool = False
+    pph22_agri_eligible: bool = False
+
+
+class TaxProfileWrite(BaseModel):
+    kind: Literal['partner', 'product']
+    source_key: str
+    label: str
+    verified: bool = False
+    effective_from: date
+    effective_until: Optional[date] = None
+    evidence: str = ''
+    settings: TaxProfileSettings
+    revision: int = 0
+    reason: str
+
+
+class TaxManualValues(BaseModel):
+    vat_scheme: Literal['general_nonluxury', 'bhpt_specific', 'exempt', 'other']
+    vat_rate: float
+    pph_type: Literal['PPh 22', 'Tidak dipungut', 'Lainnya']
+    pph_rate: float
+    legal_basis: str
+
+
+class TaxDecisionWrite(BaseModel):
+    no_invoice: str
+    revision: int = 0
+    mode: Literal['automatic', 'manual']
+    manual: Optional[TaxManualValues] = None
+    reason: str
 
 
 # --- Auth ---
@@ -220,6 +262,7 @@ class DeliveryOrderOut(DeliveryOrderBase):
 class BeritaAcaraBase(BaseModel):
     no_ba: str
     no_kontrak: str
+    no_do: Optional[str] = None
     tanggal_ba: date
     bulan_buku: Optional[date] = None
     volume_ba: float = 0.0

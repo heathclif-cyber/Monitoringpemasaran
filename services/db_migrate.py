@@ -59,12 +59,14 @@ def _seed_default_users(db) -> None:
 
 
 def run_migrations() -> None:
+    from services.ba_linkage import ensure_schema
     logger.info("Menghubungkan ke Railway PostgreSQL...")
     logger.info("(Dari PC lokal bisa 30-60 detik — jangan Ctrl+C, tunggu sampai selesai)")
     t0 = time.perf_counter()
 
     logger.info("Membuat tabel jika belum ada...")
     models.Base.metadata.create_all(bind=engine)
+    ensure_schema(engine)
     logger.info("Koneksi OK (%.1f detik)", time.perf_counter() - t0)
 
     db = SessionLocal()

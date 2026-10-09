@@ -14,7 +14,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton'
-import { PageShell } from '@/components/patterns'
+import { PageShell, PageHeader } from '@/components/patterns'
+import { DocumentFlowPanel } from '@/components/feature/DocumentFlowPanel'
 import { formatCurrency, formatDate, safe } from '@/lib/utils'
 import { client } from '@/lib/client'
 import type { KontrakTrace, TraceInvoice, TracePembayaran, PaymentStatus } from '@/types'
@@ -87,6 +88,8 @@ export default function TraceKontrak() {
 
   return (
     <PageShell density="compact">
+      <PageHeader title="Alur Dokumen" description="Tautan aktual dokumen dan status transaksi." />
+      {data.document_flow && <DocumentFlowPanel flow={data.document_flow} unit={satuan} />}
       {/* breadcrumb / back */}
       <div className="flex items-center gap-3">
         <Button
@@ -200,7 +203,7 @@ export default function TraceKontrak() {
               <div>
                 <div className="text-gray-400">Diambil</div>
                 <div className="font-semibold text-sky-700">
-                  {summary.total_volume_do.toLocaleString('id-ID')} {satuan}
+                  {(summary.volume_pengambilan || 0).toLocaleString('id-ID')} {satuan}
                 </div>
               </div>
               <div className="text-center">
@@ -215,7 +218,7 @@ export default function TraceKontrak() {
               </div>
             </div>
             <div className="text-xs text-gray-400 pt-1 border-t">
-              Total kontrak: {summary.total_volume.toLocaleString('id-ID')} {satuan}
+              Total DO terbit: {summary.total_volume_do.toLocaleString('id-ID')} {satuan}
             </div>
           </CardContent>
         </Card>

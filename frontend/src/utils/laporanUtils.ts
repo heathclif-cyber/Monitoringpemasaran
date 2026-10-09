@@ -1,4 +1,4 @@
-import type { LaporanRow } from '@/types'
+import type { LaporanInvoiceGroup, LaporanRekapDimension, LaporanRekapRow, LaporanRow, PiutangRow } from '@/types'
 
 const MONTHS_ID = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 
@@ -59,6 +59,10 @@ function extractMonthFromDateString(dateStr: string): string {
 }
 
 export function extractPeriodKeys(row: LaporanRow, mode: 'TRANSFER' | 'RENCANA'): LaporanPeriodKeys {
+  if (row.Row_Type) {
+    const raw = row.Report_Date || ''
+    return { year: raw.slice(0, 4), month: raw.slice(5, 7) }
+  }
   // Setiap BA (normal maupun payung) memakai periode pembukuan BA.
   if (row.No_BA) {
     const buku = row.Raw_Bulan_Buku || ''
@@ -113,6 +117,12 @@ export interface LaporanSummary {
   totalPphNominals: number
 }
 
+export function pickupRemainingRatio(row: LaporanRow): number {
+  const issuedVolume = row.Volume_DO_Invoice ?? 0
+  if (issuedVolume <= 0) return 0
+  return Math.min(1, Math.max(0, (row.Outstanding_Pengambilan ?? 0) / issuedVolume))
+}
+
 function summaryRowKey(row: LaporanRow): string | null {
   if (row.No_DO.startsWith('BYPASS-')) return row.No_DO
   if (row.No_Invoice && row.No_Invoice !== '-') return `INV-${row.No_Invoice}`
@@ -139,6 +149,7 @@ export function calculateLaporanSummary(rows: LaporanRow[]): LaporanSummary {
   let totalButirVolume = 0
   let totalButirHargaVolume = 0
   const seenSisaKeys = new Set<string>()
+  const seenPickupContracts = new Set<string>()
 
   for (const row of rows) {
     const satuan = (row.Satuan || 'Kg').toLowerCase()
@@ -155,21 +166,36 @@ export function calculateLaporanSummary(rows: LaporanRow[]): LaporanSummary {
       seenSisaKeys.add(idKey)
       const sisaBayar = row.Sisa_Pembayaran || 0
       if (sisaBayar > 0) result.sisaBayar += sisaBayar
-      const sisaVol = row.Sisa_Volume || 0
+      const sisaVol = row.Outstanding_Pengambilan === undefined ? row.Sisa_Volume || 0 : 0
       if (sisaVol > 0) {
         if (isEa) result.sisaVolumeButir += sisaVol
         else result.sisaVolume += sisaVol
       }
     }
 
+    const pickupKey = summaryRowKey(row)
+    if (row.Row_Type) {
+      if (isEa) result.barangTerkirimButir += row.Volume_Pengambilan ?? 0
+      else result.barangTerkirimKg += row.Volume_Pengambilan ?? 0
+    }
+    if (row.Outstanding_Pengambilan !== undefined && pickupKey && !seenPickupContracts.has(pickupKey)) {
+      seenPickupContracts.add(pickupKey)
+      const pickedUp = row.Volume_Pengambilan ?? 0
+      if (isEa) {
+        result.sisaVolumeButir += row.Outstanding_Pengambilan
+        if (!row.Row_Type) result.barangTerkirimButir += pickedUp
+      } else {
+        result.sisaVolume += row.Outstanding_Pengambilan
+        if (!row.Row_Type) result.barangTerkirimKg += pickedUp
+      }
+    }
+
     if (isEa) {
-      result.barangTerkirimButir += volDo
       totalButirVolume += volDo
-      totalButirHargaVolume += harga * volDo
+      totalButirHargaVolume += row.Row_Type ? row.DPP_Pokok || 0 : harga * volDo
     } else {
-      result.barangTerkirimKg += volDo
       totalKgVolume += volDo
-      totalKgHargaVolume += harga * volDo
+      totalKgHargaVolume += row.Row_Type ? row.DPP_Pokok || 0 : harga * volDo
     }
   }
 
@@ -217,7 +243,7 @@ export function filterLaporanRows(rows: LaporanRow[], filters: LaporanFilters): 
     if (filters.search) {
       const q = filters.search.toLowerCase()
       const haystack = [
-        row.No_DO, row.No_Invoice, row.No_Kontrak,
+        row.No_DO, row.No_Invoice, row.No_Kontrak, row.No_BA, row.No_Pembayaran,
         row.Mitra_Pembeli, row.Unit, row.Komoditi,
         row.Kontrak_SAP, row.SO_SAP, row.DO_SAP, row.Billing, row.Superman,
       ].filter(Boolean).join(' ').toLowerCase()
@@ -261,14 +287,183 @@ export function createDefaultLaporanFilters(): LaporanFilters {
   }
 }
 
-/** State awal halaman — bulan & tahun berjalan + filter lain default */
+/** State awal halaman — tahun berjalan (semua bulan) + filter lain default */
 export function createInitialLaporanFilters(): LaporanFilters {
   return {
     ...createDefaultLaporanFilters(),
     year: getInitialLaporanYearKey(),
-    months: getInitialLaporanMonthKeys(),
   }
 }
 
 /** @deprecated Use createInitialLaporanFilters() atau createDefaultLaporanFilters() */
 export const DEFAULT_LAPORAN_FILTERS: LaporanFilters = createInitialLaporanFilters()
+
+const REKAP_EMPTY_LABEL: Record<LaporanRekapDimension, string> = {
+  komoditi: 'Tanpa komoditi',
+  produk: 'Tanpa produk',
+  unit: 'Tanpa unit',
+  pembeli: 'Tanpa pembeli',
+  bulan: 'Tanpa tanggal',
+}
+
+export function laporanRekapKey(row: LaporanRow, dimension: LaporanRekapDimension): string {
+  switch (dimension) {
+    case 'komoditi': return (row.Komoditi || '').trim()
+    case 'produk': return (row.Deskripsi_Produk || row.Komoditi || '').trim()
+    case 'unit': return (row.Unit || '').trim()
+    case 'pembeli': return (row.Mitra_Pembeli || '').trim()
+    case 'bulan': return (row.Report_Date || '').slice(0, 7)
+  }
+}
+
+export function laporanRekapLabel(key: string, dimension: LaporanRekapDimension): string {
+  if (!key) return REKAP_EMPTY_LABEL[dimension]
+  if (dimension === 'bulan') return `${MONTHS_ID[Number(key.slice(5, 7))] || key.slice(5, 7)} ${key.slice(0, 4)}`
+  return key
+}
+
+function emptyRekapRow(key: string, label: string): LaporanRekapRow {
+  return {
+    key, label, sales: 0, salesRencana: 0, salesKg: 0, salesEa: 0, volumeKg: 0, volumeEa: 0,
+    cashIn: 0, transferCount: 0, shortfall: null, unpaidInvoices: 0,
+    pickupOutstandingKg: 0, pickupOutstandingEa: 0, komoditiCount: 0,
+  }
+}
+
+function isEaRow(row: LaporanRow): boolean {
+  const satuan = (row.Satuan || '').trim().toLowerCase()
+  return satuan === 'ea' || satuan === 'butir'
+}
+
+function hasInvoice(row: LaporanRow): boolean {
+  return !!row.No_Invoice && row.No_Invoice !== '-' && !row.No_DO.startsWith('BYPASS-')
+}
+
+/**
+ * Rekap per dimensi. Penjualan & cash in dijumlah per baris kejadian;
+ * kurang bayar & sisa pengambilan dihitung sekali per invoice.
+ */
+export function buildLaporanRekap(
+  rows: LaporanRow[],
+  dimension: LaporanRekapDimension,
+  balances: PiutangRow[] | null,
+): { groups: LaporanRekapRow[]; total: LaporanRekapRow } {
+  const balanceByInvoice = new Map((balances || []).map((b) => [b.no_invoice, b]))
+  const buckets = new Map<string, { rekap: LaporanRekapRow; invoices: Map<string, LaporanRow>; komoditi: Set<string> }>()
+  const total = { rekap: emptyRekapRow('__total__', 'Total'), invoices: new Map<string, LaporanRow>(), komoditi: new Set<string>() }
+
+  for (const row of rows) {
+    const key = laporanRekapKey(row, dimension)
+    let bucket = buckets.get(key)
+    if (!bucket) {
+      bucket = { rekap: emptyRekapRow(key, laporanRekapLabel(key, dimension)), invoices: new Map(), komoditi: new Set() }
+      buckets.set(key, bucket)
+    }
+    for (const target of [bucket, total]) {
+      const r = target.rekap
+      const sales = row.Pendapatan_Pokok || 0
+      const volume = row.Jumlah_DO || 0
+      r.sales += sales
+      if (row.Row_Type === 'RENCANA') r.salesRencana += sales
+      if (isEaRow(row)) { r.salesEa += sales; r.volumeEa += volume } else { r.salesKg += sales; r.volumeKg += volume }
+      if ((row.Jumlah_Transfer || 0) > 0) { r.cashIn += row.Jumlah_Transfer; r.transferCount += 1 }
+      if (sales > 0 && row.Komoditi) target.komoditi.add(row.Komoditi)
+      if (hasInvoice(row) && !target.invoices.has(row.No_Invoice)) target.invoices.set(row.No_Invoice, row)
+    }
+  }
+
+  const finish = (target: { rekap: LaporanRekapRow; invoices: Map<string, LaporanRow>; komoditi: Set<string> }) => {
+    const r = target.rekap
+    r.komoditiCount = target.komoditi.size
+    let shortfall = 0
+    for (const [noInvoice, row] of target.invoices) {
+      const outstanding = row.Outstanding_Pengambilan || 0
+      if (isEaRow(row)) r.pickupOutstandingEa += outstanding
+      else r.pickupOutstandingKg += outstanding
+      const piutang = balanceByInvoice.get(noInvoice)?.piutang_pokok || 0
+      shortfall += piutang
+      if (piutang > 0) r.unpaidInvoices += 1
+    }
+    r.shortfall = balances ? shortfall : null
+    return r
+  }
+
+  const groups = [...buckets.values()].map(finish)
+  if (dimension === 'bulan') groups.sort((a, b) => (a.key || '9999').localeCompare(b.key || '9999'))
+  else groups.sort((a, b) => b.sales - a.sales || b.cashIn - a.cashIn || a.label.localeCompare(b.label))
+  return { groups, total: finish(total) }
+}
+
+/** Harga rata-rata (sebelum PPN) per satuan dominan; null bila tidak ada volume */
+export function rekapAveragePrice(r: LaporanRekapRow): { value: number; unit: 'Kg' | 'EA' } | null {
+  if (r.volumeKg > 0) return { value: r.salesKg / r.volumeKg, unit: 'Kg' }
+  if (r.volumeEa > 0) return { value: r.salesEa / r.volumeEa, unit: 'EA' }
+  return null
+}
+
+/**
+ * Gabungkan baris kejadian (BA/rencana DO/pembayaran) menjadi satu baris per invoice.
+ * Total penjualan & cash in tetap penjumlahan kejadian, tidak ada yang dihitung ulang.
+ */
+export function groupLaporanByInvoice(rows: LaporanRow[], order: 'DESC' | 'ASC'): LaporanInvoiceGroup[] {
+  const groups = new Map<string, LaporanInvoiceGroup>()
+  rows.forEach((row, index) => {
+    const key = hasInvoice(row) ? `INV:${row.No_Invoice}` : row.Row_ID || `ROW:${index}`
+    let g = groups.get(key)
+    if (!g) {
+      g = { key, main: row, rows: [], sales: 0, volume: 0, cashIn: 0, salesDate: '', cashDate: '', sortDate: '', rowTypes: [], warnings: [] }
+      groups.set(key, g)
+    }
+    g.rows.push(row)
+    const date = row.Report_Date || ''
+    if ((row.Pendapatan_Pokok || 0) > 0) {
+      g.sales += row.Pendapatan_Pokok
+      g.volume += row.Jumlah_DO || 0
+      if (date && (!g.salesDate || date < g.salesDate)) g.salesDate = date
+      if ((g.main.Pendapatan_Pokok || 0) <= 0 || (row.Row_Type === 'REALISASI' && g.main.Row_Type !== 'REALISASI')) g.main = row
+    }
+    if ((row.Jumlah_Transfer || 0) > 0) {
+      g.cashIn += row.Jumlah_Transfer
+      if (date && date > g.cashDate) g.cashDate = date
+    }
+    if (row.Row_Type && row.Row_Type !== 'PEMBAYARAN' && !g.rowTypes.includes(row.Row_Type)) g.rowTypes.push(row.Row_Type)
+    for (const w of row.Reporting_Warnings || []) if (!g.warnings.includes(w)) g.warnings.push(w)
+  })
+  const result = [...groups.values()]
+  for (const g of result) {
+    g.sortDate = g.salesDate || g.cashDate || g.main.Report_Date || g.main.Raw_Date || ''
+    if (g.rowTypes.length === 0 && g.cashIn > 0) g.rowTypes.push('PEMBAYARAN')
+  }
+  result.sort((a, b) => (order === 'DESC' ? b.sortDate.localeCompare(a.sortDate) : a.sortDate.localeCompare(b.sortDate)))
+  return result
+}
+
+const SAP_FIELDS = ['Superman', 'Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const
+
+/** Satu baris LaporanRow gabungan per invoice (untuk tabel lengkap & Excel). */
+export function mergeInvoiceGroup(group: LaporanInvoiceGroup): LaporanRow {
+  if (group.rows.length === 1) return group.main
+  const sumOf = (pick: (r: LaporanRow) => number | undefined) => group.rows.reduce((t, r) => t + (pick(r) || 0), 0)
+  const merged: LaporanRow = {
+    ...group.main,
+    Jumlah_DO: group.volume,
+    Pendapatan_Pokok: group.sales,
+    Pendapatan_Setelah_PPN: sumOf((r) => r.Pendapatan_Setelah_PPN),
+    DPP_Pokok: sumOf((r) => r.DPP_Pokok),
+    Pajak_PPN: sumOf((r) => r.Pajak_PPN),
+    PPh_Nominal: sumOf((r) => r.PPh_Nominal),
+    Jumlah_Transfer: group.cashIn,
+    Pelunasan: sumOf((r) => r.Pelunasan),
+    Reporting_Warnings: group.warnings,
+  }
+  const paid = [...group.rows].filter((r) => (r.Jumlah_Transfer || 0) > 0 && r.Tanggal_Transfer).pop()
+  if (paid) {
+    merged.Tanggal_Transfer = paid.Tanggal_Transfer
+    merged.No_Pembayaran = paid.No_Pembayaran
+    merged.PPh_Setor = paid.PPh_Setor
+  }
+  for (const field of SAP_FIELDS) {
+    if (!merged[field]) merged[field] = group.rows.find((r) => r[field])?.[field] || ''
+  }
+  return merged
+}

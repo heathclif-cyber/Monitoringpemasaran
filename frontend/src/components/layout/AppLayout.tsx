@@ -15,6 +15,11 @@ export function AppLayout() {
         className="min-h-screen pt-14 transition-[margin-left] duration-200 lg:ml-[var(--sidebar-width)]"
       >
         <div className={isWidePage ? 'w-full p-5' : 'mx-auto max-w-[1600px] p-5'}>
+          {import.meta.env.VITE_ISOLATED_PREVIEW === 'true' && (
+            <div role="status" className="mb-4 rounded-md border bg-muted px-3 py-2 text-xs text-muted-foreground">
+              Preview lokal · database salinan terpisah. Perubahan di sini tidak masuk ke produksi atau SAP.
+            </div>
+          )}
           <PageTransition>
             <Outlet />
           </PageTransition>

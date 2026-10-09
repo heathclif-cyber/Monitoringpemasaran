@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   RefreshCw,
   Download,
@@ -7,11 +8,9 @@ import {
   AlertTriangle,
   Package,
   BarChart3,
-  Box,
+  Scale,
   ChevronDown,
   ChevronUp,
-  X,
-  SlidersHorizontal,
   CheckCircle2,
 } from 'lucide-react'
 import {
@@ -22,10 +21,17 @@ import {
 } from '@/store/laporanStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { LaporanRekapTable } from '@/components/feature/LaporanRekapTable'
+import { LaporanRincianTable } from '@/components/feature/LaporanRincianTable'
+import { SapReconciliationDialog } from '@/components/feature/SapReconciliationDialog'
+import { InvoiceOutstanding } from '@/components/feature/InvoiceOutstanding'
+import { client } from '@/lib/client'
+import type { LaporanRekapDimension, LaporanRekapRow, PiutangRow, PiutangResponse } from '@/types'
 import { StatCard } from '@/components/common/StatCard'
 import { SearchInput } from '@/components/common/SearchInput'
 import { MultiSelectFilter } from '@/components/common/MultiSelectFilter'
@@ -33,15 +39,18 @@ import { FilterSelect } from '@/components/common/FilterBar'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { TableSkeleton } from '@/components/common/LoadingSkeleton'
-import { PageHeader, PageShell } from '@/components/patterns'
+import { FilterToolbar, PageHeader, PageShell } from '@/components/patterns'
 import { normalizeSatuan } from '@/utils/satuanUtils'
+import { invoiceTaxEstimate, pphEvidenceLabel } from '@/utils/sapReconciliation'
 import {
   filterLaporanRows,
-  calculateLaporanSummary,
+  buildLaporanRekap,
+  groupLaporanByInvoice,
+  mergeInvoiceGroup,
+  rekapAveragePrice,
   createDefaultLaporanFilters,
   createInitialLaporanFilters,
   extractPeriodKeys,
-  getInitialLaporanMonthKeys,
   getInitialLaporanYearKey,
   MONTH_OPTIONS,
   MONTH_LABELS,
@@ -71,13 +80,17 @@ const STICKY_TH = 'sticky top-0 z-30 bg-muted border-b border-border'
 const STICKY_TH_FROZEN = 'sticky top-0 z-40 bg-muted border-b border-border'
 const STICKY_TD = 'sticky z-20 bg-card'
 
-function FilterField({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn('space-y-1.5 min-w-0', className)}>
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {children}
-    </div>
-  )
+/** Field filter yang diisi saat baris rekap diklik */
+const REKAP_FILTER_FIELD: Record<Exclude<LaporanRekapDimension, 'bulan'>, 'komoditi' | 'jenisKomoditi' | 'unit' | 'pembeli'> = {
+  komoditi: 'komoditi',
+  produk: 'jenisKomoditi',
+  unit: 'unit',
+  pembeli: 'pembeli',
+}
+
+function volumeLabel(kg: number, ea: number): string {
+  if (kg <= 0 && ea <= 0) return '0 Kg'
+  return [kg > 0 && `${formatNumber(Math.round(kg))} Kg`, ea > 0 && `${formatNumber(Math.round(ea))} EA`].filter(Boolean).join(' + ')
 }
 
 export default function LaporanPage() {
@@ -88,8 +101,23 @@ export default function LaporanPage() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [isExportingHo, setIsExportingHo] = useState(false)
+  const [showFullTable, setShowFullTable] = useState(false)
+  const [dimension, setDimension] = useState<LaporanRekapDimension>('komoditi')
+  const [detailKey, setDetailKey] = useState<string | null>(null)
+  const [sapReconciliationOpen, setSapReconciliationOpen] = useState(false)
+  const [balances, setBalances] = useState<PiutangRow[] | null>(null)
+  const [balanceError, setBalanceError] = useState(false)
+  const detailRow = rows.find((row) => (row.Row_ID || JSON.stringify(laporanRowKey(row))) === detailKey)
 
   useEffect(() => { fetch() }, [])
+  useEffect(() => {
+    let active = true
+    setBalances(null); setBalanceError(false)
+    client.get<PiutangResponse>('/api/piutang').then((data) => {
+      if (active) setBalances(data.rows)
+    }).catch(() => { if (active) setBalanceError(true) })
+    return () => { active = false }
+  }, [rows])
 
   const units = useMemo(() => [...new Set(rows.map((r) => r.Unit).filter(Boolean))].sort(), [rows])
   const pembelis = useMemo(() => [...new Set(rows.map((r) => r.Mitra_Pembeli).filter(Boolean))].sort(), [rows])
@@ -105,17 +133,30 @@ export default function LaporanPage() {
   }, [rows, filters.modeTanggal])
 
   const filtered = useMemo(() => filterLaporanRows(rows, filters), [rows, filters])
-  const summary = useMemo(() => calculateLaporanSummary(filtered), [filtered])
+  const rekap = useMemo(() => buildLaporanRekap(filtered, dimension, balances), [filtered, dimension, balances])
+  const total = rekap.total
+  const averagePrice = rekapAveragePrice(total)
+
+  /** Penjualan tanpa tanggal (DO belum ada rencana/BA) tidak masuk filter periode */
+  const undatedSales = useMemo(() => {
+    if (!filters.year && filters.months.length === 0) return 0
+    return filterLaporanRows(rows, { ...filters, year: '', months: [] })
+      .filter((row) => !row.Report_Date && (row.Pendapatan_Pokok || 0) > 0).length
+  }, [rows, filters])
 
   const sorted = useMemo(() => {
     const arr = [...filtered]
     arr.sort((a, b) => {
-      const dateA = new Date(a.Raw_Date || a.Billing_Date || 0).getTime()
-      const dateB = new Date(b.Raw_Date || b.Billing_Date || 0).getTime()
-      return filters.sort === 'DESC' ? dateB - dateA : dateA - dateB
+      const dateA = a.Report_Date || a.Raw_Date || ''
+      const dateB = b.Report_Date || b.Raw_Date || ''
+      return filters.sort === 'DESC' ? dateB.localeCompare(dateA) : dateA.localeCompare(dateB)
     })
     return arr
   }, [filtered, filters.sort])
+
+  const invoiceGroups = useMemo(() => groupLaporanByInvoice(filtered, filters.sort), [filtered, filters.sort])
+
+  const mergedRows = useMemo(() => invoiceGroups.map(mergeInvoiceGroup), [invoiceGroups])
 
   const periodLabel = useMemo(() => {
     if (!filters.year && filters.months.length === 0) return 'Semua periode'
@@ -132,84 +173,36 @@ export default function LaporanPage() {
     return monthPart
   }, [filters.year, filters.months])
 
-  const activeChips = useMemo(() => {
-    const chips: { id: string; label: string; onRemove: () => void }[] = []
-    const patch = (partial: Partial<LaporanFilters>) => setFilters((f) => ({ ...f, ...partial }))
+  const activeRekapKeys = useMemo(() => {
+    if (dimension === 'bulan') {
+      return filters.year ? filters.months.map((m) => `${filters.year}-${m}`) : []
+    }
+    return filters[REKAP_FILTER_FIELD[dimension]]
+  }, [dimension, filters])
 
-    if (filters.search) {
-      chips.push({ id: 'search', label: `"${filters.search}"`, onRemove: () => patch({ search: '' }) })
-    }
-    if (filters.unit.length > 0) {
-      chips.push({
-        id: 'unit',
-        label: filters.unit.length === 1 ? filters.unit[0] : `${filters.unit.length} unit`,
-        onRemove: () => patch({ unit: [] }),
-      })
-    }
-    if (filters.pembeli.length > 0) {
-      chips.push({
-        id: 'pembeli',
-        label: filters.pembeli.length === 1 ? filters.pembeli[0] : `${filters.pembeli.length} pembeli`,
-        onRemove: () => patch({ pembeli: [] }),
-      })
-    }
-    if (filters.komoditi.length > 0) {
-      chips.push({
-        id: 'komoditi',
-        label: filters.komoditi.length === 1 ? filters.komoditi[0] : `${filters.komoditi.length} komoditi`,
-        onRemove: () => patch({ komoditi: [] }),
-      })
-    }
-    if (filters.jenisKomoditi.length > 0) {
-      chips.push({
-        id: 'material',
-        label: filters.jenisKomoditi.length === 1 ? '1 material' : `${filters.jenisKomoditi.length} material`,
-        onRemove: () => patch({ jenisKomoditi: [] }),
-      })
-    }
-    if (filters.year) {
-      chips.push({
-        id: 'year',
-        label: `Tahun ${filters.year}`,
-        onRemove: () => patch({ year: '' }),
-      })
-    }
-    if (filters.months.length > 0) {
-      chips.push({
-        id: 'months',
-        label: filters.months.length === 1
-          ? MONTH_LABELS[filters.months[0]] || filters.months[0]
-          : `${filters.months.length} bulan`,
-        onRemove: () => patch({ months: [] }),
-      })
-    }
-    if (filters.tipe !== 'ALL') {
-      const labels = { NO_BYPASS: 'Tanpa bypass', ONLY_BYPASS: 'Hanya bypass' }
-      chips.push({ id: 'tipe', label: labels[filters.tipe], onRemove: () => patch({ tipe: 'ALL' }) })
-    }
-    if (filters.sap !== 'ALL') {
-      chips.push({ id: 'sap', label: 'Filter SAP', onRemove: () => patch({ sap: 'ALL' }) })
-    }
-    if (filters.statusBayar !== 'ALL') {
-      chips.push({ id: 'bayar', label: 'Filter bayar', onRemove: () => patch({ statusBayar: 'ALL' }) })
-    }
-    if (filters.modeTanggal !== 'TRANSFER') {
-      chips.push({ id: 'mode', label: 'Rencana ambil', onRemove: () => patch({ modeTanggal: 'TRANSFER' }) })
-    }
+  const advancedFilterCount = [
+    filters.jenisKomoditi.length > 0,
+    filters.tipe !== 'ALL',
+    filters.sap !== 'ALL',
+    filters.statusBayar !== 'ALL',
+  ].filter(Boolean).length
 
-    return chips
-  }, [filters])
-
-  const advancedFilterCount = useMemo(() => {
-    let n = 0
-    if (filters.jenisKomoditi.length > 0) n++
-    if (filters.modeTanggal !== 'TRANSFER') n++
-    if (filters.sort !== 'DESC') n++
-    if (filters.tipe !== 'ALL') n++
-    if (filters.sap !== 'ALL') n++
-    if (filters.statusBayar !== 'ALL') n++
-    return n
-  }, [filters])
+  /** Klik baris rekap → filter ke nilai itu (klik lagi untuk melepas) */
+  const handleRekapSelect = (group: LaporanRekapRow) => {
+    if (!group.key) return
+    if (dimension === 'bulan') {
+      const year = group.key.slice(0, 4)
+      const month = group.key.slice(5, 7)
+      const isOnly = filters.year === year && filters.months.length === 1 && filters.months[0] === month
+      setFilters((f) => ({ ...f, year, months: isOnly ? [] : [month] }))
+      return
+    }
+    const field = REKAP_FILTER_FIELD[dimension]
+    const current = filters[field]
+    const isOnly = current.length === 1 && current[0] === group.key
+    setFilters((f) => ({ ...f, [field]: isOnly ? [] : [group.key] }))
+    if (dimension === 'produk' && !isOnly) setShowAdvanced(true)
+  }
 
   const handleSapSave = async (row: LaporanRow, field: string, value: string) => {
     if (!canSaveSapFields(row)) {
@@ -241,7 +234,7 @@ export default function LaporanPage() {
   const handleExportExcel = async () => {
     const { exportLaporanExcel } = await import('@/utils/laporanExport')
     exportLaporanExcel(
-      sorted,
+      mergedRows,
       `Laporan_Digital_${periodLabel.replace(/\s+/g, '_')}.xlsx`,
     )
   }
@@ -249,11 +242,12 @@ export default function LaporanPage() {
   const handleExportHO = async () => {
     setIsExportingHo(true)
     try {
-      const result = await exportLaporanHO(sorted, {
+      const result = await exportLaporanHO(filterLaporanRows(rows, { ...filters, year: '', months: [] }), {
         year: filters.year,
         months: filters.months,
         modeTanggal: filters.modeTanggal,
         filters: {
+          ...filters,
           units: filters.unit,
           komoditis: filters.komoditi,
         },
@@ -271,22 +265,27 @@ export default function LaporanPage() {
   }
 
   const handleResetFilters = () => setFilters(createDefaultLaporanFilters())
+  const hoReady = !!filters.year && filters.months.length > 0
 
   return (
     <PageShell width="full" density="compact">
       <PageHeader
-        title="Laporan Digital"
-        description={
-          isLoading
-            ? 'Memuat data...'
-            : `${sorted.length} baris ditampilkan${rows.length !== sorted.length ? ` dari ${rows.length} total` : ''} · ${periodLabel}${filters.modeTanggal === 'TRANSFER' ? ' (tgl transfer)' : ' (rencana ambil)'}`
-        }
+        title="Laporan Penjualan"
+        description={isLoading ? 'Memuat data...' : `${periodLabel} · ${invoiceGroups.length} invoice/transaksi`}
         actions={
-          <div className="flex shrink-0 gap-2">
-            <Button variant="outline" size="sm" onClick={() => void fetch()} disabled={isLoading} className="gap-1.5">
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSapReconciliationOpen(true)}>Rekonsiliasi SAP</Button>
+            <Button variant="outline" size="sm" onClick={() => void fetch({ fresh: true })} disabled={isLoading} className="gap-1.5">
               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportHO} disabled={isExportingHo || !filters.year || filters.months.length === 0} className="gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportHO}
+              disabled={isExportingHo || !hoReady}
+              title={hoReady ? undefined : 'Pilih tahun dan bulan terlebih dahulu'}
+              className="gap-1.5"
+            >
               <Download size={14} className={isExportingHo ? 'animate-pulse' : ''} /> Export HO
             </Button>
             <Button variant="default" size="sm" onClick={handleExportExcel} disabled={sorted.length === 0} className="gap-1.5">
@@ -296,266 +295,150 @@ export default function LaporanPage() {
         }
       />
 
-      {/* Summary — nilai menyesuaikan lebar kartu */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <StatCard fitValue label="Total Cash In" value={formatCurrency(summary.cashIn)} icon={Wallet} />
-        <StatCard fitValue label="Total Pendapatan" value={formatCurrency(summary.pendapatan)} icon={TrendingUp} />
-        <StatCard fitValue label="Kekurangan Bayar" value={formatCurrency(summary.sisaBayar)} icon={AlertTriangle} iconClassName="text-amber-500" />
-        <StatCard
-          fitValue
-          label="Sisa Barang (DO)"
-          value={formatNumber(summary.sisaVolume)}
-          subtitle={`EA: ${formatNumber(summary.sisaVolumeButir)}`}
-          icon={Package}
+      <FilterToolbar
+        end={
+          <>
+            <Button variant={showAdvanced ? 'secondary' : 'outline'} size="sm" className="h-9 gap-1.5" onClick={() => setShowAdvanced((v) => !v)}>
+              {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              Lainnya{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ''}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={handleResetFilters}>Reset</Button>
+          </>
+        }
+        contentClassName="sm:items-start"
+      >
+        <FilterSelect
+          value={filters.year}
+          onChange={(year) => setFilters((f) => ({ ...f, year }))}
+          options={[{ value: '', label: 'Semua Tahun' }, ...years.map((y) => ({ value: y, label: y }))]}
+          className="w-32"
         />
-        <StatCard
-          fitValue
-          label="Harga Rata-Rata"
-          value={`${formatCurrency(summary.hargaRataKg)}/Kg`}
-          subtitle={`${formatCurrency(summary.hargaRataButir)}/EA · Σ(harga×vol)/Σvol`}
-          icon={BarChart3}
+        <MultiSelectFilter label="Bulan" allLabel="Semua Bulan" options={MONTH_OPTIONS} optionLabels={MONTH_LABELS}
+          selected={filters.months} onChange={(months) => setFilters((f) => ({ ...f, months }))} className="w-40" />
+        <MultiSelectFilter label="Komoditi" allLabel="Semua Komoditi" options={komoditas}
+          selected={filters.komoditi} onChange={(komoditi) => setFilters((f) => ({ ...f, komoditi }))} className="w-40" />
+        <MultiSelectFilter label="Unit" allLabel="Semua Unit" options={units}
+          selected={filters.unit} onChange={(unit) => setFilters((f) => ({ ...f, unit }))} className="w-44" />
+        <MultiSelectFilter label="Pembeli" allLabel="Semua Pembeli" options={pembelis} contentWidth="w-72"
+          selected={filters.pembeli} onChange={(pembeli) => setFilters((f) => ({ ...f, pembeli }))} className="w-48" />
+        <SearchInput
+          value={filters.search}
+          onChange={(v) => setFilters((f) => ({ ...f, search: v }))}
+          placeholder="Cari no. kontrak/invoice/DO, pembeli, SAP..."
+          className="min-w-[220px]"
         />
-        <StatCard
-          fitValue
-          label="Barang Terkirim"
-          value={formatNumber(summary.barangTerkirimKg)}
-          subtitle={`EA: ${formatNumber(summary.barangTerkirimButir)}`}
-          icon={Box}
-        />
+        {showAdvanced && (
+          <div className="flex w-full flex-wrap items-center gap-2 border-t pt-2">
+            <MultiSelectFilter label="Produk" allLabel="Semua Produk" options={jenisKomoditas} contentWidth="w-72"
+              selected={filters.jenisKomoditi} onChange={(jenisKomoditi) => setFilters((f) => ({ ...f, jenisKomoditi }))} className="w-48" />
+            <FilterSelect
+              value={filters.statusBayar}
+              onChange={(v) => setFilters((f) => ({ ...f, statusBayar: v }))}
+              options={[
+                { value: 'ALL', label: 'Semua Status Bayar' },
+                { value: 'BELUM', label: 'Belum Bayar' },
+                { value: 'SEBAGIAN', label: 'Pembayaran Sebagian' },
+                { value: 'LUNAS', label: 'Lunas' },
+              ]}
+              className="w-48"
+            />
+            <FilterSelect
+              value={filters.sap}
+              onChange={(v) => setFilters((f) => ({ ...f, sap: v }))}
+              options={[
+                { value: 'ALL', label: 'Semua Status SAP' },
+                { value: 'MISSING_SAP', label: 'SAP Belum Lengkap' },
+                { value: 'NO_KONTRAK_SAP', label: 'Tanpa Kontrak SAP' },
+                { value: 'NO_SO_SAP', label: 'Tanpa SO SAP' },
+                { value: 'NO_DO_SAP', label: 'Tanpa DO SAP' },
+                { value: 'NO_BILLING_SAP', label: 'Tanpa Billing SAP' },
+                { value: 'ALL_COMPLETE', label: 'SAP Lengkap' },
+              ]}
+              className="w-44"
+            />
+            <FilterSelect
+              value={filters.tipe}
+              onChange={(v) => setFilters((f) => ({ ...f, tipe: v as LaporanFilters['tipe'] }))}
+              options={[
+                { value: 'ALL', label: 'Termasuk Bypass' },
+                { value: 'NO_BYPASS', label: 'Tanpa Bypass' },
+                { value: 'ONLY_BYPASS', label: 'Hanya Bypass' },
+              ]}
+              className="w-40"
+            />
+          </div>
+        )}
+      </FilterToolbar>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <StatCard fitValue label="Penjualan (sebelum PPN)" value={formatCurrency(total.sales)}
+          subtitle={total.salesRencana > 0 ? `Termasuk rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya realisasi BA'} icon={TrendingUp} />
+        <StatCard fitValue label="Volume Terjual" value={volumeLabel(total.volumeKg, total.volumeEa)} subtitle="BA selesai + rencana DO" icon={Scale} />
+        <StatCard fitValue label="Harga Rata-rata"
+          value={total.komoditiCount > 1 ? 'Lihat rekap' : averagePrice ? `${formatCurrency(averagePrice.value)}/${averagePrice.unit}` : '—'}
+          subtitle={total.komoditiCount > 1 ? `${total.komoditiCount} komoditi — pilih satu komoditi` : 'Penjualan ÷ volume'} icon={BarChart3} />
+        <StatCard fitValue label="Cash In" value={formatCurrency(total.cashIn)} subtitle={`${total.transferCount} transfer diterima`} icon={Wallet} />
+        <StatCard fitValue label="Kurang Bayar" value={total.shortfall == null ? (balanceError ? 'Gagal dimuat' : '…') : formatCurrency(total.shortfall)}
+          subtitle={`${total.unpaidInvoices} invoice belum lunas · posisi saat ini`} icon={AlertTriangle} />
+        <StatCard fitValue label="Belum Diambil" value={volumeLabel(total.pickupOutstandingKg, total.pickupOutstandingEa)} subtitle="DO terbit − BA selesai" icon={Package} />
       </div>
 
-      {/* Filters */}
+      <p className="text-xs text-muted-foreground">
+        Penjualan dihitung pada tanggal BA (realisasi) atau rencana DO bila belum ada BA. Cash in dihitung pada tanggal transfer.
+        Kurang bayar dan sisa ambil adalah posisi saat ini untuk invoice yang tampil.
+        {undatedSales > 0 && <span className="text-amber-700 dark:text-amber-400"> {undatedSales} DO belum punya tanggal rencana/BA sehingga tidak masuk periode ini.</span>}
+        {balanceError && <span className="text-destructive"> Data piutang gagal dimuat, klik Refresh.</span>}
+      </p>
+
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <SlidersHorizontal size={16} className="text-muted-foreground" />
-              Filter Data
-            </CardTitle>
-            <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground" onClick={handleResetFilters}>
-              Reset ke default
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <SearchInput
-            value={filters.search}
-            onChange={(v) => setFilters((f) => ({ ...f, search: v }))}
-            placeholder="Cari No DO, Invoice, Kontrak, Pembeli, SAP..."
-            className="max-w-none w-full"
-          />
-
-          {/* Filter utama — grid proporsional */}
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 items-end">
-            <FilterField label="Tahun">
-              <FilterSelect
-                value={filters.year}
-                onChange={(year) => setFilters((f) => ({ ...f, year }))}
-                options={[
-                  { value: '', label: 'Semua Tahun' },
-                  ...years.map((y) => ({ value: y, label: y })),
-                ]}
-                className="w-full"
-              />
-            </FilterField>
-            <FilterField label="Bulan">
-              <MultiSelectFilter
-                label="Bulan"
-                allLabel="Semua Bulan"
-                options={MONTH_OPTIONS}
-                optionLabels={MONTH_LABELS}
-                selected={filters.months}
-                onChange={(months) => setFilters((f) => ({ ...f, months }))}
-                className="w-full"
-              />
-            </FilterField>
-            <FilterField label="Unit">
-              <MultiSelectFilter
-                label="Unit"
-                allLabel="Semua Unit"
-                options={units}
-                selected={filters.unit}
-                onChange={(unit) => setFilters((f) => ({ ...f, unit }))}
-                className="w-full"
-              />
-            </FilterField>
-            <FilterField label="Komoditi">
-              <MultiSelectFilter
-                label="Komoditi"
-                allLabel="Semua Komoditi"
-                options={komoditas}
-                selected={filters.komoditi}
-                onChange={(komoditi) => setFilters((f) => ({ ...f, komoditi }))}
-                className="w-full"
-              />
-            </FilterField>
-            <FilterField label="Pembeli">
-              <MultiSelectFilter
-                label="Pembeli"
-                allLabel="Semua Pembeli"
-                options={pembelis}
-                selected={filters.pembeli}
-                onChange={(pembeli) => setFilters((f) => ({ ...f, pembeli }))}
-                className="w-full"
-                contentWidth="w-64"
-              />
-            </FilterField>
-            <FilterField label="Opsi">
-              <Button
-                variant={showAdvanced ? 'secondary' : 'outline'}
-                size="sm"
-                className="h-9 w-full justify-between gap-1.5 font-normal"
-                onClick={() => setShowAdvanced((v) => !v)}
-              >
-                <span className="flex items-center gap-1.5 truncate">
-                  {showAdvanced ? <ChevronUp size={14} className="shrink-0" /> : <ChevronDown size={14} className="shrink-0" />}
-                  Filter lanjutan
-                </span>
-                {advancedFilterCount > 0 && (
-                  <Badge variant="default" className="h-5 min-w-5 px-1.5 text-[10px] shrink-0">
-                    {advancedFilterCount}
-                  </Badge>
-                )}
-              </Button>
-            </FilterField>
-          </div>
-
-          {showAdvanced && (
-            <div className="rounded-lg border border-border/70 bg-muted/25 p-3 space-y-3">
-              <p className="text-xs font-medium text-muted-foreground">Filter lanjutan</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <FilterField label="Jenis Material" className="sm:col-span-2 lg:col-span-1">
-                  <MultiSelectFilter
-                    label="Material"
-                    allLabel="Semua Jenis Material"
-                    options={jenisKomoditas}
-                    selected={filters.jenisKomoditi}
-                    onChange={(jenisKomoditi) => setFilters((f) => ({ ...f, jenisKomoditi }))}
-                    className="w-full"
-                    contentWidth="w-72"
-                  />
-                </FilterField>
-                <FilterField label="Dasar Tanggal Bulan">
-                  <FilterSelect
-                    value={filters.modeTanggal}
-                    onChange={(v) => setFilters((f) => ({ ...f, modeTanggal: v as 'TRANSFER' | 'RENCANA' }))}
-                    options={[
-                      { value: 'TRANSFER', label: 'Tgl Transfer' },
-                      { value: 'RENCANA', label: 'Rencana Ambil' },
-                    ]}
-                    className="w-full"
-                  />
-                </FilterField>
-                <FilterField label="Urutan Data">
-                  <FilterSelect
-                    value={filters.sort}
-                    onChange={(v) => setFilters((f) => ({ ...f, sort: v as 'DESC' | 'ASC' }))}
-                    options={[
-                      { value: 'DESC', label: 'Terbaru → Terlama' },
-                      { value: 'ASC', label: 'Terlama → Terbaru' },
-                    ]}
-                    className="w-full"
-                  />
-                </FilterField>
-                <FilterField label="Tipe Data">
-                  <FilterSelect
-                    value={filters.tipe}
-                    onChange={(v) => setFilters((f) => ({ ...f, tipe: v as 'ALL' | 'NO_BYPASS' | 'ONLY_BYPASS' }))}
-                    options={[
-                      { value: 'ALL', label: 'Semua Data' },
-                      { value: 'NO_BYPASS', label: 'Sembunyikan Bypass' },
-                      { value: 'ONLY_BYPASS', label: 'Hanya Bypass' },
-                    ]}
-                    className="w-full"
-                  />
-                </FilterField>
-                <FilterField label="Status SAP">
-                  <FilterSelect
-                    value={filters.sap}
-                    onChange={(v) => setFilters((f) => ({ ...f, sap: v }))}
-                    options={[
-                      { value: 'ALL', label: 'Semua Status SAP' },
-                      { value: 'MISSING_SAP', label: 'Belum Lengkap' },
-                      { value: 'NO_KONTRAK_SAP', label: 'Tanpa Kontrak SAP' },
-                      { value: 'NO_SO_SAP', label: 'Tanpa SO SAP' },
-                      { value: 'NO_DO_SAP', label: 'Tanpa DO SAP' },
-                      { value: 'NO_BILLING_SAP', label: 'Tanpa Billing SAP' },
-                      { value: 'ALL_COMPLETE', label: 'Sudah Lengkap' },
-                    ]}
-                    className="w-full"
-                  />
-                </FilterField>
-                <FilterField label="Status Pembayaran">
-                  <FilterSelect
-                    value={filters.statusBayar}
-                    onChange={(v) => setFilters((f) => ({ ...f, statusBayar: v }))}
-                    options={[
-                      { value: 'ALL', label: 'Semua Status Bayar' },
-                      { value: 'BELUM', label: 'Belum Bayar' },
-                      { value: 'SEBAGIAN', label: 'Pembayaran Sebagian' },
-                      { value: 'LUNAS', label: 'Lunas' },
-                    ]}
-                    className="w-full"
-                  />
-                </FilterField>
-              </div>
-            </div>
-          )}
-
-          {activeChips.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">Filter aktif:</span>
-              {activeChips.map((chip) => (
-                <Badge key={chip.id} variant="secondary" className="gap-1 pr-1 font-normal">
-                  {chip.label}
-                  <button
-                    type="button"
-                    onClick={chip.onRemove}
-                    className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
-                    aria-label={`Hapus filter ${chip.label}`}
-                  >
-                    <X size={12} />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          <p className="text-xs text-muted-foreground">
-            Saat buka halaman: filter bulan & tahun berjalan (
-            {MONTH_LABELS[getInitialLaporanMonthKeys()[0]]} {getInitialLaporanYearKey()}
-            ). Reset filter menampilkan semua periode tanpa batas.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      <Card>
-        <CardHeader className="py-3 border-b">
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-sm font-semibold">Tabel Laporan</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Scroll horizontal · nomor SAP diisi per invoice (DO belum wajib)
-            </p>
-          </div>
-        </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-4"><TableSkeleton rows={8} cols={8} /></div>
+            <div className="p-4"><TableSkeleton rows={6} cols={7} /></div>
           ) : sorted.length === 0 ? (
             <div className="py-8">
-              <EmptyState
-                title="Tidak ada data laporan"
-                description={`Tidak ada baris untuk ${periodLabel}. Coba ubah filter periode atau reset ke default.`}
-              />
-              <div className="flex justify-center mt-4">
-                <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                  Reset Filter
-                </Button>
+              <EmptyState title="Tidak ada data" description={`Tidak ada transaksi untuk ${periodLabel}. Ubah filter atau reset.`} />
+              <div className="mt-4 flex justify-center">
+                <Button variant="outline" size="sm" onClick={handleResetFilters}>Reset Filter</Button>
               </div>
             </div>
           ) : (
-            <div className="overflow-auto max-h-[76vh]">
+            <LaporanRekapTable
+              dimension={dimension}
+              onDimensionChange={setDimension}
+              groups={rekap.groups}
+              total={total}
+              activeKeys={activeRekapKeys}
+              onSelect={handleRekapSelect}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {!isLoading && sorted.length > 0 && (
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold">Rincian Transaksi</p>
+              <p className="text-xs text-muted-foreground">
+                {showFullTable ? 'Semua kolom · nomor SAP dapat diisi langsung.' : 'Satu baris per invoice; penjualan dan pembayaran dari periode terpilih digabung.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="sm" variant={showFullTable ? 'outline' : 'default'} onClick={() => setShowFullTable(false)}>Ringkas</Button>
+              <Button type="button" size="sm" variant={showFullTable ? 'default' : 'outline'} onClick={() => setShowFullTable(true)}>Kolom lengkap (SAP)</Button>
+            </div>
+          </div>
+          <CardContent className="p-0">
+            {!showFullTable ? (
+              <LaporanRincianTable
+                groups={invoiceGroups}
+                balances={balances}
+                sort={filters.sort}
+                onToggleSort={() => setFilters((f) => ({ ...f, sort: f.sort === 'DESC' ? 'ASC' : 'DESC' }))}
+                onDetail={(row) => setDetailKey(row.Row_ID || JSON.stringify(laporanRowKey(row)))}
+              />
+            ) : (
+              <div className="overflow-auto max-h-[76vh]">
               <table className="text-[13px] border-separate border-spacing-0 w-full" style={{ minWidth: '4420px' }}>
                 <thead>
                   <tr className="text-muted-foreground">
@@ -566,22 +449,22 @@ export default function LaporanPage() {
                     <th className={cn(TH, STICKY_TH_FROZEN, STICKY_LEFT_MITRA, STICKY_SHADOW, FROZEN_W_MITRA, 'text-left')}>Mitra Pembeli</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[7.5rem]')}>Komoditi</th>
                     <th className={cn(TH, STICKY_TH, 'text-center min-w-[4.5rem]')}>Satuan</th>
-                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Billing Date</th>
+                    <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Tanggal Acuan Laporan</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Tgl Transfer</th>
-                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[11rem]')}>Kewajiban Pembayaran (Inc. PPh)</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[11rem]')}>Pelunasan Efektif</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[11rem]')}>Kewajiban Transfer (Cash In)</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jumlah Transfer</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[12rem]')}>Jenis Material</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Jml Invoice</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Harga Satuan</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[7.5rem]')}>Volume Invoice</th>
-                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[7.5rem]')}>Jumlah DO</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[7.5rem]')}>Volume DO</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Pendapatan Pokok</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[10.5rem]')}>Setelah PPN</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Pajak PPN</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[8.5rem]')}>PPh</th>
-                    <th className={cn(TH, STICKY_TH, 'text-center min-w-[5.5rem]')}>PPh Setor?</th>
-                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Sisa Bayar</th>
+                    <th className={cn(TH, STICKY_TH, 'text-center min-w-[12rem]')}>Status Setor PPh</th>
+                    <th className={cn(TH, STICKY_TH, 'text-right min-w-[9.5rem]')}>Sisa Kurang Bayar</th>
                     <th className={cn(TH, STICKY_TH, 'text-right min-w-[8rem]')}>Sisa Volume</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[8rem]')}>Bulan Buku</th>
                     <th className={cn(TH, STICKY_TH, 'text-left min-w-[9rem]')}>Superman</th>
@@ -593,12 +476,13 @@ export default function LaporanPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/80">
-                  {sorted.map((row, idx) => {
+                  {mergedRows.map((row, idx) => {
                     const isBypass = row.No_DO.startsWith('BYPASS-')
                     return (
                       <LaporanTableRow
                         key={`${row.No_DO}-${idx}`}
                         row={row}
+                        balances={balances}
                         isBypass={isBypass}
                         onSapSave={(field, value) => handleSapSave(row, field, value)}
                         onDeleteBypass={(noDo, id) => {
@@ -611,9 +495,23 @@ export default function LaporanPage() {
                 </tbody>
               </table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <SapReconciliationDialog open={sapReconciliationOpen} onOpenChange={setSapReconciliationOpen} rows={rows} loading={isLoading} />
+
+      <Dialog open={!!detailRow} onOpenChange={(open) => { if (!open) setDetailKey(null) }}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detail Transaksi</DialogTitle>
+            <DialogDescription>{detailRow?.Mitra_Pembeli} · {detailRow?.No_Invoice || detailRow?.No_DO || detailRow?.No_Kontrak}</DialogDescription>
+          </DialogHeader>
+          {detailRow && <LaporanDetail row={detailRow} balances={balances} onSapSave={(field, value) => handleSapSave(detailRow, field, value)} />}
+          {detailRow?.No_Kontrak && detailRow.No_Kontrak !== '-' && <Button variant="outline" asChild><Link to={`/kontrak-trace?id=${encodeURIComponent(detailRow.No_Kontrak)}`}>Document Flow · Alur Dokumen</Link></Button>}
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -628,6 +526,70 @@ export default function LaporanPage() {
   )
 }
 
+function LaporanDetail({ row, balances, onSapSave }: { row: LaporanRow; balances: PiutangRow[] | null; onSapSave: (field: string, value: string) => Promise<void> }) {
+  const canEdit = useAuthStore((s) => s.canEdit)
+  const tax = row.No_DO.startsWith('BYPASS-') ? null : invoiceTaxEstimate(row)
+  const sections = [
+    { title: 'Dokumen & Periode', fields: [
+      ['Kontrak', row.No_Kontrak], ['Invoice', row.No_Invoice], ['DO', row.No_DO],
+      ['Volume pengambilan (BA terkait invoice/DO)', row.Volume_Pengambilan == null ? 'Belum tercatat' : `${formatNumber(row.Volume_Pengambilan)} ${normalizeSatuan(row.Satuan)}`],
+      ['Sisa pengambilan (DO terbit)', !row.No_DO ? 'Belum ada DO' : row.Outstanding_Pengambilan == null ? '—' : `${formatNumber(row.Outstanding_Pengambilan)} ${normalizeSatuan(row.Satuan)}`],
+      ['Unit', row.Unit], ['Komoditi / Material', [row.Komoditi, row.Deskripsi_Produk].filter(Boolean).join(' · ')],
+      ['Tanggal Acuan Laporan (BA/invoice/kontrak)', formatDate(row.Billing_Date)], ['Tanggal Transfer', formatDate(row.Tanggal_Transfer)], ['Bulan Buku', row.Bulan_Buku],
+    ] },
+    { title: 'Pembayaran & Pajak', fields: [
+      ['Nilai Invoice', formatCurrency(row.Jumlah_Invoice)], ['Cash In', formatCurrency(row.Jumlah_Transfer)],
+      ['Pelunasan Efektif', formatCurrency(row.Pelunasan)], ['Kewajiban Transfer', formatCurrency(row.Kewajiban_Pembayaran)],
+      ['Pendapatan Pokok', formatCurrency(row.Pendapatan_Pokok)], ['Setelah PPN', formatCurrency(row.Pendapatan_Setelah_PPN)],
+      ['PPN alokasi baris (bukan total invoice)', formatCurrency(row.Pajak_PPN)], ['PPh alokasi baris (bukan total invoice)', formatCurrency(row.PPh_Nominal)],
+      ['Nilai sebelum PPN (estimasi tarif kontrak)', tax ? formatCurrency(tax.net) : '—'],
+      ['PPN invoice (estimasi tarif kontrak)', tax ? formatCurrency(tax.vat) : '—'],
+      ['PPh invoice (estimasi tarif kontrak)', tax ? formatCurrency(tax.withholding) : '—'],
+      ['Jenis PPh', 'Belum tersedia dalam data laporan'],
+      ['Status bukti PPh', pphEvidenceLabel(row)],
+      ['Verifikasi pajak', 'Nominal estimasi bukan DPP faktur pajak terverifikasi. Bukti potong/pungut, bukti setor/NTPN, dan verifikasi belum dicatat oleh fitur ini.'],
+    ] },
+    { title: 'Volume', fields: [
+      ['Harga Satuan', formatCurrency(row.Harga_Satuan)],
+      ['Volume Invoice', `${formatNumber(row.Volume_Invoice)} ${normalizeSatuan(row.Satuan)}`],
+      ['Volume DO', `${formatNumber(row.Volume_DO_Dokumen ?? row.Jumlah_DO)} ${normalizeSatuan(row.Satuan)}`],
+      ['Volume Pengambilan BA', `${formatNumber(row.Volume_Pengambilan ?? 0)} ${normalizeSatuan(row.Satuan)}`],
+      ['Outstanding Pengambilan', `${formatNumber(row.Outstanding_Pengambilan ?? row.Sisa_Volume)} ${normalizeSatuan(row.Satuan)}`],
+    ] },
+  ]
+  return (
+    <div className="space-y-5">
+      {sections.map((section) => (
+        <section key={section.title}>
+          <h3 className="border-b pb-2 text-sm font-semibold">{section.title}</h3>
+          <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            {section.fields.map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-sm break-words tabular-nums">{safe(value)}</dd></div>)}
+          </dl>
+        </section>
+      ))}
+      <section>
+        <h3 className="border-b pb-2 text-sm font-semibold">Sisa per Invoice — Transfer & PPh</h3>
+        <div className="mt-3"><InvoiceOutstanding row={row} balances={balances} /></div>
+        <p className="mt-2 text-xs text-muted-foreground">Kekurangan bayar adalah sisa pelunasan setelah PPh diperhitungkan. PPh tertunda dihitung dari termin yang belum ditandai disetor, bukan seluruh estimasi PPh invoice. Penandaan disetor tetap memerlukan verifikasi bukti terpisah.</p>
+      </section>
+      <section>
+        <h3 className="border-b pb-2 text-sm font-semibold">Administrasi</h3>
+        <p className="mt-3 text-sm">Superman: {row.Superman?.trim() || 'Belum terisi'}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Nomor SAP disimpan setelah kolom selesai diisi. DO belum wajib terbit.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {(['Kontrak_SAP', 'SO_SAP', 'DO_SAP', 'Billing'] as const).map((field) => (
+            <div key={field} className="space-y-1.5">
+              <Label htmlFor={`detail-${field}`} className="text-xs">{field.replace('_', ' ')}</Label>
+              <Input id={`detail-${field}`} key={`${laporanRowKey(row)}-${field}-${row[field]}`} defaultValue={row[field] || ''} readOnly={!canEdit() || !canSaveSapFields(row)}
+                onBlur={(event) => { if (canEdit() && canSaveSapFields(row) && event.target.value !== (row[field] || '')) void onSapSave(field, event.target.value) }} />
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function MoneyCell({ value, className }: { value: number; className?: string }) {
   const formatted = formatCurrency(value)
   return (
@@ -639,11 +601,13 @@ function MoneyCell({ value, className }: { value: number; className?: string }) 
 
 function LaporanTableRow({
   row,
+  balances,
   isBypass,
   onSapSave,
   onDeleteBypass,
 }: {
   row: LaporanRow
+  balances: PiutangRow[] | null
   isBypass: boolean
   onSapSave: (field: string, value: string) => Promise<void>
   onDeleteBypass: (noDo: string, id: number) => void
@@ -739,17 +703,10 @@ function LaporanTableRow({
       <MoneyCell value={row.Pajak_PPN} />
       <MoneyCell value={row.PPh_Nominal} />
       <td className={cn(TD, 'text-center min-w-[5.5rem]')}>
-        {row.PPh_Setor === 'Disetor' ? <span className="text-emerald-600 dark:text-emerald-400">✓ Disetor</span> : '-'}
+        <InvoiceOutstanding row={row} balances={balances} mode="status" />
       </td>
-      <td
-        className={cn(
-          TD_MONEY,
-          'font-semibold',
-          (row.Sisa_Pembayaran || 0) <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400',
-        )}
-        title={(row.Sisa_Pembayaran || 0) <= 0 ? 'Lunas' : formatCurrency(row.Sisa_Pembayaran)}
-      >
-        {(row.Sisa_Pembayaran || 0) <= 0 ? 'Lunas' : formatCurrency(row.Sisa_Pembayaran)}
+      <td className={cn(TD_MONEY)}>
+        <InvoiceOutstanding row={row} balances={balances} mode="shortfall" />
       </td>
       <td className={cn(
         TD_MONEY,

@@ -100,7 +100,7 @@ def get_revenue(
         no_pembayaran = (row.get("No_Pembayaran") or "").strip()
         is_bypass = no_do.startswith("BYPASS-")
         # Kontrak/invoice tanpa realisasi belum menjadi pendapatan integrasi.
-        if is_bypass or not (no_do or no_pembayaran):
+        if is_bypass or row.get("Row_Type") != "REALISASI":
             continue
 
         raw_tanggal = row.get("Raw_Bulan_Buku") or row.get("Raw_Date")
@@ -114,7 +114,7 @@ def get_revenue(
         if unit and (row.get("Unit") or "").strip() != unit.strip():
             continue
 
-        record_id = f"do:{no_do}" if no_do else f"invoice:{row.get('No_Invoice') or no_pembayaran}"
+        record_id = f"ba:{row['No_BA']}"
         data.append(
             {
                 "id": record_id,

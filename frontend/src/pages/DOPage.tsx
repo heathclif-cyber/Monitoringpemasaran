@@ -291,7 +291,7 @@ export default function DOPage() {
   const normalBAOptions = useMemo(() => {
     if (isPayungBA || !currentInvoice?.no_kontrak) return []
     return baStore.data
-      .filter((ba) => ba.no_kontrak === currentInvoice.no_kontrak)
+      .filter((ba) => ba.no_kontrak === currentInvoice.no_kontrak && ba.status === 'Selesai' && (!ba.no_do || ba.no_do === watch('no_do')))
       .map((ba) => ({
         value: ba.no_ba,
         label: `${ba.no_ba} — ${ba.tanggal_ba} (Buku: ${ba.bulan_buku?.slice(0, 7) || '-'})`,
@@ -556,7 +556,7 @@ export default function DOPage() {
                         ))}
                       </NativeSelect>
                       <p className="text-xs text-slate-400 mt-1">
-                        Jika dipilih, tanggal BA menggantikan rencana pengambilan dan Bulan Buku BA dipakai di Laporan Digital.
+                        Untuk pengambilan bertahap, tautkan DO dari halaman BA. Tanggal BA menjadi acuan Laporan Digital.
                       </p>
                     </div>
                   </div>

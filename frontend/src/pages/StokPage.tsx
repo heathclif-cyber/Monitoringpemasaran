@@ -141,7 +141,7 @@ export default function StokPage() {
     <PageShell density="default">
       <PageHeader
         title="Persediaan"
-        description="Catat stok masuk; penjualan DO mengurangi saldo otomatis"
+        description="Saldo tersedia setelah alokasi DO; realisasi pengambilan mengikuti BA di laporan"
       />
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,420px)_1fr] gap-6 items-start">
         <Card>
@@ -218,7 +218,7 @@ export default function StokPage() {
                 <div>
                   <CardTitle className="text-sm font-semibold">Saldo Saat Ini</CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Persediaan masuk per tanggal input. DO mengurangi persediaan per tanggal DO (saldo boleh negatif).
+                    Persediaan masuk per tanggal input. DO mengalokasikan persediaan per tanggal DO (saldo boleh negatif). Alokasi bukan bukti barang sudah diambil; realisasi fisik mengikuti BA.
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

@@ -64,7 +64,7 @@ function StatCards() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <StatCard
-        label="Pendapatan (Omset)"
+        label="Penjualan (BA / rencana DO)"
         value={formatCurrency(summary.total_pendapatan)}
         icon={TrendingUp}
         trend={pendapatanTrend}
@@ -502,6 +502,10 @@ export default function Dashboard() {
         </div>
       ) : data?.summary && data?.charts ? (
         <>
+          {data.summary.reporting_warnings?.length ? <div role="alert" className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">Angka belum final: ada {data.summary.reporting_warnings.length} peringatan data.</p>
+            <p>Periksa BA berpotensi ganda dan tautan lama melalui Laporan → Detail → Document Flow. Rencana DO belum merupakan realisasi.</p>
+          </div> : null}
           <StatCards />
           <SapStatus />
 

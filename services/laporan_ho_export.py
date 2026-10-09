@@ -213,7 +213,8 @@ def _ba_to_ho_row(ba, kontrak, invoice=None) -> dict:
     """Baris penjualan HO dari Berita Acara — diakui terjual saat barang dikirim."""
     volume = float(ba.volume_ba or 0)
     pokok = _ba_pendapatan_pokok(ba, kontrak, invoice=invoice)
-    buku = ba.bulan_buku or ba.tanggal_ba
+    # HO always follows the BA date, including monthly umbrella contracts.
+    buku = ba.tanggal_ba
     komoditi = ba.komoditi or kontrak.komoditi or ""
     deskripsi = ba.deskripsi or kontrak.jenis_komoditi or kontrak.deskripsi_produk or komoditi
     unit = ba.nama_unit or kontrak.kebun_produsen or ""
@@ -222,15 +223,20 @@ def _ba_to_ho_row(ba, kontrak, invoice=None) -> dict:
         "Komoditi": komoditi,
         "Deskripsi_Produk": deskripsi,
         "Unit": unit,
+        "Mitra_Pembeli": kontrak.pembeli or "",
+        "No_Kontrak": kontrak.no_kontrak,
+        "No_Invoice": getattr(invoice, "no_invoice", "") or "",
         "Jumlah_DO": volume,
         "DPP_Pokok": pokok,
         "Pendapatan_Pokok": pokok,
         "Satuan": "EA" if (kontrak.satuan or "").strip().lower() in ("butir", "ea") else (kontrak.satuan or "Kg"),
         "No_BA": ba.no_ba,
+        "No_DO": getattr(ba, "no_do", None) or "",
         "Tanggal_BA": ba.tanggal_ba.strftime("%Y-%m-%d") if ba.tanggal_ba else "",
         "Bulan_Buku": _format_bulan_buku(buku),
         "Rencana_Pengambilan": ba.tanggal_ba.strftime("%Y-%m-%d") if ba.tanggal_ba else "",
         "Raw_Date": buku.strftime("%Y-%m-%d") if buku else "",
+        "Raw_Bulan_Buku": buku.strftime("%Y-%m-%d") if buku else "",
         "Is_Payung_BA": True,
     }
 
@@ -241,7 +247,7 @@ def fetch_payung_ba_ho_rows(
     units: list[str] | None = None,
     komoditis: list[str] | None = None,
 ) -> list[dict]:
-    """Ambil semua BA kontrak payung untuk pengakuan penjualan HO."""
+    """Ambil realisasi BA selesai, baik kontrak standar maupun payung."""
     from sqlalchemy.orm import joinedload
 
     import models
@@ -261,7 +267,7 @@ def fetch_payung_ba_ho_rows(
     rows: list[dict] = []
     for ba in bas:
         kontrak = ba.kontrak
-        if not kontrak or not is_payung_ba(kontrak):
+        if not kontrak or ba.status not in ("Selesai", "Ter-invoice"):
             continue
         if float(ba.volume_ba or 0) <= 0:
             continue
@@ -290,50 +296,24 @@ def _merge_payung_ba_row(laporan_row: dict, ba_row: dict) -> dict:
 
 
 def prepare_ho_export_rows(client_rows: list[dict], ba_supplement: list[dict]) -> list[dict]:
-    """
-    Kontrak payung: penjualan HO mengikuti BA (pengiriman), bukan menunggu DO/transfer.
-    - Jika sudah ada DO dengan volume → pakai baris DO.
-    - Jika belum ada DO → volume dari BA, nilai tetap Pendapatan_Pokok laporan.
-    """
-    ba_by_no = {r["No_BA"]: r for r in ba_supplement if r.get("No_BA")}
-
-    do_volume_by_ba: dict[str, float] = {}
-    rows_by_ba: dict[str, list[dict]] = {}
-    non_ba_rows: list[dict] = []
-
-    for row in client_rows:
-        no_ba = (row.get("No_BA") or "").strip()
-        if not no_ba:
-            non_ba_rows.append(row)
-            continue
-        rows_by_ba.setdefault(no_ba, []).append(row)
-        do_volume_by_ba[no_ba] = do_volume_by_ba.get(no_ba, 0) + float(row.get("Jumlah_DO") or 0)
-
-    result = list(non_ba_rows)
-
-    for no_ba, grouped in rows_by_ba.items():
-        if do_volume_by_ba.get(no_ba, 0) > 0:
-            for row in grouped:
-                if float(row.get("Jumlah_DO") or 0) > 0:
-                    result.append(row)
-            continue
-        if no_ba in ba_by_no:
-            result.append(_merge_payung_ba_row(grouped[0], ba_by_no[no_ba]))
-            continue
-        for row in grouped:
-            result.append(row)
-            break
-
-    for no_ba, ba_row in ba_by_no.items():
-        if no_ba not in rows_by_ba:
-            result.append(ba_row)
-
-    return result
+    """Gabungkan entri manual dan realisasi BA tanpa menghitung ulang DO."""
+    # BA owns both realized volume and sales value. Never replace either with
+    # payment-proportional DO rows; one BA is included exactly once.
+    ba_by_no = {r["No_BA"]: dict(r) for r in ba_supplement if r.get("No_BA")}
+    return [r for r in client_rows if not r.get("No_BA")] + list(ba_by_no.values())
 
 
 def _extract_year_month(row: dict, mode: str) -> tuple[str, str]:
-    # Payung BA: periode HO selalu bulan buku BA (pengiriman), bukan tgl transfer
+    if row.get("Report_Date"):
+        return row["Report_Date"][:4], row["Report_Date"][5:7]
+    # A BA date always takes precedence over book month or payment date.
     if row.get("No_BA") or row.get("Is_Payung_BA"):
+        ba_date = row.get("Tanggal_BA") or ""
+        if len(ba_date) >= 7:
+            return ba_date[:4], ba_date[5:7]
+        book_date = row.get("Raw_Bulan_Buku") or ""
+        if len(book_date) >= 7:
+            return book_date[:4], book_date[5:7]
         bulan_buku = row.get("Bulan_Buku") or ""
         month = bulan_buku[:2] if len(bulan_buku) >= 2 else ""
         for field in ("Rencana_Pengambilan", "Tanggal_BA", "Raw_Date"):
@@ -378,6 +358,8 @@ def _row_kuantum_nilai(row: dict) -> tuple[float, float]:
     nilai = float(row.get("Pendapatan_Pokok") or row.get("DPP_Pokok") or 0)
     if satuan in ("butir", "ea"):
         return 0.0, nilai
+    if satuan in ("ton", "tonne", "tonnes", "mt"):
+        return volume * 1000, nilai
     return volume, nilai
 
 
@@ -428,9 +410,74 @@ def _ytd_label(month: str, year: str) -> str:
     return f"   S/d. Bulan {name} {year}"
 
 
+def _matches_ho_filters(row: dict, filters: dict, client_rows: list[dict]) -> bool:
+    for option, field in (("units", "Unit"), ("komoditis", "Komoditi"),
+                          ("pembeli", "Mitra_Pembeli"), ("jenisKomoditi", "Deskripsi_Produk")):
+        if filters.get(option) and row.get(field) not in filters[option]:
+            return False
+    manual = str(row.get("No_DO") or "").startswith("BYPASS-")
+    if filters.get("tipe") == "NO_BYPASS" and manual:
+        return False
+    if filters.get("tipe") == "ONLY_BYPASS" and not manual:
+        return False
+    search = str(filters.get("search") or "").strip().lower()
+    if search and search not in " ".join(str(row.get(f) or "") for f in (
+        "No_BA", "No_DO", "No_Invoice", "No_Kontrak", "Unit", "Komoditi", "Mitra_Pembeli",
+        "Kontrak_SAP", "SO_SAP", "DO_SAP", "Billing", "Superman", "No_Pembayaran",
+    )).lower():
+        if row.get("Row_Type"):
+            return False
+        # A search can match a related DO/SAP reference, not the BA itself.
+        field = "No_DO" if manual or row.get("Is_Planned_GI") else "No_BA"
+        if not any(r.get(field) == row.get(field) for r in client_rows):
+            return False
+    # Payment/SAP filters are operational selections from the full-year report.
+    if any(filters.get(f, "ALL") != "ALL" for f in ("sap", "statusBayar")):
+        if not row.get("Row_Type"):
+            field = "No_DO" if manual or row.get("Is_Planned_GI") else "No_BA"
+            return bool(row.get(field)) and any(r.get(field) == row.get(field) for r in client_rows)
+        sap = filters.get("sap", "ALL")
+        fields = {"NO_KONTRAK_SAP": "Kontrak_SAP", "NO_SO_SAP": "SO_SAP", "NO_DO_SAP": "DO_SAP", "NO_BILLING_SAP": "Billing"}
+        filled = all(row.get(f) for f in ("Kontrak_SAP", "SO_SAP", "DO_SAP", "Billing"))
+        if sap == "ALL_COMPLETE" and not filled or sap == "MISSING_SAP" and filled:
+            return False
+        if sap in fields and row.get(fields[sap]):
+            return False
+        status = filters.get("statusBayar", "ALL")
+        shortfall, total = row.get("Sisa_Pembayaran", 0), row.get("Kewajiban_Pembayaran", 0)
+        if status == "LUNAS" and shortfall > 0 or status == "BELUM" and not (total > 0 and shortfall >= total) or status == "SEBAGIAN" and not (0 < shortfall < total):
+            return False
+    return True
+
+
+def _planned_do_to_ho_row(do) -> dict | None:
+    """Fallback periode HO dari rencana pengambilan, tanpa membuat BA fiktif."""
+    invoice = do.invoice
+    contract = invoice.kontrak if invoice else None
+    if not contract or do.no_ba or invoice.no_ba or not do.rencana_pengambilan:
+        return None
+    volume = float(do.volume_do or 0)
+    if volume <= 0:
+        return None
+    planned_date = do.rencana_pengambilan.isoformat()
+    return {
+        "No_DO": do.no_do, "No_Invoice": invoice.no_invoice,
+        "No_Kontrak": contract.no_kontrak, "No_BA": "",
+        "Unit": invoice.nama_unit or contract.kebun_produsen or "",
+        "Komoditi": contract.komoditi or "",
+        "Deskripsi_Produk": contract.jenis_komoditi or contract.deskripsi_produk or "",
+        "Mitra_Pembeli": contract.pembeli or "", "Satuan": contract.satuan or "Kg",
+        "Jumlah_DO": volume,
+        "Pendapatan_Pokok": round(calculate_ba_pokok(contract, volume)),
+        "Raw_Date": planned_date, "Raw_Bulan_Buku": planned_date,
+        "Rencana_Pengambilan": planned_date, "Is_Planned_GI": True,
+    }
+
+
 def _write_bucket(ws, row_idx: int, bucket: HoBucket, *, col_kuantum: int, col_nilai: int) -> None:
     ws.cell(row=row_idx, column=col_kuantum, value=round(bucket.kuantum, 2) if bucket.kuantum else 0)
     ws.cell(row=row_idx, column=col_nilai, value=round(bucket.nilai, 0) if bucket.nilai else 0)
+    ws.cell(row=row_idx, column=col_kuantum + 1, value=round(bucket.per_unit, 2) if bucket.kuantum else None)
 
 
 def generate_laporan_ho_xlsx(
@@ -448,17 +495,25 @@ def generate_laporan_ho_xlsx(
     export_rows = list(rows)
     if db is not None:
         filter_opts = filters or {}
-        ba_rows = fetch_payung_ba_ho_rows(
-            db,
-            units=filter_opts.get("units") or None,
-            komoditis=filter_opts.get("komoditis") or None,
-        )
-        export_rows = prepare_ho_export_rows(export_rows, ba_rows)
+        from api.r_laporan import _build_laporan_rows
+        export_rows = [r for r in _build_laporan_rows(db, include_documents=False)
+                       if r.get("Row_Type") in ("REALISASI", "RENCANA", "BYPASS")
+                       and _matches_ho_filters(r, filter_opts, rows)]
 
     bulan_data, ytd_data = _aggregate_lokal(export_rows, year=year, month=month, mode=mode)
 
     wb = load_workbook(TEMPLATE_PATH)
     ws = wb.active
+
+    warnings = [(r.get("No_BA") or r.get("No_DO"), warning) for r in export_rows
+                for warning in r.get("Reporting_Warnings", [])]
+    if warnings:
+        audit = wb.create_sheet("Pemeriksaan Data")
+        audit.append(["Dokumen", "Peringatan — nilai belum direkonsiliasi"])
+        for entry in warnings:
+            audit.append(entry)
+        audit.column_dimensions["A"].width = 45
+        audit.column_dimensions["B"].width = 100
 
     ws["D3"] = _month_label(month, year)
     ws["G3"] = _ytd_label(month, year)

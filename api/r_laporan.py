@@ -51,6 +51,11 @@ def _compute_volume_invoice(k, inv, ba_ref):
 
 
 def _resolve_ba_ref(k, inv, do, ba_by_no: dict):
+    if do:
+        pickups = [b for b in ba_by_no.values() if getattr(b, "no_do", None) == do.no_do
+                   and b.status in ("Selesai", "Ter-invoice")]
+        if pickups:
+            return max(pickups, key=lambda b: b.tanggal_ba)
     if do and getattr(do, "berita_acara", None):
         return do.berita_acara
     if inv and getattr(inv, "berita_acara", None):
@@ -60,6 +65,23 @@ def _resolve_ba_ref(k, inv, do, ba_by_no: dict):
     if k.no_kontrak:
         return ba_by_no.get(k.no_kontrak)
     return None
+
+
+def _invoice_pickup_metrics(invoice, ba_by_no, invoice_volume, ba_ref=None):
+    """Outstanding starts only when DOs exist; subtract their related BA."""
+    dos = list(invoice.delivery_orders) if invoice else []
+    base = sum(float(do.volume_do or 0) for do in dos)
+    refs = {do.no_ba for do in dos if do.no_ba}
+    do_numbers = {getattr(do, "no_do", None) for do in dos if getattr(do, "no_do", None)}
+    refs.update(b.no_ba for b in ba_by_no.values() if getattr(b, "no_do", None) in do_numbers)
+    if invoice and invoice.no_ba:
+        refs.add(invoice.no_ba)
+    if ba_ref:
+        refs.add(ba_ref.no_ba)
+    completed = [ba_by_no[ref] for ref in refs if ref in ba_by_no
+                 and ba_by_no[ref].status in ("Selesai", "Ter-invoice")]
+    picked_up = sum(float(ba.volume_ba or 0) for ba in completed) if completed else None
+    return picked_up, max(0.0, base - (picked_up or 0))
 
 
 def _build_laporan_rows(db: Session, include_documents: bool = True):
@@ -151,6 +173,7 @@ def _build_laporan_rows(db: Session, include_documents: bool = True):
 
         # Volume Invoice = acuan sisa volume (bukan estimasi transfer pra-DO)
         volume_invoice = _compute_volume_invoice(k, inv, ba_ref)
+        pickup_volume, pickup_outstanding = _invoice_pickup_metrics(inv, ba_by_no, volume_invoice, ba_ref)
 
         # Sisa volume = volume invoice − sum volume DO aktual (0 jika DO belum terbit)
         sisa_volume = round(float(volume_invoice) - float(total_do_volume))
@@ -171,9 +194,7 @@ def _build_laporan_rows(db: Session, include_documents: bool = True):
         ba_buku_date = ba_ref.bulan_buku if ba_ref else None
         # Normal: tanggal BA adalah tanggal buku. Payung: gunakan periode buku
         # yang dipilih pada BA (fallback tanggal BA untuk data lama).
-        effective_buku_date = (
-            (ba_buku_date or ba_date) if is_payung_kontrak else ba_date
-        )
+        effective_buku_date = ba_date
 
         ppn_persen_val = (
             float(getattr(k, "ppn_persen", 0) or 0)
@@ -296,6 +317,9 @@ def _build_laporan_rows(db: Session, include_documents: bool = True):
             "Harga_Satuan": k_harga_local,
             "Volume_Invoice": volume_invoice,
             "Jumlah_DO": do_volume,
+            "Volume_DO_Invoice": float(total_do_volume or 0),
+            "Volume_Pengambilan": pickup_volume,
+            "Outstanding_Pengambilan": pickup_outstanding,
             "PPN_Persen": ppn_persen_val,
             "PPh_Persen": pph_persen_val,
             "Pendapatan_Pokok": round(pendapatan_do),
@@ -425,7 +449,8 @@ def _build_laporan_rows(db: Session, include_documents: bool = True):
             "Link_Berita_Acara_Serah_Terima": "",
         })
 
-    return rows
+    from services.sales_reporting import normalize_sales_rows
+    return normalize_sales_rows(db, rows, build_row)
 
 
 @router.post("/export-ho")

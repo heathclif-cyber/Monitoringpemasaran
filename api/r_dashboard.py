@@ -319,6 +319,31 @@ def get_dashboard_data(
             "available_komoditas": avail_k,
             "selected_komoditi": str(komoditi),
         }
+        # Sales, physical pickup and cash use the same events as table/HO.
+        from api.r_laporan import _build_laporan_rows
+        canonical = [r for r in _build_laporan_rows(db, include_documents=False)
+                     if r.get("Report_Date", "").startswith(str(year) + "-")
+                     and (unit == "ALL" or r["Unit"] == unit)
+                     and (komoditi == "ALL" or r["Komoditi"] == komoditi)]
+        income, cash, kg, ea = [0.0] * 12, [0.0] * 12, [0.0] * 12, [0.0] * 12
+        commodities, units = {}, {}
+        warnings = set()
+        for row in canonical:
+            month_index = int(row["Report_Date"][5:7]) - 1
+            value = float(row["Pendapatan_Pokok"] or 0)
+            income[month_index] += value
+            cash[month_index] += float(row["Jumlah_Transfer"] or 0)
+            physical = float(row.get("Volume_Pengambilan") or 0)
+            (ea if row["Satuan"].lower() in ("ea", "butir") else kg)[month_index] += physical
+            commodities[row["Komoditi"]] = commodities.get(row["Komoditi"], 0) + value
+            units[row["Unit"]] = units.get(row["Unit"], 0) + value
+            warnings.update(row.get("Reporting_Warnings", []))
+        result["summary"].update(total_pendapatan=sum(income), total_cash_in=sum(cash),
+                                 total_volume_kg=sum(kg), total_volume_butir=sum(ea),
+                                 total_volume_all=sum(kg) + sum(ea), reporting_warnings=sorted(warnings))
+        result["charts"]["bulanan"].update(pendapatan=income, cashin=cash, volume_kg=kg, volume_butir=ea)
+        result["charts"]["komoditas"] = {"labels": list(commodities), "values": list(commodities.values())}
+        result["charts"]["unit"] = {"labels": list(units), "values": list(units.values())}
         api_cache.set(cache_key, result)
         return result
 

@@ -1,4 +1,5 @@
 import type { LaporanRow } from '@/types'
+import type { LaporanFilters } from '@/utils/laporanUtils'
 import { normalizeSatuan } from '@/utils/satuanUtils'
 
 function pickReportMonth(months: string[]): string | null {
@@ -9,6 +10,7 @@ function pickReportMonth(months: string[]): string | null {
 function toHoPayloadRow(row: LaporanRow) {
   return {
     Komoditi: row.Komoditi,
+    No_DO: row.No_DO,
     Deskripsi_Produk: row.Deskripsi_Produk,
     Jumlah_DO: row.Jumlah_DO,
     DPP_Pokok: row.DPP_Pokok,
@@ -17,6 +19,7 @@ function toHoPayloadRow(row: LaporanRow) {
     Raw_Date: row.Raw_Date,
     Tanggal_Transfer: row.Tanggal_Transfer,
     Bulan_Buku: row.Bulan_Buku,
+    Raw_Bulan_Buku: row.Raw_Bulan_Buku,
     Rencana_Pengambilan: row.Rencana_Pengambilan,
     No_BA: row.No_BA,
     Tanggal_BA: row.Tanggal_BA,
@@ -34,7 +37,7 @@ export interface LaporanHoExportOptions {
   year: string
   months: string[]
   modeTanggal: 'TRANSFER' | 'RENCANA'
-  filters?: {
+  filters?: Partial<LaporanFilters> & {
     units?: string[]
     komoditis?: string[]
   }
@@ -66,6 +69,7 @@ export async function exportLaporanHO(
       mode_tanggal: options.modeTanggal,
       rows: rows.map(toHoPayloadRow),
       filters: {
+        ...options.filters,
         units: options.filters?.units?.length ? options.filters.units : undefined,
         komoditis: options.filters?.komoditis?.length ? options.filters.komoditis : undefined,
       },

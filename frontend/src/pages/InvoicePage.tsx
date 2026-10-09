@@ -7,6 +7,7 @@ import { FileDown, MessageCircle, RotateCcw, Save } from 'lucide-react'
 import { openAuthenticatedFile } from '@/lib/client'
 import { useInvoiceStore } from '@/store/invoiceStore'
 import { useKontrakStore } from '@/store/kontrakStore'
+import { TransactionTaxSummary } from '@/components/feature/TransactionTaxSummary'
 import { useBAStore } from '@/store/baStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -274,7 +275,7 @@ export default function InvoicePage() {
         .map((inv) => inv.no_ba as string),
     )
     return baStore.data
-      .filter((b) => b.no_kontrak === selectedKontrak && !invoicedBa.has(b.no_ba))
+      .filter((b) => b.no_kontrak === selectedKontrak && b.status === 'Selesai' && !invoicedBa.has(b.no_ba))
       .map((b) => ({
         no_ba: b.no_ba,
         tanggal_ba: b.tanggal_ba,
@@ -723,6 +724,13 @@ export default function InvoicePage() {
                     </p>
                   )}
                 </div>
+                <TransactionTaxSummary input={{ document: 'invoice', partner: k.pembeli,
+                  commodity: selectedUnitObj?.komoditi || k.komoditi,
+                  material: selectedUnitObj?.jenis_komoditi || k.jenis_komoditi,
+                  multipleMaterials: !selectedUnit && new Set(kontrakUnits.map(u => `${u.komoditi || k.komoditi}|${u.jenis_komoditi || k.jenis_komoditi}`)).size > 1,
+                  date: watch('tanggal_transaksi'), isVat: k.is_ppn, vatRate: k.ppn_persen,
+                  isWithholding: k.is_pph, withholdingRate: k.pph_persen,
+                  priceBeforeVat: currentJumlah > 0 ? currentJumlah / (1 + (k.is_ppn === 'true' ? Number(k.ppn_persen) / 100 : 0)) : null }} />
               </CardContent>
             </Card>
           ) : (

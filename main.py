@@ -24,6 +24,7 @@ from api.r_ba import router as ba_router
 from api.r_stok import router as stok_router
 from api.r_superman import router as superman_router
 from api.r_piutang import router as piutang_router
+from api.r_tax import router as tax_router
 from api.r_auth import router as auth_router
 from api.r_users import router as users_router
 from api.r_integrasi import router as integrasi_router
@@ -129,6 +130,7 @@ app.include_router(ba_router)
 app.include_router(stok_router)
 app.include_router(superman_router)
 app.include_router(piutang_router)
+app.include_router(tax_router)
 app.include_router(kontak_pajak_router)
 
 

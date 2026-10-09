@@ -58,6 +58,18 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     terbilang = terbilang_rupiah(math.floor(nilai_transaksi + 1e-9))
 
     if db_kontrak:
+        if db_kontrak.invoices or db_kontrak.berita_acara:
+            protected = ("tipe_alur", "volume", "harga_satuan", "premi", "is_ppn", "ppn_persen",
+                         "is_pph", "pph_persen", "pembeli", "komoditi", "satuan", "kebun_produsen")
+            for field in protected:
+                old, new = getattr(db_kontrak, field), kontrak_data.get(field)
+                same = abs(float(old or 0) - float(new or 0)) < 1e-6 if isinstance(old, (int, float)) else (old or "") == (new or "")
+                if not same:
+                    raise HTTPException(status_code=400, detail="Kontrak memiliki dokumen turunan; dasar transaksi tidak boleh diubah")
+            old_units = sorted((u.nama_unit, float(u.volume or 0), u.komoditi or "", u.jenis_komoditi or "", u.satuan or "") for u in db_kontrak.units)
+            new_units = sorted((u.nama_unit, float(u.volume or 0), u.komoditi or "", u.jenis_komoditi or "", u.satuan or "") for u in units_input)
+            if old_units != new_units:
+                raise HTTPException(status_code=400, detail="Unit kontrak memiliki dokumen turunan; tidak boleh diubah")
         for key, value in kontrak_data.items():
             setattr(db_kontrak, key, value)
         db_kontrak.nilai_transaksi = nilai_transaksi
@@ -361,7 +373,32 @@ def get_kontrak_trace(no_kontrak: str, db: Session = Depends(get_db)):
     else:
         overall_status = "BELUM"
 
+    from services.document_flow import build_document_flow
+    from services.pembayaran_utils import pembayaran_paid_total, payment_balance
+    from services.sales_reporting import COMPLETED
+    for inv, item in zip(k.invoices, invoices_data):
+        effective = pembayaran_paid_total(inv.pembayaran, k)
+        shortfall, surplus = payment_balance(effective, inv.jumlah_pembayaran)
+        item.update(sisa_pembayaran=round(shortfall), total_terbayar=effective,
+                    payment_status="LUNAS" if not shortfall else "SEBAGIAN" if effective else "BELUM",
+                    persen_terbayar=round(effective / inv.jumlah_pembayaran * 100, 1) if inv.jumlah_pembayaran else 0)
+    sisa_bayar = sum(i["sisa_pembayaran"] for i in invoices_data)
+    total_value = sum(float(i.jumlah_pembayaran or 0) for i in k.invoices)
+    bas = db.query(models.BeritaAcara).filter_by(no_kontrak=k.no_kontrak).all()
+    do_numbers = {d.no_do for i in k.invoices for d in i.delivery_orders}
+    ba_numbers = {i.no_ba for i in k.invoices if i.no_ba} | {d.no_ba for i in k.invoices for d in i.delivery_orders if d.no_ba}
+    picked = sum(float(b.volume_ba or 0) for b in bas if b.status in COMPLETED and (b.no_do in do_numbers or b.no_ba in ba_numbers))
+    linked_pickup = picked
+    sisa_vol = 0
+    for inv in k.invoices:
+        numbers = {d.no_do for d in inv.delivery_orders}
+        refs = {d.no_ba for d in inv.delivery_orders if d.no_ba} | ({inv.no_ba} if inv.no_ba else set())
+        actual = sum(float(b.volume_ba or 0) for b in bas if b.status in COMPLETED and (b.no_do in numbers or b.no_ba in refs))
+        sisa_vol += max(0, sum(float(d.volume_do or 0) for d in inv.delivery_orders) - actual)
+    picked = sum(float(b.volume_ba or 0) for b in bas if b.status in COMPLETED)
+    overall_status = "LUNAS" if total_value and not sisa_bayar else "SEBAGIAN" if total_do_nominal else "BELUM"
     return {
+        "document_flow": build_document_flow(db, k),
         "no_kontrak": k.no_kontrak,
         "tanggal_kontrak": k.tanggal_kontrak.isoformat() if k.tanggal_kontrak else None,
         "jatuh_tempo_pembayaran": k.jatuh_tempo_pembayaran.isoformat() if k.jatuh_tempo_pembayaran else None,
@@ -372,14 +409,15 @@ def get_kontrak_trace(no_kontrak: str, db: Session = Depends(get_db)):
         "volume": k_vol,
         "kebun_produsen": k.kebun_produsen,
         "summary": {
-            "total_nilai": k_nilai,
+            "total_nilai": total_value,
             "total_terbayar": total_do_nominal,
             "sisa_pembayaran": sisa_bayar,
-            "persen_terbayar": persen_bayar,
+            "persen_terbayar": round((total_value - sisa_bayar) / total_value * 100, 1) if total_value else 0,
             "total_volume": k_vol,
             "total_volume_do": total_do_volume,
             "sisa_volume": sisa_vol,
-            "persen_volume": persen_vol,
+            "volume_pengambilan": picked,
+            "persen_volume": round(linked_pickup / total_do_volume * 100, 1) if total_do_volume else 0,
             "jumlah_invoice": len(invoices_data),
             "jumlah_do": sum(d["jumlah_do"] for d in invoices_data),
             "overall_status": overall_status,
@@ -404,6 +442,8 @@ def delete_kontrak(no_kontrak: str, db: Session = Depends(get_db), _: models.Use
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == no_kontrak).first()
     if not db_kontrak:
         raise HTTPException(status_code=404, detail="Kontrak not found")
+    if db_kontrak.invoices or db_kontrak.berita_acara:
+        raise HTTPException(status_code=400, detail="Kontrak masih memiliki invoice atau BA; tidak dapat dihapus")
     
     db.delete(db_kontrak)
     db.commit()

@@ -4,6 +4,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+ARG VITE_ISOLATED_PREVIEW=false
 RUN npm run build
 
 # Stage 2: Python backend

@@ -40,14 +40,14 @@ const COLUMNS: ColDef[] = [
   { header: 'Jml Invoice', width: 15, type: 'currency' },
   { header: 'Harga Satuan', width: 14, type: 'currency' },
   { header: 'Volume Invoice', width: 13, type: 'volume' },
-  { header: 'Jumlah DO', width: 12, type: 'volume' },
+  { header: 'Volume BA / Rencana DO', width: 18, type: 'volume' },
   { header: '% PPN', width: 8, type: 'percent' },
   { header: '% PPh', width: 8, type: 'percent' },
   { header: 'Pendapatan Pokok', width: 16, type: 'currency' },
   { header: 'Setelah PPN', width: 16, type: 'currency' },
   { header: 'Pajak PPN', width: 14, type: 'currency' },
   { header: 'PPh', width: 14, type: 'currency' },
-  { header: 'PPh Setor?', width: 11, type: 'center' },
+  { header: 'PPh Ditandai Setor (Manual)', width: 20, type: 'center' },
   { header: 'Sisa Bayar', width: 14, type: 'currency' },
   { header: 'Sisa Volume', width: 12, type: 'volume' },
   { header: 'Bulan Buku', width: 12, type: 'text' },
@@ -56,6 +56,9 @@ const COLUMNS: ColDef[] = [
   { header: 'SO SAP', width: 10, type: 'text' },
   { header: 'DO SAP', width: 10, type: 'text' },
   { header: 'Billing', width: 10, type: 'text' },
+  { header: 'No BA', width: 24, type: 'text' },
+  { header: 'Jenis Baris', width: 16, type: 'text' },
+  { header: 'Peringatan Data', width: 50, type: 'text' },
 ]
 
 const LAST_COL = COLUMNS.length - 1
@@ -202,8 +205,11 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
 
   const SUM_COLS = [8, 9, 10, 13, 15, 16, 19, 20, 21, 22]
   const columnSums: Record<number, number> = Object.fromEntries(SUM_COLS.map((c) => [c, 0]))
+  const seenInvoices = new Set<string>()
 
   rows.forEach((row, i) => {
+    const firstInvoice = !row.Row_Type || !seenInvoices.has(row.No_Invoice)
+    if (row.No_Invoice) seenInvoices.add(row.No_Invoice)
     const r = DATA_START_ROW + i
     const rn = r + 1 // nomor baris Excel 1-based, untuk rumus
     const banded = i % 2 === 1
@@ -244,8 +250,10 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
     setNum(17, row.PPN_Persen ?? 0)
     setNum(18, row.PPh_Persen ?? 0)
     columnSums[10] += num(row.Jumlah_Transfer)
-    columnSums[13] += num(row.Jumlah_Invoice)
-    columnSums[15] += num(row.Volume_Invoice)
+    if (firstInvoice) {
+      columnSums[13] += num(row.Jumlah_Invoice)
+      columnSums[15] += num(row.Volume_Invoice)
+    }
     columnSums[16] += num(row.Jumlah_DO)
 
     const {
@@ -289,11 +297,26 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
     columnSums[9] += kewajibanTransfer
     columnSums[8] += kewajibanPembayaran
 
+    if (row.Row_Type) {
+      setNum(19, row.Pendapatan_Pokok)
+      setNum(20, row.Pendapatan_Setelah_PPN)
+      setNum(21, row.Pajak_PPN)
+      setNum(22, row.PPh_Nominal)
+      setNum(8, row.Pelunasan)
+      setNum(9, row.Kewajiban_Pembayaran)
+      columnSums[19] += num(row.Pendapatan_Pokok) - pendapatanPokok
+      columnSums[20] += num(row.Pendapatan_Setelah_PPN) - setelahPPN
+      columnSums[21] += num(row.Pajak_PPN) - pajakPPN
+      columnSums[22] += num(row.PPh_Nominal) - pph
+      columnSums[8] += num(row.Pelunasan) - kewajibanPembayaran
+      columnSums[9] += (firstInvoice ? num(row.Kewajiban_Pembayaran) : 0) - kewajibanTransfer
+    }
+
     const sisaBayar = sisaBayarLabel(row)
     if (typeof sisaBayar === 'number') setNum(24, sisaBayar)
     else setText(24, sisaBayar, { color: { rgb: GREEN }, bold: true })
 
-    const sisaVol = sisaVolumeLabel(row)
+    const sisaVol = row.Row_Type ? row.Outstanding_Pengambilan || 0 : sisaVolumeLabel(row)
     if (typeof sisaVol === 'number') setNum(25, sisaVol)
     else setText(25, sisaVol, { color: { rgb: GREEN }, bold: true })
 
@@ -304,6 +327,9 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
     setText(29, row.SO_SAP)
     setText(30, row.DO_SAP)
     setText(31, row.Billing)
+    setText(32, row.No_BA || '')
+    setText(33, row.Row_Type || '')
+    setText(34, (row.Reporting_Warnings || []).join('; '))
   })
 
   const lastDataRow = DATA_START_ROW + Math.max(rows.length, 1) - 1
@@ -335,7 +361,7 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
       }
       if (isSum) {
         set(totalRow, c, {
-          f: `SUM(${colLetter(c)}${DATA_START_ROW + 1}:${colLetter(c)}${lastDataRow + 1})`,
+          ...(rows.some(row => row.Row_Type) && [9, 13, 15].includes(c) ? {} : { f: `SUM(${colLetter(c)}${DATA_START_ROW + 1}:${colLetter(c)}${lastDataRow + 1})` }),
           v: columnSums[c],
           t: 'n',
           s: style,
