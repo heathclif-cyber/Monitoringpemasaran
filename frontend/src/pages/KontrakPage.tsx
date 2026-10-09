@@ -33,6 +33,7 @@ import {
   DEFAULT_SYARAT,
   DEFAULT_KETENTUAN,
   materialOptionsForUnit,
+  komoditiOptionsForUnit,
   syncKontrakFieldsFromUnits,
   type UnitRow,
 } from '@/utils/kontrakUtils'
@@ -575,16 +576,26 @@ export default function KontrakPage() {
                       <div key={i} className="border rounded-lg p-2 space-y-2 bg-slate-50/50">
                         {/* Row 1: Material fields */}
                         <div className="flex gap-2 items-center">
-                          <Input
+                          <NativeSelect
                             value={unit.komoditi}
                             onChange={e => {
+                              const komoditi = e.target.value
+                              const allowed = materialOptionsForUnit('', [], komoditi)
                               const next = [...unitList]
-                              next[i] = { ...next[i], komoditi: e.target.value }
+                              next[i] = {
+                                ...next[i],
+                                komoditi,
+                                jenis_komoditi: allowed.includes(next[i].jenis_komoditi) ? next[i].jenis_komoditi : (allowed.length === 1 ? allowed[0] : ''),
+                              }
                               patchUnitList(next)
                             }}
                             className={`${sel} w-28 shrink-0`}
-                            placeholder="Komoditi"
-                          />
+                          >
+                            <option value="">-- Komoditi --</option>
+                            {komoditiOptionsForUnit(unit.komoditi).map((k) => (
+                              <option key={k} value={k}>{k}</option>
+                            ))}
+                          </NativeSelect>
                           <NativeSelect
                             value={unit.jenis_komoditi}
                             onChange={e => {
@@ -595,7 +606,7 @@ export default function KontrakPage() {
                             className={`${sel} min-w-[12rem] flex-1 shrink-0`}
                           >
                             <option value="">-- Jenis Material --</option>
-                            {materialOptionsForUnit(unit.jenis_komoditi).map((m) => (
+                            {materialOptionsForUnit(unit.jenis_komoditi, [], unit.komoditi).map((m) => (
                               <option key={m} value={m}>{m}</option>
                             ))}
                           </NativeSelect>

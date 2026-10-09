@@ -93,8 +93,25 @@ export type UnitRow = {
   deskripsi_produk: string
 }
 
-export function materialOptionsForUnit(jenisKomoditi: string, extra: string[] = []): string[] {
-  const merged = new Set<string>([...MATERIAL_OPTIONS, ...extra])
+export const KOMODITI_OPTIONS = ['Karet', 'Kelapa', 'Sapi', 'Sawit', 'Tebu'] as const
+
+/** Material yang lazim per komoditi — memfilter dropdown agar tidak salah pasangan */
+const MATERIAL_BY_KOMODITI: Record<string, readonly string[]> = {
+  Sawit: ['TBS (TANDAN BUAH SEGAR)', 'CPO'],
+  Karet: ['Lump', 'TH BR CR 3X', 'TH BR CR 3X HITAM'],
+  Kelapa: ['KELAPA KUPAS', 'KELAPA BUTIR', 'Kopra'],
+  Tebu: ['GULA GAPOKTAN', 'Gula Kemasan 50 KG Milik PG'],
+  Sapi: ['SAPI PEJANTAN AFKIR'],
+}
+
+export function komoditiOptionsForUnit(current: string): string[] {
+  const merged = new Set<string>(KOMODITI_OPTIONS)
+  if (current?.trim()) merged.add(current.trim())
+  return [...merged].sort((a, b) => a.localeCompare(b, 'id'))
+}
+
+export function materialOptionsForUnit(jenisKomoditi: string, extra: string[] = [], komoditi = ''): string[] {
+  const merged = new Set<string>([...(MATERIAL_BY_KOMODITI[komoditi] ?? MATERIAL_OPTIONS), ...extra])
   if (jenisKomoditi?.trim()) merged.add(jenisKomoditi.trim())
   return [...merged].sort((a, b) => a.localeCompare(b, 'id'))
 }
