@@ -60,14 +60,14 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     if db_kontrak:
         if db_kontrak.invoices or db_kontrak.berita_acara:
             protected = ("tipe_alur", "volume", "harga_satuan", "premi", "is_ppn", "ppn_persen",
-                         "is_pph", "pph_persen", "pembeli", "komoditi", "satuan", "kebun_produsen")
+                         "is_pph", "pph_persen", "pembeli", "satuan", "kebun_produsen")
             for field in protected:
                 old, new = getattr(db_kontrak, field), kontrak_data.get(field)
                 same = abs(float(old or 0) - float(new or 0)) < 1e-6 if isinstance(old, (int, float)) else (old or "") == (new or "")
                 if not same:
                     raise HTTPException(status_code=400, detail="Kontrak memiliki dokumen turunan; dasar transaksi tidak boleh diubah")
-            old_units = sorted((u.nama_unit, float(u.volume or 0), u.komoditi or "", u.jenis_komoditi or "", u.satuan or "") for u in db_kontrak.units)
-            new_units = sorted((u.nama_unit, float(u.volume or 0), u.komoditi or "", u.jenis_komoditi or "", u.satuan or "") for u in units_input)
+            old_units = sorted((u.nama_unit, float(u.volume or 0), u.satuan or "") for u in db_kontrak.units)
+            new_units = sorted((u.nama_unit, float(u.volume or 0), u.satuan or "") for u in units_input)
             if old_units != new_units:
                 raise HTTPException(status_code=400, detail="Unit kontrak memiliki dokumen turunan; tidak boleh diubah")
         for key, value in kontrak_data.items():
@@ -120,6 +120,14 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
         if first.deskripsi_produk is not None:
             db_kontrak.deskripsi_produk = first.deskripsi_produk
         db_kontrak.kebun_produsen = ", ".join(u.nama_unit for u in units_input if u.nama_unit)
+
+    # Komoditi/jenis hanya label: koreksi harus ikut ke BA (snapshot yang dipakai Laporan).
+    for ba in db.query(models.BeritaAcara).filter(models.BeritaAcara.no_kontrak == kontrak.no_kontrak).all():
+        unit = next((u for u in units_input if u.nama_unit == ba.nama_unit), units_input[0] if units_input else None)
+        if unit is None or not unit.komoditi:
+            continue
+        ba.komoditi = unit.komoditi
+        ba.deskripsi = unit.jenis_komoditi or unit.deskripsi_produk or unit.komoditi
 
     db.commit()
     api_cache.invalidate_reporting()
