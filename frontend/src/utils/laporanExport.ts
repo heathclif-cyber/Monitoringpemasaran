@@ -49,7 +49,7 @@ const COLUMNS: ColDef[] = [
   { header: 'PPh', width: 14, type: 'currency' },
   { header: 'PPh Ditandai Setor (Manual)', width: 20, type: 'center' },
   { header: 'Sisa Bayar', width: 14, type: 'currency' },
-  { header: 'Sisa Volume', width: 12, type: 'volume' },
+  { header: 'Outstanding Pengambilan', width: 16, type: 'volume' },
   { header: 'Bulan Buku', width: 12, type: 'text' },
   { header: 'Superman', width: 11, type: 'text' },
   { header: 'Kontrak SAP', width: 12, type: 'text' },
@@ -59,6 +59,7 @@ const COLUMNS: ColDef[] = [
   { header: 'No BA', width: 24, type: 'text' },
   { header: 'Jenis Baris', width: 16, type: 'text' },
   { header: 'Peringatan Data', width: 50, type: 'text' },
+  { header: 'Volume DO Terbit', width: 14, type: 'volume' },
 ]
 
 const LAST_COL = COLUMNS.length - 1
@@ -330,6 +331,7 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
     setText(32, row.No_BA || '')
     setText(33, row.Row_Type || '')
     setText(34, (row.Reporting_Warnings || []).join('; '))
+    setNum(35, row.Volume_DO_Invoice ?? 0)
   })
 
   const lastDataRow = DATA_START_ROW + Math.max(rows.length, 1) - 1

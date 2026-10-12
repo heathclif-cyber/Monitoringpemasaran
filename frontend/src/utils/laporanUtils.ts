@@ -326,7 +326,7 @@ function emptyRekapRow(key: string, label: string): LaporanRekapRow {
   return {
     key, label, sales: 0, salesRencana: 0, salesKg: 0, salesEa: 0, volumeKg: 0, volumeEa: 0,
     cashIn: 0, transferCount: 0, shortfall: null, unpaidInvoices: 0,
-    pickupOutstandingKg: 0, pickupOutstandingEa: 0, komoditiCount: 0,
+    pickupOutstandingKg: 0, pickupOutstandingEa: 0, doIssuedKg: 0, doIssuedEa: 0, komoditiCount: 0,
   }
 }
 
@@ -378,8 +378,9 @@ export function buildLaporanRekap(
     let shortfall = 0
     for (const [noInvoice, row] of target.invoices) {
       const outstanding = row.Outstanding_Pengambilan || 0
-      if (isEaRow(row)) r.pickupOutstandingEa += outstanding
-      else r.pickupOutstandingKg += outstanding
+      const issued = row.Volume_DO_Invoice || 0
+      if (isEaRow(row)) { r.pickupOutstandingEa += outstanding; r.doIssuedEa += issued }
+      else { r.pickupOutstandingKg += outstanding; r.doIssuedKg += issued }
       const piutang = balanceByInvoice.get(noInvoice)?.piutang_pokok || 0
       shortfall += piutang
       if (piutang > 0) r.unpaidInvoices += 1
@@ -411,7 +412,7 @@ export function groupLaporanByInvoice(rows: LaporanRow[], order: 'DESC' | 'ASC')
     const key = hasInvoice(row) ? `INV:${row.No_Invoice}` : row.Row_ID || `ROW:${index}`
     let g = groups.get(key)
     if (!g) {
-      g = { key, main: row, rows: [], sales: 0, volume: 0, cashIn: 0, salesDate: '', cashDate: '', sortDate: '', rowTypes: [], warnings: [] }
+      g = { key, main: row, rows: [], sales: 0, volume: 0, cashIn: 0, doIssued: 0, outstanding: 0, salesDate: '', cashDate: '', sortDate: '', rowTypes: [], warnings: [] }
       groups.set(key, g)
     }
     g.rows.push(row)
@@ -431,6 +432,8 @@ export function groupLaporanByInvoice(rows: LaporanRow[], order: 'DESC' | 'ASC')
   })
   const result = [...groups.values()]
   for (const g of result) {
+    g.doIssued = g.main.Volume_DO_Invoice || 0
+    g.outstanding = g.main.Outstanding_Pengambilan || 0
     g.sortDate = g.salesDate || g.cashDate || g.main.Report_Date || g.main.Raw_Date || ''
     if (g.rowTypes.length === 0 && g.cashIn > 0) g.rowTypes.push('PEMBAYARAN')
   }

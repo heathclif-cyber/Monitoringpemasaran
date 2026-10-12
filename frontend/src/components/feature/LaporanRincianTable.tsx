@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { StatusPill, type StatusPillTone } from '@/components/patterns'
 import { cn, formatCurrency, formatDate, formatNumber, safe } from '@/lib/utils'
 import { normalizeSatuan } from '@/utils/satuanUtils'
+import { pickupRemainingRatio } from '@/utils/laporanUtils'
 import type { LaporanInvoiceGroup, LaporanRow, PiutangRow } from '@/types'
 
 const ROW_TYPE: Record<string, { label: string; tone: StatusPillTone }> = {
@@ -33,7 +34,7 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
   const num = cn(td, 'whitespace-nowrap text-right tabular-nums')
   return (
     <div className="max-h-[70vh] overflow-auto">
-      <table className="w-full min-w-[1100px] border-separate border-spacing-0">
+      <table className="w-full min-w-[1400px] border-separate border-spacing-0">
         <thead className="sticky top-0 z-10 bg-muted">
           <tr>
             <th className={cn(th, 'text-left')}>
@@ -50,6 +51,8 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
             <th className={cn(th, 'text-right')}>Cash In</th>
             <th className={cn(th, 'text-left')}>Tgl Transfer</th>
             <th className={cn(th, 'text-right')}>Sisa Kurang Bayar</th>
+            <th className={cn(th, 'text-right')}>Volume DO Terbit</th>
+            <th className={cn(th, 'text-right')}>Outstanding Pengambilan</th>
             <th className={th} />
           </tr>
         </thead>
@@ -57,6 +60,8 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
           {groups.map((g) => {
             const row = g.main
             const unit = normalizeSatuan(row.Satuan)
+            const isBypass = row.No_DO.startsWith('BYPASS-')
+            const ratio = pickupRemainingRatio(row)
             const doc = row.No_DO.startsWith('BYPASS-') ? 'Entri manual' : row.No_Invoice || row.No_Kontrak
             return (
               <tr key={g.key} className="hover:bg-muted/40">
@@ -91,6 +96,11 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
                 <td className={num}>{g.cashIn > 0 ? formatCurrency(g.cashIn) : '—'}</td>
                 <td className={cn(td, 'whitespace-nowrap')}>{g.cashIn > 0 && g.cashDate ? formatDate(g.cashDate) : '—'}</td>
                 <td className={num}><Shortfall row={row} balances={balances} /></td>
+                <td className={num}>{isBypass ? '—' : g.doIssued > 0 ? `${formatNumber(g.doIssued)} ${unit}` : 'Belum ada DO'}</td>
+                <td className={cn(num, !isBypass && g.outstanding > 0 && (ratio >= 0.5 ? 'font-semibold text-destructive' : 'text-destructive/80'))}>
+                  {isBypass || g.doIssued <= 0 ? '—' : g.outstanding > 0 ? `${formatNumber(g.outstanding)} ${unit}` : 'Selesai'}
+                  {!isBypass && g.outstanding > 0 && <p className="text-[11px] font-normal">{Math.round(ratio * 100)}% belum diambil</p>}
+                </td>
                 <td className={cn(td, 'text-right')}>
                   <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => onDetail(row)}>Detail</Button>
                 </td>

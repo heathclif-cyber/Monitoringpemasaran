@@ -312,6 +312,9 @@ export interface LaporanRekapRow {
   unpaidInvoices: number
   pickupOutstandingKg: number
   pickupOutstandingEa: number
+  /** Volume DO terbit per invoice (posisi saat ini) */
+  doIssuedKg: number
+  doIssuedEa: number
   komoditiCount: number
 }
 
@@ -324,6 +327,9 @@ export interface LaporanInvoiceGroup {
   sales: number
   volume: number
   cashIn: number
+  /** Total volume DO terbit & sisa belum diambil untuk invoice (posisi saat ini) */
+  doIssued: number
+  outstanding: number
   salesDate: string
   cashDate: string
   sortDate: string

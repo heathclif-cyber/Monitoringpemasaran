@@ -9,6 +9,7 @@ import {
   Package,
   BarChart3,
   Scale,
+  FileText,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
@@ -336,7 +337,7 @@ export default function LaporanPage() {
         )}
       </FilterToolbar>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <StatCard fitValue label="Pendapatan Pokok" value={formatCurrency(total.sales)}
           subtitle={total.salesRencana > 0 ? `Termasuk rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya dari BA'} icon={TrendingUp} />
         <StatCard fitValue label="Volume BA / Rencana DO" value={volumeLabel(total.volumeKg, total.volumeEa)} subtitle="Sebelum PPN · BA selesai + rencana DO" icon={Scale} />
@@ -346,7 +347,8 @@ export default function LaporanPage() {
         <StatCard fitValue label="Total Cash In" value={formatCurrency(total.cashIn)} subtitle={`${total.transferCount} transfer diterima`} icon={Wallet} />
         <StatCard fitValue label="Sisa Kurang Bayar" value={total.shortfall == null ? (balanceError ? 'Gagal dimuat' : '…') : formatCurrency(total.shortfall)}
           subtitle={`${total.unpaidInvoices} invoice belum lunas · posisi saat ini`} icon={AlertTriangle} />
-        <StatCard fitValue label="Outstanding Pengambilan" value={volumeLabel(total.pickupOutstandingKg, total.pickupOutstandingEa)} subtitle="DO terbit − BA selesai" icon={Package} />
+        <StatCard fitValue label="Volume DO Terbit" value={volumeLabel(total.doIssuedKg, total.doIssuedEa)} subtitle="Total DO terbit · posisi saat ini" icon={FileText} />
+        <StatCard fitValue label="Outstanding Pengambilan" value={volumeLabel(total.pickupOutstandingKg, total.pickupOutstandingEa)} subtitle="Sisa barang belum diambil · DO terbit − BA selesai" icon={Package} />
       </div>
 
       <p className="text-xs text-muted-foreground">

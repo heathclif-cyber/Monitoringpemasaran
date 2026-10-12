@@ -55,6 +55,7 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
             <p>{r.shortfall == null ? '…' : r.shortfall > 0 ? formatCurrency(r.shortfall) : '—'}</p>
             {r.unpaidInvoices > 0 && <p className="text-[11px] text-muted-foreground">{r.unpaidInvoices} invoice</p>}
           </td>
+          <td className={td}>{volumeText(r.doIssuedKg, r.doIssuedEa)}</td>
           <td className={td}>{volumeText(r.pickupOutstandingKg, r.pickupOutstandingEa)}</td>
         </>
       )}
@@ -84,6 +85,7 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
               <th className={cn(th, 'text-right')}>Harga Rata-Rata</th>
               <th className={cn(th, 'text-right')}>Cash In</th>
               {!isPeriod && <th className={cn(th, 'text-right')}>Sisa Kurang Bayar</th>}
+              {!isPeriod && <th className={cn(th, 'text-right')}>Volume DO Terbit</th>}
               {!isPeriod && <th className={cn(th, 'text-right')}>Outstanding Pengambilan</th>}
             </tr>
           </thead>
