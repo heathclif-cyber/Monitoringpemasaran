@@ -40,7 +40,7 @@ const COLUMNS: ColDef[] = [
   { header: 'Jml Invoice', width: 15, type: 'currency' },
   { header: 'Harga Satuan', width: 14, type: 'currency' },
   { header: 'Volume Invoice', width: 13, type: 'volume' },
-  { header: 'Volume BA / Rencana DO', width: 18, type: 'volume' },
+  { header: 'Volume (dasar Pendapatan Pokok)', width: 18, type: 'volume' },
   { header: '% PPN', width: 8, type: 'percent' },
   { header: '% PPh', width: 8, type: 'percent' },
   { header: 'Pendapatan Pokok', width: 16, type: 'currency' },
@@ -59,7 +59,8 @@ const COLUMNS: ColDef[] = [
   { header: 'No BA', width: 24, type: 'text' },
   { header: 'Jenis Baris', width: 16, type: 'text' },
   { header: 'Peringatan Data', width: 50, type: 'text' },
-  { header: 'Volume DO Terbit', width: 14, type: 'volume' },
+  { header: 'DO Terbit', width: 14, type: 'volume' },
+  { header: 'DO Terlayani (BA)', width: 16, type: 'volume' },
 ]
 
 const LAST_COL = COLUMNS.length - 1
@@ -332,6 +333,7 @@ export function exportLaporanExcel(rows: LaporanRow[], filename: string): void {
     setText(33, row.Row_Type || '')
     setText(34, (row.Reporting_Warnings || []).join('; '))
     setNum(35, row.Volume_DO_Invoice ?? 0)
+    setNum(36, row.Volume_Pengambilan_Invoice ?? 0)
   })
 
   const lastDataRow = DATA_START_ROW + Math.max(rows.length, 1) - 1

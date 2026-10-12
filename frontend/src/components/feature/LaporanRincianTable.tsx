@@ -45,14 +45,14 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
             <th className={cn(th, 'text-left')}>Mitra Pembeli / Invoice</th>
             <th className={cn(th, 'text-left')}>Unit</th>
             <th className={cn(th, 'text-left')}>Komoditi / Material</th>
-            <th className={cn(th, 'text-right')}>Volume BA / Rencana DO</th>
+            <th className={cn(th, 'text-right')}>DO Terbit</th>
+            <th className={cn(th, 'text-right')}>DO Terlayani (BA)</th>
+            <th className={cn(th, 'text-right')}>Outstanding Pengambilan</th>
             <th className={cn(th, 'text-right')}>Harga per Satuan</th>
             <th className={cn(th, 'text-right')}>Pendapatan Pokok</th>
             <th className={cn(th, 'text-right')}>Cash In</th>
             <th className={cn(th, 'text-left')}>Tgl Transfer</th>
             <th className={cn(th, 'text-right')}>Sisa Kurang Bayar</th>
-            <th className={cn(th, 'text-right')}>Volume DO Terbit</th>
-            <th className={cn(th, 'text-right')}>Outstanding Pengambilan</th>
             <th className={th} />
           </tr>
         </thead>
@@ -90,17 +90,17 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
                   <p>{safe(row.Komoditi)}</p>
                   {row.Deskripsi_Produk && row.Deskripsi_Produk !== row.Komoditi && <p className="text-[11px] text-muted-foreground break-words">{row.Deskripsi_Produk}</p>}
                 </td>
-                <td className={num}>{g.volume > 0 ? `${formatNumber(g.volume)} ${unit}` : '—'}</td>
+                <td className={num}>{isBypass ? `${formatNumber(g.volume)} ${unit}` : g.doIssued > 0 ? `${formatNumber(g.doIssued)} ${unit}` : 'Belum ada DO'}</td>
+                <td className={num}>{isBypass || g.served <= 0 ? '—' : `${formatNumber(g.served)} ${unit}`}</td>
+                <td className={cn(num, !isBypass && g.outstanding > 0 && (ratio >= 0.5 ? 'font-semibold text-destructive' : 'text-destructive/80'))}>
+                  {isBypass || g.doIssued <= 0 ? '—' : g.outstanding > 0 ? `${formatNumber(g.outstanding)} ${unit}` : 'Selesai'}
+                  {!isBypass && g.outstanding > 0 && <p className="text-[11px] font-normal">{Math.round(ratio * 100)}% belum diambil</p>}
+                </td>
                 <td className={num}>{g.sales > 0 ? formatCurrency(row.Harga_Satuan) : '—'}</td>
                 <td className={cn(num, 'font-medium')}>{g.sales > 0 ? formatCurrency(g.sales) : '—'}</td>
                 <td className={num}>{g.cashIn > 0 ? formatCurrency(g.cashIn) : '—'}</td>
                 <td className={cn(td, 'whitespace-nowrap')}>{g.cashIn > 0 && g.cashDate ? formatDate(g.cashDate) : '—'}</td>
                 <td className={num}><Shortfall row={row} balances={balances} /></td>
-                <td className={num}>{isBypass ? '—' : g.doIssued > 0 ? `${formatNumber(g.doIssued)} ${unit}` : 'Belum ada DO'}</td>
-                <td className={cn(num, !isBypass && g.outstanding > 0 && (ratio >= 0.5 ? 'font-semibold text-destructive' : 'text-destructive/80'))}>
-                  {isBypass || g.doIssued <= 0 ? '—' : g.outstanding > 0 ? `${formatNumber(g.outstanding)} ${unit}` : 'Selesai'}
-                  {!isBypass && g.outstanding > 0 && <p className="text-[11px] font-normal">{Math.round(ratio * 100)}% belum diambil</p>}
-                </td>
                 <td className={cn(td, 'text-right')}>
                   <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => onDetail(row)}>Detail</Button>
                 </td>

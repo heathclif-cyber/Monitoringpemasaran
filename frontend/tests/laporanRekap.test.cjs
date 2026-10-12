@@ -96,14 +96,16 @@ test('merged invoice row sums sale and cash and keeps SAP numbers', () => {
 
 test('DO terbit and outstanding are counted once per invoice', () => {
   const rows = [
-    { ...base, Row_Type: 'REALISASI', Report_Date: '2026-05-02', Jumlah_DO: 100, Pendapatan_Pokok: 1500, Volume_DO_Invoice: 150, Outstanding_Pengambilan: 50 },
-    { ...base, Row_Type: 'PEMBAYARAN', Report_Date: '2026-05-05', Jumlah_Transfer: 10, Volume_DO_Invoice: 150, Outstanding_Pengambilan: 50 },
+    { ...base, Row_Type: 'REALISASI', Report_Date: '2026-05-02', Jumlah_DO: 100, Pendapatan_Pokok: 1500, Volume_DO_Invoice: 150, Volume_Pengambilan_Invoice: 100, Outstanding_Pengambilan: 50 },
+    { ...base, Row_Type: 'PEMBAYARAN', Report_Date: '2026-05-05', Jumlah_Transfer: 10, Volume_DO_Invoice: 150, Volume_Pengambilan_Invoice: 100, Outstanding_Pengambilan: 50 },
   ]
   const { total } = buildLaporanRekap(rows, 'komoditi', null)
   assert.equal(total.doIssuedKg, 150)
+  assert.equal(total.servedKg, 100)
   assert.equal(total.pickupOutstandingKg, 50)
   const { groupLaporanByInvoice } = instance.exports
   const g = groupLaporanByInvoice(rows, 'DESC')[0]
   assert.equal(g.doIssued, 150)
+  assert.equal(g.served, 100)
   assert.equal(g.outstanding, 50)
 })

@@ -39,7 +39,9 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
 
   const cells = (r: LaporanRekapRow, isTotal = false) => (
     <>
-      <td className={td}>{volumeText(r.volumeKg, r.volumeEa)}</td>
+      <td className={td}>{volumeText(r.doIssuedKg, r.doIssuedEa)}</td>
+      <td className={td}>{volumeText(r.servedKg, r.servedEa)}</td>
+      <td className={td}>{volumeText(r.pickupOutstandingKg, r.pickupOutstandingEa)}</td>
       <td className={td}>
         <p className="font-semibold">{formatCurrency(r.sales)}</p>
         {r.salesRencana > 0 && <p className="text-[11px] font-normal text-muted-foreground">rencana DO {formatCurrency(r.salesRencana)}</p>}
@@ -55,8 +57,6 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
             <p>{r.shortfall == null ? '…' : r.shortfall > 0 ? formatCurrency(r.shortfall) : '—'}</p>
             {r.unpaidInvoices > 0 && <p className="text-[11px] text-muted-foreground">{r.unpaidInvoices} invoice</p>}
           </td>
-          <td className={td}>{volumeText(r.doIssuedKg, r.doIssuedEa)}</td>
-          <td className={td}>{volumeText(r.pickupOutstandingKg, r.pickupOutstandingEa)}</td>
         </>
       )}
     </>
@@ -80,13 +80,13 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
           <thead className="sticky top-0 z-10 bg-muted">
             <tr>
               <th className={cn(th, 'text-left')}>{REKAP_DIMENSIONS.find((d) => d.value === dimension)?.label}</th>
-              <th className={cn(th, 'text-right')}>Volume BA / Rencana DO</th>
+              <th className={cn(th, 'text-right')}>DO Terbit</th>
+              <th className={cn(th, 'text-right')}>DO Terlayani (BA)</th>
+              <th className={cn(th, 'text-right')}>Outstanding Pengambilan</th>
               <th className={cn(th, 'text-right')}>Pendapatan Pokok</th>
               <th className={cn(th, 'text-right')}>Harga Rata-Rata</th>
               <th className={cn(th, 'text-right')}>Cash In</th>
               {!isPeriod && <th className={cn(th, 'text-right')}>Sisa Kurang Bayar</th>}
-              {!isPeriod && <th className={cn(th, 'text-right')}>Volume DO Terbit</th>}
-              {!isPeriod && <th className={cn(th, 'text-right')}>Outstanding Pengambilan</th>}
             </tr>
           </thead>
           <tbody>
