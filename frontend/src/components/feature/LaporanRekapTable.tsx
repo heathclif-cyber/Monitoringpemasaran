@@ -34,6 +34,7 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
   onSelect?: (row: LaporanRekapRow) => void
 }) {
   const isPeriod = dimension === 'bulan'
+  const band = 'border-b border-l px-3 py-1 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground'
   const th = 'border-b px-3 py-2 text-xs font-semibold whitespace-nowrap'
   const td = 'border-b px-3 py-2 text-[13px] whitespace-nowrap tabular-nums text-right'
 
@@ -78,6 +79,12 @@ export function LaporanRekapTable({ dimension, onDimensionChange, groups, total,
       <div className="max-h-[60vh] overflow-auto">
         <table className="w-full min-w-[960px] border-separate border-spacing-0">
           <thead className="sticky top-0 z-10 bg-muted">
+            <tr>
+              <th className="border-b px-3 py-1" />
+              <th colSpan={3} className={band}>Pengambilan Barang</th>
+              <th colSpan={2} className={band}>Nilai</th>
+              <th colSpan={isPeriod ? 1 : 2} className={band}>Pembayaran</th>
+            </tr>
             <tr>
               <th className={cn(th, 'text-left')}>{REKAP_DIMENSIONS.find((d) => d.value === dimension)?.label}</th>
               <th className={cn(th, 'text-right')}>DO Terbit</th>

@@ -1,18 +1,18 @@
 import { AlertTriangle, ArrowDown, ArrowUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { StatusPill, type StatusPillTone } from '@/components/patterns'
-import { cn, formatCurrency, formatDate, formatNumber, safe } from '@/lib/utils'
+import { cn, formatCurrency, formatCurrencyDec, formatDate, formatNumber, safe } from '@/lib/utils'
 import { normalizeSatuan } from '@/utils/satuanUtils'
 import { pickupRemainingRatio } from '@/utils/laporanUtils'
 import type { LaporanInvoiceGroup, LaporanRow, PiutangRow } from '@/types'
 
-const ROW_TYPE: Record<string, { label: string; tone: StatusPillTone }> = {
-  REALISASI: { label: 'Realisasi', tone: 'success' },
-  RENCANA: { label: 'Rencana DO', tone: 'warning' },
-  PEMBAYARAN: { label: 'Pembayaran', tone: 'neutral' },
-  INVOICE: { label: 'Invoice', tone: 'neutral' },
-  KONTRAK: { label: 'Kontrak', tone: 'neutral' },
-  BYPASS: { label: 'Bypass', tone: 'neutral' },
+/** Penjelasan tanggal yang tampil di bawah nama mitra */
+const DATE_LABEL: Record<string, string> = {
+  REALISASI: 'BA',
+  RENCANA: 'Rencana DO',
+  INVOICE: 'Invoice',
+  KONTRAK: 'Kontrak',
+  BYPASS: 'Bypass',
+  PEMBAYARAN: 'Transfer',
 }
 
 function Shortfall({ row, balances }: { row: LaporanRow; balances: PiutangRow[] | null }) {
@@ -29,29 +29,35 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
   onToggleSort: () => void
   onDetail: (row: LaporanRow) => void
 }) {
+  const band = 'border-b border-l px-3 py-1 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground'
   const th = 'border-b px-3 py-2 text-xs font-semibold whitespace-nowrap'
   const td = 'border-b px-3 py-2 align-top text-[13px]'
   const num = cn(td, 'whitespace-nowrap text-right tabular-nums')
+  const edge = 'border-l'
   return (
     <div className="max-h-[70vh] overflow-auto">
-      <table className="w-full min-w-[1400px] border-separate border-spacing-0">
+      <table className="w-full min-w-[1150px] border-separate border-spacing-0">
         <thead className="sticky top-0 z-10 bg-muted">
           <tr>
+            <th colSpan={2} className={cn(band, 'border-l-0')}>Transaksi</th>
+            <th colSpan={3} className={band}>Pengambilan Barang</th>
+            <th className={band}>Nilai</th>
+            <th colSpan={2} className={band}>Pembayaran</th>
+            <th className={band} />
+          </tr>
+          <tr>
             <th className={cn(th, 'text-left')}>
-              <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={onToggleSort}>
-                Tanggal Acuan Laporan {sort === 'DESC' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+              <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={onToggleSort} title="Urutkan berdasarkan tanggal di bawah nama mitra">
+                Mitra Pembeli {sort === 'DESC' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+                <span className="font-normal text-muted-foreground">{sort === 'DESC' ? 'terbaru' : 'terlama'}</span>
               </button>
             </th>
-            <th className={cn(th, 'text-left')}>Mitra Pembeli / Invoice</th>
-            <th className={cn(th, 'text-left')}>Unit</th>
-            <th className={cn(th, 'text-left')}>Komoditi / Material</th>
-            <th className={cn(th, 'text-right')}>DO Terbit</th>
+            <th className={cn(th, 'text-left')}>Unit / Komoditi / Material</th>
+            <th className={cn(th, edge, 'text-right')}>DO Terbit</th>
             <th className={cn(th, 'text-right')}>DO Terlayani (BA)</th>
             <th className={cn(th, 'text-right')}>Outstanding Pengambilan</th>
-            <th className={cn(th, 'text-right')}>Harga per Satuan</th>
-            <th className={cn(th, 'text-right')}>Pendapatan Pokok</th>
-            <th className={cn(th, 'text-right')}>Cash In</th>
-            <th className={cn(th, 'text-left')}>Tgl Transfer</th>
+            <th className={cn(th, edge, 'text-right')}>Pendapatan Pokok</th>
+            <th className={cn(th, edge, 'text-right')}>Cash In</th>
             <th className={cn(th, 'text-right')}>Sisa Kurang Bayar</th>
             <th className={th} />
           </tr>
@@ -62,44 +68,41 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
             const unit = normalizeSatuan(row.Satuan)
             const isBypass = row.No_DO.startsWith('BYPASS-')
             const ratio = pickupRemainingRatio(row)
-            const doc = row.No_DO.startsWith('BYPASS-') ? 'Entri manual' : row.No_Invoice || row.No_Kontrak
+            const date = g.salesDate || g.cashDate
+            const dateLabel = DATE_LABEL[g.rowTypes[0] || (g.cashIn > 0 ? 'PEMBAYARAN' : '')] || ''
             return (
               <tr key={g.key} className="hover:bg-muted/40">
-                <td className={cn(td, 'whitespace-nowrap')}>
-                  <span className="inline-flex items-center gap-1">
-                    {g.salesDate ? formatDate(g.salesDate) : g.cashDate ? formatDate(g.cashDate) : <span className="text-muted-foreground">Belum ada</span>}
-                    {g.warnings.length > 0 && (
-                      <span title={g.warnings.join('\n')} aria-label="Perlu diperiksa">
-                        <AlertTriangle size={13} className="text-amber-600" />
-                      </span>
-                    )}
-                  </span>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {g.rowTypes.map((t) => {
-                      const type = ROW_TYPE[t] ?? { label: t, tone: 'neutral' as const }
-                      return <StatusPill key={t} tone={type.tone} icon={false}>{type.label}</StatusPill>
-                    })}
-                  </div>
-                </td>
-                <td className={cn(td, 'min-w-[200px] max-w-[280px]')}>
+                <td className={cn(td, 'min-w-[240px] max-w-[320px]')}>
                   <p className="font-medium break-words">{safe(row.Mitra_Pembeli)}</p>
-                  <p className="text-[11px] text-muted-foreground [overflow-wrap:anywhere]">{safe(doc)}</p>
+                  {isBypass ? <p className="text-[11px] text-muted-foreground">Entri manual</p> : <>
+                    <p className="text-[11px] text-muted-foreground [overflow-wrap:anywhere]">Invoice: {safe(row.No_Invoice, 'Belum terbit')}</p>
+                    <p className="text-[11px] text-muted-foreground [overflow-wrap:anywhere]">Kontrak: {safe(row.No_Kontrak, '—')}</p>
+                  </>}
+                  <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    {date ? `${dateLabel} ${formatDate(date)}` : 'Belum ada tanggal BA / rencana DO'}
+                    {g.warnings.length > 0 && (
+                      <span title={g.warnings.join('\n')} aria-label="Perlu diperiksa"><AlertTriangle size={12} className="text-amber-600" /></span>
+                    )}
+                  </p>
                 </td>
-                <td className={cn(td, 'whitespace-nowrap')}>{safe(row.Unit)}</td>
-                <td className={cn(td, 'min-w-[140px] max-w-[200px]')}>
-                  <p>{safe(row.Komoditi)}</p>
-                  {row.Deskripsi_Produk && row.Deskripsi_Produk !== row.Komoditi && <p className="text-[11px] text-muted-foreground break-words">{row.Deskripsi_Produk}</p>}
+                <td className={cn(td, 'min-w-[170px] max-w-[230px]')}>
+                  <p className="break-words">{safe(row.Komoditi)}{row.Deskripsi_Produk && row.Deskripsi_Produk !== row.Komoditi ? ` · ${row.Deskripsi_Produk}` : ''}</p>
+                  <p className="text-[11px] text-muted-foreground">{safe(row.Unit)}</p>
                 </td>
-                <td className={num}>{isBypass ? `${formatNumber(g.volume)} ${unit}` : g.doIssued > 0 ? `${formatNumber(g.doIssued)} ${unit}` : 'Belum ada DO'}</td>
+                <td className={cn(num, edge)}>{isBypass ? `${formatNumber(g.volume)} ${unit}` : g.doIssued > 0 ? `${formatNumber(g.doIssued)} ${unit}` : 'Belum ada DO'}</td>
                 <td className={num}>{isBypass || g.served <= 0 ? '—' : `${formatNumber(g.served)} ${unit}`}</td>
                 <td className={cn(num, !isBypass && g.outstanding > 0 && (ratio >= 0.5 ? 'font-semibold text-destructive' : 'text-destructive/80'))}>
                   {isBypass || g.doIssued <= 0 ? '—' : g.outstanding > 0 ? `${formatNumber(g.outstanding)} ${unit}` : 'Selesai'}
                   {!isBypass && g.outstanding > 0 && <p className="text-[11px] font-normal">{Math.round(ratio * 100)}% belum diambil</p>}
                 </td>
-                <td className={num}>{g.sales > 0 ? formatCurrency(row.Harga_Satuan) : '—'}</td>
-                <td className={cn(num, 'font-medium')}>{g.sales > 0 ? formatCurrency(g.sales) : '—'}</td>
-                <td className={num}>{g.cashIn > 0 ? formatCurrency(g.cashIn) : '—'}</td>
-                <td className={cn(td, 'whitespace-nowrap')}>{g.cashIn > 0 && g.cashDate ? formatDate(g.cashDate) : '—'}</td>
+                <td className={cn(num, edge)}>
+                  <p className="font-medium">{g.sales > 0 ? formatCurrency(g.sales) : '—'}</p>
+                  {g.sales > 0 && <p className="text-[11px] text-muted-foreground">{formatCurrencyDec(row.Harga_Satuan)} / {unit}</p>}
+                </td>
+                <td className={cn(num, edge)}>
+                  <p>{g.cashIn > 0 ? formatCurrency(g.cashIn) : '—'}</p>
+                  {g.cashIn > 0 && g.cashDate && <p className="text-[11px] text-muted-foreground">Transfer {formatDate(g.cashDate)}</p>}
+                </td>
                 <td className={num}><Shortfall row={row} balances={balances} /></td>
                 <td className={cn(td, 'text-right')}>
                   <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => onDetail(row)}>Detail</Button>

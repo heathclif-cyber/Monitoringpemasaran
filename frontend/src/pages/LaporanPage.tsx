@@ -337,23 +337,38 @@ export default function LaporanPage() {
         )}
       </FilterToolbar>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        <StatCard fitValue label="Pendapatan Pokok" value={formatCurrency(total.sales)}
-          subtitle={total.salesRencana > 0 ? `Termasuk rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya dari BA'} icon={TrendingUp} />
-        <StatCard fitValue label="Harga Rata-Rata"
-          value={total.komoditiCount > 1 ? 'Lihat rekap' : averagePrice ? `${formatCurrency(averagePrice.value)}/${averagePrice.unit}` : '—'}
-          subtitle={total.komoditiCount > 1 ? `${total.komoditiCount} komoditi — pilih satu komoditi` : 'Pendapatan Pokok ÷ volume'} icon={BarChart3} />
-        <StatCard fitValue label="Total Cash In" value={formatCurrency(total.cashIn)} subtitle={`${total.transferCount} transfer diterima`} icon={Wallet} />
-        <StatCard fitValue label="Sisa Kurang Bayar" value={total.shortfall == null ? (balanceError ? 'Gagal dimuat' : '…') : formatCurrency(total.shortfall)}
-          subtitle={`${total.unpaidInvoices} invoice belum lunas · posisi saat ini`} icon={AlertTriangle} />
-        <StatCard fitValue label="DO Terbit" value={volumeLabel(total.doIssuedKg, total.doIssuedEa)} subtitle="Posisi saat ini" icon={FileText} />
-        <StatCard fitValue label="DO Terlayani (BA)" value={volumeLabel(total.servedKg, total.servedEa)} subtitle="BA selesai" icon={Scale} />
-        <StatCard fitValue label="Outstanding Pengambilan" value={volumeLabel(total.pickupOutstandingKg, total.pickupOutstandingEa)} subtitle="Sisa belum diambil = DO Terbit − DO Terlayani" icon={Package} />
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr_2fr]">
+        <section className="space-y-1.5">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pengambilan Barang</h2>
+          <div className="grid grid-cols-3 gap-2">
+            <StatCard fitValue label="DO Terbit" value={volumeLabel(total.doIssuedKg, total.doIssuedEa)} subtitle="Posisi saat ini" icon={FileText} />
+            <StatCard fitValue label="DO Terlayani (BA)" value={volumeLabel(total.servedKg, total.servedEa)} subtitle="BA selesai" icon={Scale} />
+            <StatCard fitValue label="Outstanding Pengambilan" value={volumeLabel(total.pickupOutstandingKg, total.pickupOutstandingEa)} subtitle="DO Terbit − DO Terlayani" icon={Package} />
+          </div>
+        </section>
+        <section className="space-y-1.5">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nilai (sebelum PPN)</h2>
+          <div className="grid grid-cols-2 gap-2">
+            <StatCard fitValue label="Pendapatan Pokok" value={formatCurrency(total.sales)}
+              subtitle={total.salesRencana > 0 ? `Rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya dari BA'} icon={TrendingUp} />
+            <StatCard fitValue label="Harga Rata-Rata"
+              value={total.komoditiCount > 1 ? 'Lihat rekap' : averagePrice ? `${formatCurrency(averagePrice.value)}/${averagePrice.unit}` : '—'}
+              subtitle={total.komoditiCount > 1 ? 'Beda komoditi' : 'Pendapatan Pokok ÷ volume'} icon={BarChart3} />
+          </div>
+        </section>
+        <section className="space-y-1.5">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pembayaran</h2>
+          <div className="grid grid-cols-2 gap-2">
+            <StatCard fitValue label="Total Cash In" value={formatCurrency(total.cashIn)} subtitle={`${total.transferCount} transfer`} icon={Wallet} />
+            <StatCard fitValue label="Sisa Kurang Bayar" value={total.shortfall == null ? (balanceError ? 'Gagal dimuat' : '…') : formatCurrency(total.shortfall)}
+              subtitle={`${total.unpaidInvoices} invoice belum lunas`} icon={AlertTriangle} />
+          </div>
+        </section>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Rekap per komoditi/unit/mitra pembeli ada di Dashboard. Pendapatan Pokok dihitung pada tanggal BA (realisasi) atau rencana DO bila belum ada BA. Cash in dihitung pada tanggal transfer.
-        Kurang bayar dan sisa ambil adalah posisi saat ini untuk invoice yang tampil.
+        Rekap per komoditi/unit/mitra pembeli ada di Dashboard. Filter Bulan dan tanggal di bawah nama mitra mengikuti tanggal BA; bila belum ada BA, memakai tanggal rencana DO. Cash In mengikuti tanggal transfer.
+        DO Terbit, DO Terlayani, Outstanding, dan Sisa Kurang Bayar adalah posisi saat ini untuk invoice yang tampil.
         {undatedSales > 0 && <span className="text-amber-700 dark:text-amber-400"> {undatedSales} DO belum punya tanggal rencana/BA sehingga tidak masuk periode ini.</span>}
         {balanceError && <span className="text-destructive"> Data piutang gagal dimuat, klik Refresh.</span>}
       </p>
@@ -377,7 +392,7 @@ export default function LaporanPage() {
             <div>
               <p className="text-sm font-semibold">Rincian Transaksi</p>
               <p className="text-xs text-muted-foreground">
-                {showFullTable ? 'Semua kolom · nomor SAP dapat diisi langsung.' : 'Satu baris per invoice; Pendapatan Pokok (BA / rencana DO) dan Cash In dari periode terpilih digabung.'}
+                {showFullTable ? 'Semua kolom · nomor SAP dapat diisi langsung.' : 'Satu baris per invoice; Pendapatan Pokok dan Cash In dari periode terpilih digabung.'}
               </p>
             </div>
             <div className="flex items-center gap-2">
