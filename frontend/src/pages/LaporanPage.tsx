@@ -3,13 +3,6 @@ import { Link } from 'react-router-dom'
 import {
   RefreshCw,
   Download,
-  Wallet,
-  TrendingUp,
-  AlertTriangle,
-  Package,
-  BarChart3,
-  Scale,
-  FileText,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
@@ -32,7 +25,6 @@ import { SapReconciliationDialog } from '@/components/feature/SapReconciliationD
 import { InvoiceOutstanding } from '@/components/feature/InvoiceOutstanding'
 import { client } from '@/lib/client'
 import type { PiutangRow, PiutangResponse } from '@/types'
-import { StatCard } from '@/components/common/StatCard'
 import { SearchInput } from '@/components/common/SearchInput'
 import { MultiSelectFilter } from '@/components/common/MultiSelectFilter'
 import { FilterSelect } from '@/components/common/FilterBar'
@@ -80,9 +72,34 @@ const STICKY_TH = 'sticky top-0 z-30 bg-muted border-b border-border'
 const STICKY_TH_FROZEN = 'sticky top-0 z-40 bg-muted border-b border-border'
 const STICKY_TD = 'sticky z-20 bg-card'
 
-function volumeLabel(kg: number, ea: number): string {
-  if (kg <= 0 && ea <= 0) return '0 Kg'
-  return [kg > 0 && `${formatNumber(Math.round(kg))} Kg`, ea > 0 && `${formatNumber(Math.round(ea))} EA`].filter(Boolean).join(' + ')
+function volumeLines(kg: number, ea: number): string[] {
+  const lines = [kg > 0 && `${formatNumber(Math.round(kg))} Kg`, ea > 0 && `${formatNumber(Math.round(ea))} EA`].filter(Boolean) as string[]
+  return lines.length > 0 ? lines : ['0 Kg']
+}
+
+function KpiGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <h2 className="border-b px-5 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
+        <div className="divide-y">{children}</div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Metric({ label, lines, note, tone }: { label: string; lines: string[]; note?: string; tone?: 'warn' | 'danger' }) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-5 py-3.5">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        {note && <p className="mt-0.5 text-xs text-muted-foreground">{note}</p>}
+      </div>
+      <div className={cn('shrink-0 text-right text-lg font-semibold leading-tight tabular-nums', tone === 'warn' && 'text-amber-700 dark:text-amber-400', tone === 'danger' && 'text-destructive')}>
+        {lines.map((line) => <p key={line}>{line}</p>)}
+      </div>
+    </div>
+  )
 }
 
 export default function LaporanPage() {
@@ -337,33 +354,23 @@ export default function LaporanPage() {
         )}
       </FilterToolbar>
 
-      <div className="grid gap-4 lg:grid-cols-[3fr_2fr_2fr]">
-        <section className="space-y-1.5">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pengambilan Barang</h2>
-          <div className="grid grid-cols-3 gap-2">
-            <StatCard fitValue label="DO Terbit" value={volumeLabel(total.doIssuedKg, total.doIssuedEa)} subtitle="Posisi saat ini" icon={FileText} />
-            <StatCard fitValue label="DO Terlayani (BA)" value={volumeLabel(total.servedKg, total.servedEa)} subtitle="BA selesai" icon={Scale} />
-            <StatCard fitValue label="Outstanding Pengambilan" value={volumeLabel(total.pickupOutstandingKg, total.pickupOutstandingEa)} subtitle="DO Terbit − DO Terlayani" icon={Package} />
-          </div>
-        </section>
-        <section className="space-y-1.5">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nilai (sebelum PPN)</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <StatCard fitValue label="Pendapatan Pokok" value={formatCurrency(total.sales)}
-              subtitle={total.salesRencana > 0 ? `Rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya dari BA'} icon={TrendingUp} />
-            <StatCard fitValue label="Harga Rata-Rata"
-              value={total.komoditiCount > 1 ? 'Lihat rekap' : averagePrice ? `${formatCurrency(averagePrice.value)}/${averagePrice.unit}` : '—'}
-              subtitle={total.komoditiCount > 1 ? 'Beda komoditi' : 'Pendapatan Pokok ÷ volume'} icon={BarChart3} />
-          </div>
-        </section>
-        <section className="space-y-1.5">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pembayaran</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <StatCard fitValue label="Total Cash In" value={formatCurrency(total.cashIn)} subtitle={`${total.transferCount} transfer`} icon={Wallet} />
-            <StatCard fitValue label="Sisa Kurang Bayar" value={total.shortfall == null ? (balanceError ? 'Gagal dimuat' : '…') : formatCurrency(total.shortfall)}
-              subtitle={`${total.unpaidInvoices} invoice belum lunas`} icon={AlertTriangle} />
-          </div>
-        </section>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <KpiGroup title="Pengambilan Barang">
+          <Metric label="DO Terbit" lines={volumeLines(total.doIssuedKg, total.doIssuedEa)} note="Posisi saat ini" />
+          <Metric label="DO Terlayani (BA)" lines={volumeLines(total.servedKg, total.servedEa)} note="BA selesai" />
+          <Metric label="Outstanding Pengambilan" lines={volumeLines(total.pickupOutstandingKg, total.pickupOutstandingEa)} note="DO Terbit − DO Terlayani" tone={total.pickupOutstandingKg + total.pickupOutstandingEa > 0 ? 'warn' : undefined} />
+        </KpiGroup>
+        <KpiGroup title="Nilai (sebelum PPN)">
+          <Metric label="Pendapatan Pokok" lines={[formatCurrency(total.sales)]} note={total.salesRencana > 0 ? `Termasuk rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya dari BA'} />
+          <Metric label="Harga Rata-Rata"
+            lines={[total.komoditiCount > 1 ? 'Beda komoditi' : averagePrice ? `${formatCurrency(averagePrice.value)} / ${averagePrice.unit}` : '—']}
+            note={total.komoditiCount > 1 ? 'Pilih satu komoditi, atau lihat rekap di Dashboard' : 'Pendapatan Pokok ÷ volume'} />
+        </KpiGroup>
+        <KpiGroup title="Pembayaran">
+          <Metric label="Total Cash In" lines={[formatCurrency(total.cashIn)]} note={`${total.transferCount} transfer diterima`} />
+          <Metric label="Sisa Kurang Bayar" lines={[total.shortfall == null ? (balanceError ? 'Gagal dimuat' : '…') : formatCurrency(total.shortfall)]}
+            note={`${total.unpaidInvoices} invoice belum lunas · posisi saat ini`} tone={(total.shortfall ?? 0) > 0 ? 'danger' : undefined} />
+        </KpiGroup>
       </div>
 
       <p className="text-xs text-muted-foreground">
