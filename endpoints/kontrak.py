@@ -12,7 +12,7 @@ from services.auth import require_write
 from services.utils import terbilang_rupiah
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba
-from services.money_utils import as_money
+from services.money_utils import as_money, money_gt
 
 router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 
@@ -58,18 +58,15 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     terbilang = terbilang_rupiah(math.floor(nilai_transaksi + 1e-9))
 
     if db_kontrak:
-        if db_kontrak.invoices or db_kontrak.berita_acara:
-            protected = ("tipe_alur", "volume", "harga_satuan", "premi", "is_ppn", "ppn_persen",
-                         "is_pph", "pph_persen", "pembeli", "satuan", "kebun_produsen")
-            for field in protected:
-                old, new = getattr(db_kontrak, field), kontrak_data.get(field)
-                same = abs(float(old or 0) - float(new or 0)) < 1e-6 if isinstance(old, (int, float)) else (old or "") == (new or "")
-                if not same:
-                    raise HTTPException(status_code=400, detail="Kontrak memiliki dokumen turunan; dasar transaksi tidak boleh diubah")
-            old_units = sorted((u.nama_unit, float(u.volume or 0), u.satuan or "") for u in db_kontrak.units)
-            new_units = sorted((u.nama_unit, float(u.volume or 0), u.satuan or "") for u in units_input)
-            if old_units != new_units:
-                raise HTTPException(status_code=400, detail="Unit kontrak memiliki dokumen turunan; tidak boleh diubah")
+        # Kontrak yang sudah punya invoice boleh dikoreksi; yang dijaga hanya konsistensi nilai:
+        # nilai baru tidak boleh lebih kecil dari total invoice yang sudah terbit.
+        if db_kontrak.invoices and not payung:
+            total_invoiced = sum(float(inv.jumlah_pembayaran or 0.0) for inv in db_kontrak.invoices)
+            if money_gt(total_invoiced, nilai_transaksi):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Nilai kontrak baru (Rp {nilai_transaksi:,.2f}) lebih kecil dari total invoice yang sudah terbit (Rp {total_invoiced:,.2f})",
+                )
         for key, value in kontrak_data.items():
             setattr(db_kontrak, key, value)
         db_kontrak.nilai_transaksi = nilai_transaksi
