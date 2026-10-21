@@ -172,6 +172,7 @@ class KontrakOut(KontrakBase):
     jatuh_tempo_pembayaran: Optional[date]
     terbilang: Optional[str]
     units: List[KontrakUnitOut] = []
+    peringatan_sap: Optional[str] = None
 
     class Config:
         from_attributes = True

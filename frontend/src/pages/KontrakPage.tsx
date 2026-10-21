@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { FileDown, RotateCcw, Plus, X } from 'lucide-react'
-import { openAuthenticatedFile } from '@/lib/client'
+import { FileDown, RotateCcw, Plus, X, History } from 'lucide-react'
+import { client, openAuthenticatedFile } from '@/lib/client'
 import { useKontrakStore } from '@/store/kontrakStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
@@ -38,6 +39,7 @@ import {
   type UnitRow,
 } from '@/utils/kontrakUtils'
 import { normalizeSatuan } from '@/utils/satuanUtils'
+import type { KontrakRevisi } from '@/types'
 
 const KONTRAK_STEPS: FormStep[] = [
   { id: 'identitas', label: 'Identitas', description: 'Data dasar & pihak' },
@@ -108,6 +110,8 @@ export default function KontrakPage() {
   const { addNotification } = useAppStore()
   const canEdit = useAuthStore((s) => s.canEdit)
   const [isExisting, setIsExisting] = useState(false)
+  const [revisiOpen, setRevisiOpen] = useState(false)
+  const [revisiList, setRevisiList] = useState<KontrakRevisi[]>([])
   const [previewData, setPreviewData] = useState<Partial<KontrakFormData>>({})
   const [exportNo, setExportNo] = useState<string | null>(null)
   const emptyUnit = (): UnitRow => ({
@@ -354,7 +358,7 @@ export default function KontrakPage() {
       }
 
       const wasExisting = isExisting
-      await saveKontrak(payload)
+      const saved = await saveKontrak(payload)
       unitsDirtyRef.current = false
       lastFetchedNo.current = null
       await loadKontrakByNo(data.no_kontrak, true)
@@ -362,12 +366,23 @@ export default function KontrakPage() {
       setIsExisting(true)
       addNotification(
         wasExisting
-          ? 'Kontrak diperbarui. Dokumen turunan (Invoice, DO, Kuitansi) akan memakai data kontrak terbaru saat dibuka/diunduh ulang; nominal invoice yang sudah tercatat tidak berubah otomatis.'
+          ? 'Kontrak diperbarui. Invoice, DO, dan Kuitansi yang sudah terbit tetap memakai data kontrak saat dibuat; perubahan hanya berlaku untuk dokumen baru.'
           : 'Kontrak berhasil disimpan',
         'success',
       )
+      if (saved?.peringatan_sap) addNotification(saved.peringatan_sap, 'warning')
     } catch (err: any) {
       addNotification(err.message || 'Gagal menyimpan kontrak', 'error')
+    }
+  }
+
+  const handleOpenRevisi = async () => {
+    if (!exportNo) return
+    try {
+      setRevisiList(await client.get<KontrakRevisi[]>(`/api/kontrak/${encodeURIComponent(exportNo)}/revisi`))
+      setRevisiOpen(true)
+    } catch (err: unknown) {
+      addNotification(err instanceof Error ? err.message : 'Gagal memuat riwayat perubahan', 'error')
     }
   }
 
@@ -932,6 +947,12 @@ export default function KontrakPage() {
                     Export .docx
                   </Button>
                 )}
+                {exportNo && isExisting && (
+                  <Button type="button" variant="outline" onClick={handleOpenRevisi} className="gap-2">
+                    <History size={14} />
+                    Riwayat Perubahan
+                  </Button>
+                )}
                 <Button type="button" variant="outline" onClick={handleReset} disabled={!canEdit()} className="gap-2">
                   <RotateCcw size={14} />
                   Reset
@@ -951,6 +972,42 @@ export default function KontrakPage() {
         <KontrakPreview data={{ ...watchedFields, volume: payungMode ? 0 : watchedFields.volume, units: unitList.filter(u => u.nama_unit.trim()).map((u, i) => ({ id: i, no_kontrak: watchedFields.no_kontrak || '', nama_unit: u.nama_unit, urutan: i, volume: payungMode ? 0 : (u.volume || 0), komoditi: u.komoditi || null, jenis_komoditi: u.jenis_komoditi || null, satuan: u.satuan || null, tahun_panen: u.tahun_panen || null, deskripsi_produk: u.deskripsi_produk || null })) }} />
       </PreviewPanel>
       </div>
+      <Dialog open={revisiOpen} onOpenChange={setRevisiOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Riwayat Perubahan Kontrak</DialogTitle>
+          </DialogHeader>
+          {revisiList.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada perubahan setelah kontrak dibuat.</p>
+          ) : (
+            <ul className="space-y-4">
+              {revisiList.map((r) => (
+                <li key={r.id} className="rounded-md border p-3 text-sm">
+                  <div className="mb-2 text-xs text-muted-foreground">
+                    {new Date(r.created_at).toLocaleString('id-ID')} · {r.actor}
+                  </div>
+                  <ul className="space-y-1">
+                    {Object.entries(r.changes).map(([field, [oldV, newV]]) => (
+                      <li key={field}>
+                        <span className="font-medium">{field.replace(/_/g, ' ')}</span>:{' '}
+                        {field === 'units' ? (
+                          <span className="text-muted-foreground">daftar unit diubah</span>
+                        ) : (
+                          <>
+                            <span className="text-muted-foreground line-through">{String(oldV ?? '-')}</span>
+                            {' → '}
+                            <span>{String(newV ?? '-')}</span>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

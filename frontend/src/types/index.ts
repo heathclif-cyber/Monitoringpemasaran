@@ -105,6 +105,14 @@ export interface Kontrak {
   jatuh_tempo_pembayaran: string | null
   terbilang: string | null
   units?: KontrakUnit[]
+  peringatan_sap?: string | null
+}
+
+export interface KontrakRevisi {
+  id: number
+  actor: string
+  created_at: string
+  changes: Record<string, [unknown, unknown]>
 }
 
 export interface Invoice {

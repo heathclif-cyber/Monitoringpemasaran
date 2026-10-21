@@ -10,6 +10,7 @@ from database import get_db
 from services.auth import require_write
 from services.cache import api_cache
 from services.utils import terbilang_rupiah
+from services.kontrak_snapshot import take_snapshot
 from services.ba_utils import is_payung_ba, calculate_ba_invoice_amount, kontrak_nilai_maksimum, ba_effective_harga
 from services.money_utils import as_money, money_gt, money_remaining
 from services.volume_utils import resolve_volume_scope, compute_proportional_volume
@@ -229,6 +230,7 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
     db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == invoice.no_invoice).first()
     if db_invoice:
         previous_ba = db_invoice.no_ba
+        previous_kontrak = db_invoice.no_kontrak
         if db_invoice.pembayaran and (
             db_invoice.no_kontrak != invoice.no_kontrak or db_invoice.no_ba != invoice.no_ba
             or abs(float(db_invoice.jumlah_pembayaran or 0) - jumlah_pembayaran) > 0.01
@@ -244,6 +246,8 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
             raise HTTPException(status_code=400, detail="Invoice sudah memiliki DO; kontrak, BA, unit dan volume tidak boleh diganti")
         for key, value in invoice.model_dump().items():
             setattr(db_invoice, key, value)
+        if db_invoice.kontrak_snapshot is None or db_invoice.no_kontrak != previous_kontrak:
+            db_invoice.kontrak_snapshot = take_snapshot(db_kontrak)
         db_invoice.jumlah_pembayaran = jumlah_pembayaran
         db_invoice.volume = volume_invoice
         db_invoice.terbilang_invoice = terbilang_invoice
@@ -263,7 +267,8 @@ def create_invoice(invoice: schemas.InvoiceCreate, db: Session = Depends(get_db)
             **invoice.model_dump(exclude={'jumlah_pembayaran', 'terbilang_invoice', 'volume'}),
             jumlah_pembayaran=jumlah_pembayaran,
             volume=volume_invoice,
-            terbilang_invoice=terbilang_invoice
+            terbilang_invoice=terbilang_invoice,
+            kontrak_snapshot=take_snapshot(db_kontrak),
         )
         db.add(new_invoice)
         if payung_ba and db_ba:

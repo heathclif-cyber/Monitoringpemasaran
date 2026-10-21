@@ -13,12 +13,13 @@ from services.utils import terbilang_rupiah
 from services.cache import api_cache
 from services.ba_utils import is_payung_ba
 from services.money_utils import as_money, money_gt
+from services.kontrak_snapshot import take_snapshot, units_snapshot, diff_snapshots
 
 router = APIRouter(prefix="/api/kontrak", tags=["Kontrak"])
 
 
 @router.post("", response_model=schemas.KontrakOut)
-def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db), _: models.User = Depends(require_write)):
+def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db), user: models.User = Depends(require_write)):
     db_kontrak = db.query(models.Kontrak).filter(models.Kontrak.no_kontrak == kontrak.no_kontrak).first()
 
     units_input = kontrak.units or []
@@ -57,7 +58,9 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
     # Terbilang dari nilai tampilan (bulat); DB tetap desimal.
     terbilang = terbilang_rupiah(math.floor(nilai_transaksi + 1e-9))
 
+    revisi_before = None
     if db_kontrak:
+        revisi_before = (take_snapshot(db_kontrak), units_snapshot(db_kontrak))
         # Kontrak yang sudah punya invoice boleh dikoreksi; yang dijaga hanya konsistensi nilai:
         # nilai baru tidak boleh lebih kecil dari total invoice yang sudah terbit.
         if db_kontrak.invoices and not payung:
@@ -126,10 +129,43 @@ def create_kontrak(kontrak: schemas.KontrakCreate, db: Session = Depends(get_db)
         ba.komoditi = unit.komoditi
         ba.deskripsi = unit.jenis_komoditi or unit.deskripsi_produk or unit.komoditi
 
+    if revisi_before is not None:
+        db.refresh(db_kontrak)
+        changes = diff_snapshots(revisi_before[0], take_snapshot(db_kontrak))
+        units_after = units_snapshot(db_kontrak)
+        if revisi_before[1] != units_after:
+            changes["units"] = [revisi_before[1], units_after]
+        if changes:
+            db.add(models.KontrakRevisi(no_kontrak=kontrak.no_kontrak, actor=user.username, changes=changes))
+
     db.commit()
     api_cache.invalidate_reporting()
     db.refresh(db_kontrak)
+    if revisi_before is not None:
+        has_sap = any(
+            (inv.kontrak_sap or inv.so_sap or inv.do_sap or inv.billing_sap)
+            or any(do.kontrak_sap or do.so_sap or do.do_sap or do.billing_sap for do in inv.delivery_orders)
+            for inv in db_kontrak.invoices
+        )
+        if has_sap:
+            db_kontrak.peringatan_sap = (
+                "Kontrak ini sudah punya nomor SAP pada invoice/DO. Pastikan perubahan yang sama juga dilakukan di SAP."
+            )
     return db_kontrak
+
+
+@router.get("/{no_kontrak:path}/revisi")
+def get_kontrak_revisi(no_kontrak: str, db: Session = Depends(get_db)):
+    rows = (
+        db.query(models.KontrakRevisi)
+        .filter(models.KontrakRevisi.no_kontrak == no_kontrak)
+        .order_by(models.KontrakRevisi.id.desc())
+        .all()
+    )
+    return [
+        {"id": r.id, "actor": r.actor, "created_at": r.created_at, "changes": r.changes}
+        for r in rows
+    ]
 
 
 @router.get("", response_model=List[schemas.KontrakOut])

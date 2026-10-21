@@ -58,6 +58,16 @@ class TaxAudit(Base):
     reason = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class KontrakRevisi(Base):
+    __tablename__ = "kontrak_revisi"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    no_kontrak = Column(String, nullable=False, index=True)
+    actor = Column(String, nullable=False)
+    changes = Column(JSON, nullable=False)  # {field: [lama, baru]}; kunci "units" = [daftar lama, daftar baru]
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class Kontrak(Base):
     __tablename__ = "kontrak"
     
@@ -168,6 +178,8 @@ class Invoice(Base):
     do_sap = Column(String, nullable=True)
     billing_sap = Column(String, nullable=True)
     link_deklarasi_penerimaan = Column(String, nullable=True)
+    # Salinan data kontrak saat invoice dibuat — dokumen turunan tidak berubah saat kontrak diedit
+    kontrak_snapshot = Column(JSON, nullable=True)
 
     kontrak = relationship("Kontrak", back_populates="invoices")
     berita_acara = relationship("BeritaAcara", back_populates="invoice", foreign_keys=[no_ba])

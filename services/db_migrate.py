@@ -88,6 +88,7 @@ def run_migrations() -> None:
         add_column_safely(db, "invoice", "nama_unit", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "delivery_order", "link_berita_acara_serah_terima", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "kontrak", "tipe_alur", "VARCHAR DEFAULT 'STANDAR'")
+        add_column_safely(db, "invoice", "kontrak_snapshot", "JSON DEFAULT NULL")
         db.execute(text("UPDATE kontrak SET status = 'Active' WHERE status IS NULL OR status = 'Draft'"))
         db.commit()
         add_column_safely(db, "invoice", "no_ba", "VARCHAR DEFAULT NULL")
@@ -116,6 +117,9 @@ def run_migrations() -> None:
         add_column_safely(db, "invoice", "do_sap", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "invoice", "billing_sap", "VARCHAR DEFAULT NULL")
         add_column_safely(db, "invoice", "link_deklarasi_penerimaan", "VARCHAR DEFAULT NULL")
+
+        from services.kontrak_snapshot import backfill_invoice_snapshots
+        logger.info("Backfill snapshot kontrak untuk %d invoice lama", backfill_invoice_snapshots(db))
 
         # Backfill volume invoice: utamakan total volume_do; fallback proporsi nilai
         try:

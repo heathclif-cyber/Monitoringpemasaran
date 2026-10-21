@@ -6,6 +6,8 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
+from services.kontrak_snapshot import kontrak_for_invoice
+
 C = 'Calibri'
 FS = 9
 
@@ -274,7 +276,7 @@ def generate_invoice_docx(invoice) -> io.BytesIO:
     sec.left_margin = Cm(1.5); sec.right_margin = Cm(1.5)
     sec.top_margin = Cm(1.5); sec.bottom_margin = Cm(1.5)
 
-    k = invoice.kontrak
+    k = kontrak_for_invoice(invoice)
 
     CW = [1.0, 3.0, 1.5, 1.5, 2.0, 1.5, 2.0, 2.0, 0.5, 3.0]
     tbl = doc.add_table(rows=0, cols=10)
@@ -528,7 +530,7 @@ def generate_kuitansi_docx(invoice) -> io.BytesIO:
     import os, math
     from services.utils import terbilang_rupiah
 
-    k = invoice.kontrak
+    k = kontrak_for_invoice(invoice)
     template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'kuitansi_template.docx')
     doc = Document(template_path)
 
@@ -622,7 +624,7 @@ def generate_do_docx(do) -> io.BytesIO:
     sec.bottom_margin = Cm(1.5)
 
     inv = do.invoice
-    k   = inv.kontrak
+    k   = kontrak_for_invoice(inv)
 
     # Create ONE giant table for the entire Delivery Order
     tbl = doc.add_table(rows=7, cols=7)
