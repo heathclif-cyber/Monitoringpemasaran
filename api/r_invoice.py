@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
-import math, io, mammoth
+import logging, math, io, mammoth
 
 import models
 import schemas
@@ -312,6 +312,30 @@ def export_kuitansi_docx(no_invoice: str, db: Session = Depends(get_db)):
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="Kuitansi_{safe_name}.docx"'}
     )
+
+
+@router.post("/lepas-superman")
+def release_superman(no_invoice: str, db: Session = Depends(get_db), user: models.User = Depends(require_write)):
+    """Lepas nomor Superman dari invoice (koreksi salah input/deklarasi batal).
+
+    Hanya membersihkan catatan lokal; pengajuan di portal Superman tidak ikut terhapus.
+    Ditolak jika invoice sudah punya DO.
+    """
+    db_invoice = db.query(models.Invoice).filter(models.Invoice.no_invoice == no_invoice).with_for_update().first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    old = (db_invoice.superman or "").strip()
+    if not old:
+        raise HTTPException(status_code=400, detail="Invoice belum punya nomor Superman")
+    if db_invoice.delivery_orders:
+        raise HTTPException(status_code=400, detail="Invoice sudah punya DO; hapus DO terlebih dahulu sebelum melepas nomor Superman")
+    db_invoice.superman = None
+    for pay in db_invoice.pembayaran:
+        pay.superman = None
+    db.commit()
+    api_cache.invalidate_reporting()
+    logging.getLogger(__name__).warning("Superman %s dilepas dari invoice %s oleh %s", old, no_invoice, user.username)
+    return {"success": True, "released": old}
 
 
 def _docx_to_html(buf: io.BytesIO) -> str:

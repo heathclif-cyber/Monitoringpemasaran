@@ -72,6 +72,8 @@ export default function PembayaranPage() {
   const [savedNo, setSavedNo] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [releaseOpen, setReleaseOpen] = useState(false)
+  const [releasing, setReleasing] = useState(false)
   const [docRequirements, setDocRequirements] = useState<SupermanDocRequirement[]>([])
   const [docsReady, setDocsReady] = useState(false)
   const [invoicePembayaran, setInvoicePembayaran] = useState<Pembayaran[]>([])
@@ -260,6 +262,22 @@ export default function PembayaranPage() {
     const updated = await pembayaranStore.fetchByInvoice(noInvoice)
     setInvoicePembayaran(updated)
     await pembayaranStore.fetch()
+  }
+
+  const handleReleaseSuperman = async () => {
+    const noInvoice = currentInvoice?.no_invoice
+    if (!noInvoice) return
+    setReleasing(true)
+    try {
+      await client.post(`/api/invoice/lepas-superman?no_invoice=${encodeURIComponent(noInvoice)}`)
+      addNotification(`Nomor Superman dilepas dari ${noInvoice}`, 'success')
+      setReleaseOpen(false)
+      await refreshAfterSuperman(noInvoice)
+    } catch (err) {
+      addNotification(err instanceof Error ? err.message : 'Gagal melepas nomor Superman', 'error')
+    } finally {
+      setReleasing(false)
+    }
   }
 
   const runSupermanForInvoice = async (noInvoice: string) => {
@@ -917,9 +935,20 @@ export default function PembayaranPage() {
 
         {invoiceSuperman && (
           <Card>
-            <CardContent className="py-4 text-sm text-emerald-800 bg-emerald-50 rounded-md">
-              Invoice sudah terdaftar di Superman: <strong>{invoiceSuperman}</strong>.
-              Lanjutkan ke menu Input DO untuk menerbitkan Delivery Order per termin.
+            <CardContent className="py-4 text-sm text-emerald-800 bg-emerald-50 rounded-md flex flex-wrap items-center justify-between gap-3">
+              <span>
+                Invoice sudah terdaftar di Superman: <strong>{invoiceSuperman}</strong>.
+                Lanjutkan ke menu Input DO untuk menerbitkan Delivery Order per termin.
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canEdit()}
+                onClick={() => setReleaseOpen(true)}
+              >
+                Lepas Nomor Superman
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -990,6 +1019,19 @@ export default function PembayaranPage() {
           closeSupermanProgress()
           if (noInvoice) void startSupermanFlow(noInvoice)
         }}
+      />
+
+      <ConfirmDialog
+        open={releaseOpen}
+        onOpenChange={(open) => {
+          if (!releasing) setReleaseOpen(open)
+        }}
+        title="Lepas Nomor Superman?"
+        description={`Nomor ${invoiceSuperman} akan dilepas dari invoice ini sehingga pembayaran bisa diedit/dihapus dan deklarasi dibuat ulang. Pengajuan di portal Superman TIDAK ikut terhapus — batalkan juga di sana jika perlu. Tidak bisa jika invoice sudah punya DO.`}
+        confirmLabel="Lepas"
+        isDestructive
+        isLoading={releasing}
+        onConfirm={() => void handleReleaseSuperman()}
       />
 
       <ConfirmDialog
