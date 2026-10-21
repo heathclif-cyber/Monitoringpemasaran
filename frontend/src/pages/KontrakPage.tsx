@@ -353,13 +353,19 @@ export default function KontrakPage() {
         payload.volume = validUnits.reduce((s, u) => s + (u.volume || 0), 0)
       }
 
+      const wasExisting = isExisting
       await saveKontrak(payload)
       unitsDirtyRef.current = false
       lastFetchedNo.current = null
       await loadKontrakByNo(data.no_kontrak, true)
       setExportNo(data.no_kontrak)
       setIsExisting(true)
-      addNotification('Kontrak berhasil disimpan', 'success')
+      addNotification(
+        wasExisting
+          ? 'Kontrak diperbarui. Dokumen turunan (Invoice, DO, Kuitansi) akan memakai data kontrak terbaru saat dibuka/diunduh ulang; nominal invoice yang sudah tercatat tidak berubah otomatis.'
+          : 'Kontrak berhasil disimpan',
+        'success',
+      )
     } catch (err: any) {
       addNotification(err.message || 'Gagal menyimpan kontrak', 'error')
     }
