@@ -25,8 +25,8 @@ function Shortfall({ row, balances, hasCash }: { row: LaporanRow; balances: Piut
 
 function PickupLine({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="whitespace-nowrap text-xs text-muted-foreground">{label}</span>
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-xs text-muted-foreground">{label}</span>
       <span className={cn('whitespace-nowrap tabular-nums', className)}>{children}</span>
     </div>
   )
@@ -48,19 +48,19 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
   onToggleSort: () => void
   onDetail: (row: LaporanRow) => void
 }) {
-  const th = 'border-b bg-muted px-3 py-3 text-xs font-semibold'
-  const td = 'border-b px-3 py-4 align-top text-[13px]'
+  const th = 'border-b bg-muted px-4 py-2.5 text-xs font-semibold text-muted-foreground'
+  const td = 'border-b px-4 py-3.5 align-top text-[13px]'
   return (
     <div className="max-h-[75vh] overflow-auto">
-      <table className="w-full min-w-[1000px] table-fixed border-separate border-spacing-0">
+      <table className="w-full min-w-[1100px] table-fixed border-separate border-spacing-0">
         <colgroup>
-          <col style={{ width: '15%' }} />
-          <col style={{ width: '19%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '17%' }} />
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '20%' }} />
           <col style={{ width: '12%' }} />
-          <col style={{ width: '22%' }} />
-          <col style={{ width: '11%' }} />
-          <col style={{ width: '11%' }} />
-          <col style={{ width: '10%' }} />
+          <col style={{ width: '12%' }} />
+          <col style={{ width: '12%' }} />
         </colgroup>
         <thead className="sticky top-0 z-10">
           <tr>
@@ -87,7 +87,7 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
             const dateLabel = DATE_LABEL[g.rowTypes[0] || (g.cashIn > 0 ? 'PEMBAYARAN' : '')] || ''
             const servedPct = g.doIssued > 0 ? Math.min(100, (g.served / g.doIssued) * 100) : g.served > 0 ? 100 : 0
             return (
-              <tr key={g.key} className="group cursor-pointer hover:bg-muted/40" onClick={() => onDetail(row)}>
+              <tr key={g.key} className="group cursor-pointer transition-colors hover:bg-muted/40" onClick={() => onDetail(row)}>
                 <td className={td}>
                   <p className="font-semibold leading-snug">{safe(row.Mitra_Pembeli)}</p>
                   <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -113,9 +113,9 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
                     <PickupLine label="Volume">{formatNumber(g.volume)} {unit}</PickupLine>
                   ) : <>
                     <PickupLine label="DO Terbit">{g.doIssued > 0 ? `${formatNumber(g.doIssued)} ${unit}` : <span className="text-muted-foreground">Tanpa DO</span>}</PickupLine>
-                    <PickupLine label="DO Terlayani (BA)">{g.served > 0 ? `${formatNumber(g.served)} ${unit}` : <span className="text-muted-foreground">—</span>}</PickupLine>
+                    <PickupLine label="DO Terlayani">{g.served > 0 ? `${formatNumber(g.served)} ${unit}` : <span className="text-muted-foreground">—</span>}</PickupLine>
                     {g.doIssued > 0 && (
-                      <PickupLine label="Outstanding Pengambilan" className={cn('font-semibold', g.outstanding > 0 ? (ratio >= 0.5 ? 'text-destructive' : 'text-amber-700 dark:text-amber-400') : 'text-emerald-700 dark:text-emerald-400')}>
+                      <PickupLine label="Outstanding" className={cn('font-semibold', g.outstanding > 0 ? (ratio >= 0.5 ? 'text-destructive' : 'text-amber-700 dark:text-amber-400') : 'text-emerald-700 dark:text-emerald-400')}>
                         {g.outstanding > 0 ? `${formatNumber(g.outstanding)} ${unit}` : 'Selesai'}
                       </PickupLine>
                     )}
@@ -124,7 +124,7 @@ export function LaporanRincianTable({ groups, balances, sort, onToggleSort, onDe
                 </td>
                 <td className={cn(td, 'text-right tabular-nums')}>
                   <p className="text-sm font-semibold">{g.sales > 0 ? formatCurrency(g.sales) : '—'}</p>
-                  {g.sales > 0 && <p className="mt-1 text-xs text-muted-foreground">{formatCurrencyDec(row.Harga_Satuan)} / {unit}</p>}
+                  {g.sales > 0 && <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">@ {Number.isInteger(row.Harga_Satuan) ? formatCurrency(row.Harga_Satuan) : formatCurrencyDec(row.Harga_Satuan)}/{unit}</p>}
                 </td>
                 <td className={cn(td, 'text-right tabular-nums')}>
                   <p className="text-sm font-semibold">{g.cashIn > 0 ? formatCurrency(g.cashIn) : '—'}</p>

@@ -79,23 +79,26 @@ function volumeLines(kg: number, ea: number): string[] {
 
 function KpiGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Card>
-      <CardContent className="p-0">
-        <h2 className="border-b px-5 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
-        <div className="divide-y">{children}</div>
-      </CardContent>
+    <Card className="flex h-full flex-col overflow-hidden border-border/80 shadow-sm">
+      <h2 className="border-b bg-muted/40 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+      <div className="flex flex-1 flex-col divide-y">{children}</div>
     </Card>
   )
 }
 
-function Metric({ label, lines, note, tone }: { label: string; lines: string[]; note?: string; tone?: 'warn' | 'danger' }) {
+function Metric({ label, lines, note, tone }: { label: string; lines: string[]; note?: string; tone?: 'warn' | 'danger' | 'muted' }) {
   return (
-    <div className="flex items-start justify-between gap-4 px-5 py-3.5">
+    <div className="flex flex-1 items-center justify-between gap-4 px-5 py-3">
       <div className="min-w-0">
         <p className="text-sm font-medium">{label}</p>
-        {note && <p className="mt-0.5 text-xs text-muted-foreground">{note}</p>}
+        {note && <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{note}</p>}
       </div>
-      <div className={cn('shrink-0 text-right text-lg font-semibold leading-tight tabular-nums', tone === 'warn' && 'text-amber-700 dark:text-amber-400', tone === 'danger' && 'text-destructive')}>
+      <div className={cn(
+        'shrink-0 text-right text-[17px] font-semibold leading-snug tabular-nums',
+        tone === 'warn' && 'text-amber-700 dark:text-amber-400',
+        tone === 'danger' && 'text-destructive',
+        tone === 'muted' && 'text-sm font-medium text-muted-foreground',
+      )}>
         {lines.map((line) => <p key={line}>{line}</p>)}
       </div>
     </div>
@@ -279,42 +282,40 @@ export default function LaporanPage() {
         }
       />
 
-      <FilterToolbar
-        end={
-          <>
-            <Button variant={showAdvanced ? 'secondary' : 'outline'} size="sm" className="h-9 gap-1.5" onClick={() => setShowAdvanced((v) => !v)}>
-              {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              Filter lanjutan{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ''}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={handleResetFilters}>Reset</Button>
-          </>
-        }
-        contentClassName="sm:items-start"
-      >
-        <FilterSelect
-          value={filters.year}
-          onChange={(year) => setFilters((f) => ({ ...f, year }))}
-          options={[{ value: '', label: 'Semua Tahun' }, ...years.map((y) => ({ value: y, label: y }))]}
-          className="w-32"
-        />
-        <MultiSelectFilter label="Bulan" allLabel="Semua Bulan" options={MONTH_OPTIONS} optionLabels={MONTH_LABELS}
-          selected={filters.months} onChange={(months) => setFilters((f) => ({ ...f, months }))} className="w-40" />
-        <MultiSelectFilter label="Komoditi" allLabel="Semua Komoditi" options={komoditas}
-          selected={filters.komoditi} onChange={(komoditi) => setFilters((f) => ({ ...f, komoditi }))} className="w-40" />
-        <MultiSelectFilter label="Unit" allLabel="Semua Unit" options={units}
-          selected={filters.unit} onChange={(unit) => setFilters((f) => ({ ...f, unit }))} className="w-44" />
-        <MultiSelectFilter label="Pembeli" allLabel="Semua Mitra Pembeli" options={pembelis} contentWidth="w-72"
-          selected={filters.pembeli} onChange={(pembeli) => setFilters((f) => ({ ...f, pembeli }))} className="w-48" />
-        <SearchInput
-          value={filters.search}
-          onChange={(v) => setFilters((f) => ({ ...f, search: v }))}
-          placeholder="Cari No DO, Invoice, Kontrak, Mitra Pembeli, SAP..."
-          className="min-w-[220px]"
-        />
+      <FilterToolbar contentClassName="sm:flex-col sm:items-stretch" >
+        <div className="grid w-full grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-[7rem_repeat(3,minmax(0,1fr))_minmax(0,1.4fr)]">
+          <FilterSelect
+            value={filters.year}
+            onChange={(year) => setFilters((f) => ({ ...f, year }))}
+            options={[{ value: '', label: 'Semua Tahun' }, ...years.map((y) => ({ value: y, label: y }))]}
+            className="w-full"
+          />
+          <MultiSelectFilter label="Bulan" allLabel="Semua Bulan" options={MONTH_OPTIONS} optionLabels={MONTH_LABELS}
+            selected={filters.months} onChange={(months) => setFilters((f) => ({ ...f, months }))} className="w-full" />
+          <MultiSelectFilter label="Komoditi" allLabel="Semua Komoditi" options={komoditas}
+            selected={filters.komoditi} onChange={(komoditi) => setFilters((f) => ({ ...f, komoditi }))} className="w-full" />
+          <MultiSelectFilter label="Unit" allLabel="Semua Unit" options={units}
+            selected={filters.unit} onChange={(unit) => setFilters((f) => ({ ...f, unit }))} className="w-full" />
+          <MultiSelectFilter label="Pembeli" allLabel="Semua Mitra Pembeli" options={pembelis} contentWidth="w-72"
+            selected={filters.pembeli} onChange={(pembeli) => setFilters((f) => ({ ...f, pembeli }))} className="w-full col-span-2 md:col-span-1" />
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <SearchInput
+            value={filters.search}
+            onChange={(v) => setFilters((f) => ({ ...f, search: v }))}
+            placeholder="Cari No DO, Invoice, Kontrak, Mitra Pembeli, SAP..."
+            className="min-w-[240px] max-w-none basis-72 flex-1"
+          />
+          <Button variant={showAdvanced ? 'secondary' : 'outline'} size="sm" className="h-9 gap-1.5" onClick={() => setShowAdvanced((v) => !v)}>
+            {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            Filter lanjutan{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ''}
+          </Button>
+          <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={handleResetFilters}>Reset</Button>
+        </div>
         {showAdvanced && (
-          <div className="flex w-full flex-wrap items-center gap-2 border-t pt-2">
+          <div className="grid w-full grid-cols-2 gap-2 border-t pt-3 md:grid-cols-4">
             <MultiSelectFilter label="Material" allLabel="Semua Jenis Material" options={jenisKomoditas} contentWidth="w-72"
-              selected={filters.jenisKomoditi} onChange={(jenisKomoditi) => setFilters((f) => ({ ...f, jenisKomoditi }))} className="w-48" />
+              selected={filters.jenisKomoditi} onChange={(jenisKomoditi) => setFilters((f) => ({ ...f, jenisKomoditi }))} className="w-full" />
             <FilterSelect
               value={filters.statusBayar}
               onChange={(v) => setFilters((f) => ({ ...f, statusBayar: v }))}
@@ -324,7 +325,7 @@ export default function LaporanPage() {
                 { value: 'SEBAGIAN', label: 'Pembayaran Sebagian' },
                 { value: 'LUNAS', label: 'Lunas' },
               ]}
-              className="w-48"
+              className="w-full"
             />
             <FilterSelect
               value={filters.sap}
@@ -338,7 +339,7 @@ export default function LaporanPage() {
                 { value: 'NO_BILLING_SAP', label: 'Tanpa Billing SAP' },
                 { value: 'ALL_COMPLETE', label: 'SAP Lengkap' },
               ]}
-              className="w-44"
+              className="w-full"
             />
             <FilterSelect
               value={filters.tipe}
@@ -348,7 +349,7 @@ export default function LaporanPage() {
                 { value: 'NO_BYPASS', label: 'Tanpa Bypass' },
                 { value: 'ONLY_BYPASS', label: 'Hanya Bypass' },
               ]}
-              className="w-40"
+              className="w-full"
             />
           </div>
         )}
@@ -364,7 +365,8 @@ export default function LaporanPage() {
           <Metric label="Pendapatan Pokok" lines={[formatCurrency(total.sales)]} note={total.salesRencana > 0 ? `Termasuk rencana DO ${formatCurrency(total.salesRencana)}` : 'Seluruhnya dari BA'} />
           <Metric label="Harga Rata-Rata"
             lines={[total.komoditiCount > 1 ? 'Beda komoditi' : averagePrice ? `${formatCurrency(averagePrice.value)} / ${averagePrice.unit}` : '—']}
-            note={total.komoditiCount > 1 ? 'Pilih satu komoditi, atau lihat rekap di Dashboard' : 'Pendapatan Pokok ÷ volume'} />
+            tone={total.komoditiCount > 1 ? 'muted' : undefined}
+            note={total.komoditiCount > 1 ? 'Pilih satu komoditi untuk melihat rata-rata' : 'Pendapatan Pokok ÷ volume'} />
         </KpiGroup>
         <KpiGroup title="Pembayaran">
           <Metric label="Total Cash In" lines={[formatCurrency(total.cashIn)]} note={`${total.transferCount} transfer diterima`} />
@@ -373,12 +375,23 @@ export default function LaporanPage() {
         </KpiGroup>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Rekap per komoditi/unit/mitra pembeli ada di Dashboard. Filter Bulan dan tanggal di bawah nama mitra mengikuti tanggal BA; bila belum ada BA, memakai tanggal rencana DO. Cash In mengikuti tanggal transfer.
-        DO Terbit, DO Terlayani, Outstanding, dan Sisa Kurang Bayar adalah posisi saat ini untuk invoice yang tampil.
-        {undatedSales > 0 && <span className="text-amber-700 dark:text-amber-400"> {undatedSales} DO belum punya tanggal rencana/BA sehingga tidak masuk periode ini.</span>}
-        {balanceError && <span className="text-destructive"> Data piutang gagal dimuat, klik Refresh.</span>}
-      </p>
+      <div className="space-y-1.5 text-xs text-muted-foreground">
+        {undatedSales > 0 && (
+          <p className="text-amber-700 dark:text-amber-400">{undatedSales} DO belum punya tanggal rencana/BA sehingga tidak masuk periode ini.</p>
+        )}
+        {balanceError && <p className="text-destructive">Data piutang gagal dimuat, klik Refresh.</p>}
+        <details className="group">
+          <summary className="inline-flex cursor-pointer select-none items-center gap-1 hover:text-foreground">
+            <ChevronDown size={12} className="transition-transform group-open:rotate-180" /> Cara membaca angka laporan
+          </summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5 leading-relaxed">
+            <li>Filter Bulan dan tanggal di bawah nama mitra mengikuti tanggal BA; bila belum ada BA, memakai tanggal rencana DO.</li>
+            <li>Cash In mengikuti tanggal transfer.</li>
+            <li>DO Terbit, DO Terlayani, Outstanding, dan Sisa Kurang Bayar adalah posisi saat ini untuk invoice yang tampil.</li>
+            <li>Rekap per komoditi/unit/mitra pembeli ada di Dashboard.</li>
+          </ul>
+        </details>
+      </div>
 
       {isLoading ? (
         <Card><CardContent className="p-4"><TableSkeleton rows={6} cols={7} /></CardContent></Card>
