@@ -3,7 +3,6 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   FileText,
-  FileSearch,
   Receipt,
   Banknote,
   Truck,
@@ -44,7 +43,6 @@ const navItems: NavItemDef[] = [
   { label: 'Dokumen Unit', to: '/dokumen-unit', icon: <ClipboardCheck size={16} /> },
   { label: 'Persediaan', to: '/stok', icon: <Boxes size={16} /> },
   { label: 'Laporan Digital', to: '/laporan', icon: <Table size={16} /> },
-  { label: 'Cek SAP', to: '/cek-sap', icon: <FileSearch size={16} /> },
   { label: 'Monitoring Piutang', to: '/piutang', icon: <Wallet size={16} /> },
   { label: 'Input Bypass', to: '/bypass', icon: <Zap size={16} /> },
   {

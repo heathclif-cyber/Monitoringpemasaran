@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { LaporanRincianTable } from '@/components/feature/LaporanRincianTable'
+import { LaporanBelumSapTable, isMissingBilling } from '@/components/feature/LaporanBelumSapTable'
 import { SapReconciliationDialog } from '@/components/feature/SapReconciliationDialog'
 import { InvoiceOutstanding } from '@/components/feature/InvoiceOutstanding'
 import { client } from '@/lib/client'
@@ -113,7 +114,8 @@ export default function LaporanPage() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [isExportingHo, setIsExportingHo] = useState(false)
-  const [showFullTable, setShowFullTable] = useState(false)
+  const [tableView, setTableView] = useState<'ringkas' | 'lengkap' | 'belum-sap'>('ringkas')
+  const showFullTable = tableView === 'lengkap'
   const [detailKey, setDetailKey] = useState<string | null>(null)
   const [sapReconciliationOpen, setSapReconciliationOpen] = useState(false)
   const [balances, setBalances] = useState<PiutangRow[] | null>(null)
@@ -168,6 +170,7 @@ export default function LaporanPage() {
   const invoiceGroups = useMemo(() => groupLaporanByInvoice(filtered, filters.sort), [filtered, filters.sort])
 
   const mergedRows = useMemo(() => invoiceGroups.map(mergeInvoiceGroup), [invoiceGroups])
+  const missingBillingRows = useMemo(() => mergedRows.filter(isMissingBilling), [mergedRows])
 
   const periodLabel = useMemo(() => {
     if (!filters.year && filters.months.length === 0) return 'Semua periode'
@@ -412,16 +415,22 @@ export default function LaporanPage() {
             <div>
               <p className="text-sm font-semibold">Rincian Transaksi</p>
               <p className="text-xs text-muted-foreground">
-                {showFullTable ? 'Semua kolom · nomor SAP dapat diisi langsung.' : 'Satu baris per invoice; Pendapatan Pokok dan Cash In dari periode terpilih digabung.'}
+                {tableView === 'lengkap' ? 'Semua kolom · nomor SAP dapat diisi langsung.' : tableView === 'belum-sap' ? 'Invoice yang belum masuk SAP (belum ada no billing) · mengikuti filter di atas.' : 'Satu baris per invoice; Pendapatan Pokok dan Cash In dari periode terpilih digabung.'}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button type="button" size="sm" variant={showFullTable ? 'outline' : 'default'} onClick={() => setShowFullTable(false)}>Ringkas</Button>
-              <Button type="button" size="sm" variant={showFullTable ? 'default' : 'outline'} onClick={() => setShowFullTable(true)}>Kolom lengkap (SAP)</Button>
+              <Button type="button" size="sm" variant={tableView === 'ringkas' ? 'default' : 'outline'} onClick={() => setTableView('ringkas')}>Ringkas</Button>
+              <Button type="button" size="sm" variant={tableView === 'lengkap' ? 'default' : 'outline'} onClick={() => setTableView('lengkap')}>Kolom lengkap (SAP)</Button>
+              <Button type="button" size="sm" variant={tableView === 'belum-sap' ? 'default' : 'outline'} onClick={() => setTableView('belum-sap')} className="gap-1.5">
+                Belum ada SAP
+                <span className={cn('rounded px-1.5 text-[11px] tabular-nums', tableView === 'belum-sap' ? 'bg-primary-foreground/20' : missingBillingRows.length > 0 ? 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300' : 'bg-muted')}>{missingBillingRows.length}</span>
+              </Button>
             </div>
           </div>
           <CardContent className="p-0">
-            {!showFullTable ? (
+            {tableView === 'belum-sap' ? (
+              <LaporanBelumSapTable rows={missingBillingRows} onSapSave={handleSapSave} />
+            ) : tableView === 'ringkas' ? (
               <LaporanRincianTable
                 groups={invoiceGroups}
                 balances={balances}

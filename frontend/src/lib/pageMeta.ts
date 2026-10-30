@@ -35,11 +35,6 @@ const PAGE_META: Record<string, PageMeta> = {
     description: 'Rekapitulasi terintegrasi kontrak, invoice, dan DO',
     breadcrumb: 'Laporan',
   },
-  '/cek-sap': {
-    title: 'Cek SAP',
-    description: 'Invoice yang belum masuk SAP / belum ada no billing',
-    breadcrumb: 'Laporan / Cek SAP',
-  },
   '/bypass': {
     title: 'Input Bypass',
     description: 'Entri manual transaksi tanpa kontrak',

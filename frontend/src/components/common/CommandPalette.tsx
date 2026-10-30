@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   FileText,
-  FileSearch,
   Receipt,
   Banknote,
   Truck,
@@ -36,7 +35,6 @@ const NAV_COMMANDS = [
   { label: 'Dokumen Unit', to: '/dokumen-unit', icon: ClipboardCheck, group: 'Menu' },
   { label: 'Persediaan', to: '/stok', icon: Boxes, group: 'Menu' },
   { label: 'Laporan Digital', to: '/laporan', icon: Table, group: 'Menu' },
-  { label: 'Cek SAP (belum ada no billing)', to: '/cek-sap', icon: FileSearch, group: 'Menu' },
   { label: 'Input Bypass', to: '/bypass', icon: Zap, group: 'Menu' },
   { label: 'Arsip Kontrak', to: '/repo/kontrak', icon: Archive, group: 'Repository' },
   { label: 'Arsip Invoice', to: '/repo/invoice', icon: Receipt, group: 'Repository' },
