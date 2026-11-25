@@ -15,8 +15,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV RUN_DB_MIGRATE=true
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
+COPY requirements.txt constraints.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt \
     && playwright install --with-deps chromium firefox
 
 COPY . .
