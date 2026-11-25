@@ -677,3 +677,125 @@ def seed_beteleme(db: Session = Depends(get_db), _: models.User = Depends(requir
     db.commit()
     api_cache.invalidate_reporting()
     return {"success": True, "inserted": count}
+
+
+# ── Tren harga bulanan per komoditi / material ─────────────────────────────
+
+def _month_key(d) -> str:
+    return f"{d.year:04d}-{d.month:02d}"
+
+
+def _shift_month(year: int, month: int, delta: int) -> tuple[int, int]:
+    idx = year * 12 + (month - 1) + delta
+    return idx // 12, idx % 12 + 1
+
+
+@router.get("/harga-bulanan")
+def get_harga_bulanan(
+    bulan: int = Query(12, ge=1, le=36, description="Jumlah bulan ke belakang (termasuk bulan berjalan)"),
+    db: Session = Depends(get_db),
+):
+    """Harga satuan rata-rata tertimbang volume per bulan, per komoditi & material.
+
+    Sumber harga:
+    - Kontrak STANDAR: harga_satuan kontrak, bulan = tanggal_kontrak.
+    - Kontrak PAYUNG_BA: harga_satuan tiap BA (dinamis), bulan = tanggal_ba.
+    Harga = harga satuan pokok (excl. PPN & premi). Harga ≤ 0 diabaikan.
+    """
+    from datetime import date
+
+    today = date.today()
+    sy, sm = _shift_month(today.year, today.month, -(bulan - 1))
+    start = date(sy, sm, 1)
+    months = [_month_key(date(*_shift_month(sy, sm, i), 1)) for i in range(bulan)]
+
+    kontraks = (
+        db.query(models.Kontrak)
+        .options(joinedload(models.Kontrak.berita_acara))
+        .all()
+    )
+
+    transaksi = []
+    for k in kontraks:
+        komoditi = (k.komoditi or "-").strip() or "-"
+        material = (k.jenis_komoditi or "-").strip() or "-"
+        satuan = _display_satuan(k.satuan)
+        base = {
+            "komoditi": komoditi,
+            "material": material,
+            "satuan": satuan,
+            "no_kontrak": k.no_kontrak,
+            "pembeli": k.pembeli or "",
+        }
+        if is_payung_ba(k):
+            for ba in k.berita_acara or []:
+                if not ba.tanggal_ba or ba.tanggal_ba < start or ba.tanggal_ba > today:
+                    continue
+                harga = ba_effective_harga(ba, k)
+                if harga <= 0:
+                    continue
+                transaksi.append({
+                    **base,
+                    "tanggal": ba.tanggal_ba.isoformat(),
+                    "bulan": _month_key(ba.tanggal_ba),
+                    "harga_satuan": float(harga),
+                    "volume": float(ba.volume_ba or 0.0),
+                    "sumber": "BA",
+                    "referensi": ba.no_ba,
+                })
+        else:
+            tgl = k.tanggal_kontrak
+            harga = float(k.harga_satuan or 0.0)
+            if not tgl or tgl < start or tgl > today or harga <= 0:
+                continue
+            transaksi.append({
+                **base,
+                "tanggal": tgl.isoformat(),
+                "bulan": _month_key(tgl),
+                "harga_satuan": harga,
+                "volume": float(k.volume or 0.0),
+                "sumber": "Kontrak",
+                "referensi": k.no_kontrak,
+            })
+
+    transaksi.sort(key=lambda t: (t["tanggal"], t["referensi"]), reverse=True)
+
+    groups: dict = {}
+    for t in transaksi:
+        key = (t["komoditi"], t["material"], t["satuan"])
+        g = groups.setdefault(key, {})
+        b = g.setdefault(t["bulan"], [])
+        b.append(t)
+
+    series = []
+    for (komoditi, material, satuan), by_month in sorted(groups.items()):
+        points = []
+        for m in months:
+            items = by_month.get(m)
+            if not items:
+                points.append({"bulan": m, "harga_rata": None, "harga_min": None,
+                               "harga_max": None, "volume": 0.0, "jumlah_transaksi": 0})
+                continue
+            prices = [i["harga_satuan"] for i in items]
+            vol = sum(i["volume"] for i in items)
+            if vol > 0:
+                avg = sum(i["harga_satuan"] * i["volume"] for i in items) / vol
+            else:
+                avg = sum(prices) / len(prices)
+            points.append({
+                "bulan": m,
+                "harga_rata": round(avg, 2),
+                "harga_min": min(prices),
+                "harga_max": max(prices),
+                "volume": vol,
+                "jumlah_transaksi": len(items),
+            })
+        series.append({
+            "key": f"{komoditi}|{material}|{satuan}",
+            "komoditi": komoditi,
+            "material": material,
+            "satuan": satuan,
+            "points": points,
+        })
+
+    return {"months": months, "series": series, "transaksi": transaksi}

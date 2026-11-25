@@ -35,6 +35,16 @@ const PAGE_META: Record<string, PageMeta> = {
     description: 'Rekapitulasi terintegrasi kontrak, invoice, dan DO',
     breadcrumb: 'Laporan',
   },
+  '/tren-harga': {
+    title: 'Tren Harga',
+    description: 'Grafik harga satuan bulanan per komoditi dan material',
+    breadcrumb: 'Laporan / Tren Harga',
+  },
+  '/piutang': {
+    title: 'Monitoring Piutang',
+    description: 'Pantau saldo piutang mitra, umur tagihan, dan progres pelunasan',
+    breadcrumb: 'Laporan / Piutang',
+  },
   '/bypass': {
     title: 'Input Bypass',
     description: 'Entri manual transaksi tanpa kontrak',
@@ -89,6 +99,11 @@ const PAGE_META: Record<string, PageMeta> = {
     title: 'Trace Kontrak',
     description: 'Lacak alur pembayaran dan pengiriman per kontrak',
     breadcrumb: 'Repository / Trace',
+  },
+  '/users': {
+    title: 'Kelola User',
+    description: 'Manajemen akun dan hak akses pengguna',
+    breadcrumb: 'Admin / Pengguna',
   },
 }
 

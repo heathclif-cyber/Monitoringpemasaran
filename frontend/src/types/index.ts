@@ -1193,3 +1193,41 @@ export interface TransactionTaxConclusion {
   notes: string[]
   references: { label: string; url: string }[]
 }
+
+// ── Tren harga bulanan (GET /api/laporan/harga-bulanan) ──
+export interface HargaBulananPoint {
+  bulan: string // YYYY-MM
+  harga_rata: number | null
+  harga_min: number | null
+  harga_max: number | null
+  volume: number
+  jumlah_transaksi: number
+}
+
+export interface HargaBulananSeries {
+  key: string
+  komoditi: string
+  material: string
+  satuan: string
+  points: HargaBulananPoint[]
+}
+
+export interface HargaTransaksi {
+  tanggal: string
+  bulan: string
+  komoditi: string
+  material: string
+  satuan: string
+  harga_satuan: number
+  volume: number
+  sumber: 'Kontrak' | 'BA'
+  referensi: string
+  no_kontrak: string
+  pembeli: string
+}
+
+export interface HargaBulananResponse {
+  months: string[]
+  series: HargaBulananSeries[]
+  transaksi: HargaTransaksi[]
+}
